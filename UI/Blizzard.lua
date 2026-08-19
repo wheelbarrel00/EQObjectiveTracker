@@ -4,11 +4,12 @@ local Blizzard = ns:RegisterModule("Blizzard", {})
 
 -- Deliberately does NOT reparent ObjectiveTrackerFrame. In retail it hosts secure
 -- quest-item buttons, and reparenting a chain containing secure children taints it.
--- Unregister plus Hide plus an OnShow re-hide is the approach Everything Quests
--- ships against 12.0.x, so it is the known-good baseline.
+-- Alpha as well as Hide: Show() does not restore alpha, so nothing draws during the frame
+-- between Blizzard showing the tracker and the deferred re-hide landing.
 local function silence(frame)
     if not frame then return end
     if frame.UnregisterAllEvents then frame:UnregisterAllEvents() end
+    if frame.SetAlpha then frame:SetAlpha(0) end
     if frame.Hide then frame:Hide() end
 end
 
@@ -53,20 +54,26 @@ function Blizzard:Suppress()
     if self._hookedFrame ~= tracker then
         self._hookedFrame = tracker
         tracker:HookScript("OnShow", function(f)
-            -- Hidden unconditionally, combat included, exactly as EQ does it. EQOT used to
-            -- bail out in combat believing the Hide was protected, which left Blizzard's
-            -- tracker on screen beside EQOT's for the rest of every fight. EQ has hidden it
-            -- this way for years without a blocked action, so the belief was wrong.
-            f:Hide()
-            -- Belt and braces: if a future build ever does protect it, the queued re-suppress
-            -- still catches the frame when combat ends.
-            if InCombatLockdown() then
-                local Events = ns:GetModule("Events")
-                if Events and Events.RunWhenOutOfCombat then
-                    self._reSuppress = self._reSuppress or function() self:Suppress() end
-                    Events:RunWhenOutOfCombat("eqot.blizzardSuppress", self._reSuppress)
+            -- Hiding straight from this hook was followed by a blocked SetPassThroughButtons
+            -- on a map pin, off a stack carrying none of our code. Deferred by a frame since.
+            self._shows, self._lastShow = (self._shows or 0) + 1, GetTime()
+            if self._hidePending then return end
+            self._hidePending = true
+            C_Timer.After(0, function()
+                self._hidePending = nil
+                if not f:IsShown() then return end
+                if f.SetAlpha then f:SetAlpha(0) end
+                f:Hide()
+                -- Belt and braces: if a future build ever does protect it, the queued
+                -- re-suppress still catches the frame when combat ends.
+                if InCombatLockdown() then
+                    local Events = ns:GetModule("Events")
+                    if Events and Events.RunWhenOutOfCombat then
+                        self._reSuppress = self._reSuppress or function() self:Suppress() end
+                        Events:RunWhenOutOfCombat("eqot.blizzardSuppress", self._reSuppress)
+                    end
                 end
-            end
+            end)
         end)
     end
 end
@@ -79,10 +86,15 @@ function Blizzard:DebugLine()
     local t, name = findTracker()
     if not t then return "blizzard tracker: no known tracker frame on this client" end
     local n = (type(t.modules) == "table") and #t.modules or 0
-    return ("blizzard tracker: %s %s, %d modules, hook %s"):format(
-        name,
-        t:IsShown() and "SHOWN - suppression lost" or "hidden",
-        n, self._hookedFrame and "installed" or "missing")
+    local ago = self._lastShow and ("%.0fs ago"):format(GetTime() - self._lastShow) or "never"
+    local shown = "hidden"
+    if t:IsShown() then
+        shown = self._hidePending and "SHOWN - hide pending" or "SHOWN - suppression lost"
+    end
+    return ("blizzard tracker: %s %s, %d modules, hook %s | alpha %.2f | reshown %d, last %s"):format(
+        name, shown,
+        n, self._hookedFrame and "installed" or "missing",
+        t:GetAlpha() or 0, self._shows or 0, ago)
 end
 
 function Blizzard:OnEnable()

@@ -5,6 +5,28 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-08-18
+
+Two fixes for errors users reported this addon being named in.
+
+### Bug Fixes
+
+- Scenarios where the game supplies its own display block, which includes delves, now draw the
+  addon's own stage banner instead of hosting it. Hosting it meant registering against a widget
+  set the game shares with its tooltips, and that was reported breaking the next tooltip to
+  close with widgets on it, with an error naming this addon that lasted until the next reload.
+  Inside a delve the banner shows the stage and the delve name in the addon's own artwork now,
+  and the delve tier that the game's block used to show is not drawn. Getting the tier back
+  onto the banner is being worked on and is planned for the next update. The scenario banner
+  font size, text shadow and alignment settings apply in these scenarios now, where before
+  they did nothing. Reported on Discord.
+
+- Blizzard's own tracker is hidden one frame after it tries to show itself now, rather than
+  from inside the code that showed it. Hiding it from there could leave this addon named on a
+  blocked action from Blizzard's world map quest pins, reported as "tried to call the protected
+  function Button:SetPassThroughButtons()" off a stack carrying none of this addon's code. The
+  tracker is still hidden, in combat as well as out of it. Reported by AIR.
+
 ## [1.9.0] - 2026-08-17
 
 Traditional Chinese, and the zone filter hides what it says it hides.

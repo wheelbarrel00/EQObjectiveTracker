@@ -152,16 +152,6 @@ function Scenario:Build(container)
     banner.Stage._baseFont = { banner.Stage:GetFont() }
     banner.Name._baseFont  = { banner.Name:GetFont() }
 
-    -- Guarded for the same reason line 118 was: CreateFrame raises on a template the client
-    -- does not know, Build runs from Render on every flavor, and a raise here aborts the
-    -- whole tracker. This is the only Legion or later template in the tree.
-    banner.WidgetContainer = CreateFrame("Frame", nil, banner,
-        C_UIWidgetManager and "UIWidgetContainerTemplate" or nil)
-    banner.WidgetContainer.verticalAnchorPoint   = "TOP"
-    banner.WidgetContainer.verticalRelativePoint = "TOP"
-    banner.WidgetContainer:SetPoint("TOP", banner, "TOP")
-    banner.WidgetContainer:Hide()
-
     self.subHeader = subHeader
     self.banner    = banner
 end
@@ -243,9 +233,6 @@ function Scenario:_Clear()
     local banner = self.banner
     if banner then
         banner:Hide()
-        if banner.WidgetContainer.UnregisterForWidgetSet then
-            banner.WidgetContainer:UnregisterForWidgetSet()
-        end
     end
     self._sCat, self._sName = nil, nil
 end
@@ -293,22 +280,9 @@ function Scenario:_DrawBanner(info, cfg)
         banner.ThemeOverlay:Hide()
     end
 
-    if info.widgetSetID and info.widgetSetID > 0 then
-        banner.WidgetContainer:RegisterForWidgetSet(info.widgetSetID)
-        banner.WidgetContainer:Show()
-        banner.Name:Hide()
-        banner.Stage:Hide()
-        banner.NormalBG:Hide()
-        banner.ThemeOverlay:Hide()
-        banner.FinalBG:Hide()
-        return
-    end
-
-    if banner.WidgetContainer.UnregisterForWidgetSet then
-        banner.WidgetContainer:UnregisterForWidgetSet()
-    end
-    banner.WidgetContainer:Hide()
-
+    -- No UIWidgetContainer here on purpose. Registering one against Blizzard's shared widget
+    -- set was reported killing the next tooltip to close with widgets on it. Read the widgets
+    -- and draw them if the game's own delve display is ever wanted back.
     banner.Stage:ClearAllPoints()
     banner.Stage:SetPoint("TOP", banner, "TOP", 0, -10)
     if info.isFinalStage then
