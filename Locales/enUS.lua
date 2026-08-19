@@ -316,6 +316,7 @@ L["Special thanks to %s for the many hours spent translating EQ Objective Tracke
 L["Special thanks to %s for the many hours spent translating EQ Objective Tracker into Korean."] = true
 L["Special thanks to %s for the many hours spent translating EQ Objective Tracker into Simplified Chinese."] = true
 L["Special thanks to %s for the many hours spent translating EQ Objective Tracker into Traditional Chinese."] = true
+L["Special thanks to %s for the many hours spent translating EQ Objective Tracker into German."] = true
 L["About"] = true
 L["Version %s"] = true
 L["by Wheelbarrel00"] = true

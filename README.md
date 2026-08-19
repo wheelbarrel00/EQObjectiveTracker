@@ -138,8 +138,7 @@ Profiles are shared across all your characters.
 
 ## Translations
 
-`Locales/frFR.lua`, `ruRU.lua`, `koKR.lua`, `zhCN.lua` and `zhTW.lua` are generated, and so
-is the `enUS.lua` phrase list. The translations live in
+Every file in `Locales/` is generated, including the `enUS.lua` phrase list. The translations live in
 [EverythingLocales](https://github.com/wheelbarrel00/EverythingLocales), shared across all of
 this author's addons so that a phrase more than one of them uses is only ever translated once,
 and so that a phrase moving between addons keeps its translation.
@@ -159,7 +158,8 @@ in all four `.toc` files here.
 
 Every non-English string in this addon is somebody else's work. Thanks to **Zox** for the
 French, **Malevi4** for the Russian, **labrie75** for the Korean, **失眠啤酒** for the
-Simplified Chinese, and **BNS333** for the Traditional Chinese.
+Simplified Chinese, **BNS333** for the Traditional
+Chinese, and **Stonetwist** for the German.
 
 ## Building
 

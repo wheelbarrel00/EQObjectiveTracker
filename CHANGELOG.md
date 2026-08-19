@@ -5,6 +5,16 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-18
+
+German, and it is the most complete translation the addon has.
+
+### New Features
+
+- German. The tracker and its options panel now read in German on a deDE client, covering 386
+  of the addon's 390 phrases, which is the most complete translation the addon has.
+  Contributed by Stonetwist.
+
 ## [1.9.1] - 2026-08-18
 
 Two fixes for errors users reported this addon being named in.

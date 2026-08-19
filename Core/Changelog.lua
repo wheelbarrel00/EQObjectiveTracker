@@ -9,6 +9,15 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.10.0", date = "2026-08-18",
+        summary = "German, and it is the most complete translation the addon has.",
+        sections = {
+            { head = "New Features", items = {
+                "German. The tracker and its options panel now read in German on a deDE client, covering 386 of the addon's 390 phrases, which is the most complete translation the addon has. Contributed by Stonetwist.",
+            } },
+        },
+    },
+    {
         version = "1.9.1", date = "2026-08-18",
         summary = "Two fixes for errors users reported this addon being named in.",
         sections = {
