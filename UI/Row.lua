@@ -608,7 +608,14 @@ function Row:Render(row, entry, width, cfg)
     row.subtitle:ClearAllPoints()
     row.subtitle:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -TITLE_TO_SUB)
 
+    local subGap = math.max(0, SUB_TO_LINES + Media:HeaderSpacing())
+    local textW = width - (iconW + iconGap + padX * 2 + gutter)
+    if textW > 0 then
+        row.title:SetWidth(math.max(1, textW - timerW - eyeW))
+        row.lines:SetWidth(textW)
+    end
     row.title:SetText(titleText)
+
     local ovR, ovG, ovB = Util.EffectiveTitleColor(cfg)
     -- Recoloring completed entries needs a color to recolor them TO, so the toggle is
     -- inert until an override or class color is set.
@@ -630,9 +637,9 @@ function Row:Render(row, entry, width, cfg)
         row.title:SetTextColor(0.92, 0.72, 0.02)
     end
 
-    local subGap = math.max(0, SUB_TO_LINES + Media:HeaderSpacing())
     row.lines:ClearAllPoints()
     if subtitle and subtitle ~= "" then
+        row.subtitle:SetWidth(textW)
         row.subtitle:SetText(subtitle)
         row.subtitle:Show()
         row.lines:SetPoint("TOPLEFT", row.subtitle, "BOTTOMLEFT", 0, -subGap)
@@ -643,19 +650,11 @@ function Row:Render(row, entry, width, cfg)
     end
     row.lines:SetText(lineText)
 
-    -- Without an explicit SetWidth, GetStringHeight returns stale values after a
-    -- width change and rows overlap
-    local textW = width - (iconW + iconGap + padX * 2 + gutter)
-    if textW > 0 then
-        row.title:SetWidth(math.max(1, textW - timerW - eyeW))
-        row.lines:SetWidth(textW)
-        if row.subtitle:IsShown() then row.subtitle:SetWidth(textW) end
-    end
-
-    local titleH = math.max(row.title:GetStringHeight(), iconW)
+    local titleH = row.title:GetStringHeight()
     local subH   = row.subtitle:IsShown() and (TITLE_TO_SUB + row.subtitle:GetStringHeight()) or 0
     local linesH = (lineText ~= "") and (subGap + row.lines:GetStringHeight()) or 0
-    local h      = titleH + subH + linesH + padY * 2
+    local textH  = titleH + subH + linesH
+    local h      = math.max(textH, iconW) + padY * 2
 
     row:SetHeight(math.max(1, h))
 
