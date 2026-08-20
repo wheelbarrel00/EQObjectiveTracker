@@ -5,8 +5,9 @@
 # still works at runtime (the metatable falls back to English) but will never be
 # translated. A key in a translation file that is NOT in the manifest is dead
 # weight - usually a phrase that was reworded in the code and orphaned here.
-# Run after each extraction pass, and before any release:
-#   python docs/_gen_enus.py   then   python docs/_verify_locale.py
+# Every Locales/*.lua here is GENERATED, enUS.lua included. Rebuild them from the shared
+# store in ../EverythingLocales first, then run this:
+#   scan.py --apply, build.py --apply, check.py   then   python docs/_verify_locale.py
 import re, io, glob, sys
 
 KEY = re.compile(r'L\["((?:[^"\\]|\\.)*)"\]')

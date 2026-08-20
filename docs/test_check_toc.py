@@ -32,12 +32,17 @@ HEADER = (
     "## X-Curse-Project-ID: {project}\n"
 )
 
-RETAIL_FILES = [
-    "Core/Init.lua",
+# Locales/enUS.lua stands for every shared file. It is here rather than only Core/Init.lua
+# because a LANGUAGE is what the flavor-blind version of this gate let through: dropping a
+# locale from a flavor TOC exited 0, and Era and TBC players would have got an all-English
+# tracker off a green CI run.
+SHARED = ["Core/Init.lua", "Locales/enUS.lua"]
+
+RETAIL_FILES = SHARED + [
     "Data/Providers/Quests.lua",
     "Data/Providers/WorldQuests.lua",
 ]
-CLASSIC_FILES = ["Core/Init.lua", "Data/Providers/QuestsClassic.lua"]
+CLASSIC_FILES = SHARED + ["Data/Providers/QuestsClassic.lua"]
 
 # Every authored lua the good tree has on disk. QuestsClassic.lua is here on purpose: it
 # is listed by the flavor TOC only, which is the shape the real repo has.
@@ -102,7 +107,7 @@ case("a clean tree passes", 0, copy.deepcopy(GOOD), list(LUAS))
 case(
     "a flavor TOC may omit a provider the retail TOCs list",
     0,
-    _with(**{VANILLA: {"files": ["Core/Init.lua"]}}),
+    _with(**{VANILLA: {"files": list(SHARED)}}),
     [f for f in LUAS if f != "Data/Providers/QuestsClassic.lua"],
 )
 
@@ -158,7 +163,46 @@ case(
 case(
     "the reference TOC listing a file the fallback does not fails",
     1,
-    _with(**{FALLBACK: {"files": ["Core/Init.lua"]}}),
+    _with(**{FALLBACK: {"files": list(SHARED)}}),
+    list(LUAS),
+)
+
+# --- check 3: the flavor blindness this gate shipped with ------------------------------
+# All three exited 0 before FLAVOR_ONLY existed. Check 2 only asks whether SOME TOC lists a
+# file and check 4 only compares the two retail files, so nothing looked at a flavor TOC.
+
+case(
+    "a locale missing from a flavor TOC fails",
+    1,
+    _with(**{VANILLA: {"files": [f for f in CLASSIC_FILES if f != "Locales/enUS.lua"]}}),
+    list(LUAS),
+)
+
+case(
+    "a shared file missing from a flavor TOC fails",
+    1,
+    _with(**{VANILLA: {"files": [f for f in CLASSIC_FILES if f != "Core/Init.lua"]}}),
+    list(LUAS),
+)
+
+case(
+    "a shared file missing from a retail TOC fails",
+    1,
+    _with(**{MAINLINE: {"files": [f for f in RETAIL_FILES if f != "Locales/enUS.lua"]}}),
+    list(LUAS),
+)
+
+# Keeps the exemption list honest. One that every TOC lists anyway hides that file from
+# check 3 for nothing, so it has to be noticed rather than left to rot.
+case(
+    "a flavor-only file listed by every TOC fails",
+    1,
+    _with(
+        **{
+            MAINLINE: {"files": RETAIL_FILES + ["Data/Providers/QuestsClassic.lua"]},
+            FALLBACK: {"files": RETAIL_FILES + ["Data/Providers/QuestsClassic.lua"]},
+        }
+    ),
     list(LUAS),
 )
 
