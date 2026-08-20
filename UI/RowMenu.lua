@@ -3,6 +3,14 @@ local _, ns = ...
 local RowMenu = ns:RegisterModule("RowMenu", {})
 local L       = ns.L
 
+-- Same seam as LABELS, for the other direction: a provider that refuses an action returns a
+-- reason token and this is where it becomes something the player can read.
+local REFUSALS = {
+    combat      = L["You cannot abandon a quest while in combat."],
+    unavailable = L["This game version cannot abandon quests from the tracker."],
+    stale       = L["That quest is no longer in your quest log."],
+}
+
 -- Providers return item IDs, never translatable wording, so Data/ stays free of display text
 -- and the manifest has one place to harvest. The title row carries the quest name as data, and
 -- an API-registered item supplies its own already-translated label.
@@ -64,7 +72,8 @@ local function run(providerID, entryID, item)
     else
         local provider = ns:GetModule("Registry"):Get(providerID)
         if provider and provider.OnEntryMenuSelect then
-            provider:OnEntryMenuSelect(entryID, item.id)
+            local refused = provider:OnEntryMenuSelect(entryID, item.id)
+            if refused and REFUSALS[refused] then ns:Print(REFUSALS[refused]) end
         end
     end
     local Tracker = ns:GetModule("Tracker")

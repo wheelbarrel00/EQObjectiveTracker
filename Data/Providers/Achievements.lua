@@ -100,6 +100,10 @@ function Achievements:OnEntryClick(entry, button)
         elseif RemoveTrackedAchievement then
             RemoveTrackedAchievement(entry.id)
         end
+    -- 12.1 is reported to have renamed this call. The old name is tried second rather than
+    -- dropped, because the Mainline TOC still targets 120007 and 120005.
+    elseif ShowAchievementFrameForAchievement then
+        ShowAchievementFrameForAchievement(entry.id)
     elseif OpenAchievementFrameToAchievement then
         OpenAchievementFrameToAchievement(entry.id)
     end

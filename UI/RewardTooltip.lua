@@ -74,8 +74,10 @@ local function renderLines(tip, questID)
     if not QR then return false end
 
     local lines = QR:Lines(questID)
+    local sawReward = false
     for i = 1, #lines do
         local e = lines[i]
+        if e.kind ~= "objective" then sawReward = true end
         if e.kind == "objective" then
             if e.done then
                 tip:AddLine("- " .. e.text, 0.40, 0.85, 0.40, true)
@@ -96,7 +98,27 @@ local function renderLines(tip, questID)
             tip:AddLine(label, 0.85, 0.85, 1.0)
         end
     end
-    return #lines > 0
+    return #lines > 0, sawReward
+end
+
+-- A task quest's rewards stream in after RequestPreloadRewardData, so the first hover of a
+-- cold world quest drew a tooltip with no rewards and nothing ever redrew it. One re-draw,
+-- armed only when no reward line came back, and only while the same row is still hovered and
+-- still showing the same quest.
+local REDRAW_DELAY = 0.4
+
+local function armRedraw(owner, questID, redraw)
+    if RT._redrawArmed then return end
+    RT._redrawArmed = true
+    C_Timer.After(REDRAW_DELAY, function()
+        RT._redrawArmed = nil
+        local tip = Util.Tooltip()
+        if not (tip:IsShown() and tip:GetOwner() == owner) then return end
+        -- The row may have been recycled onto another quest inside the delay.
+        local e = owner._entry
+        if e and e.id ~= questID then return end
+        redraw()
+    end)
 end
 
 RT.calls, RT.drawn = 0, 0
@@ -110,9 +132,12 @@ function RT:Show(owner, questID)
     local tip = Util.Tooltip()
     tip:SetOwner(owner, pickAnchor(owner))
     tip:SetText(QR:Title(questID) or "", 1.0, 0.82, 0.0, 1, true)
-    renderLines(tip, questID)
+    local _, sawReward = renderLines(tip, questID)
     tip:Show()
     self.drawn = self.drawn + 1
+    if not sawReward then
+        armRedraw(owner, questID, function() self:Show(owner, questID) end)
+    end
 end
 
 -- The tracker row tooltip, mirroring EQ: title, objectives and rewards on a quest row, plus
@@ -124,23 +149,27 @@ end
 -- and cannot place one. The arrow belongs to whatever registered a focus listener.
 function RT:ShowForEntry(owner, entry, clickHint)
     if not (owner and entry and entry.id) then return end
+    -- Scalars only from here down. An entry is provider-owned and invalid after the next
+    -- GetEntries, so the deferred re-draw below must never hold one.
+    self:_DrawEntry(owner, entry.id, entry.title, entry.expiresAt, clickHint)
+end
+
+function RT:_DrawEntry(owner, questID, title, expiresAt, clickHint)
     local QR = ns:GetModule("QuestRewards")
     if not QR then return end
 
     -- An expiry is what makes a row a world quest in the Entry shape - Row's own countdown
     -- reads the same field - so it gates both of EQ's world-quest-only lines.
-    local expiresAt = entry.expiresAt
-
     local tip = Util.Tooltip()
     tip:SetOwner(owner, pickAnchor(owner))
-    tip:SetText(QR:Title(entry.id) or entry.title or "", 1.0, 0.82, 0.0, 1, true)
+    tip:SetText(QR:Title(questID) or title or "", 1.0, 0.82, 0.0, 1, true)
 
     if expiresAt then
-        local faction = QR:FactionName(entry.id)
+        local faction = QR:FactionName(questID)
         if faction then tip:AddLine(faction, 0.7, 0.7, 0.7) end
     end
 
-    local drew = renderLines(tip, entry.id)
+    local drew, sawReward = renderLines(tip, questID)
 
     if expiresAt then
         local mins = math.floor((expiresAt - time()) / 60)
@@ -159,6 +188,11 @@ function RT:ShowForEntry(owner, entry, clickHint)
     end
 
     tip:Show()
+    if not sawReward then
+        armRedraw(owner, questID, function()
+            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)
+        end)
+    end
 end
 
 function RT:Hide()

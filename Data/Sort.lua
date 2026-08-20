@@ -23,11 +23,23 @@ local function byStatus(a, b)
     return byTitle(a, b)
 end
 
--- Descending, so weekly sorts above daily above normal. Only the Quests provider emits
--- frequency, so every other group shares the 0 fallback and drops through to byTitle.
+-- Ranked on the tags rather than on entry.frequency, which the two flavors number
+-- differently: Classic's flat quest log calls daily 2 and weekly 3 where retail's enum
+-- calls them 1 and 2, so a raw descending compare agreed only by accident and retail's
+-- fourth member sorted above everything. Only the quest providers tag any of these, so
+-- every other group ranks 0 and drops through to byTitle.
+local function typeRank(e)
+    local t = e.tags
+    if not t then return 0 end
+    if t.weekly    then return 3 end
+    if t.scheduled then return 2 end
+    if t.daily     then return 1 end
+    return 0
+end
+
 local function byType(a, b)
-    local fa, fb = a.frequency or 0, b.frequency or 0
-    if fa ~= fb then return fa > fb end
+    local ra, rb = typeRank(a), typeRank(b)
+    if ra ~= rb then return ra > rb end
     return byTitle(a, b)
 end
 

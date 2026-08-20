@@ -162,10 +162,56 @@ function Tracker:ApplyHeaderIcons()
     end
 end
 
--- True only in the window where Visibility could not call Hide, because a secure quest-item
--- button makes it protected, so the tracker is invisible but still on screen. Every mouse
--- handler in the tracker checks this. Without it an alpha-0 tracker keeps taking clicks,
--- tooltips and the wheel, which is the trap EQ leaves open on all but two of its paths.
+-- Blizzard's scroll bar keeps its own handlers, so a click in the invisible gutter scrolled
+-- a tracker nobody could see. The bar's children are walked rather than named: the template
+-- differs between flavors.
+local function suspendBarInput(sf, suspended)
+    local bar = sf and (sf.ScrollBar or sf.scrollBar)
+    if not bar then return end
+    bar:EnableMouse(not suspended)
+    local kids = { bar:GetChildren() }
+    for i = 1, #kids do
+        if kids[i].EnableMouse then kids[i]:EnableMouse(not suspended) end
+    end
+end
+
+-- A list that shrinks leaves the offset past its new end, so the frame draws blank where the
+-- content used to be and the section reads as empty until the player scrolls back up.
+local function clampScroll(sf)
+    if not sf then return end
+    local range = math.max(0, sf:GetVerticalScrollRange() or 0)
+    if (sf:GetVerticalScroll() or 0) > range then sf:SetVerticalScroll(range) end
+end
+
+function Tracker:SetScrollInputSuspended(suspended)
+    local f = self.frame
+    if not f then return end
+    suspendBarInput(f.scroll, suspended)
+    suspendBarInput(f.eventsScroll, suspended)
+end
+
+-- True whenever the tracker is alpha-hidden but still on screen. Every mouse handler in the
+-- tracker checks this. Without it an alpha-0 tracker keeps taking clicks, tooltips and the
+-- wheel, which is the trap EQ leaves open on all but two of its paths.
+-- Expanding a section near the bottom of a long list puts its rows below the viewport, so the
+-- header flips to "-" and nothing else appears to happen. Scrolls only when the body is short
+-- of room, and never past the end.
+function Tracker:ScrollSectionIntoView(groupID)
+    local f = self.frame
+    local top = f and f._sectionTop and f._sectionTop[groupID]
+    local sf  = f and f.scroll
+    if not (top and sf) or secureLocked() then return end
+
+    local viewH = sf:GetHeight() or 0
+    local cur   = sf:GetVerticalScroll() or 0
+    local want  = math.min(top, math.max(0, sf:GetVerticalScrollRange() or 0))
+    -- One header plus a little body is the bar for "you can see that it opened".
+    local need  = ns:GetModule("Sections"):Height() + 40
+    if top < cur or (top + need) > (cur + viewH) then
+        if want ~= cur then sf:SetVerticalScroll(want) end
+    end
+end
+
 function Tracker:IsClickThrough()
     local f = self.frame
     return (f and f._eqotHidden and f:IsShown()) and true or false
@@ -184,9 +230,12 @@ end
 
 -- In Top mode the protected quest scroll hangs off this region, so resizing it in combat
 -- blocks. Bottom mode has nothing protected below it and needs no gate.
+-- Deferred on BOTH positions, though nothing in this region is secure. Render skips
+-- scroll:SetSize under the same lock, so growing the region in combat moved half the layout
+-- and left the quest area at its old size, drawing rows past the tracker's bottom edge until
+-- the fight ended. Bottom is the default, so that was the common case.
 local function setRegionHeight(region, h)
-    local cfg = ns:GetModule("DB"):Tracker()
-    if ((cfg and cfg.worldQuestsPosition) or "bottom") == "top" and secureLocked() then
+    if secureLocked() then
         deferRender()
         return
     end
@@ -240,7 +289,7 @@ function Tracker:ApplyLockState()
     if not (f and f.grip) then return end
     local locked = self:IsLocked()
     if locked and f._dragging then
-        f:StopMovingOrSizing()
+        pcall(f.StopMovingOrSizing, f)
         f._dragging = nil
     end
     f.grip:SetAlpha(locked and 0 or 1)
@@ -300,14 +349,24 @@ function Tracker:BuildFrame()
     f.headerIcons = { cog }
     self:RebuildHeaderIcons()
 
+    -- Only PersistPositionAndSize makes the protected SetPoint, so only it has to wait for
+    -- combat to end. Deferring the whole body left the frame following the cursor for the
+    -- rest of the fight and then saved wherever the cursor had wandered to.
+    local function finishDrag()
+        pcall(f.StopMovingOrSizing, f)
+        Tracker:PersistPositionAndSize()
+    end
+
+    -- Whether StopMovingOrSizing is protected once secure buttons are armed has never been
+    -- established, so it is attempted here and repeated by finishDrag if it was refused.
     local function stopDrag()
         if not f._dragging then return end
-        if InCombatLockdown() then
-            ns:GetModule("Events"):RunWhenOutOfCombat("eqot.stopDrag", stopDrag)
+        f._dragging = nil
+        pcall(f.StopMovingOrSizing, f)
+        if secureLocked() then
+            ns:GetModule("Events"):RunWhenOutOfCombat("eqot.stopDrag", finishDrag)
             return
         end
-        f._dragging = nil
-        f:StopMovingOrSizing()
         Tracker:PersistPositionAndSize()
     end
 
@@ -386,11 +445,11 @@ function Tracker:BuildFrame()
 
     local function wheelScroll(sf, delta)
         if Tracker:IsClickThrough() then return end
-        -- The seventh protected site, and the only one that must REFUSE rather than defer: this
-        -- frame hosts the secure item buttons, so the call is blocked in combat, and running a
-        -- wheel turn minutes later when combat drops is worse than not scrolling. Reachable on
-        -- every flavor, not just the one that surfaced it.
-        if secureLocked() then return end
+        -- The one protected site that must REFUSE rather than defer: running a wheel turn
+        -- minutes later when combat drops is worse than not scrolling. Only this scroll frame
+        -- is affected - its content child parents the secure item buttons, while eventsScroll
+        -- is a disjoint subtree that hosts nothing secure.
+        if sf == scroll and secureLocked() then return end
         local range = sf:GetVerticalScrollRange() or 0
         if range <= 0 then return end
         local new = (sf:GetVerticalScroll() or 0) - delta * 24
@@ -737,6 +796,13 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
     local Sections = ns:GetModule("Sections")
     local band     = headerBand()
 
+    -- escroll is anchored once at build from this same band, so it only goes stale after a
+    -- Header Size Offset change. Re-applied on change rather than every render.
+    if f._eqotBand ~= band and not secureLocked() then
+        f._eqotBand = band
+        escroll:SetPoint("TOPLEFT", region, "TOPLEFT", 0, -band)
+    end
+
     local function collapseRegion()
         escroll:Hide()
         if f.eventsScrollBarBG then f.eventsScrollBarBG:Hide() end
@@ -782,11 +848,19 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
     end
     econtent:SetHeight(math.max(1, y))
 
-    local capViewport = math.max(30, (cap or 0) - band)
+    -- A cap of zero means the tracker has no room for this region at all, and the 30px floor
+    -- would take band + 30 anyway - so the floor is skipped there and the region collapses.
+    -- Any non-zero cap keeps the floor, which is what stops a tight tracker losing the region.
+    if (cap or 0) <= 0 then
+        collapseRegion()
+        return 0, false
+    end
+    local capViewport = math.max(30, cap - band)
     local viewport    = math.max(1, math.min(y, capViewport))
     setRegionHeight(region, band + viewport)
 
     if escroll.UpdateScrollChildRect then escroll:UpdateScrollChildRect() end
+    clampScroll(escroll)
 
     if f.eventsScrollBarBG then
         local needsBar = y > viewport + 0.5
@@ -855,6 +929,14 @@ function Tracker:_RenderScenario(group, cfg)
     return h
 end
 
+-- A group Feed has never created has no byGroup entry, and Feed builds that table lazily
+-- from emitted entries - so a section with popups and no quests had nothing to draw into
+-- and the player got no affordance at all, Blizzard's own popup being suppressed. Every
+-- OFFER popup routes to quests, since a quest not yet in the log cannot test as campaign,
+-- which makes a campaign-only log reach this and not just an empty one. Read-only: Place
+-- and the row loop only ever read these two counts.
+local EMPTY_GROUP = { visibleCount = 0, totalCount = 0, entries = {} }
+
 function Tracker:Render()
     local f = self.frame
     if not f then return end
@@ -920,6 +1002,9 @@ function Tracker:Render()
     local y        = 0
     local hasTimed = false
     local sectionTops = {}
+    local tops = f._sectionTop
+    if not tops then tops = {}; f._sectionTop = tops end
+    wipe(tops)
 
     for _, groupID in ipairs(Sections:Order()) do
         if Sections:IsVirtual(groupID) then
@@ -928,13 +1013,14 @@ function Tracker:Render()
             if added > 0 then sectionTops[#sectionTops + 1] = top end
             y = y + added
         else
-            local group      = byGroup[groupID]
+            local group      = byGroup[groupID] or EMPTY_GROUP
             local popupCount = Popups:CountFor(groupID)
-            local anything   = (group and group.visibleCount or 0) + popupCount
-            if group and anything > 0 and not Sections:IsHidden(groupID) then
+            local anything   = group.visibleCount + popupCount
+            if anything > 0 and not Sections:IsHidden(groupID) then
                 local collapsed = Sections:IsCollapsed(groupID)
                 local header    = Sections:Acquire(content, groupID)
                 sectionTops[#sectionTops + 1] = y
+                tops[groupID] = y
                 y = y + Sections:Place(header, content, y, group, collapsed,
                                        cfg and cfg.showQuestTotal ~= false, popupCount) + gap
 
@@ -1010,6 +1096,7 @@ function Tracker:Render()
     if not locked then
         f.scroll:SetSize(math.max(1, width), scrollH)
         if f.scroll.UpdateScrollChildRect then f.scroll:UpdateScrollChildRect() end
+        clampScroll(f.scroll)
     end
 
     RowPool:Sweep(_resetRow)
@@ -1079,6 +1166,14 @@ function Tracker:OnEnable()
 
     local Distance = ns:GetModule("Distance")
     if Distance then Distance:OnDirty(function() self:Refresh() end) end
+
+    -- A ding changes no entry field. GetQuestDifficultyColor is player-level relative, so it
+    -- is the COMPARISON BASE that moved and no memoized field can see that - the repaint gate
+    -- has to be cleared before a render will redraw a single title.
+    ns:GetModule("Events"):On("PLAYER_LEVEL_UP", function()
+        ns:GetModule("Row"):Invalidate()
+        self:Refresh()
+    end)
 
     self:ApplyHeaderIcons()
     self:Render()

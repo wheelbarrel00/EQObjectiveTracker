@@ -118,6 +118,7 @@ DB.defaults = {
                 showNormal      = true,
                 showDaily       = true,
                 showWeekly      = true,
+                showScheduled   = true,
                 showCampaign    = true,
                 showWorld       = true,
                 showBonus       = true,

@@ -358,10 +358,16 @@ Options:RegisterTab({
         -- unset, so a live Clear no longer sits beside a swatch it cannot change.
         local titlePicker = self:CreateColorPicker(content, L["Quest Title Color Override"],
             function() return DB().titleColorOverride end,
-            function(v) restyle("titleColorOverride", v) end,
+            function(v)
+                local had = DB().titleColorOverride ~= nil
+                restyle("titleColorOverride", v)
+                -- Only on the nil transition. The wheel fires this setter every frame of a
+                -- drag, and the sweep below is ~40 SetAlpha calls.
+                if not had then syncDependents() end
+            end,
             L["When cleared, falls back to difficulty coloring or default yellow."],
             false,
-            function() restyle("titleColorOverride", nil) end)
+            function() restyle("titleColorOverride", nil); syncDependents() end)
         titlePicker:SetPoint("TOPLEFT", colorsHeader, "BOTTOMLEFT", 0, self.GAP.tabHead)
 
         local titleClassCheck = self:CreateCheckbox(content, L["Use class color for titles"],
@@ -616,6 +622,8 @@ Options:RegisterTab({
             -- The class color overrides the picker above it rather than the other way
             -- round, so the picker is what goes dim.
             dim(titlePicker,  not cfg.titleColorUseClass)
+            -- Inert until one of those two gives it a color to use instead of green.
+            dim(recolorCheck, cfg.titleColorOverride ~= nil or cfg.titleColorUseClass)
             dim(headerPicker, not cfg.headerColorUseClass)
 
             local card = (cfg.blockLayout or "classic") == "card"

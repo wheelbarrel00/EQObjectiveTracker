@@ -1029,7 +1029,12 @@ function Options:ApplyWindowScale()
     -- re-applies on every open the broken state would survive closing the window.
     local uw, uh = UIParent:GetWidth(), UIParent:GetHeight()
     if uw and uh and uw > 0 and uh > 0 then
-        s = math.min(s, uw / W, uh / H)
+        local capped = math.min(s, uw / W, uh / H)
+        -- Written back, or the slider goes on reporting a number the window never had: at a
+        -- 768-unit UIParent every step from about 1.07 up rendered identically while the
+        -- readout still said 1.40. The ceiling moves with the player's UI Scale.
+        if capped < s and g then g.optionsWindowScale = capped end
+        s = capped
     end
 
     -- SetScale re-reads the anchor offsets in the new scale, so a dragged window jumps

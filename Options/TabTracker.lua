@@ -27,7 +27,14 @@ local SORT_OPTIONS = {
 -- EQ's own screen order, which is not Filter.CATEGORIES order - that one encodes match
 -- precedence and must not be reshuffled for display.
 local FILTER_ORDER = {
-    "showNormal", "showDaily", "showWeekly", "showCampaign", "showWorld", "showBonus",
+    "showNormal", "showDaily", "showWeekly", "showScheduled", "showCampaign", "showWorld",
+    "showBonus",
+}
+
+-- Most of these say what they are in the label. Scheduled is the one nothing in the game
+-- names out loud, so the generic line below leaves the player guessing.
+local FILTER_TIPS = {
+    showScheduled = L["Quests the game resets on its own schedule rather than daily or weekly. Special Assignments and some meta quests are what you will see here."],
 }
 
 -- EQ exposes three of these. The author kept all five plus World Quests, so the shape is
@@ -197,7 +204,7 @@ Options:RegisterTab({
                 -- Not interpolated with the label: every label already ends in a noun, so
                 -- the old form read "Show or hide world quests entries in the tracker."
                 local cb = self:CreateCheckbox(content, c.label, get, set,
-                    L["Show or hide this category of entry in the tracker."])
+                    FILTER_TIPS[key] or L["Show or hide this category of entry in the tracker."])
                 cb:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, prev == filtersHeader and self.GAP.head or -2)
                 filterBoxes[#filterBoxes + 1] = { key = key, cb = cb }
                 prev = cb
@@ -216,8 +223,9 @@ Options:RegisterTab({
         local resetFilters = self:CreateButton(content, L["Reset filters to defaults"], 180,
             function()
                 local f = DB().filters
-                f.showNormal, f.showDaily, f.showWeekly = true, true, true
-                f.showCampaign, f.showWorld, f.showBonus = true, true, true
+                -- Walked rather than listed, so a category added to Filter.CATEGORIES is
+                -- reset here without anyone remembering to come back for it.
+                for i = 1, #Filter.CATEGORIES do f[Filter.CATEGORIES[i].key] = true end
                 f.onlyCurrentZone = false
                 -- Re-checked in place rather than by reloading the tab: these boxes only
                 -- read their getter on build and on a tab view.
@@ -227,7 +235,7 @@ Options:RegisterTab({
                 end
                 render()
             end,
-            L["Turns all six category filters back on and clears the current-zone filter. Nothing else on this tab is changed."])
+            L["Turns every category filter back on and clears the current-zone filter. Nothing else on this tab is changed."])
         resetFilters:SetSize(180, 24)
         resetFilters:SetPoint("TOPLEFT", zoneOnly, "BOTTOMLEFT", 0, -10)
 
@@ -253,51 +261,60 @@ Options:RegisterTab({
             end
         end
 
-        local autoWQ = self:CreateCheckbox(content, L["Auto-list current-zone world quests"],
-            trackerSetting("autoListZoneWorldQuests"))
-        autoWQ:SetPoint("TOPLEFT", visPrev, "BOTTOMLEFT", 0, -2)
-        self:AttachTooltip(autoWQ, L["Auto-list current-zone world quests"],
-            L["Lists every WQ in your zone without tracking each."])
+        -- No loaded provider can produce a world quest, so the whole block would sit there
+        -- with nothing behind it. The region itself still exists at 1px on such a flavor,
+        -- which is exactly why the controls read as live when they are not.
+        local hasWorldQuests = Registry:HasTag("worldquest")
+        local wqPrev = visPrev
 
-        -- The two sliders are mutually exclusive - UI/Tracker.lua reads the fixed height or
-        -- the fraction, never both - so exactly one of them is live at a time and the dead
-        -- one has to say so.
-        local wqHeightSlider, wqMaxSlider
-        local function setWqHeightEnabled(on)
-            self:SetDependent(wqHeightSlider, on)
-            self:SetDependent(wqMaxSlider, not on)
+        if hasWorldQuests then
+            local autoWQ = self:CreateCheckbox(content, L["Auto-list current-zone world quests"],
+                trackerSetting("autoListZoneWorldQuests"))
+            autoWQ:SetPoint("TOPLEFT", visPrev, "BOTTOMLEFT", 0, -2)
+            self:AttachTooltip(autoWQ, L["Auto-list current-zone world quests"],
+                L["Lists every WQ in your zone without tracking each."])
+
+            -- The two sliders are mutually exclusive - UI/Tracker.lua reads the fixed height or
+            -- the fraction, never both - so exactly one of them is live at a time and the dead
+            -- one has to say so.
+            local wqHeightSlider, wqMaxSlider
+            local function setWqHeightEnabled(on)
+                self:SetDependent(wqHeightSlider, on)
+                self:SetDependent(wqMaxSlider, not on)
+            end
+
+            local wqhCheck = self:CreateCheckbox(content, L["Set a custom World Quests height"],
+                function() return DB().worldQuestsHeightOverride end,
+                function(v)
+                    DB().worldQuestsHeightOverride = v
+                    setWqHeightEnabled(v)
+                    render()
+                end,
+                L["By default the World Quests area is capped to a share of the tracker, set by the slider below that. Turn this on to give it a fixed height in pixels instead."])
+            wqhCheck:SetPoint("TOPLEFT", autoWQ, "BOTTOMLEFT", 0, -2)
+
+            wqHeightSlider = self:CreateSlider(content, L["World Quests Height"], 40, 400, 10,
+                function() return DB().worldQuestsHeight or 200 end,
+                function(v) DB().worldQuestsHeight = v; render() end,
+                L["Height in pixels for the world quest area. Only used while Set a custom World Quests height is on."])
+            wqHeightSlider:SetPoint("TOPLEFT", wqhCheck, "BOTTOMLEFT", 0, -8)
+
+            -- EQOT-only: EQ caps the world quest area by fixed height alone. Kept because it
+            -- is backed by real tracker code, and placed with the other height controls.
+            wqMaxSlider = self:CreateSlider(content, L["Maximum Height (percent of tracker)"], 10, 80, 5,
+                function() return (DB().worldQuestsPinnedMaxFraction or 0.40) * 100 end,
+                function(v)
+                    DB().worldQuestsPinnedMaxFraction = v / 100
+                    render()
+                end,
+                L["The most of the tracker the world quest area may take. It is capped here first and your quest list takes the space that is left, scrolling for whatever does not fit. Only used while Set a custom World Quests height is off."])
+            wqMaxSlider:SetPoint("TOPLEFT", wqHeightSlider, "BOTTOMLEFT", 0, -14)
+            setWqHeightEnabled(DB().worldQuestsHeightOverride)
+            wqPrev = wqMaxSlider
         end
 
-        local wqhCheck = self:CreateCheckbox(content, L["Set a custom World Quests height"],
-            function() return DB().worldQuestsHeightOverride end,
-            function(v)
-                DB().worldQuestsHeightOverride = v
-                setWqHeightEnabled(v)
-                render()
-            end,
-            L["By default the World Quests area is capped to a share of the tracker, set by the slider below that. Turn this on to give it a fixed height in pixels instead."])
-        wqhCheck:SetPoint("TOPLEFT", autoWQ, "BOTTOMLEFT", 0, -2)
-
-        wqHeightSlider = self:CreateSlider(content, L["World Quests Height"], 40, 400, 10,
-            function() return DB().worldQuestsHeight or 200 end,
-            function(v) DB().worldQuestsHeight = v; render() end,
-            L["Height in pixels for the world quest area. Only used while Set a custom World Quests height is on."])
-        wqHeightSlider:SetPoint("TOPLEFT", wqhCheck, "BOTTOMLEFT", 0, -8)
-
-        -- EQOT-only: EQ caps the world quest area by fixed height alone. Kept because it
-        -- is backed by real tracker code, and placed with the other height controls.
-        wqMaxSlider = self:CreateSlider(content, L["Maximum Height (% of tracker)"], 10, 80, 5,
-            function() return (DB().worldQuestsPinnedMaxFraction or 0.40) * 100 end,
-            function(v)
-                DB().worldQuestsPinnedMaxFraction = v / 100
-                render()
-            end,
-            L["The most of the tracker the world quest area may take. It is capped here first and your quest list takes the space that is left, scrolling for whatever does not fit. Only used while Set a custom World Quests height is off."])
-        wqMaxSlider:SetPoint("TOPLEFT", wqHeightSlider, "BOTTOMLEFT", 0, -14)
-        setWqHeightEnabled(DB().worldQuestsHeightOverride)
-
         local orderHeader = self:CreateHeading(content, L["Section Order"])
-        orderHeader:SetPoint("TOPLEFT", wqMaxSlider, "BOTTOMLEFT", 0, self.GAP.aboveHead)
+        orderHeader:SetPoint("TOPLEFT", wqPrev, "BOTTOMLEFT", 0, self.GAP.aboveHead)
         self:AttachTooltip(orderHeader, L["Section Order"],
             L["Rearrange the tracker's sections with the arrows below. A section only appears on the tracker while it has something in it, so reordering an empty section won't look like anything changed. World Quests scroll in their own panel and can only sit at the very top or bottom, so use the Top/Bottom control."])
 
@@ -309,9 +326,11 @@ Options:RegisterTab({
             L["World Quests Position"],
             L["Where the World Quests panel sits on the tracker. |cffffffffTop|r puts it above your quests. |cffffffffBottom|r keeps it below your quests, which is the default. World Quests scroll in their own capped panel, which is why they can't be mixed in between the other sections."])
         wqPos:SetPoint("TOPLEFT", orderHeader, "BOTTOMLEFT", 0, self.GAP.head)
+        if not hasWorldQuests then wqPos:Hide() end
 
         local orderList = CreateFrame("Frame", nil, content)
-        orderList:SetPoint("TOPLEFT", wqPos, "BOTTOMLEFT", 0, -10)
+        orderList:SetPoint("TOPLEFT", hasWorldQuests and wqPos or orderHeader, "BOTTOMLEFT", 0,
+                           hasWorldQuests and -10 or self.GAP.head)
         orderList:SetSize(300, ORDER_ROW_H)
 
         local orderRows = {}
@@ -365,6 +384,13 @@ Options:RegisterTab({
         local diff = self:CreateCheckbox(content, L["Quest Title Color By Difficulty"],
             rowSetting("colorByDifficulty", true))
         diff:SetPoint("TOPLEFT", optionsHeader, "BOTTOMLEFT", 0, self.GAP.tabHead)
+        -- Its master is on the Appearance tab, so the sweep there can never reach it. Per
+        -- view rather than per setter for the same reason.
+        content._syncDiff = function()
+            local cfg = DB() or {}
+            self:SetDependent(diff, cfg.titleColorOverride == nil and not cfg.titleColorUseClass)
+        end
+        content._syncDiff()
         self:AttachTooltip(diff, L["Quest Title Color By Difficulty"],
             L["Colors each quest title by how hard it is for your level, the way the quest log does. The Quest Title Color Override on the Appearance tab wins over this while it is set."])
 
@@ -466,10 +492,10 @@ Options:RegisterTab({
         -- controls on the Appearance tab. They live together under Appearance's Zone
         -- Progress Bar heading now - one feature, one place.
 
-        -- A capability probe, so this reads true on Classic where the system does not exist and
-        -- the controls appear there with nothing behind them. The real gate is whether the
-        -- provider registered, which the TOC already decides. Recorded, not fixed.
-        if ns.Has.ScenarioBonus then
+        -- Whether the provider registered, which the TOC already decides per flavor. ns.Has
+        -- is a CAPABILITY probe and reads true on Classic, where the client keeps the
+        -- functions and ships no scenarios behind them.
+        if ns.Has.ScenarioBonus and Registry:Get("scenarios") then
             local sbHeader = self:CreateHeading(content, L["Scenario Bonus Objectives"])
             sbHeader:SetPoint("TOPLEFT", soundDD, "BOTTOMLEFT", 0, self.GAP.aboveHead)
 
@@ -499,5 +525,9 @@ Options:RegisterTab({
                 L["Sizes the bonus objectives HUD."])
             sbScale:SetPoint("TOPLEFT", sbTest, "BOTTOMLEFT", 0, -16)
         end
+    end,
+
+    refresh = function(_, content)
+        if content._syncDiff then content._syncDiff() end
     end,
 })

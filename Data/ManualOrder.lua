@@ -30,11 +30,19 @@ end
 
 -- The quest log is this addon's stand-in for EQ's quest Cache: it decides whether an off-screen
 -- rank is worth carrying forward, and it is the only thing keeping the saved map from growing
--- for every quest ever dragged. On Classic it returns true unconditionally, so nothing is
--- pruned there at all - GetQuestLogIndexByID is the resolver that would fix it.
+-- for every quest ever dragged. Only ever asked from Commit, which a drag reaches, so the log
+-- is loaded by then.
 function ManualOrder:IsLive(questID)
-    if not (C_QuestLog and C_QuestLog.GetLogIndexForQuestID) then return true end
-    return C_QuestLog.GetLogIndexForQuestID(questID) ~= nil
+    if C_QuestLog and C_QuestLog.GetLogIndexForQuestID then
+        return C_QuestLog.GetLogIndexForQuestID(questID) ~= nil
+    end
+    -- The Classic global answers 0 rather than nil for a quest that is not in the log. Without
+    -- this branch it answered true for everything and nothing was pruned there at all.
+    if GetQuestLogIndexByID then
+        local i = GetQuestLogIndexByID(questID)
+        return (i and i ~= 0) and true or false
+    end
+    return true
 end
 
 -- Densifies to 1..N and drops junk keys. Commit always writes a dense map, so the only
@@ -56,11 +64,19 @@ function ManualOrder:Commit(visibleIDs, draggedID, dropIndex)
     local m = map()
     if not (m and visibleIDs and draggedID and dropIndex) then return end
 
-    local seq = {}
+    local seq, dragAt = {}, nil
     for i = 1, #visibleIDs do
         local id = visibleIDs[i]
-        if id ~= draggedID then seq[#seq + 1] = id end
+        if id == draggedID then
+            dragAt = i
+        else
+            seq[#seq + 1] = id
+        end
     end
+
+    -- dropIndex counts the dragged row, since it is measured against the rows on screen,
+    -- and seq does not. Without this every drop below its own slot lands a row too low.
+    if dragAt and dropIndex > dragAt then dropIndex = dropIndex - 1 end
 
     local insertAt = math.min(math.max(dropIndex, 1), #seq + 1)
     table.insert(seq, insertAt, draggedID)

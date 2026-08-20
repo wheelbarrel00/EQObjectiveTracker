@@ -118,7 +118,10 @@ end
 
 -- Labels drop the "EQ: " prefix, values keep it - the value is what a profile stores
 function Media:GetSoundList()
-    local out, labels = { "None" }, { None = "NONE" }
+    -- The client's own word for it, so this reads right in every language the game ships and
+    -- costs the manifest no phrase. The stored value stays the bare token.
+    local none = _G.NONE or "None"
+    local out, labels = { none }, { [none] = "NONE" }
     for _, s in ipairs(SOUNDS) do
         local label = s.name:gsub("^EQ: ", "")
         out[#out + 1] = label
@@ -128,7 +131,7 @@ function Media:GetSoundList()
 end
 
 function Media:GetSoundLabel(value)
-    if not value or value == "NONE" then return "None" end
+    if not value or value == "NONE" then return _G.NONE or "None" end
     return (value:gsub("^EQ: ", ""))
 end
 

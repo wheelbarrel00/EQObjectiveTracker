@@ -95,6 +95,9 @@ end
 local qlQuests      = {}
 local retryCount    = {}
 local retryPending  = {}
+-- Bumped by dirty(). A C_Timer callback cannot be cancelled, so a superseded chain retires
+-- itself by comparing this instead.
+local retryGen      = 0
 
 local dirtyListeners = {}
 
@@ -126,7 +129,13 @@ function ZoneProgress:EnsureQuests(qlID, silent)
         if n < RETRY_MAX and not retryPending[qlID] then
             retryPending[qlID] = true
             retryCount[qlID]   = n + 1
+            local gen = retryGen
             C_Timer.After(RETRY_DELAY * (n + 1), function()
+                -- Without this, wiping retryPending on a zone change let a second chain arm
+                -- for the same questline while the first was still in flight. They share one
+                -- retryCount, so the five attempts were spent in half the wall time and the
+                -- streaming window closed early. Reproduced at almost every login.
+                if gen ~= retryGen then return end
                 retryPending[qlID] = nil
                 self:EnsureQuests(qlID)
             end)
@@ -233,6 +242,7 @@ function ZoneProgress:OnEnable()
         _rootDirty = true
         wipe(retryCount)
         wipe(retryPending)
+        retryGen = retryGen + 1
         self:Invalidate()
     end
     Events:On("ZONE_CHANGED_NEW_AREA", dirty)

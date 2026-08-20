@@ -24,8 +24,12 @@ local function hookRow(row)
         -- moved that modifier to Ctrl still gets shift toggling. Kept because the gesture is
         -- confirmed working in game this way and QUESTWATCHTOGGLE's presence on 1.15.9 has not
         -- been measured, so dropping it risks removing the gesture entirely.
+        -- With the chat edit box open, shift-click is the link gesture, and toggling there
+        -- materializes the whole tracked set behind the player's back. The explicit
+        -- QUESTWATCHTOGGLE branch is left unconditional, since that one was asked for.
+        local linking = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
         local wantsToggle = (IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE"))
-                            or (IsShiftKeyDown and IsShiftKeyDown())
+                            or (not linking and IsShiftKeyDown and IsShiftKeyDown())
         if not wantsToggle then return end
         local TrackedSet = ns:GetModule("TrackedSet")
         if TrackedSet then TrackedSet:ToggleAtIndex(self:GetID()) end
@@ -49,6 +53,7 @@ local function repaint()
     local TrackedSet = ns:GetModule("TrackedSet")
     if not TrackedSet then return end
 
+    QuestLogChecks._rows = 0
     local i = 1
     while true do
         local row = _G["QuestLogTitle" .. i]
@@ -71,10 +76,14 @@ local function repaint()
         end
         i = i + 1
     end
+    QuestLogChecks._rows = i - 1
 end
 
 function QuestLogChecks:OnEnable()
-    if type(QuestLog_Update) ~= "function" then return end
+    if type(QuestLog_Update) ~= "function" then
+        self._why = "QuestLog_Update absent"
+        return
+    end
 
     -- hooksecurefunc rather than a replacement, the same taint-safe shape UI/Visibility.lua uses
     -- on the world map. Blizzard has already drawn its own answer by the time this runs.
@@ -89,12 +98,29 @@ function QuestLogChecks:OnEnable()
     -- only because Blizzard's handler also fires QUEST_LOG_UPDATE, which the provider listens to -
     -- the repaint was riding on a coincidence. UI may ask UI, and the row menu has always done
     -- exactly this after a track or untrack.
+    self._hooked = true
+
     local TrackedSet = ns:GetModule("TrackedSet")
     if TrackedSet then
+        self._subscribed = true
         TrackedSet:OnDirty(function()
             repaint()
             local Tracker = ns:GetModule("Tracker")
             if Tracker and Tracker.Refresh then Tracker:Refresh() end
         end)
+    else
+        self._why = "TrackedSet module absent"
     end
+end
+
+-- Both halves can be missing with nothing on screen to say so: OnEnable returns outright
+-- without QuestLog_Update, and skips the repaint subscription on its own if TrackedSet is
+-- absent. rows counts what the last repaint actually walked, so a hook that fires against a
+-- log Blizzard has not built yet is visible as 0 rather than as silence.
+function QuestLogChecks:DebugLine()
+    return ("quest log checks: hook %s, repaint subscription %s, %d row(s) last pass%s")
+        :format(self._hooked and "installed" or "missing",
+                self._subscribed and "on" or "|cffff5555off|r",
+                self._rows or 0,
+                self._why and (" | " .. self._why) or "")
 end

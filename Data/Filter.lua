@@ -12,6 +12,7 @@ Filter.CATEGORIES = {
     { tag = "campaign",   key = "showCampaign", label = L["Campaign quests"]  },
     { tag = "daily",      key = "showDaily",    label = L["Daily quests"]     },
     { tag = "weekly",     key = "showWeekly",   label = L["Weekly quests"]    },
+    { tag = "scheduled",  key = "showScheduled", label = L["Scheduled quests"] },
     { tag = nil,          key = "showNormal",   label = L["Normal quests"]    },
 }
 

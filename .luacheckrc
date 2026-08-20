@@ -38,7 +38,7 @@ read_globals = {
     -- Picks which Classic Wowhead site a row menu link opens
     "GetExpansionLevel",
     -- Blizzard's Classic quest log, whose tracked checkmarks UI/QuestLogChecks.lua repaints
-    "QuestLog_Update", "IsShiftKeyDown",
+    "QuestLog_Update", "IsShiftKeyDown", "ChatEdit_GetActiveWindow", "NONE",
 
     -- Everything Quests' saved variable, read one way for the config import. Never its
     -- addon table: EQ depends on EQOT, so EQOT loads first and that table is always nil.
@@ -64,6 +64,7 @@ read_globals = {
     -- Legacy / cross-flavor globals guarded by Core/Compat.lua
     "GetAchievementInfo", "GetAchievementNumCriteria", "GetAchievementCriteriaInfo",
     "GetTrackedAchievements", "RemoveTrackedAchievement", "OpenAchievementFrameToAchievement",
+    "ShowAchievementFrameForAchievement",
     "GetQuestLogRewardMoney", "GetNumQuestLogRewards", "GetQuestLogRewardInfo",
     "HaveQuestRewardData", "GetCoinTextureString", "GetQuestLogRewardXP",
     "GetNumQuestLogChoices", "GetQuestLogChoiceInfo", "GetQuestLogItemLink",

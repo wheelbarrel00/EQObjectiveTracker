@@ -106,6 +106,26 @@ local function lookup(tbl, classification)
     return tbl[classification] or tbl[QC.Normal or -1]
 end
 
+-- Written from the fallback branch as well as the success one. It used to sit after the
+-- fallback's return, so the single path a broken icon takes was the one path the instrument
+-- could not see, and /eqot status showed whatever the previous render had left behind.
+local function recordFocusProbe(row, entry, icon, face, faceOK, glow, glowOK)
+    if not entry.isFocused then return end
+    local ulx, uly = row.icon:GetTexCoord()
+    Row._focusIcon = ("id=%s class=%s | face=%s ok=%s tex=%s coord %.3f,%.3f"
+                      .. " size %.0fx%.0f a=%.2f | glow=%s ok=%s tex=%s size %.0fx%.0f"
+                      .. " a=%.2f | holder a=%.2f row a=%.2f"):format(
+        tostring(entry.id), tostring(icon.classification),
+        tostring(face), tostring(faceOK), tostring(row.icon:GetTexture()),
+        ulx or -1, uly or -1,
+        row.icon:GetWidth() or 0, row.icon:GetHeight() or 0, row.icon:GetAlpha() or -1,
+        tostring(glow), tostring(glowOK), tostring(row.iconGlow:GetTexture()),
+        row.iconGlow:GetWidth() or 0, row.iconGlow:GetHeight() or 0,
+        row.iconGlow:GetAlpha() or -1,
+        row.iconHolder:GetAlpha() or -1, row:GetAlpha() or -1)
+    Row._focusIconAt = GetTime and GetTime() or nil
+end
+
 local function applyIcon(row, entry)
     local icon = entry.icon
     local kind = icon and icon.kind or ICON.NONE
@@ -140,6 +160,7 @@ local function applyIcon(row, entry)
             row.icon:SetTexture(entry.state == STATE.COMPLETE
                                 and POI_FALLBACK_ACTIVE or POI_FALLBACK_AVAILABLE)
             row.iconBang:SetTexture(nil)
+            recordFocusProbe(row, entry, icon, face, faceOK, glow, glowOK)
             return
         end
         if entry.state == STATE.COMPLETE then
@@ -147,21 +168,7 @@ local function applyIcon(row, entry)
         else
             Util.SafeSetAtlas(row.iconBang, "Quest-In-Progress-Icon-yellow")
         end
-        if entry.isFocused then
-            local ulx, uly = row.icon:GetTexCoord()
-            Row._focusIcon = ("id=%s class=%s | face=%s ok=%s tex=%s coord %.3f,%.3f"
-                              .. " size %.0fx%.0f a=%.2f | glow=%s ok=%s tex=%s size %.0fx%.0f"
-                              .. " a=%.2f | holder a=%.2f row a=%.2f"):format(
-                tostring(entry.id), tostring(icon.classification),
-                tostring(face), tostring(faceOK), tostring(row.icon:GetTexture()),
-                ulx or -1, uly or -1,
-                row.icon:GetWidth() or 0, row.icon:GetHeight() or 0, row.icon:GetAlpha() or -1,
-                tostring(glow), tostring(glowOK), tostring(row.iconGlow:GetTexture()),
-                row.iconGlow:GetWidth() or 0, row.iconGlow:GetHeight() or 0,
-                row.iconGlow:GetAlpha() or -1,
-                row.iconHolder:GetAlpha() or -1, row:GetAlpha() or -1)
-            Row._focusIconAt = GetTime and GetTime() or nil
-        end
+        recordFocusProbe(row, entry, icon, face, faceOK, glow, glowOK)
         return
     end
 
@@ -382,10 +389,18 @@ end
 -- does not fire again for that, so the half is re-tested while the row is hovered. Installed
 -- only on a row that can actually show the hint, and only one row is hovered at a time.
 local HINT_POLL = 0.1
+local onLeave
 local function onUpdateHalf(row, elapsed)
     row._hintClock = (row._hintClock or 0) + elapsed
     if row._hintClock < HINT_POLL then return end
     row._hintClock = 0
+    -- IsMouseOver adds the vertical constraint the icon hit-test does not have, and catches a
+    -- row that stopped being hovered without an OnLeave - a visibility rule can take the
+    -- tracker away underneath the cursor.
+    if clickThrough() or not row:IsMouseOver() then
+        onLeave(row)
+        return
+    end
     local want = splitHintWanted(row)
     if want ~= row._hintShown then
         row._hintShown = want
@@ -405,7 +420,7 @@ local function onEnter(row)
 end
 
 -- Shared with the group-finder button, which has no icon holder and never polls.
-local function onLeave(frame)
+function onLeave(frame)
     ns.Util.Tooltip():Hide()
     if frame and frame.iconHolder then
         frame:SetScript("OnUpdate", nil)
@@ -485,6 +500,10 @@ end
 function Row:Reset(row)
     row._entry, row._providerID = nil, nil
     row._wasDragging = nil
+    -- Owner-scoped, so retiring some other row cannot close the tooltip of the one the
+    -- cursor is actually on. A retired row would otherwise strand its own on screen.
+    local tip = ns.Util.Tooltip()
+    if tip:GetOwner() == row then tip:Hide() end
     row:SetScript("OnUpdate", nil)
     row._hintShown, row._hintClock = nil, nil
     row._sTitle, row._sSub, row._sState  = nil, nil, nil
@@ -516,7 +535,12 @@ function Row:Render(row, entry, width, cfg)
     -- marker until its tag info streams in - so the icon has to sit in the repaint gate
     -- or that second answer never reaches the screen.
     local icon    = entry.icon
-    local iconKey = icon and (icon.atlas or icon.texture or icon.classification) or nil
+    -- kind is part of the key, not just the art: hasIcon below decides whether the row pays
+    -- for the icon COLUMN, and it reads kind. Safe without it only while kind is a store
+    -- default nothing mutates per entry, which is a property of today's providers rather
+    -- than of the shape.
+    local iconKey = icon and ((icon.kind or "?") .. "|"
+                    .. tostring(icon.atlas or icon.texture or icon.classification)) or nil
 
     local timeText, timeMins
     if entry.expiresAt then

@@ -77,24 +77,27 @@ function Util.EffectiveTitleColor(cfg)
     if ov and ov.r then return ov.r, ov.g, ov.b end
 end
 
+-- Only a TRUE is memoized. GetAtlasInfo answers nil for art that has not streamed in yet, and
+-- caching that answered nil for the rest of the session - one badly timed ask and the atlas was
+-- blank until the next reload.
 local _atlasOK = {}
 function Util.AtlasExists(atlas)
     if not atlas or atlas == "" then return false end
     if not ns.Has.Atlas then return false end
-    local ok = _atlasOK[atlas]
-    if ok == nil then
-        ok = C_Texture.GetAtlasInfo(atlas) and true or false
-        _atlasOK[atlas] = ok
-    end
+    if _atlasOK[atlas] then return true end
+    local ok = C_Texture.GetAtlasInfo(atlas) and true or false
+    if ok then _atlasOK[atlas] = true end
     return ok
 end
 
 -- Texcoords are cleared first: SetAtlas was measured leaving an earlier SetTexCoord in place,
 -- so a pooled row that last drew a world quest rendered its POI face through the ring's crop.
-function Util.SafeSetAtlas(tex, atlas)
+-- useAtlasSize is passed through for the callers that size a texture from its atlas. It
+-- defaults to false, which is what every original caller wanted.
+function Util.SafeSetAtlas(tex, atlas, useAtlasSize)
     tex:SetTexCoord(0, 1, 0, 1)
     if Util.AtlasExists(atlas) then
-        tex:SetAtlas(atlas, false)
+        tex:SetAtlas(atlas, useAtlasSize and true or false)
         return true
     end
     tex:SetTexture(nil)

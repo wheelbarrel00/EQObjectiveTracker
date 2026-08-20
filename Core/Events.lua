@@ -60,12 +60,18 @@ frame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 local _deferred   = {}
+local _deferOrder = {}
 local _flushKeys  = {}
 local _flushArmed = false
 
+-- Drained in the order the calls arrived rather than in pairs() order. A deferred reset and a
+-- deferred stopDrag both write the tracker's position, and which one won was left to chance.
 local function flushDeferred()
-    local n = 0
-    for key in pairs(_deferred) do n = n + 1; _flushKeys[n] = key end
+    local n = #_deferOrder
+    for i = 1, n do
+        _flushKeys[i]  = _deferOrder[i]
+        _deferOrder[i] = nil
+    end
     for i = 1, n do
         local key = _flushKeys[i]
         local fn  = _deferred[key]
@@ -87,6 +93,8 @@ function Events:RunWhenOutOfCombat(key, fn)
         fn()
         return true
     end
+    -- Re-deferring a key keeps its first arrival slot, which is what makes this FIFO.
+    if _deferred[key] == nil then _deferOrder[#_deferOrder + 1] = key end
     _deferred[key] = fn
     if not _flushArmed then
         _flushArmed = true

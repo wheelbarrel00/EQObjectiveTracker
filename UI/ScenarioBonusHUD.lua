@@ -163,6 +163,10 @@ function HUD:_Acquire()
     f:SetClampedToScreen(true)
     f:SetMovable(true)
     f:EnableMouse(true)
+    -- Hiding this frame fires no OnLeave on the reward button inside it, and the private
+    -- tooltip does not self-heal the way the shared one did, so hiding the HUD under a
+    -- hovered reward icon left an opaque box over the world.
+    f:HookScript("OnHide", function() ns.Util.Tooltip():Hide() end)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(s)
         local st = hudState()

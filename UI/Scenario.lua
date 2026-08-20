@@ -256,13 +256,13 @@ function Scenario:_DrawBanner(info, cfg)
         banner:SetPoint("TOP",      subHeader, "BOTTOM",      0, -BANNER_GAP)
     end
 
-    banner.NormalBG:SetAtlas(normalAtlas, true)
+    Util.SafeSetAtlas(banner.NormalBG, normalAtlas, true)
     banner.NormalBG:ClearAllPoints()
     banner.NormalBG:SetPoint("TOPLEFT", banner, "TOPLEFT", offsets.nx, offsets.ny)
     banner.NormalBG:Show()
 
     if finalAtlas and info.isFinalStage then
-        banner.FinalBG:SetAtlas(finalAtlas, true)
+        Util.SafeSetAtlas(banner.FinalBG, finalAtlas, true)
         banner.FinalBG:ClearAllPoints()
         banner.FinalBG:SetPoint("TOPLEFT", banner, "TOPLEFT", offsets.fx, offsets.fy)
         banner.FinalBG:Show()
@@ -271,7 +271,7 @@ function Scenario:_DrawBanner(info, cfg)
     end
 
     if info.themeR then
-        banner.ThemeOverlay:SetAtlas("themed-scenario-trackerheader-add", true)
+        Util.SafeSetAtlas(banner.ThemeOverlay, "themed-scenario-trackerheader-add", true)
         banner.ThemeOverlay:ClearAllPoints()
         banner.ThemeOverlay:SetPoint("BOTTOM", banner.NormalBG, "BOTTOM", 0, 0)
         banner.ThemeOverlay:SetVertexColor(info.themeR, info.themeG, info.themeB)
@@ -354,8 +354,8 @@ function Scenario:_DrawCriteria(container, lines)
             row.icon:Show()
             row.icon:ClearAllPoints()
             row.icon:SetPoint("LEFT", row, "LEFT", 8, 0)
-            row.icon:SetAtlas(ln.completed and "ui-questtracker-tracker-check"
-                                            or "ui-questtracker-objective-nub", false)
+            Util.SafeSetAtlas(row.icon, ln.completed and "ui-questtracker-tracker-check"
+                                                      or "ui-questtracker-objective-nub")
 
             row.text:ClearAllPoints()
             row.text:SetPoint("LEFT",  row.icon, "RIGHT", 6, 0)

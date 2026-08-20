@@ -81,6 +81,7 @@ L["Recent"] = true
 L["Most recently accepted first."] = true
 L["Manual"] = true
 L["Your own order. Drag quests up and down in the tracker to set it."] = true
+L["Quests the game resets on its own schedule rather than daily or weekly. Special Assignments and some meta quests are what you will see here."] = true
 L["Campaign section"] = true
 L["Quests section"] = true
 L["Profession section"] = true
@@ -108,7 +109,7 @@ L["Show or hide this category of entry in the tracker."] = true
 L["Show only quests in current zone"] = true
 L["Only show entries with an objective on your current map. Entries whose provider cannot tell are always shown."] = true
 L["Reset filters to defaults"] = true
-L["Turns all six category filters back on and clears the current-zone filter. Nothing else on this tab is changed."] = true
+L["Turns every category filter back on and clears the current-zone filter. Nothing else on this tab is changed."] = true
 L["Tracker Visibility"] = true
 L["Uncheck to hide this section from the tracker even while it has entries."] = true
 L["Auto-list current-zone world quests"] = true
@@ -117,7 +118,7 @@ L["Set a custom World Quests height"] = true
 L["By default the World Quests area is capped to a share of the tracker, set by the slider below that. Turn this on to give it a fixed height in pixels instead."] = true
 L["World Quests Height"] = true
 L["Height in pixels for the world quest area. Only used while Set a custom World Quests height is on."] = true
-L["Maximum Height (% of tracker)"] = true
+L["Maximum Height (percent of tracker)"] = true
 L["The most of the tracker the world quest area may take. It is capped here first and your quest list takes the space that is left, scrolling for whatever does not fit. Only used while Set a custom World Quests height is off."] = true
 L["Section Order"] = true
 L["Rearrange the tracker's sections with the arrows below. A section only appears on the tracker while it has something in it, so reordering an empty section won't look like anything changed. World Quests scroll in their own panel and can only sit at the very top or bottom, so use the Top/Bottom control."] = true
@@ -352,6 +353,7 @@ L["Bonus Objectives"] = true
 L["Campaign quests"] = true
 L["Daily quests"] = true
 L["Weekly quests"] = true
+L["Scheduled quests"] = true
 L["Normal quests"] = true
 
 -- Data/Providers/Achievements.lua
@@ -427,6 +429,9 @@ L["Find Group"] = true
 L["Open the Premade Group Finder for this quest."] = true
 
 -- UI/RowMenu.lua
+L["You cannot abandon a quest while in combat."] = true
+L["This game version cannot abandon quests from the tracker."] = true
+L["That quest is no longer in your quest log."] = true
 L["Pin to tracker"] = true
 L["Unpin from tracker"] = true
 L["Track Quest"] = true

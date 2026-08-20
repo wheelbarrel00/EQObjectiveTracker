@@ -76,22 +76,27 @@ function ns:SafeMode()
     return (db and db.global and db.global.safeMode) and true or false
 end
 
+-- An explicit enable outranks safe mode. Without that the bisection tool could turn
+-- everything off and then never bring one subsystem back to test it, while reporting that it
+-- had - which is the whole workflow the tool exists for.
 function ns:IsModuleDisabled(name)
     if NEVER_SKIP[name] then return false end
-    if self:SafeMode() then return true end
     local db = _G.EQObjectiveTrackerDB
-    local off = db and db.global and db.global.disabledModules
-    return (off and off[name]) and true or false
+    local g  = db and db.global
+    if g and g.enabledModules and g.enabledModules[name] then return false end
+    if self:SafeMode() then return true end
+    return (g and g.disabledModules and g.disabledModules[name]) and true or false
 end
 
 -- Providers are a separate axis: Registry itself must stay enabled or Feed has nothing to
 -- iterate, but each provider can be marked unavailable so it registers no events and makes
 -- no game API calls at all.
 function ns:IsProviderDisabled(id)
-    if self:SafeMode() then return true end
     local db = _G.EQObjectiveTrackerDB
-    local off = db and db.global and db.global.disabledProviders
-    return (off and off[id]) and true or false
+    local g  = db and db.global
+    if g and g.enabledProviders and g.enabledProviders[id] then return false end
+    if self:SafeMode() then return true end
+    return (g and g.disabledProviders and g.disabledProviders[id]) and true or false
 end
 
 function ns:SkippableModules()

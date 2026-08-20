@@ -11,7 +11,8 @@ local Quests = {
     groups   = { "campaign", "quests" },
     priority = 10,
     idSpace  = "quest",
-    tags     = { "campaign", "daily", "weekly", "dungeon", "raid", "legendary", "worldquest" },
+    tags     = { "campaign", "daily", "weekly", "scheduled", "dungeon", "raid", "legendary",
+                 "worldquest" },
     filterCategories = true,
 }
 
@@ -21,6 +22,10 @@ local Quests = {
 -- QuestsClassic.lua, wrong here, and dead code either way while the enum is present.
 local DAILY_FREQ  = (Enum and Enum.QuestFrequency and Enum.QuestFrequency.Daily)  or 1
 local WEEKLY_FREQ = (Enum and Enum.QuestFrequency and Enum.QuestFrequency.Weekly) or 2
+
+-- The fourth member, read off a 12.1 dump as 3. It carries Special Assignments and the
+-- Midnight meta quest, which had no tag at all and so filtered as normal quests.
+local SCHED_FREQ  = (Enum and Enum.QuestFrequency and Enum.QuestFrequency.ResetByScheduler) or 3
 
 -- Fallback ids read off Enum.QuestTag on 1.15.9: Dungeon 81, Raid 62, Raid10 88, Raid25 89.
 -- Raid10 used to read 85, which is Heroic, and Raid25 used to read 88, which is Raid10.
@@ -37,7 +42,18 @@ local store = Entry.NewStore({
     tags    = {},
 })
 
-local firstSeen = {}
+-- Persisted per character. A session-local table stamped every quest that predated the
+-- session with the 0 baseline, so after a reload the whole log tied at 0 and the Recent
+-- sort fell through to alphabetical. Deliberately not in DB.defaults: it is created on
+-- first use and pruned to the live log below.
+local sessionSeen = {}
+local function stamps()
+    local DB   = ns:GetModule("DB")
+    local char = DB and DB:Char()
+    if not char then return sessionSeen end
+    if type(char.questFirstSeen) ~= "table" then char.questFirstSeen = {} end
+    return char.questFirstSeen
+end
 
 local dirtyAll        = true
 local dirtyObjectives = false
@@ -146,12 +162,13 @@ local function fillTags(e, id, info)
     wipe(tags)
     if isWorldQuest(id) then tags.worldquest = true end
     if isCampaign(id, info) then tags.campaign = true end
-    -- Kept as the raw enum as well as a tag, because the type sort orders by it
-    -- directly - weekly above daily above normal - rather than by tag presence.
+    -- Kept as the raw enum alongside the tags for the diagnostic dump. Nothing sorts or
+    -- filters on it: the two flavors number this field differently.
     e.frequency = (info and info.frequency) or 0
     if info then
-        if info.frequency == DAILY_FREQ  then tags.daily  = true end
-        if info.frequency == WEEKLY_FREQ then tags.weekly = true end
+        if info.frequency == DAILY_FREQ  then tags.daily     = true end
+        if info.frequency == WEEKLY_FREQ then tags.weekly    = true end
+        if info.frequency == SCHED_FREQ  then tags.scheduled = true end
     end
     local tagID = getTagID(id)
     if tagID == TAG_DUNGEON then
@@ -211,6 +228,7 @@ end
 local walkEntries, walkQuests = 0, 0
 
 local function fullRebuild()
+    local firstSeen = stamps()
     local focused = superTrackedID()
     local currentHeader
     store:Begin()
@@ -251,13 +269,14 @@ local function fullRebuild()
 
     store:Finish()
 
-    for id in pairs(firstSeen) do
-        if not store:Get(id) then
-            firstSeen[id], tagIDCache[id], objTextCache[id] = nil, nil, nil
-        end
-    end
-
+    -- Pruned only against a log that actually returned something. A cold login can present
+    -- an empty one, and pruning against that would drop every persisted stamp.
     if next(store:Out()) ~= nil then
+        for id in pairs(firstSeen) do
+            if not store:Get(id) then
+                firstSeen[id], tagIDCache[id], objTextCache[id] = nil, nil, nil
+            end
+        end
         primed    = true
         baselined = true
     end
@@ -471,12 +490,15 @@ end
 -- Routed through Blizzard's own confirmation popup rather than abandoning outright, so the
 -- item-loss warning still appears. SetSelectedQuest is global state the quest log reads, so
 -- the previous selection is put back or the log opens on a quest the player did not choose.
+-- Returns nil on success or a reason TOKEN, never wording: UI/RowMenu.lua turns it into a
+-- line the player can read. Returning nothing meant a click on a red Abandon Quest did
+-- nothing at all and looked like a broken addon.
 local function abandonQuest(id)
     if not (C_QuestLog.SetSelectedQuest and C_QuestLog.SetAbandonQuest
             and C_QuestLog.GetAbandonQuest) then
-        return
+        return "unavailable"
     end
-    if InCombatLockdown() then return end
+    if InCombatLockdown() then return "combat" end
 
     local oldSelected = C_QuestLog.GetSelectedQuest and C_QuestLog.GetSelectedQuest() or 0
     C_QuestLog.SetSelectedQuest(id)
@@ -487,7 +509,7 @@ local function abandonQuest(id)
     -- clicking, the latch can still hold the previous one, and abandoning that is unrecoverable.
     if abandonID and abandonID ~= id then
         C_QuestLog.SetSelectedQuest(oldSelected or 0)
-        return
+        return "stale"
     end
     -- Total by construction: a nil here reaches StaticPopup's no-arg branch and the
     -- confirmation renders a literal %s instead of the quest name.
@@ -528,6 +550,7 @@ function Quests:GetEntryMenu(entry)
 end
 
 function Quests:OnEntryMenuSelect(entryID, itemID)
+    local refused
     if itemID == "pin" or itemID == "unpin" then
         pinShim.id, pinShim.providerID = entryID, self.id
         ns:GetModule("Filter"):SetPinned(pinShim, itemID == "pin")
@@ -544,9 +567,10 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
     elseif itemID == "popout" then
         openQuestDetailsPopup(entryID)
     elseif itemID == "abandon" then
-        abandonQuest(entryID)
+        refused = abandonQuest(entryID)
     end
     if self._notifyDirty then self._notifyDirty() end
+    return refused
 end
 
 function Quests:Enable(notifyDirty)

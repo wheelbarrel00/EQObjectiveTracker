@@ -44,6 +44,21 @@ handlers.debug = function()
     tracker():Render()
 end
 
+-- Every DebugLine goes through here. One module raising must not take the rest of the report
+-- with it: this is the tool for diagnosing a broken subsystem, so it has to outlive one, and
+-- a report that stops halfway reads as "the addon is fine up to here".
+local function debugLine(name, prefix, method)
+    local m = ns:GetModule(name)
+    method = method or "DebugLine"
+    if not (m and m[method]) then return end
+    local ok, line = pcall(m[method], m)
+    if not ok then
+        ns:Print(("|cffff5555%s:%s raised|r %s"):format(name, method, tostring(line)))
+        return
+    end
+    if line then ns:Print((prefix or "") .. line) end
+end
+
 handlers.status = function()
     local Registry = ns:GetModule("Registry")
     local Feed     = ns:GetModule("Feed")
@@ -55,8 +70,7 @@ handlers.status = function()
 
     -- Early, because a refused event registration explains a whole subsystem being silent
     -- and every counter below it would otherwise read as a clean zero.
-    local EV = ns:GetModule("Events")
-    if EV and EV.DebugLine then ns:Print(EV:DebugLine()) end
+    debugLine("Events")
 
     -- Rebuild first so the counters describe the current state, not the last repaint.
     -- Render skips entirely while the tracker is hidden, so the feed is built directly too
@@ -76,13 +90,16 @@ handlers.status = function()
             ns:Print(("  %-14s %d -> dup %d, filtered %d, shown %d")
                 :format(p.id, st.emitted or 0, st.duplicate or 0,
                         st.filtered or 0, st.shown or 0))
-            if p.DebugLine then ns:Print("      " .. (p:DebugLine() or "")) end
+            if p.DebugLine then
+                local ok, line = pcall(p.DebugLine, p)
+                ns:Print("      " .. (ok and (line or "")
+                    or ("|cffff5555DebugLine raised|r " .. tostring(line))))
+            end
         end
     end
 
-    local FILT = ns:GetModule("Filter")
-    if FILT and FILT.FiltersLine then ns:Print(FILT:FiltersLine()) end
-    if FILT and FILT.DebugLine then ns:Print(FILT:DebugLine()) end
+    debugLine("Filter", nil, "FiltersLine")
+    debugLine("Filter")
 
     ns:Print("sections (in render order):")
     local function sectionLine(id)
@@ -103,55 +120,34 @@ handlers.status = function()
 
     local active, free = RowPool:Count()
     ns:Print(("rows: %d active, %d pooled"):format(active, free))
-    local RowMod = ns:GetModule("Row")
-    if RowMod and RowMod.DebugLine then ns:Print(RowMod:DebugLine()) end
+    debugLine("Row")
+    debugLine("Tracker", "scroll: ", "DebugScroll")
 
-    local T = tracker()
-    if T and T.DebugScroll then ns:Print("scroll: " .. T:DebugScroll()) end
-
-    local IB = ns:GetModule("ItemButtons")
-    if IB and IB.DebugLine then ns:Print(IB:DebugLine()) end
-
-    local MO = ns:GetModule("ManualOrder")
-    if MO and MO.DebugLine then ns:Print(MO:DebugLine()) end
-
-    local DIST = ns:GetModule("Distance")
-    if DIST and DIST.DebugLine then ns:Print(DIST:DebugLine()) end
-
-    local MIG = ns:GetModule("Migrate")
-    if MIG and MIG.DebugLine then ns:Print(MIG:DebugLine()) end
-
-    local API = ns:GetModule("API")
-    if API and API.DebugLine then ns:Print(API:DebugLine()) end
-
-    local AQP = ns:GetModule("AutoQuestPopups")
-    if AQP and AQP.DebugLine then ns:Print(AQP:DebugLine()) end
-
-    local WP = ns:GetModule("WatchPersist")
-    if WP and WP.DebugLine then ns:Print(WP:DebugLine()) end
-
-    local BZ = ns:GetModule("Blizzard")
-    if BZ and BZ.DebugLine then ns:Print(BZ:DebugLine()) end
-
-    local AT = ns:GetModule("AutoTrack")
-    if AT and AT.DebugLine then ns:Print(AT:DebugLine()) end
-
-    local QC = ns:GetModule("QuestieCoexist")
-    if QC and QC.DebugLine then ns:Print(QC:DebugLine()) end
-
-    local VIS = ns:GetModule("Visibility")
-    if VIS and VIS.DebugLine then ns:Print(VIS:DebugLine()) end
+    debugLine("ItemButtons")
+    debugLine("ManualOrder")
+    debugLine("Distance")
+    debugLine("Migrate")
+    debugLine("API")
+    debugLine("AutoQuestPopups")
+    debugLine("WatchPersist")
+    debugLine("Blizzard")
+    debugLine("AutoTrack")
+    debugLine("QuestieCoexist")
+    debugLine("QuestLogChecks")
+    debugLine("Visibility")
 
     local ZP = ns:GetModule("ZoneProgress")
     if ZP and ZP.DebugLines then
-        for _, line in ipairs(ZP:DebugLines()) do ns:Print(line) end
+        local ok, lines = pcall(ZP.DebugLines, ZP)
+        if ok and type(lines) == "table" then
+            for _, line in ipairs(lines) do ns:Print(line) end
+        elseif not ok then
+            ns:Print("|cffff5555ZoneProgress:DebugLines raised|r " .. tostring(lines))
+        end
     end
 
-    local ZB = ns:GetModule("ZoneProgressBar")
-    if ZB and ZB.DebugLine then ns:Print(ZB:DebugLine()) end
-
-    local BH = ns:GetModule("ScenarioBonusHUD")
-    if BH and BH.DebugLine then ns:Print(BH:DebugLine()) end
+    debugLine("ZoneProgressBar")
+    debugLine("ScenarioBonusHUD")
 end
 
 -- Bisection aid: skip a subsystem's OnEnable for a session so a fault can be narrowed to one
@@ -165,17 +161,30 @@ local function moduleCmd(cmd, rest)
 
     db.global.disabledProviders = db.global.disabledProviders or {}
     local offP = db.global.disabledProviders
+    -- The explicit-enable sets. Safe mode turns everything off as a default, and these are
+    -- what let one subsystem be brought back on top of it.
+    db.global.enabledModules   = db.global.enabledModules or {}
+    db.global.enabledProviders = db.global.enabledProviders or {}
+    local on, onP = db.global.enabledModules, db.global.enabledProviders
     local Registry = ns:GetModule("Registry")
+
+    -- Reports the EFFECTIVE state, not the raw flag: under safe mode the flag reads enabled
+    -- for everything, which made the whole optional half look innocent when it was not.
+    local function stateOf(disabled, overridden)
+        if disabled then return "|cffff5555disabled|r" end
+        if overridden and db.global.safeMode then return "enabled |cffffd100(override)|r" end
+        return "enabled"
+    end
 
     if cmd == "modules" then
         ns:Print(("skippable modules (safe mode %s, /reload to apply):")
             :format(db.global.safeMode and "|cffff5555ON|r" or "off"))
         for _, name in ipairs(list) do
-            ns:Print(("  %-18s %s"):format(name, off[name] and "|cffff5555disabled|r" or "enabled"))
+            ns:Print(("  %-18s %s"):format(name, stateOf(ns:IsModuleDisabled(name), on[name])))
         end
         ns:Print("providers:")
         for _, p in ipairs(Registry:Active()) do
-            ns:Print(("  %-18s %s"):format(p.id, offP[p.id] and "|cffff5555disabled|r" or "enabled"))
+            ns:Print(("  %-18s %s"):format(p.id, stateOf(ns:IsProviderDisabled(p.id), onP[p.id])))
         end
         return
     end
@@ -188,30 +197,41 @@ local function moduleCmd(cmd, rest)
     if want:lower() == "all" then
         if cmd == "disable" then
             db.global.safeMode = true
+            -- Cleared so a bisection starts from a clean slate rather than inheriting an
+            -- override left over from the previous one.
+            wipe(on)
+            wipe(onP)
             ns:Print("|cffff5555safe mode ON|r - every optional module, every provider, quest item buttons and quest popups are off. /reload to apply.")
         else
             db.global.safeMode = nil
             wipe(off)
             wipe(offP)
+            wipe(on)
+            wipe(onP)
             ns:Print("safe mode off, all modules and providers re-enabled. /reload to apply.")
         end
         return
     end
 
+    -- The two sets are always written together, so they can never disagree.
+    local disabling = (cmd == "disable")
+
     for _, name in ipairs(list) do
         if name:lower() == want:lower() then
-            off[name] = (cmd == "disable") or nil
+            off[name] = disabling or nil
+            on[name]  = (not disabling) or nil
             ns:Print(("%s is now %s. /reload to apply."):format(name,
-                off[name] and "|cffff5555disabled|r" or "enabled"))
+                stateOf(disabling, on[name])))
             return
         end
     end
 
     for _, p in ipairs(Registry:Active()) do
         if p.id:lower() == want:lower() then
-            offP[p.id] = (cmd == "disable") or nil
+            offP[p.id] = disabling or nil
+            onP[p.id]  = (not disabling) or nil
             ns:Print(("provider %s is now %s. /reload to apply."):format(p.id,
-                offP[p.id] and "|cffff5555disabled|r" or "enabled"))
+                stateOf(disabling, onP[p.id])))
             return
         end
     end
@@ -262,8 +282,16 @@ function Commands:OnEnable()
         if cmd == "disable" or cmd == "enable" or cmd == "modules" then
             moduleCmd(cmd, rest)
         elseif cmd == "bonushud" then
+            -- Guarded like flavorprobe below. The module is absent on a flavor whose TOC does
+            -- not list it, and this is the one documented command that fetched it unguarded.
             local BH = ns:GetModule("ScenarioBonusHUD")
-            if strtrim(rest or ""):lower() == "test" then BH:ToggleTest() else BH:Dump() end
+            if not BH then
+                ns:Print("scenario bonus HUD is not loaded on this client.")
+            elseif strtrim(rest or ""):lower() == "test" then
+                BH:ToggleTest()
+            else
+                BH:Dump()
+            end
         elseif cmd == "importeq" then
             importEQ()
         elseif cmd == "flavorprobe" then

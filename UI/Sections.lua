@@ -149,9 +149,15 @@ function Sections:ToggleCollapsed(groupID)
     local char = DB and DB:Char()
     if not char then return end
     char.sectionsCollapsed = char.sectionsCollapsed or {}
-    char.sectionsCollapsed[groupID] = not self:IsCollapsed(groupID)
+    local collapsed = not self:IsCollapsed(groupID)
+    char.sectionsCollapsed[groupID] = collapsed
     local Tracker = ns:GetModule("Tracker")
-    if Tracker then Tracker:Render() end
+    if not Tracker then return end
+    Tracker:Render()
+    -- After the render, which is what places the section and records where it landed.
+    if not collapsed and Tracker.ScrollSectionIntoView then
+        Tracker:ScrollSectionIntoView(groupID)
+    end
 end
 
 local function build(parent, groupID, title)
@@ -273,6 +279,14 @@ function Sections:ApplyStyle(header)
     Media:ApplyFont(header.count, delta - 4 - 2)
     Media:ApplyFont(header.collapse, delta)
 
+    -- Derived from the live font instead of fixed. Header Size Offset reaches 36pt inside
+    -- what was a 26px button, and past about 28 the text crossed its own hairline and drew
+    -- outside the bar. Floored at the old constant, so the default layout is untouched, and
+    -- stored because Height and Tracker's headerBand have to move with it.
+    local textH = header.text and header.text:GetStringHeight() or 0
+    self._h = (textH > 0) and math.max(HEADER_H, math.ceil(textH + 2)) or HEADER_H
+    header:SetHeight(self._h)
+
     local r, g, b
     if cfg.headerColorUseClass then r, g, b = Util.GetPlayerClassColor() end
     if not r then
@@ -307,7 +321,7 @@ function Sections:Place(header, content, y, group, collapsed, showTotal, extra)
     -- ASCII rather than an en dash: the Korean client font has no glyph for U+2013
     -- and every section header drew an empty box.
     header.collapse:SetText(collapsed and "+" or "-")
-    return HEADER_H
+    return self._h or HEADER_H
 end
 
 function Sections:HideAll()
@@ -315,5 +329,5 @@ function Sections:HideAll()
 end
 
 function Sections:Height()
-    return HEADER_H
+    return self._h or HEADER_H
 end

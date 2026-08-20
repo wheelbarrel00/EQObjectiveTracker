@@ -98,7 +98,10 @@ local function addInZoneTaskQuests()
     if not ns.Has.Map then return end
     local m = C_Map.GetBestMapForUnit("player")
     for _ = 1, MAP_DEPTH do
-        if not m then break end
+        -- The top of a hierarchy answers parentMapID 0, and 0 is truthy in Lua - so without
+        -- the second test this walked one more level and asked two APIs about map zero. The
+        -- sibling site below has carried this guard all along.
+        if not m or m <= 0 then break end
         local list = taskQuestsForMap(m)
         for i = 1, (list and #list or 0) do
             local q = list[i]

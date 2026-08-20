@@ -74,10 +74,20 @@ function Dialog:Build()
     -- SetPropagateKeyboardInput is protected, so the whole handler stands down in combat
     -- and Escape falls through to the default UI.
     f:EnableKeyboard(false)
-    f:HookScript("OnShow", function(frame)
-        if InCombatLockdown() then return end
+    local function armKeyboard(frame)
+        if InCombatLockdown() or not frame:IsShown() then return end
         frame:EnableKeyboard(true)
         frame:SetPropagateKeyboardInput(true)
+    end
+    f:HookScript("OnShow", function(frame)
+        -- Deferred rather than dropped. A dialog opened in combat stayed keyboard-dead for as
+        -- long as it was shown, so Escape never closed it even once the fight was over.
+        if InCombatLockdown() then
+            ns:GetModule("Events"):RunWhenOutOfCombat("eqot.dialogKeys",
+                function() armKeyboard(frame) end)
+            return
+        end
+        armKeyboard(frame)
     end)
     f:HookScript("OnHide", function(frame) frame:EnableKeyboard(false) end)
     f:SetScript("OnKeyDown", function(frame, key)

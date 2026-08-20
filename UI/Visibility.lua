@@ -57,10 +57,20 @@ local function setVisible(f, visible)
     if not visible then ns.Util.Tooltip():Hide() end
     f:SetAlpha(visible and 1 or 0)
     f._eqotHidden = (not visible) or nil
-    if not (IB and IB.Locked and IB:Locked()) then
-        if visible then f:Show() else f:Hide() end
+    -- Hiding for real once a secure button has been built strands the frame: Show is
+    -- protected in combat too, so a toggle mid-fight set alpha on a frame that was never
+    -- coming back, and printed nothing. Alpha carries every hide from then on and the frame
+    -- stays shown, which is the one state combat can always undo.
+    if visible then
+        if not (IB and IB.Locked and IB:Locked()) then f:Show() end
+    elseif not (IB and IB.HasSecureButtons and IB:HasSecureButtons()) then
+        f:Hide()
     end
     if IB and IB.SetMouseSuspended then IB:SetMouseSuspended(not visible) end
+    local Tracker = ns:GetModule("Tracker")
+    if Tracker and Tracker.SetScrollInputSuspended then
+        Tracker:SetScrollInputSuspended(not visible)
+    end
 end
 
 function Visibility:Apply()

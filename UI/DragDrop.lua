@@ -114,6 +114,7 @@ function DragDrop:OnDragStart(row)
 
     self.dragID    = e.id
     self.dragGroup = e.groupID
+    self.dragRow   = row
     self.dropIndex = nil
 
     local g = ensureGhost()
@@ -196,7 +197,12 @@ function DragDrop:Cancel()
         self.ghost:SetScript("OnUpdate", nil)
     end
     if self.indicator then self.indicator:Hide() end
-    self.dragID, self.dragGroup, self.dropIndex = nil, nil, nil
+    -- Next frame rather than now: the row's own OnMouseUp still has to read this to swallow
+    -- the click that ended the drag. A cancel from UpdateVisuals delivers neither, and the
+    -- flag left set makes that row ignore its next click and show no tooltip.
+    local row = self.dragRow
+    if row then C_Timer.After(0, function() row._wasDragging = nil end) end
+    self.dragID, self.dragGroup, self.dropIndex, self.dragRow = nil, nil, nil, nil
 end
 
 function DragDrop:OnDragStop()

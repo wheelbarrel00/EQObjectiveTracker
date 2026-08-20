@@ -48,7 +48,18 @@ local store = Entry.NewStore({
     tags    = {},
 })
 
-local firstSeen = {}
+-- Persisted per character. A session-local table stamped every quest that predated the
+-- session with the 0 baseline, so after a reload the whole log tied at 0 and the Recent
+-- sort fell through to alphabetical. Deliberately not in DB.defaults: it is created on
+-- first use and pruned to the live log below.
+local sessionSeen = {}
+local function stamps()
+    local DB   = ns:GetModule("DB")
+    local char = DB and DB:Char()
+    if not char then return sessionSeen end
+    if type(char.questFirstSeen) ~= "table" then char.questFirstSeen = {} end
+    return char.questFirstSeen
+end
 
 local dirtyAll        = true
 local dirtyObjectives = false
@@ -126,8 +137,24 @@ end
 
 -- Hoisted rather than written inline at the Prune call, which runs on the rebuild path and would
 -- allocate a fresh closure every time.
+--
+-- A quest that has not streamed in yet looks exactly like one that is gone, and pruning deletes
+-- a tracked flag from saved variables permanently - so absence has to repeat before it counts.
+-- A missed prune costs nothing but a stale id; a wrong one is unrecoverable.
+local PRUNE_STRIKES = 3
+local pruneMisses   = {}
 local function stillInLog(id)
-    return store:Get(id) ~= nil
+    if store:Get(id) then
+        pruneMisses[id] = nil
+        return true
+    end
+    local n = (pruneMisses[id] or 0) + 1
+    if n >= PRUNE_STRIKES then
+        pruneMisses[id] = nil
+        return false
+    end
+    pruneMisses[id] = n
+    return true
 end
 
 local function fillLines(e, id, index)
@@ -187,6 +214,7 @@ function Quests:IsCurrentZone(entry)
 end
 
 local function fullRebuild()
+    local firstSeen = stamps()
     local currentHeader
     local watchedDuringWalk = 0
     store:Begin()
@@ -234,13 +262,14 @@ local function fullRebuild()
 
     store:Finish()
 
-    for id in pairs(firstSeen) do
-        if not store:Get(id) then
-            firstSeen[id], tagIDCache[id] = nil, nil
-        end
-    end
-
+    -- Pruned only against a log that actually returned something. A cold login can present
+    -- an empty one, and pruning against that would drop every persisted stamp.
     if next(store:Out()) ~= nil then
+        for id in pairs(firstSeen) do
+            if not store:Get(id) then
+                firstSeen[id], tagIDCache[id] = nil, nil
+            end
+        end
         primed    = true
         baselined = true
     end
