@@ -102,16 +102,24 @@ local function renderLines(tip, questID)
 end
 
 -- A task quest's rewards stream in after RequestPreloadRewardData, so the first hover of a
--- cold world quest drew a tooltip with no rewards and nothing ever redrew it. One re-draw,
--- armed only when no reward line came back, and only while the same row is still hovered and
--- still showing the same quest.
+-- cold world quest drew a tooltip with no rewards and nothing ever redrew it.
 local REDRAW_DELAY = 0.4
+local REDRAW_TRIES = 3
 
+-- The budget is spent per hover and is what ends the chain: each re-draw arms the next one
+-- from inside its own callback, so without it a row whose rewards never resolve rebuilt its
+-- tooltip every REDRAW_DELAY for as long as the cursor sat on it. The generation is the
+-- other half - a single armed flag let one row's pending re-draw refuse the arm of the next
+-- row hovered inside the delay, and that row then never drew its rewards at all.
 local function armRedraw(owner, questID, redraw)
-    if RT._redrawArmed then return end
-    RT._redrawArmed = true
+    local left = RT._redrawLeft or 0
+    if left <= 0 then return end
+    RT._redrawLeft = left - 1
+
+    RT._redrawGen = (RT._redrawGen or 0) + 1
+    local gen = RT._redrawGen
     C_Timer.After(REDRAW_DELAY, function()
-        RT._redrawArmed = nil
+        if RT._redrawGen ~= gen then return end
         local tip = Util.Tooltip()
         if not (tip:IsShown() and tip:GetOwner() == owner) then return end
         -- The row may have been recycled onto another quest inside the delay.
@@ -123,7 +131,14 @@ end
 
 RT.calls, RT.drawn = 0, 0
 
+-- The public entry points are hover handlers, so they are where a fresh re-draw budget
+-- belongs. The draw itself must not refill it or it could never run out.
 function RT:Show(owner, questID)
+    self._redrawLeft = REDRAW_TRIES
+    self:_DrawQuest(owner, questID)
+end
+
+function RT:_DrawQuest(owner, questID)
     self.calls = self.calls + 1
     if not (owner and questID) then return end
     local QR = ns:GetModule("QuestRewards")
@@ -136,7 +151,7 @@ function RT:Show(owner, questID)
     tip:Show()
     self.drawn = self.drawn + 1
     if not sawReward then
-        armRedraw(owner, questID, function() self:Show(owner, questID) end)
+        armRedraw(owner, questID, function() self:_DrawQuest(owner, questID) end)
     end
 end
 
@@ -149,6 +164,7 @@ end
 -- and cannot place one. The arrow belongs to whatever registered a focus listener.
 function RT:ShowForEntry(owner, entry, clickHint)
     if not (owner and entry and entry.id) then return end
+    self._redrawLeft = REDRAW_TRIES
     -- Scalars only from here down. An entry is provider-owned and invalid after the next
     -- GetEntries, so the deferred re-draw below must never hold one.
     self:_DrawEntry(owner, entry.id, entry.title, entry.expiresAt, clickHint)

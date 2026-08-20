@@ -190,9 +190,6 @@ function Tracker:SetScrollInputSuspended(suspended)
     suspendBarInput(f.eventsScroll, suspended)
 end
 
--- True whenever the tracker is alpha-hidden but still on screen. Every mouse handler in the
--- tracker checks this. Without it an alpha-0 tracker keeps taking clicks, tooltips and the
--- wheel, which is the trap EQ leaves open on all but two of its paths.
 -- Expanding a section near the bottom of a long list puts its rows below the viewport, so the
 -- header flips to "-" and nothing else appears to happen. Scrolls only when the body is short
 -- of room, and never past the end.
@@ -212,6 +209,9 @@ function Tracker:ScrollSectionIntoView(groupID)
     end
 end
 
+-- True whenever the tracker is alpha-hidden but still on screen. Every mouse handler in the
+-- tracker checks this. Without it an alpha-0 tracker keeps taking clicks, tooltips and the
+-- wheel, which is the trap EQ leaves open on all but two of its paths.
 function Tracker:IsClickThrough()
     local f = self.frame
     return (f and f._eqotHidden and f:IsShown()) and true or false
@@ -228,8 +228,6 @@ local function deferRender()
     ns:GetModule("Events"):RunWhenOutOfCombat("eqot.deferredRender", renderWhenSafe)
 end
 
--- In Top mode the protected quest scroll hangs off this region, so resizing it in combat
--- blocks. Bottom mode has nothing protected below it and needs no gate.
 -- Deferred on BOTH positions, though nothing in this region is secure. Render skips
 -- scroll:SetSize under the same lock, so growing the region in combat moved half the layout
 -- and left the quest area at its old size, drawing rows past the tracker's bottom edge until

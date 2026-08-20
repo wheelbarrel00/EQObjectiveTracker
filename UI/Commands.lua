@@ -44,7 +44,7 @@ handlers.debug = function()
     tracker():Render()
 end
 
--- Every DebugLine goes through here. One module raising must not take the rest of the report
+-- One module raising must not take the rest of the report
 -- with it: this is the tool for diagnosing a broken subsystem, so it has to outlive one, and
 -- a report that stops halfway reads as "the addon is fine up to here".
 local function debugLine(name, prefix, method)

@@ -165,8 +165,20 @@ function HUD:_Acquire()
     f:EnableMouse(true)
     -- Hiding this frame fires no OnLeave on the reward button inside it, and the private
     -- tooltip does not self-heal the way the shared one did, so hiding the HUD under a
-    -- hovered reward icon left an opaque box over the world.
-    f:HookScript("OnHide", function() ns.Util.Tooltip():Hide() end)
+    -- hovered reward icon left an opaque box over the world. Scoped to this frame's own
+    -- subtree because the owner is a reward button two levels down, and an unscoped hide
+    -- would close the tooltip of whatever the cursor is really on.
+    f:HookScript("OnHide", function(s)
+        local tip   = ns.Util.Tooltip()
+        local owner = tip:GetOwner()
+        while owner do
+            if owner == s then
+                tip:Hide()
+                return
+            end
+            owner = owner.GetParent and owner:GetParent()
+        end
+    end)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(s)
         local st = hudState()

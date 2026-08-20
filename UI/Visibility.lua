@@ -46,11 +46,11 @@ local function shouldHide(f)
     return false
 end
 
--- A real Hide wherever the engine allows one, which is everywhere except combat with a
--- secure quest-item button live - there Show and Hide are protected and alpha is the only
--- hide available, exactly as in EQ. Unlike EQ the invisible frame is also made
--- click-through: Tracker:IsClickThrough gates every mouse handler and the item buttons
--- give up their own mouse, so an alpha-0 tracker cannot take clicks, tooltips or the wheel.
+-- A real Hide until a secure quest-item button has been built, and alpha from then on for the
+-- rest of the session - HasSecureButtons latches, so this is not scoped to combat. Unlike EQ
+-- the invisible frame is also made click-through: Tracker:IsClickThrough gates every mouse
+-- handler and the item buttons give up their own mouse, so an alpha-0 tracker cannot take
+-- clicks, tooltips or the wheel.
 local function setVisible(f, visible)
     local IB = ns:GetModule("ItemButtons")
     -- The alpha-only path fires no OnHide, so the frame's own hook cannot catch this one

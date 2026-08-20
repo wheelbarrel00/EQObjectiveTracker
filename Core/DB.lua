@@ -234,7 +234,15 @@ function DB:ResetAll()
     if self.db.ResetProfile then self.db:ResetProfile() end
 
     local g = self.db.global
-    if g then g.optionsWindowScale = self.defaults.global.optionsWindowScale end
+    if g then
+        g.optionsWindowScale = self.defaults.global.optionsWindowScale
+        -- The bisection axis is not a setting, but a player who ran /eqot disable all and
+        -- forgot is looking at an addon with most of it switched off, and this is the button
+        -- they reach for. Cleared rather than defaulted: absence is what these five read as
+        -- off, and Commands recreates the tables on the next use.
+        g.safeMode, g.disabledModules, g.disabledProviders = nil, nil, nil
+        g.enabledModules, g.enabledProviders               = nil, nil
+    end
 
     local c = self.db.char
     if c then

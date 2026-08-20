@@ -5,12 +5,14 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.11.0] - 2026-08-19
+
+Every language complete, and a long round of fixes from a full audit of the addon.
 
 ### New Features
 
 - Scheduled quests are their own filter category. Retail has a fourth kind of quest reset
-  that this addon did not recognise, so Special Assignments and some meta quests carried no
+  that this addon did not recognize, so Special Assignments and some meta quests carried no
   category at all, filtered as normal quests, and sorted above weekly ones with nothing
   naming them. They now have their own checkbox and their own place in the Type sort.
 
@@ -29,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   because its rows landed below the visible area. The section now scrolls into view.
 - A list that got shorter, such as the World Quests area after untracking one, left blank
   space where the rows used to be until you scrolled back up.
-- Quest titles coloured by difficulty did not recolour when you levelled up.
+- Quest titles colored by difficulty did not recolor when you leveled up.
 - Section header bars stayed a fixed height whatever the Header Size Offset was set to, so
   large text spilled outside the bar.
 - Abandoning a quest from the row menu did nothing and said nothing when it could not be
@@ -44,14 +46,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it was tracked.
 - Classic: the tracker's own quest order grew without limit and was never trimmed.
 - Classic: the World Quest and Scenario Bonus options appeared with nothing behind them.
-- The two colour settings that do nothing until another setting is on now dim to say so.
+- The two color settings that do nothing until another setting is on now dim to say so.
 - The Quest Complete Sound list reads None in your own language.
+- The reward tooltip rebuilt itself two and a half times a second, for as long as you hovered
+  a quest whose rewards had not finished loading.
+- Moving between two quests whose rewards were still loading could leave the second one
+  showing no rewards at all until you moved away and hovered it again.
+- Pressing Cancel on the Quest Title Color Override left "Use title color for completed
+  quests" looking available when it was not.
+- Hiding the scenario bonus display while hovering its reward icon could strand a tooltip on
+  screen.
+- A quest log that had not finished loading could drop the times quests were first seen,
+  which marked quests you already had as new for an hour and put them wrong in the Recent
+  sort.
 
 ### Improvements
 
+- Every language is now fully translated. German, French, Korean, Russian, Simplified Chinese
+  and Traditional Chinese all cover the whole addon, including the new scheduled quest filter.
 - Turning one module back on after `/eqot disable all` now works. It reported success and
   changed nothing, which defeated the purpose of the tool.
 - `/eqot status` no longer stops halfway if one part of the addon fails to report.
+- Reset all settings now also clears safe mode, so an addon left switched off by
+  `/eqot disable all` and forgotten about comes back.
 
 ## [1.10.0] - 2026-08-18
 

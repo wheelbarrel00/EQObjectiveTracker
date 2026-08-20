@@ -361,13 +361,18 @@ Options:RegisterTab({
             function(v)
                 local had = DB().titleColorOverride ~= nil
                 restyle("titleColorOverride", v)
-                -- Only on the nil transition. The wheel fires this setter every frame of a
-                -- drag, and the sweep below is ~40 SetAlpha calls.
-                if not had then syncDependents() end
+                -- Only when the nil state actually changes, in either direction. The wheel
+                -- fires this setter every frame of a drag, and the sweep is ~40 SetAlpha
+                -- calls. Cancel comes back through here with the previous value, so testing
+                -- only for the arriving transition left the control undimmed and inert.
+                if had ~= (v ~= nil) then syncDependents() end
             end,
             L["When cleared, falls back to difficulty coloring or default yellow."],
             false,
-            function() restyle("titleColorOverride", nil); syncDependents() end)
+            function()
+                restyle("titleColorOverride", nil)
+                syncDependents()
+            end)
         titlePicker:SetPoint("TOPLEFT", colorsHeader, "BOTTOMLEFT", 0, self.GAP.tabHead)
 
         local titleClassCheck = self:CreateCheckbox(content, L["Use class color for titles"],

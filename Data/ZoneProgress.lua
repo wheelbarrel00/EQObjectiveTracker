@@ -95,7 +95,7 @@ end
 local qlQuests      = {}
 local retryCount    = {}
 local retryPending  = {}
--- Bumped by dirty(). A C_Timer callback cannot be cancelled, so a superseded chain retires
+-- Bumped by dirty(). A C_Timer callback cannot be canceled, so a superseded chain retires
 -- itself by comparing this instead.
 local retryGen      = 0
 

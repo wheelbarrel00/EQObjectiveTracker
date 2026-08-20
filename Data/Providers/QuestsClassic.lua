@@ -61,6 +61,11 @@ local function stamps()
     return char.questFirstSeen
 end
 
+-- Its own counter rather than stillInLog's, which TrackedSet:Prune already spends: two prunes
+-- sharing one set of strikes would reach the limit in half the passes.
+local SEEN_STRIKES = 3
+local seenMisses   = {}
+
 local dirtyAll        = true
 local dirtyObjectives = false
 local primed          = false
@@ -140,7 +145,7 @@ end
 --
 -- A quest that has not streamed in yet looks exactly like one that is gone, and pruning deletes
 -- a tracked flag from saved variables permanently - so absence has to repeat before it counts.
--- A missed prune costs nothing but a stale id; a wrong one is unrecoverable.
+-- A missed prune costs nothing but a stale id. A wrong one is unrecoverable.
 local PRUNE_STRIKES = 3
 local pruneMisses   = {}
 local function stillInLog(id)
@@ -263,11 +268,22 @@ local function fullRebuild()
     store:Finish()
 
     -- Pruned only against a log that actually returned something. A cold login can present
-    -- an empty one, and pruning against that would drop every persisted stamp.
+    -- an empty one, and pruning against that would drop every persisted stamp. That test is
+    -- one-sided though: a walk that returned SOME quests still says nothing about the ones
+    -- that have not streamed in, and they look identical to quests that are gone. So absence
+    -- has to repeat, exactly as the tracked-set prune above already requires.
     if next(store:Out()) ~= nil then
         for id in pairs(firstSeen) do
-            if not store:Get(id) then
-                firstSeen[id], tagIDCache[id] = nil, nil
+            if store:Get(id) then
+                seenMisses[id] = nil
+            else
+                local n = (seenMisses[id] or 0) + 1
+                if n >= SEEN_STRIKES then
+                    seenMisses[id] = nil
+                    firstSeen[id], tagIDCache[id] = nil, nil
+                else
+                    seenMisses[id] = n
+                end
             end
         end
         primed    = true

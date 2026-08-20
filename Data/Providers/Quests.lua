@@ -55,6 +55,11 @@ local function stamps()
     return char.questFirstSeen
 end
 
+-- Its own counter rather than sharing one with any other prune: two prunes spending the same
+-- strikes would reach the limit in half the passes.
+local SEEN_STRIKES = 3
+local seenMisses   = {}
+
 local dirtyAll        = true
 local dirtyObjectives = false
 
@@ -270,11 +275,22 @@ local function fullRebuild()
     store:Finish()
 
     -- Pruned only against a log that actually returned something. A cold login can present
-    -- an empty one, and pruning against that would drop every persisted stamp.
+    -- an empty one, and pruning against that would drop every persisted stamp. That test is
+    -- one-sided though: a walk that returned SOME quests still says nothing about the ones
+    -- that have not streamed in, and they look identical to quests that are gone. So absence
+    -- has to repeat, the same way TrackedSet's prune already handles the same hazard.
     if next(store:Out()) ~= nil then
         for id in pairs(firstSeen) do
-            if not store:Get(id) then
-                firstSeen[id], tagIDCache[id], objTextCache[id] = nil, nil, nil
+            if store:Get(id) then
+                seenMisses[id] = nil
+            else
+                local n = (seenMisses[id] or 0) + 1
+                if n >= SEEN_STRIKES then
+                    seenMisses[id] = nil
+                    firstSeen[id], tagIDCache[id], objTextCache[id] = nil, nil, nil
+                else
+                    seenMisses[id] = n
+                end
             end
         end
         primed    = true

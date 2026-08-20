@@ -30,8 +30,8 @@ end
 
 -- The quest log is this addon's stand-in for EQ's quest Cache: it decides whether an off-screen
 -- rank is worth carrying forward, and it is the only thing keeping the saved map from growing
--- for every quest ever dragged. Only ever asked from Commit, which a drag reaches, so the log
--- is loaded by then.
+-- for every quest ever dragged. Commit is the caller that matters, and a drag reaches it long
+-- after the log has loaded; DebugLine also asks, only to count.
 function ManualOrder:IsLive(questID)
     if C_QuestLog and C_QuestLog.GetLogIndexForQuestID then
         return C_QuestLog.GetLogIndexForQuestID(questID) ~= nil

@@ -9,6 +9,46 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.11.0", date = "2026-08-19",
+        summary = "Every language complete, and a long round of fixes from a full audit of the addon.",
+        sections = {
+            { head = "New Features", items = {
+                "Scheduled quests are their own filter category. Retail has a fourth kind of quest reset that this addon did not recognize, so Special Assignments and some meta quests carried no category at all, filtered as normal quests, and sorted above weekly ones with nothing naming them. They now have their own checkbox and their own place in the Type sort.",
+            } },
+            { head = "Bug Fixes", items = {
+                "Manual sort dropped a quest one row below the gold line it had just drawn, on every downward drag. Nudging a quest into the gap just below itself, which the line drew as no change, quietly moved it down one, so repeated drags walked it steadily to the bottom.",
+                "Starting combat mid drag kept the tracker glued to the cursor for the rest of the fight, then saved wherever the cursor happened to end up as its new position.",
+                "Hiding the tracker and then entering combat could leave it hidden: with a quest item button on screen, the toggle silently did nothing until the fight ended.",
+                "The Recent sort was the same as sorting by title for every quest accepted before the current session, and went back to that after every reload.",
+                "Expanding a section near the bottom of a long tracker looked like nothing happened, because its rows landed below the visible area. The section now scrolls into view.",
+                "A list that got shorter, such as the World Quests area after untracking one, left blank space where the rows used to be until you scrolled back up.",
+                "Quest titles colored by difficulty did not recolor when you leveled up.",
+                "Section header bars stayed a fixed height whatever the Header Size Offset was set to, so large text spilled outside the bar.",
+                "Abandoning a quest from the row menu did nothing and said nothing when it could not be done, most often because you were in combat. It now tells you why.",
+                "Clicking Abandon, Focus or Pop Out no longer risks acting on a stale quest.",
+                "The scroll bar still worked while the tracker was invisible in combat, so a click in the empty gutter scrolled a tracker you could not see.",
+                "The mouse wheel stopped working over the World Quests area during combat, which it never needed to.",
+                "The options window scale slider reported sizes the window could not actually take.",
+                "Classic: shift clicking a quest in the quest log to link it in chat also toggled whether it was tracked.",
+                "Classic: the tracker's own quest order grew without limit and was never trimmed.",
+                "Classic: the World Quest and Scenario Bonus options appeared with nothing behind them.",
+                "The two color settings that do nothing until another setting is on now dim to say so.",
+                "The Quest Complete Sound list reads None in your own language.",
+                "The reward tooltip rebuilt itself two and a half times a second, for as long as you hovered a quest whose rewards had not finished loading.",
+                "Moving between two quests whose rewards were still loading could leave the second one showing no rewards at all until you moved away and hovered it again.",
+                "Pressing Cancel on the Quest Title Color Override left \"Use title color for completed quests\" looking available when it was not.",
+                "Hiding the scenario bonus display while hovering its reward icon could strand a tooltip on screen.",
+                "A quest log that had not finished loading could drop the times quests were first seen, which marked quests you already had as new for an hour and put them wrong in the Recent sort.",
+            } },
+            { head = "Improvements", items = {
+                "Every language is now fully translated. German, French, Korean, Russian, Simplified Chinese and Traditional Chinese all cover the whole addon, including the new scheduled quest filter.",
+                "Turning one module back on after /eqot disable all now works. It reported success and changed nothing, which defeated the purpose of the tool.",
+                "/eqot status no longer stops halfway if one part of the addon fails to report.",
+                "Reset all settings now also clears safe mode, so an addon left switched off by /eqot disable all and forgotten about comes back.",
+            } },
+        },
+    },
+    {
         version = "1.10.0", date = "2026-08-18",
         summary = "German, and it is the most complete translation the addon has.",
         sections = {
