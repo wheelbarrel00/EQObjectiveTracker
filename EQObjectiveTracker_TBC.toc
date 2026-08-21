@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 1.11.0
+## Version: 1.11.1
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker

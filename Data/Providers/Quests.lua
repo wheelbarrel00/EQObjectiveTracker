@@ -196,18 +196,56 @@ end
 local zoneSet   = {}
 local zoneMapID = nil
 local zoneDirty = true
+-- The map the set was filled from. Differs from zoneMapID only when the walk below climbed.
+local zoneRootID = nil
 
-local function currentZoneSet()
-    if not (ns.Has.QuestsOnMap and ns.Has.Map) then return nil end
-    local map = C_Map.GetBestMapForUnit("player")
-    if not map then return nil end
-    if not zoneDirty and map == zoneMapID then return zoneSet end
-    local list = C_QuestLog.GetQuestsOnMap(map)
-    if not list then return nil end
-    wipe(zoneSet)
+local MAX_HOPS = 5
+
+local function fillZoneSet(list)
+    if not (list and #list > 0) then return false end
     for i = 1, #list do
         local q = list[i]
         if q and q.questID then zoneSet[q.questID] = true end
+    end
+    return true
+end
+
+-- The parent walk runs ONLY when the map underfoot has no quests of its own, so a map that
+-- already shows something can never change. A sub-area answers an empty list while its quests
+-- sit on the zone above it - measured in Revendreth, where map 1699 answered an empty list
+-- with the player's only quest on 1525 - which hid that quest outright. Stops at the first Zone, and
+-- refuses a parent above zone level, so it reaches the zone around a sanctum or a dungeon.
+local function currentZoneSet()
+    if not (ns.Has.QuestsOnMap and ns.Has.Map) then return nil end
+    local map = C_Map.GetBestMapForUnit("player")
+    if not map or map <= 0 then return nil end
+    if not zoneDirty and map == zoneMapID then return zoneSet end
+    local list = C_QuestLog.GetQuestsOnMap(map)
+    if not list then return nil end
+
+    wipe(zoneSet)
+    zoneRootID = map
+    if not fillZoneSet(list) then
+        local ZONE = Enum and Enum.UIMapType and Enum.UIMapType.Zone
+        local id   = map
+        for _ = 1, MAX_HOPS do
+            local info = C_Map.GetMapInfo and C_Map.GetMapInfo(id)
+            if not info or info.mapType == ZONE then break end
+            -- The top of a hierarchy answers 0, and 0 is truthy in Lua.
+            local parent = info.parentMapID
+            if not parent or parent <= 0 then break end
+            -- Refusing a parent ABOVE zone level is what actually bounds this. Breaking on a
+            -- Zone underfoot only stops the climb once one is reached, and a chain that skips
+            -- Zone entirely does exist - Data/ZoneProgress.lua names three - so without this
+            -- the set could be filled from a continent, which is every quest on it.
+            local pinfo = C_Map.GetMapInfo and C_Map.GetMapInfo(parent)
+            if ZONE and pinfo and pinfo.mapType and pinfo.mapType < ZONE then break end
+            id = parent
+            if fillZoneSet(C_QuestLog.GetQuestsOnMap(id)) then
+                zoneRootID = id
+                break
+            end
+        end
     end
     zoneMapID, zoneDirty = map, false
     return zoneSet
@@ -361,11 +399,18 @@ function Quests:DebugLine()
     -- refreshDynamic pass the stored pair describes an older log state than this line.
     local apiNow = C_QuestLog.GetNumQuestLogEntries() or 0
 
-    return ("quests: normal=%s questline=%s campaign=%s meta=%s important=%s | class %s\n      log api %d now %d walked %d | watched cached %d live %d | zone set map %s list %s"):format(
+    -- Named only when the cached set belongs to the map underfoot AND the walk climbed to
+    -- build it. Neither half is optional: zoneRootID is never cleared, so on a fail-open pass
+    -- or with the filter switched off it holds a previous map's root and would announce a
+    -- climb that did not happen, on the one line a "my quest vanished" report is read from.
+    local climbed = (zoneMapID == map and zoneRootID and zoneRootID ~= zoneMapID)
+        and (" -> zone %s"):format(tostring(zoneRootID)) or ""
+
+    return ("quests: normal=%s questline=%s campaign=%s meta=%s important=%s | class %s\n      log api %d now %d walked %d | watched cached %d live %d | zone set map %s list %s%s"):format(
         tostring(QC.Normal), tostring(QC.Questline), tostring(QC.Campaign),
         tostring(QC.Meta), tostring(QC.Important), table.concat(parts, " "),
         walkEntries, apiNow, walkQuests, cached, live, tostring(map),
-        list and tostring(#list) or "nil")
+        list and tostring(#list) or "nil", climbed)
 end
 
 -- Undocumented, like /eqot flavorprobe. Prints every signal that could place a quest beside

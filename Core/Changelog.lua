@@ -9,6 +9,17 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.11.1", date = "2026-08-20",
+        summary = "A hotfix for two quest tracker problems, one of them introduced by 1.11.0.",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Opening the world map could put a line in your chat naming this addon next to a game function called Button:SetPassThroughButtons. It affected anyone with \"Hide tracker when world map is open\" switched on, and it was new in 1.11.0. The tracker was hiding itself from inside the game's own map code, and now waits a moment and does it just after instead. Reported by DrahgunFyre.",
+                "\"Show only quests in current zone\" hid your quests while you were standing in a sub-area of the zone they belong to, such as a covenant sanctum, a building interior or a dungeon. The game files quests against the zone itself and reports none at all for those smaller maps, so the filter saw an empty list and hid everything. When the map you are standing on has no quests of its own, the tracker now asks the zone around it instead. Reported by RobSaab, and found with his help.",
+                "Worth knowing, since it follows from the same change: inside a dungeon or another instance that has no quests of its own, the tracker now lists the quests for the zone around it rather than reading empty. You are still in that zone, just inside something within it. A map that already showed quests is not affected in any way.",
+            } },
+        },
+    },
+    {
         version = "1.11.0", date = "2026-08-19",
         summary = "Every language complete, and a long round of fixes from a full audit of the addon.",
         sections = {

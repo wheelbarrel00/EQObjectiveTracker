@@ -28,7 +28,22 @@ local function ensureMapHook()
     local g = cfg()
     if not (g and g.hideOnMapOpen and WorldMapFrame) then return end
     Visibility._mapHooked = true
-    local function onMapToggle() Visibility:Apply() end
+    -- Deferred by a frame, and coalesced so a fast toggle cannot queue a second one. The hook
+    -- runs inside WorldMapFrame:Show, so Apply mutated frames there - alpha, Show and Hide, the
+    -- item buttons' mouse, and EnableMouse on the scroll bar and its children. A v1.11.0 user
+    -- who had never seen one before reported a blocked SetPassThroughButtons on a map pin, and
+    -- v1.11.0 is what added that EnableMouse call. No taint log was taken, so the mechanism is
+    -- inferred from that window alone. Same deferral as UI/Blizzard.lua. This does NOT reopen
+    -- the exoneration above: that one was measured against the 2026-07-30 report, which
+    -- reproduced with this hook never installed and before the EnableMouse call existed.
+    local function onMapToggle()
+        if Visibility._mapPending then return end
+        Visibility._mapPending = true
+        C_Timer.After(0, function()
+            Visibility._mapPending = nil
+            Visibility:Apply()
+        end)
+    end
     hooksecurefunc(WorldMapFrame, "Show", onMapToggle)
     hooksecurefunc(WorldMapFrame, "Hide", onMapToggle)
 end
