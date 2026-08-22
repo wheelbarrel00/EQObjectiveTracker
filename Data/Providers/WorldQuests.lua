@@ -30,14 +30,22 @@ local store = Entry.NewStore({
 })
 
 local candidates, seen, watched = {}, {}, {}
+-- Marked for every id a map list carries, INCLUDING one that push has already seen, because
+-- this answers "is it still out there" rather than "who found it first".
+local onMap = {}
 local sourceStats = { watched = 0, autozone = 0, inzone = 0, questlog = 0,
                       wq = 0, bonus = 0, logOwned = 0 }
 local currentSource
 -- Values only, formatted on demand in DebugLine. GetEntries runs on the render path, so
 -- building the strings here would allocate on every repaint for a line nobody has asked for.
 local rawZoneList, autoListOn = 0, false
+-- The map the zone list was actually read from, which is not the map underfoot whenever
+-- the zone-list walk below climbed out of a sub-area. On the one line a "my world quests are wrong"
+-- report is read from, that difference is the whole answer.
+local zoneListMap, zoneListClimbed = nil, false
 local detailN = 0
 local detailID, detailKind, detailMins, detailNamed = {}, {}, {}, {}
+local detailLive = {}
 
 local function push(qid)
     if qid and not seen[qid] then
@@ -52,15 +60,17 @@ local detailBuf = {}
 function WorldQuests:DebugLine()
     local m = ns.Has.Map and C_Map.GetBestMapForUnit("player")
     for i = 1, detailN do
-        detailBuf[i] = ("%d:%s%s%s"):format(detailID[i], detailKind[i],
+        detailBuf[i] = ("%d:%s%s%s%s"):format(detailID[i], detailKind[i],
             detailMins[i] and ("/" .. detailMins[i] .. "m") or "",
+            detailLive[i] or "",
             detailNamed[i] and "" or "/noname")
     end
-    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, raw map list %d, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s\n      candidates: %s")
+    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, list map %s%s, raw map list %d, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s\n      candidates: %s")
         :format(sourceStats.watched, sourceStats.autozone, sourceStats.inzone,
                 sourceStats.questlog, tostring(m),
                 sourceStats.wq, sourceStats.bonus, sourceStats.logOwned,
-                tostring(autoListOn), rawZoneList,
+                tostring(autoListOn), tostring(zoneListMap),
+                zoneListClimbed and " (climbed)" or "", rawZoneList,
                 tostring(C_QuestLog.IsWorldQuest ~= nil),
                 tostring(QuestUtils_IsQuestWorldQuest ~= nil),
                 tostring(ns.Has.WorldQuestTime and true or false),
@@ -79,8 +89,6 @@ local function addWatched()
     end
 end
 
-local GROUP_RESOLVE_DELAY = 1
-
 -- C_TaskQuest.GetQuestsForPlayerByMapID was renamed to GetQuestsOnMap - try the new
 -- name first, since the old one is gone on current retail.
 local function taskQuestsForMap(mapID)
@@ -92,24 +100,43 @@ local function taskQuestsForMap(mapID)
     return nil
 end
 
--- Walks the current map and its parents: a world quest you are standing inside is
--- often registered on a parent map rather than the one you are on.
+-- The bound both walks below need, and it is the one Quests:currentZoneSet already uses.
+-- A continent answers with every in-progress task quest on it, so the climb stops at the
+-- first Zone and refuses a parent above zone level - a chain that skips Zone entirely does
+-- exist, and Data/ZoneProgress.lua names three. Returns nil when there is nowhere to go.
+local function zoneParent(mapID)
+    if not (C_Map.GetMapInfo and mapID and mapID > 0) then return nil end
+    local ZONE = Enum and Enum.UIMapType and Enum.UIMapType.Zone
+    local info = C_Map.GetMapInfo(mapID)
+    if not info or info.mapType == ZONE then return nil end
+    -- The top of a hierarchy answers parentMapID 0, and 0 is truthy in Lua.
+    local parent = info.parentMapID
+    if not parent or parent <= 0 then return nil end
+    local pinfo = C_Map.GetMapInfo(parent)
+    if ZONE and pinfo and pinfo.mapType and pinfo.mapType < ZONE then return nil end
+    return parent
+end
+
+-- Walks the current map and its parents: a world quest you are standing inside is often
+-- registered on a parent map rather than the one you are on. Bounded by hop count alone this
+-- reached a continent within two hops on a Midnight zone, and a continent's list is every
+-- in-progress task quest on it, which is how quests from a zone the player had left kept
+-- refilling this section. zoneParent bounds it by map TYPE, which is the half that was missing.
 local function addInZoneTaskQuests()
     if not ns.Has.Map then return end
     local m = C_Map.GetBestMapForUnit("player")
     for _ = 1, MAP_DEPTH do
-        -- The top of a hierarchy answers parentMapID 0, and 0 is truthy in Lua - so without
-        -- the second test this walked one more level and asked two APIs about map zero. The
-        -- sibling site below has carried this guard all along.
         if not m or m <= 0 then break end
         local list = taskQuestsForMap(m)
         for i = 1, (list and #list or 0) do
             local q = list[i]
             local qid = q and (q.questId or q.questID)
-            if qid and q.inProgress then push(qid) end
+            if qid then
+                onMap[qid] = true
+                if q.inProgress then push(qid) end
+            end
         end
-        local info = C_Map.GetMapInfo and C_Map.GetMapInfo(m)
-        m = info and info.parentMapID
+        m = zoneParent(m)
     end
 end
 
@@ -133,22 +160,48 @@ local function isWorldQuest(qid)
 end
 
 -- Lists every world quest on the map you are standing in, watched or not. No inProgress
--- gate, which is what makes unstarted ones appear, and deliberately no parent-map walk:
--- a zone list should be the zone, not its whole continent.
+-- gate, which is what makes unstarted ones appear.
+--
+-- The climb runs ONLY when the map underfoot answers an EMPTY list, so a map that already
+-- lists something is never second-guessed. A sub-area - a cave, a building, an island's own
+-- map - answers empty while the zone's world quests sit one level up, which is what left
+-- this section blank while the player stood inside a quest area. zoneParent is what keeps it
+-- from reaching a continent.
+--
+-- An unreadable answer climbs as well as an empty one. This list is added to, never filtered
+-- against, so there is no fail-open contract to hold here the way Quests:IsCurrentZone has
+-- one - trying the parent can only find more, and finding nothing costs the same either way.
 local function addZoneWorldQuests()
     local DB  = ns:GetModule("DB")
     local cfg = DB and DB:Tracker()
+    -- Cleared before every early return, not just on the path that fills it. Left to go stale
+    -- it reports a PREVIOUS pass's map on the one line a "my world quests are wrong" report is
+    -- read from, which is the same trap Quests:currentZoneSet records for its zone suffix.
+    zoneListMap, zoneListClimbed = nil, false
     autoListOn = (cfg and cfg.autoListZoneWorldQuests) and true or false
     if not autoListOn then return end
     if not ns.Has.Map then return end
     local m = C_Map.GetBestMapForUnit("player")
     if not m or m <= 0 then return end
+    zoneListMap = m
+
     local list = taskQuestsForMap(m)
+    for _ = 1, MAP_DEPTH do
+        if list and #list > 0 then break end
+        local parent = zoneParent(zoneListMap)
+        if not parent then break end
+        zoneListMap, zoneListClimbed = parent, true
+        list = taskQuestsForMap(parent)
+    end
+
     rawZoneList = list and #list or 0
     for i = 1, (list and #list or 0) do
         local q   = list[i]
         local qid = q and (q.questId or q.questID)
-        if qid and isWorldQuest(qid) then push(qid) end
+        if qid then
+            onMap[qid] = true
+            if isWorldQuest(qid) then push(qid) end
+        end
     end
 end
 
@@ -166,6 +219,33 @@ end
 local function minutesLeft(questID)
     if not ns.Has.WorldQuestTime then return nil end
     return C_TaskQuest.GetQuestTimeLeftMinutes(questID)
+end
+
+-- A liveness question, not a claim. Claims must never be taken against the quest log, because
+-- it answers non-nil for hidden task quests - which is exactly what makes it right here.
+local function inQuestLog(questID)
+    return (C_QuestLog.GetLogIndexForQuestID
+            and C_QuestLog.GetLogIndexForQuestID(questID)) and true or false
+end
+
+-- Liveness for a WATCHED candidate, and it takes three signals rather than one. A quest still
+-- on a map list or still in the quest log is live whatever its timer says. Measured on
+-- 2026-08-21: quest 97128, a watched lair world quest on The Coiled Isle, reported no minutes
+-- at all - not zero, ABSENT - so a minutes-only test read it as an expired ghost and the row
+-- vanished while the default tracker still showed it. Not every world quest expires.
+--
+-- Strictly more permissive than the minutes test it replaces, so nothing that shows today can
+-- stop showing. A genuine ghost still fails all three.
+local function stillLive(questID, mins)
+    if mins and mins > 0 then return true end
+    return onMap[questID] or inQuestLog(questID)
+end
+
+-- Both quest providers feed the shared group cache, so this keeps anything EITHER of them
+-- still has. Pruning against this provider's entries alone would evict every quest-log answer,
+-- the quests provider would re-ask it a second later, and the eye would never settle.
+local function groupCacheKeep(qid)
+    return store:Get(qid) ~= nil or inQuestLog(qid)
 end
 
 local function title(questID)
@@ -199,53 +279,10 @@ local function typeAtlas(questID)
     return atlas
 end
 
--- CanCreateQuestGroup, never GetActivityIDForQuestID - the latter returns truthy for
--- ordinary world quests too, which would put the eye on every row.
-local groupCache = {}
-local pendingGroup, groupQueued = {}, false
-
-local function askCanCreateGroup(questID)
-    if QuestUtil and QuestUtil.CanCreateQuestGroup then
-        return QuestUtil.CanCreateQuestGroup(questID) and true or false
-    end
-    if C_LFGList and C_LFGList.CanCreateQuestGroup then
-        return C_LFGList.CanCreateQuestGroup(questID) and true or false
-    end
-    return false
-end
-
--- Resolved on a TIMER, never inside a render pass, and do not "simplify" it back.
--- Asking QuestUtil.CanCreateQuestGroup from inside the render taints the execution context,
--- and opening the world map in combat then blocks protected mouse calls on Blizzard's map POI
--- pins - ADDON_ACTION_BLOCKED on SetPassThroughButtons and SetPropagateMouseClicks, blamed on
--- EQOT. Bisected over eight rounds on 2026-07-31: the call is at fault and the eye button is
--- not, and caching to one call per quest still blocked, so volume is not the axis either. WHY
--- the timer helps was never proven - a timer callback is still insecure execution, so it may
--- have changed when the taint lands rather than whether it lands. The bisection is the evidence
--- here, so treat any explanation of it as a guess and do not move the call back on the strength
--- of one. Draining from a fresh timer is verified clean.
-local function drainGroupQueue()
-    groupQueued = false
-    local changed = false
-    for qid in pairs(pendingGroup) do
-        pendingGroup[qid] = nil
-        groupCache[qid] = askCanCreateGroup(qid)
-        changed = true
-    end
-    if changed and WorldQuests._notifyDirty then WorldQuests._notifyDirty() end
-end
-
--- A quest is eyeless for one tick the first time it appears, which is invisible in practice
+-- The cache and the deferred resolve moved to Data/QuestGroups.lua when the quests provider
+-- needed the same answer. The reasons not to call it from a render pass live there.
 local function canCreateGroup(questID)
-    local cached = groupCache[questID]
-    if cached ~= nil then return cached end
-
-    pendingGroup[questID] = true
-    if not groupQueued then
-        groupQueued = true
-        C_Timer.After(GROUP_RESOLVE_DELAY, drainGroupQueue)
-    end
-    return false
+    return ns:GetModule("QuestGroups"):CanCreate(questID)
 end
 
 local function fillLines(e, questID, complete)
@@ -258,7 +295,13 @@ local function fillLines(e, questID, complete)
         ln.completed = o.finished and true or false
         ln.current   = o.numFulfilled
         ln.required  = o.numRequired
-        if o.type == "progressbar" then ln.kind = LINE.PROGRESSBAR end
+        -- A progressbar objective reports a percentage out of 100, which is what WEIGHTED
+        -- means, and the renderer draws it as one rather than inferring it from
+        -- the denominator.
+        -- Anything else under that type is a real count and stays a count.
+        if o.type == "progressbar" then
+            ln.kind = (o.numRequired == 100) and LINE.WEIGHTED or LINE.PROGRESSBAR
+        end
     end
     if (objs and #objs or 0) == 0 and complete then
         local ln = Entry.PushLine(e)
@@ -274,6 +317,7 @@ end
 function WorldQuests:GetEntries()
     wipe(candidates)
     wipe(seen)
+    wipe(onMap)
     sourceStats.watched, sourceStats.inzone, sourceStats.questlog = 0, 0, 0
     sourceStats.autozone = 0
     sourceStats.wq, sourceStats.bonus, sourceStats.logOwned = 0, 0, 0
@@ -311,12 +355,17 @@ function WorldQuests:GetEntries()
             detailID[detailN]    = qid
             detailKind[detailN]  = wq and "wq" or (logOwned and "log" or "bonus")
             detailMins[detailN]  = mins
+            -- Which signal vouched for the candidate, which a bare count could never say
+            detailLive[detailN]  = onMap[qid] and "/map"
+                                   or inQuestLog(qid) and "/log"
+                                   or (watched[qid] and not (mins and mins > 0))
+                                      and "/ghost" or nil
             detailNamed[detailN] = name and true or false
         end
 
-        -- A watched entry with no time left is an expired ghost. Liveness cannot come
-        -- from IsWorldQuest: that stays true forever once a quest has been one.
-        local expired = watched[qid] and not (mins and mins > 0)
+        -- A watched entry nothing vouches for any more is an expired ghost. Liveness cannot
+        -- come from IsWorldQuest: that stays true forever once a quest has been one.
+        local expired = watched[qid] and not stillLive(qid, mins)
 
         if name and not expired and not logOwned then
             local complete = ns.Has.QuestIsComplete and C_QuestLog.IsComplete(qid) or false
@@ -341,13 +390,11 @@ function WorldQuests:GetEntries()
     -- Turn-in and removal miss the way most world quests actually end, which is expiring,
     -- and auto-list-zone memoizes every quest flown past whether or not it is ever accepted.
     -- Pruning against the live set also keeps the recycled-ID hazard the drop handler
-    -- describes from surviving the expiry path.
+    -- describes from surviving the expiry path. Both caches need it for the same reason.
     for qid in pairs(atlasCache) do
         if not store:Get(qid) then atlasCache[qid] = nil end
     end
-    for qid in pairs(groupCache) do
-        if not store:Get(qid) then groupCache[qid] = nil end
-    end
+    ns:GetModule("QuestGroups"):PruneExcept(groupCacheKeep)
 
     return out
 end
@@ -364,7 +411,7 @@ function WorldQuests:OnEntryClick(entry, button)
 end
 
 function WorldQuests:OnEntryGroupFinder(entry)
-    if LFGListUtil_FindQuestGroup then LFGListUtil_FindQuestGroup(entry.id) end
+    ns:GetModule("QuestGroups"):Find(entry.id)
 end
 
 local menuOut = {}
@@ -408,10 +455,14 @@ function WorldQuests:Enable(notifyDirty)
     local function drop(_, questID)
         if questID then
             atlasCache[questID] = nil
-            groupCache[questID] = nil
+            ns:GetModule("QuestGroups"):Forget(questID)
         end
         notifyDirty()
     end
+
+    -- The resolve lands a second after the render that asked for it, so without this the eye
+    -- never reaches the screen until some unrelated quest event happens by.
+    ns:GetModule("QuestGroups"):OnResolved(notifyDirty)
 
     Events:On("QUEST_TURNED_IN",           drop)
     Events:On("QUEST_REMOVED",             drop)

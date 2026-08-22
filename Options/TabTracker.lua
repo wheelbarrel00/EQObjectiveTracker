@@ -411,9 +411,21 @@ Options:RegisterTab({
         self:AttachTooltip(objCheck, L["Show objective progress numbers"],
             L["For example, 0/4, 1/1, etc."])
 
+        local barCheck = self:CreateCheckbox(content, L["Show progress bars"],
+            rowSetting("showProgressBars", true))
+        barCheck:SetPoint("TOPLEFT", objCheck, "BOTTOMLEFT", 0, -2)
+        self:AttachTooltip(barCheck, L["Show progress bars"],
+            L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."])
+
+        local widgetCheck = self:CreateCheckbox(content, L["Show event and scenario widgets"],
+            rowSetting("showTrackerWidgets", true))
+        widgetCheck:SetPoint("TOPLEFT", barCheck, "BOTTOMLEFT", 0, -2)
+        self:AttachTooltip(widgetCheck, L["Show event and scenario widgets"],
+            L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."])
+
         local qidCheck = self:CreateCheckbox(content, L["Show quest ID"],
             rowSetting("showQuestID"))
-        qidCheck:SetPoint("TOPLEFT", objCheck, "BOTTOMLEFT", 0, -2)
+        qidCheck:SetPoint("TOPLEFT", widgetCheck, "BOTTOMLEFT", 0, -2)
         self:AttachTooltip(qidCheck, L["Show quest ID"], L["Useful for bug reports."])
 
         -- UI/Tracker.lua reads showQuestTotal for every ordinary section and for the pinned

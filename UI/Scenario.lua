@@ -96,6 +96,7 @@ function Scenario:ReleaseCriteria()
         row.icon:Hide()
         row.icon:ClearAllPoints()
         row.text:ClearAllPoints()
+        row.text:SetWidth(0)
         row.text:SetText("")
         self.criteriaPool[#self.criteriaPool + 1] = row
         self.activeCriteria[i] = nil
@@ -229,6 +230,9 @@ end
 
 function Scenario:_Clear()
     self:ReleaseCriteria()
+    local WB = ns:GetModule("WidgetBlock")
+    if WB then WB:ClearScenario() end
+    self.widgetH = 0
     if self.subHeader then self.subHeader:Hide() end
     local banner = self.banner
     if banner then
@@ -281,8 +285,8 @@ function Scenario:_DrawBanner(info, cfg)
     end
 
     -- No UIWidgetContainer here on purpose. Registering one against Blizzard's shared widget
-    -- set was reported killing the next tooltip to close with widgets on it. Read the widgets
-    -- and draw them if the game's own delve display is ever wanted back.
+    -- set was reported killing the next tooltip to close with widgets on it. UI/WidgetBlock.lua
+    -- reads those widgets and draws our own frames from them instead.
     banner.Stage:ClearAllPoints()
     banner.Stage:SetPoint("TOP", banner, "TOP", 0, -10)
     if info.isFinalStage then
@@ -299,13 +303,13 @@ function Scenario:_DrawBanner(info, cfg)
     self:ApplyBannerShadow()
 end
 
-function Scenario:_DrawCriteria(container, lines)
+function Scenario:_DrawCriteria(container, cfg, lines)
     local Media    = ns:GetModule("Media")
     local width    = math.max(1, container:GetWidth() or 1)
     local barWidth = math.max(1, math.floor(width * BAR_W_RATIO))
     local rowWidth = math.max(1, width - 16)
-    local firstRowY = (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + BANNER_H
-                      + CRITERIA_LINE_GAP
+    local firstRowY = (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H)
+                      + BANNER_GAP + BANNER_H + (self.widgetH or 0) + CRITERIA_LINE_GAP
 
     local prev
     for i = 1, #lines do
@@ -323,21 +327,41 @@ function Scenario:_DrawCriteria(container, lines)
             row:SetPoint("TOP", container, "TOP", 0, -firstRowY)
         end
 
-        if ln.kind == LINE.WEIGHTED and not ln.completed then
+        -- WEIGHTED already carries a percentage, so its denominator is fixed at 100.
+        -- PROGRESSBAR is a running total and keeps its own.
+        local barValue, barMax, barLabel
+        if not ln.completed and (not cfg or cfg.showProgressBars ~= false) then
+            if ln.kind == LINE.WEIGHTED then
+                barValue, barMax = math.max(0, math.min(100, ln.current or 0)), 100
+                barLabel = ("%d%%"):format(barValue)
+            -- Only a real meter. A 0/1 criterion is a yes or no, and drawing a bar for it
+            -- reads as broken beside the checkmark rows around it.
+            elseif ln.kind == LINE.PROGRESSBAR and ln.required and ln.required > 1 then
+                barValue = math.max(0, math.min(ln.required, ln.current or 0))
+                barMax   = ln.required
+                barLabel = ("%d/%d"):format(barValue, barMax)
+            end
+        end
+
+        if barValue then
             row:SetWidth(barWidth)
             row.icon:Hide()
 
-            local pct = math.max(0, math.min(100, ln.current or 0))
             row.bar:Show()
             row.bar:ClearAllPoints()
             row.bar:SetWidth(barWidth)
-            row.bar:SetValue(pct)
-            row.bar.label:SetFormattedText("%d%%", pct)
+            row.bar:SetMinMaxValues(0, barMax)
+            row.bar:SetValue(barValue)
+            row.bar.label:SetText(barLabel)
 
             row.text:ClearAllPoints()
             if ln.text ~= "" then
                 row.text:SetPoint("TOP", row, "TOP", 0, 0)
                 row.text:SetJustifyH("CENTER")
+                -- Set for the same reason the text path below sets it, and this path measures
+                -- GetStringHeight too. Without it a pooled row keeps whatever width it last
+                -- drew with, so one criterion wraps and the next overflows the tracker.
+                row.text:SetWidth(barWidth)
                 row.text:SetText(ln.text)
                 row.text:SetTextColor(1, 0.82, 0)
                 row.bar:SetPoint("TOP", row.text, "BOTTOM", 0, -2)
@@ -365,11 +389,20 @@ function Scenario:_DrawCriteria(container, lines)
             -- explicitly or a wrapped criterion measures as one line and rows overlap
             row.text:SetWidth(math.max(1, rowWidth - 18))
 
-            -- Completed criteria drop the X/Y prefix, matching the default tracker
+            -- Completed criteria drop the meter, matching the default tracker. An
+            -- unfinished one keeps it here, which is the only place it survives when bars
+            -- are switched off.
             local label = ln.text or ""
-            if ln.kind == LINE.PROGRESSBAR and not ln.completed
-               and ln.required and ln.required > 0 then
-                label = ("%d/%d %s"):format(ln.current or 0, ln.required, label)
+            if not ln.completed then
+                local meter
+                if ln.kind == LINE.WEIGHTED then
+                    meter = ("%d%%"):format(ln.current or 0)
+                elseif ln.kind == LINE.PROGRESSBAR and ln.required and ln.required > 0 then
+                    meter = ("%d/%d"):format(ln.current or 0, ln.required)
+                end
+                if meter then
+                    label = (label ~= "") and (meter .. " " .. label) or meter
+                end
             end
             row.text:SetText(label)
             if ln.completed then
@@ -386,15 +419,22 @@ function Scenario:_DrawCriteria(container, lines)
     end
 end
 
-function Scenario:Render(container, cfg, info, entry)
+-- topOffset is the height the widget block above already took. Everything here anchors
+-- from it rather than from the container's own top, so the two share one container and
+-- one combat-gated SetHeight.
+function Scenario:Render(container, cfg, info, entry, topOffset)
     self:Build(container)
     if not (self.banner and self.subHeader) then return 1 end
+    self.topOffset = topOffset or 0
 
     if not info then
         self:_Clear()
         return 1
     end
 
+    self.subHeader:ClearAllPoints()
+    self.subHeader:SetPoint("TOPLEFT",  container, "TOPLEFT",  0, -self.topOffset)
+    self.subHeader:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, -self.topOffset)
     self.subHeader:Show()
     self:ApplyHeaderLabels(info.category, info.name)
     self:ApplyHeaderFont()
@@ -402,10 +442,16 @@ function Scenario:Render(container, cfg, info, entry)
 
     self:_DrawBanner(info, cfg)
 
-    self:ReleaseCriteria()
-    self:_DrawCriteria(container, (entry and entry.lines) or {})
+    -- Between the banner and the criteria, which is where the stage block draws it. The
+    -- scenario's countdown belongs to the scenario, not to the top of the tracker.
+    local WB = ns:GetModule("WidgetBlock")
+    self.widgetH = WB and WB:RenderScenario(container, cfg,
+        (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + BANNER_H) or 0
 
-    local h = (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + BANNER_H
+    self:ReleaseCriteria()
+    self:_DrawCriteria(container, cfg, (entry and entry.lines) or {})
+
+    local h = (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + BANNER_H + self.widgetH
     for i = 1, #self.activeCriteria do
         h = h + CRITERIA_LINE_GAP + self.activeCriteria[i]:GetHeight()
     end

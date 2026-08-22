@@ -5,6 +5,49 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-08-21
+
+Answers a report from Souseiseki87 about the World Quests panel, and about information that
+goes missing during scenarios, delves and the events that borrow the scenario panel.
+
+### New Features
+
+- The tracker now draws the extra bars and status lines the game's own tracker shows during
+  world events, delves and scenarios. Because this tracker replaces the default one, those
+  were not being shown anywhere at all. A new "Show event and scenario widgets" option on the
+  Tracker tab turns them off.
+- Scenario countdowns are shown again, under the stage banner, where the default tracker puts
+  them. The Curse Surge on The Coiled Isle is one of these.
+- A delve's tier is on screen again. The changelog for 1.9.1 said it would come back and this
+  is that.
+- Objectives that report a percentage or a running total now draw a filled bar instead of a
+  plain line of text, the way the default tracker does. Applies to quests, World Quests,
+  achievements and scenario objectives. A new "Show progress bars" option turns it off. An
+  objective that is really a yes or no, such as 0/1, stays as text.
+- The group finder eye now appears on ordinary quests that can form a group, not only on World
+  Quests. The default tracker has always shown it on both.
+
+### Bug Fixes
+
+- The World Quests section filled up with quests from other zones. The tracker was walking up
+  the map hierarchy without a limit, which reaches the whole continent within two steps, and a
+  continent lists every world quest in progress anywhere on it. It now stops at the zone.
+  Reported by Souseiseki87.
+- World quests in your current zone were sometimes not listed, even while you were standing in
+  the quest area. The game files those quests against the zone, and reports none at all for the
+  smaller maps inside it, so standing in a cave or a building meant an empty list. The tracker
+  now asks the zone around it, and only when the map you are on lists nothing of its own.
+  Reported by Souseiseki87.
+- A tracked world quest with no expiry timer, such as a lair, disappeared from the tracker. It
+  was being treated as an expired quest that had not been cleaned up. Having no timer and
+  having run out of time are not the same thing, and the tracker now checks whether the quest
+  is still on the map or still in your log before dropping it.
+- Known, and the next thing being fixed: inside a delve or another instance, a tracked world
+  quest that has no expiry timer drops off the list until you leave, and comes back on its own
+  once you are outside. The tracker asks whether the quest is on the map you are standing on,
+  and inside an instance nothing can answer that, so it reads as gone. Nothing is lost while it
+  is hidden.
+
 ## [1.11.1] - 2026-08-20
 
 A hotfix for two quest tracker problems, one of them introduced by 1.11.0.

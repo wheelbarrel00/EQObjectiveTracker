@@ -136,6 +136,8 @@ L["Show zone label under quest titles"] = "任务标题下方显示所属区域�
 L["Adds the quest log heading each quest came from as a small line under its title."] = "在任务标题下方小字显示该任务所属的任务日志分类。"
 L["Show objective progress numbers"] = "显示目标进度数字"
 L["For example, 0/4, 1/1, etc."] = "例如：0/4、1/1。"
+L["Show progress bars"] = "显示进度条"
+L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "对于会给出百分比或累计数值的目标，像默认追踪器那样绘制一条填充的进度条，而不是单纯的一行文字。适用于任务、世界任务、成就和场景战目标。"
 L["Show quest ID"] = "显示任务ID"
 L["Useful for bug reports."] = "用于提交Bug反馈参考。"
 L["Show the visible / total count on section headers"] = "板块标题显示可见/总数量"
@@ -388,6 +390,9 @@ L["Sanctified Banner: Grand Spoils earned"] = "圣化旗帜：已获得丰厚战
 L["Sanctified Banner: bonus Spoils secured"] = "圣化旗帜：已获取额外战利品"
 L["Sanctified Banner: kill the Voidfused Rager"] = "圣化旗帜：击杀虚空融合狂怒者"
 L["Sanctified Banner: find it for bonus loot"] = "圣化旗帜：找到它获取额外奖励"
+
+-- Data/Widgets.lua
+L["Tier %d"] = "%d 层"
 
 -- UI/AutoQuestPopup.lua
 L["Click to view quest"] = "点击查看任务"

@@ -35,6 +35,15 @@ local SUB_TO_LINES     = 2
 local SUBTITLE_COLOR   = { 0.42, 0.69, 1.00 }
 local DEFAULT_DONE_HEX = "44ff44"
 
+-- Objective lines are drawn as an ordered run of blocks rather than one string, so a bar can
+-- sit between two text lines instead of being pushed under them. With bars switched off every
+-- line is text, the run collapses to the single block that shipped before it existed, and the
+-- layout below is unchanged.
+local BLOCK_BAR   = "bar"
+local BAR_H       = 14
+local BAR_GAP     = 2
+local BAR_TEXTURE = [[Interface\TargetingFrame\UI-StatusBar]]
+
 -- A client with super-track marks its focused row with the -SuperTracked atlas, and that art
 -- does not exist anywhere else, so a client without the API gets a title tint instead. Nil is
 -- the off switch: every read below is a plain truth test, so retail takes none of these
@@ -213,9 +222,36 @@ local function doneHex(cfg)
     return DEFAULT_DONE_HEX
 end
 
--- Every user styling option is applied here, once, so it reaches every content type.
+-- The run is written into these shared arrays rather than returned, because Render rebuilds it
+-- on every repaint and a fresh table per row would allocate proportionally to tracker length.
+-- Only buildBlocks writes them, and only Render and blocksKey read them.
 local _scratch = {}
-local function buildLineText(entry, cfg)
+local _bKind, _bText, _bCur, _bReq, _bPct = {}, {}, {}, {}, {}
+local _nBlocks, _nText = 0, 0
+
+local function flushText()
+    if _nText == 0 then return end
+    _nBlocks = _nBlocks + 1
+    _bKind[_nBlocks] = nil
+    _bPct[_nBlocks]  = nil
+    _bText[_nBlocks] = table.concat(_scratch, "\n", 1, _nText)
+    _nText = 0
+end
+
+-- A completed line keeps its checkmark and its text rather than drawing a full bar, matching
+-- the default tracker. richText is pre-colored engine output and is never re-formatted.
+local function isBarLine(ln, cfg)
+    if cfg and cfg.showProgressBars == false then return false end
+    if ln.richText or ln.completed then return false end
+    -- WEIGHTED is already a percentage against a fixed 100, so it has no denominator to test
+    if ln.kind == LINE.WEIGHTED then return true end
+    if ln.kind ~= LINE.PROGRESSBAR then return false end
+    -- Only a real meter. A 0/1 objective is a yes or no, and a bar for it reads as broken.
+    return (ln.required and ln.required > 1) and true or false
+end
+
+-- Every user styling option is applied here, once, so it reaches every content type.
+local function buildBlocks(entry, cfg)
     local lines  = entry.lines
     local hex    = doneHex(cfg)
     local hideN  = cfg and cfg.showObjectiveNumbers == false
@@ -224,47 +260,147 @@ local function buildLineText(entry, cfg)
     local groups   = cfg and cfg.simplifyGroups
     local hideDone = simple or (groups and entry.groupID and groups[entry.groupID]) or false
 
-    local n = 0
+    _nBlocks, _nText = 0, 0
+
     for i = 1, #lines do
         local ln = lines[i]
         if not (hideDone and ln.completed) then
-            local text = ln.text or ""
-            if not ln.richText then
-                if ln.kind == LINE.PROGRESSBAR and ln.required and ln.required > 0 then
-                    local meter = tostring(ln.current or 0) .. "/" .. tostring(ln.required)
-                    -- A finished bar reads as its label alone, matching the default
-                    -- tracker. With no label the meter is all there is, so it stays.
-                    if not ln.completed then
-                        text = (text ~= "") and (meter .. " " .. text) or meter
-                    elseif text == "" then
-                        text = meter
+            if isBarLine(ln, cfg) then
+                flushText()
+                _nBlocks = _nBlocks + 1
+                _bKind[_nBlocks] = BLOCK_BAR
+                -- The meter moves into the bar, so a label already carrying one would show
+                -- the same numbers twice
+                _bText[_nBlocks] = Util.StripLeadingCount(ln.text or "")
+                _bPct[_nBlocks]  = (ln.kind == LINE.WEIGHTED) or nil
+                if _bPct[_nBlocks] then
+                    _bCur[_nBlocks] = math.max(0, math.min(100, ln.current or 0))
+                    _bReq[_nBlocks] = 100
+                else
+                    _bCur[_nBlocks] = ln.current or 0
+                    _bReq[_nBlocks] = ln.required
+                end
+            else
+                local text = ln.text or ""
+                if not ln.richText then
+                    if (ln.kind == LINE.PROGRESSBAR or ln.kind == LINE.WEIGHTED)
+                       and ln.required and ln.required > 0 then
+                        local meter = tostring(ln.current or 0) .. "/" .. tostring(ln.required)
+                        -- A finished bar reads as its label alone, matching the default
+                        -- tracker. With no label the meter is all there is, so it stays.
+                        if not ln.completed then
+                            text = (text ~= "") and (meter .. " " .. text) or meter
+                        elseif text == "" then
+                            text = meter
+                        end
+                    end
+                    if hideN then text = Util.StripLeadingCount(text) end
+                    if ln.completed then
+                        text = "|A:common-icon-checkmark:12:12|a |cff" .. hex .. text .. "|r"
+                    elseif ln.kind == LINE.NOTE then
+                        text = "|cff999999- " .. text .. "|r"
+                    else
+                        text = "- " .. Util.ColorizeProgress(text)
                     end
                 end
-                if hideN then text = Util.StripLeadingCount(text) end
-                if ln.completed then
-                    text = "|A:common-icon-checkmark:12:12|a |cff" .. hex .. text .. "|r"
-                elseif ln.kind == LINE.NOTE then
-                    text = "|cff999999- " .. text .. "|r"
-                else
-                    text = "- " .. Util.ColorizeProgress(text)
-                end
+                _nText = _nText + 1
+                _scratch[_nText] = text
             end
-            n = n + 1
-            _scratch[n] = text
             if simple then break end
         end
     end
+    flushText()
 
     -- Everything finished still needs to show the last line, or the entry renders with a
     -- bare title and reads as though it had no objectives at all
-    if n == 0 and hideDone and #lines > 0 then
+    if _nBlocks == 0 and hideDone and #lines > 0 then
         local last = lines[#lines]
-        n = 1
-        _scratch[1] = "|A:common-icon-checkmark:12:12|a |cff" .. hex .. (last.text or "") .. "|r"
+        _nBlocks  = 1
+        _bKind[1] = nil
+        _bText[1] = "|A:common-icon-checkmark:12:12|a |cff" .. hex .. (last.text or "") .. "|r"
     end
+end
 
-    if n == 0 then return "" end
-    return table.concat(_scratch, "\n", 1, n)
+-- One key for the whole run rather than a thirteenth gate field. A bar whose fill moved has to
+-- repaint even when every string on the row is identical, so the values are in here as well.
+local _keyBuf = {}
+local function blocksKey()
+    if _nBlocks == 0 then return "" end
+    for i = 1, _nBlocks do
+        if _bKind[i] == BLOCK_BAR then
+            _keyBuf[i] = ("%d bar%s %s %s/%s"):format(
+                i, _bPct[i] and " pct" or "", _bText[i], _bCur[i], _bReq[i])
+        else
+            _keyBuf[i] = i .. " " .. _bText[i]
+        end
+    end
+    return table.concat(_keyBuf, "\n", 1, _nBlocks)
+end
+
+local function newTextBlock(row)
+    local fs = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetJustifyH("LEFT")
+    fs:SetWordWrap(true)
+    fs:SetTextColor(0.85, 0.85, 0.85)
+    return fs
+end
+
+local function acquireTextBlock(row, i)
+    local fs = row._textBlocks[i]
+    if not fs then
+        fs = newTextBlock(row)
+        row._textBlocks[i] = fs
+    end
+    return fs
+end
+
+-- Parented to the row, never to the item-button container: rows sit outside the secure anchor
+-- family on purpose, which is what keeps them resizable while the ancestors are frozen.
+local function acquireBarBlock(row, i)
+    local bar = row._barBlocks[i]
+    if bar then return bar end
+
+    bar = CreateFrame("StatusBar", nil, row)
+    bar:SetHeight(BAR_H)
+    bar:SetStatusBarTexture(BAR_TEXTURE)
+    bar:SetStatusBarColor(0.26, 0.42, 1.0)
+
+    bar.bg = bar:CreateTexture(nil, "BACKGROUND")
+    bar.bg:SetAllPoints()
+    bar.bg:SetColorTexture(0.04, 0.07, 0.18, 0.9)
+
+    bar.border = CreateFrame("Frame", nil, bar, BackdropTemplateMixin and "BackdropTemplate")
+    bar.border:SetPoint("TOPLEFT", -1, 1)
+    bar.border:SetPoint("BOTTOMRIGHT", 1, -1)
+    bar.border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+    bar.border:SetBackdropBorderColor(0, 0, 0, 0.9)
+
+    bar.value = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.value:SetJustifyH("RIGHT")
+    bar.value:SetWordWrap(false)
+    bar.value:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
+
+    -- Bounded on the right by the meter rather than left to run under it. A criterion label
+    -- can be far wider than the bar, and word wrap is off, so an unbounded string would
+    -- print straight through the numbers.
+    bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.text:SetJustifyH("LEFT")
+    bar.text:SetWordWrap(false)
+    bar.text:SetPoint("LEFT",  bar, "LEFT", 4, 0)
+    bar.text:SetPoint("RIGHT", bar.value, "LEFT", -4, 0)
+
+    row._barBlocks[i] = bar
+    return bar
+end
+
+local function hideBlocks(row, firstText, firstBar)
+    local t = row._textBlocks
+    for i = firstText, (t and #t or 0) do
+        t[i]:SetText("")
+        t[i]:Hide()
+    end
+    local b = row._barBlocks
+    for i = firstBar, (b and #b or 0) do b[i]:Hide() end
 end
 
 -- EQ applies all three of these inside _RenderQuestGroup, so only quest and campaign rows
@@ -457,10 +593,11 @@ function Row:Build()
     r.subtitle:SetWordWrap(false)
     r.subtitle:SetTextColor(SUBTITLE_COLOR[1], SUBTITLE_COLOR[2], SUBTITLE_COLOR[3])
 
-    r.lines = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.lines:SetJustifyH("LEFT")
-    r.lines:SetWordWrap(true)
-    r.lines:SetTextColor(0.85, 0.85, 0.85)
+    -- Block one of the objective run, built with the row rather than on demand: almost every
+    -- row needs exactly this one, and a row with no bar then lays out as it always did.
+    r._textBlocks, r._barBlocks = {}, {}
+    r.lines = newTextBlock(r)
+    r._textBlocks[1] = r.lines
 
     r.timer = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.timer:SetJustifyH("RIGHT")
@@ -510,6 +647,7 @@ function Row:Reset(row)
     row._sFocus, row._sWidth, row._sText = nil, nil, nil
     row._sTime, row._sGen, row._sCardBg  = nil, nil, nil
     row._sGroup, row._sIcon, row._sItem = nil, nil, nil
+    hideBlocks(row, 1, 1)
     ns:GetModule("Card"):Clear(row)
 end
 
@@ -525,7 +663,10 @@ function Row:Render(row, entry, width, cfg)
 
     local titleText = decorateTitle(entry, cfg)
     local subtitle = (cfg and cfg.showZoneTag ~= false) and entry.subtitle or nil
-    local lineText = buildLineText(entry, cfg)
+    -- Fills the shared block arrays. Nothing between here and the layout loop below may call
+    -- buildBlocks again, which is the only thing that rewrites them.
+    buildBlocks(entry, cfg)
+    local lineText = blocksKey()
     local showEye  = entry.canGroup and true or false
     -- The effective answer, not the raw field, so turning the option off drops the gutter
     -- as well as the button and both land through the one repaint gate below.
@@ -587,9 +728,7 @@ function Row:Render(row, entry, width, cfg)
     local Media = ns:GetModule("Media")
     Media:ApplyTitleFont(row.title)
     Media:ApplyFont(row.subtitle, -3)
-    Media:ApplyFont(row.lines, -2)
     Media:ApplyFont(row.timer, -2)
-    row.lines:SetSpacing(Media:LineSpacing())
 
     -- A provider that emits no icon should not pay for the icon column, or its titles
     -- hang in empty space where the art would have been.
@@ -655,30 +794,69 @@ function Row:Render(row, entry, width, cfg)
     end
 
     local subGap = math.max(0, SUB_TO_LINES + Media:HeaderSpacing())
-    row.lines:ClearAllPoints()
+    local anchor
     if subtitle and subtitle ~= "" then
         row.subtitle:SetText(subtitle)
         row.subtitle:Show()
-        row.lines:SetPoint("TOPLEFT", row.subtitle, "BOTTOMLEFT", 0, -subGap)
+        anchor = row.subtitle
     else
         row.subtitle:SetText("")
         row.subtitle:Hide()
-        row.lines:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -subGap)
+        anchor = row.title
     end
-    row.lines:SetText(lineText)
 
     -- Without an explicit SetWidth, GetStringHeight returns stale values after a
     -- width change and rows overlap
     local textW = width - (iconW + iconGap + padX * 2 + gutter)
     if textW > 0 then
         row.title:SetWidth(math.max(1, textW - timerW - eyeW))
-        row.lines:SetWidth(textW)
         if row.subtitle:IsShown() then row.subtitle:SetWidth(textW) end
     end
+    local blockW = math.max(1, textW)
+
+    local nText, nBar, linesH = 0, 0, 0
+    for i = 1, _nBlocks do
+        -- The first block keeps the old gap under the title, so a row that is all text sits
+        -- exactly where it used to. Blocks after it are spaced against each other.
+        local gap = (i == 1) and subGap or BAR_GAP
+        local block, blockH
+        if _bKind[i] == BLOCK_BAR then
+            nBar  = nBar + 1
+            block = acquireBarBlock(row, nBar)
+            local cur, req = _bCur[i], _bReq[i]
+            block:SetWidth(blockW)
+            block:SetMinMaxValues(0, req)
+            block:SetValue(math.max(0, math.min(req, cur)))
+            Media:ApplyFont(block.text,  -2)
+            Media:ApplyFont(block.value, -2)
+            block.text:SetText(_bText[i])
+            block.value:SetText(_bPct[i] and ("%d%%"):format(cur) or (cur .. "/" .. req))
+            Media:ApplyTextShadow(block.text)
+            Media:ApplyTextShadow(block.value)
+            -- The label is drawn at the user's Font Size, so the bar is measured from it
+            -- rather than left at the constant, which a large font spills into the next row.
+            blockH = math.max(BAR_H, math.ceil((block.text:GetStringHeight() or 0) + 4))
+            block:SetHeight(blockH)
+            block:Show()
+        else
+            nText = nText + 1
+            block = acquireTextBlock(row, nText)
+            Media:ApplyFont(block, -2)
+            block:SetSpacing(Media:LineSpacing())
+            if textW > 0 then block:SetWidth(blockW) end
+            block:SetText(_bText[i])
+            block:Show()
+            blockH = block:GetStringHeight()
+        end
+        block:ClearAllPoints()
+        block:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
+        linesH = linesH + gap + blockH
+        anchor = block
+    end
+    hideBlocks(row, nText + 1, nBar + 1)
 
     local titleH = math.max(row.title:GetStringHeight(), iconW)
     local subH   = row.subtitle:IsShown() and (TITLE_TO_SUB + row.subtitle:GetStringHeight()) or 0
-    local linesH = (lineText ~= "") and (subGap + row.lines:GetStringHeight()) or 0
     local h      = titleH + subH + linesH + padY * 2
 
     row:SetHeight(math.max(1, h))

@@ -3,6 +3,7 @@ local _, ns = ...
 local Entry      = ns:GetModule("Entry")
 local Registry   = ns:GetModule("Registry")
 local QuestItems = ns:GetModule("QuestItems")
+local QuestGroups = ns:GetModule("QuestGroups")
 
 local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
 
@@ -146,7 +147,13 @@ local function fillLines(e, id)
             ln.completed = o.finished and true or false
             ln.current   = o.numFulfilled
             ln.required  = o.numRequired
-            if o.type == "progressbar" then ln.kind = LINE.PROGRESSBAR end
+            -- A progressbar objective reports a percentage out of 100, which is what WEIGHTED
+            -- means, and the renderer draws it as one rather than inferring it from
+            -- the denominator.
+            -- Anything else under that type is a real count and stays a count.
+            if o.type == "progressbar" then
+                ln.kind = (o.numRequired == 100) and LINE.WEIGHTED or LINE.PROGRESSBAR
+            end
         end
     end
 
@@ -253,7 +260,7 @@ end
 
 -- Zone membership comes from map POIs. Quest-log headers are campaign groupings that rarely
 -- equal GetZoneText(), so comparing those would hide almost everything. nil means "cannot
--- tell" and the filter fails open on it; absent from the map counts as elsewhere.
+-- tell" and the filter fails open on it. Absent from the map counts as elsewhere.
 --
 -- That last part replaces a fallback answering false only for a quest GetNextWaypoint could
 -- place, which on a 16 quest log in The Coiled Isle rejected 2 and showed 14 that were not in
@@ -303,6 +310,10 @@ local function fullRebuild()
                 e.isTracked = isWatched(id)
                 e.icon.classification = getClassification(id)
                 e.hasItem   = QuestItems:Has(id)
+                -- Blizzard puts the group-finder eye on any quest that can form a group, not
+                -- only on world quests. This provider not setting it is why a dungeon or an
+                -- elite quest in the ordinary Quests section never showed one.
+                e.canGroup  = QuestGroups:CanCreate(id)
                 fillTags(e, id, info)
                 e.groupID = e.tags.campaign and "campaign" or "quests"
                 fillLines(e, id)
@@ -351,6 +362,8 @@ local function refreshDynamic()
         -- data is still streaming can come back wrong, and caching the hit would pin the
         -- wrong POI shape until the next full rebuild.
         e.icon.classification = getClassification(id)
+        -- Cached and resolved off a timer inside QuestGroups, so this is a table read
+        e.canGroup  = QuestGroups:CanCreate(id)
         -- fillTags needs GetInfo and so only runs on a full rebuild. The one tag derived from
         -- classification is re-derived here, or a late-arriving Legendary repaints the POI
         -- icon while the card stays tinted as an ordinary quest.
@@ -634,8 +647,21 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
     return refused
 end
 
+function Quests:OnEntryGroupFinder(entry)
+    QuestGroups:Find(entry.id)
+end
+
 function Quests:Enable(notifyDirty)
     local Events = ns:GetModule("Events")
+
+    -- A bare notifyDirty is not enough here: GetEntries returns the cached store unless a dirty
+    -- flag is set, so the repaint would hand back the same entries with canGroup still false and
+    -- the eye would wait for an unrelated quest event. WorldQuests can subscribe the raw notify
+    -- because its GetEntries rebuilds every pass.
+    ns:GetModule("QuestGroups"):OnResolved(function()
+        dirtyObjectives = true
+        notifyDirty()
+    end)
 
     local function markAll()
         dirtyAll, zoneDirty = true, true

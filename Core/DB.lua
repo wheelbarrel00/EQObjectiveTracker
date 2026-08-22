@@ -99,6 +99,12 @@ DB.defaults = {
             hideScrollArrows     = false,
             showZoneTag          = false,
             showObjectiveNumbers = true,
+            -- A NEW key, so nobody has a stored value a default could silently revert.
+            -- On matches the default tracker, which draws a real bar for these.
+            showProgressBars     = true,
+            -- Also a NEW key. Blizzard shows these inside the tracker EQOT hides, so on
+            -- is what restores what the stock tracker was already showing.
+            showTrackerWidgets   = true,
             showQuestTotal       = true,
             showLevelInTracker   = false,
             showQuestID          = false,

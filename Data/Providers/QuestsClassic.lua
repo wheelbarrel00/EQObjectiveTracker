@@ -176,7 +176,13 @@ local function fillLines(e, id, index)
             ln.completed = o.finished and true or false
             ln.current   = o.numFulfilled
             ln.required  = o.numRequired
-            if o.type == "progressbar" then ln.kind = LINE.PROGRESSBAR end
+            -- A progressbar objective reports a percentage out of 100, which is what WEIGHTED
+            -- means, and the renderer draws it as one rather than inferring it from
+            -- the denominator.
+            -- Anything else under that type is a real count and stays a count.
+            if o.type == "progressbar" then
+                ln.kind = (o.numRequired == 100) and LINE.WEIGHTED or LINE.PROGRESSBAR
+            end
         end
     elseif index and type(GetNumQuestLeaderBoards) == "function"
            and type(GetQuestLogLeaderBoard) == "function" then

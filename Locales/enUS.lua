@@ -133,6 +133,10 @@ L["Show zone label under quest titles"] = true
 L["Adds the quest log heading each quest came from as a small line under its title."] = true
 L["Show objective progress numbers"] = true
 L["For example, 0/4, 1/1, etc."] = true
+L["Show progress bars"] = true
+L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = true
+L["Show event and scenario widgets"] = true
+L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."] = true
 L["Show quest ID"] = true
 L["Useful for bug reports."] = true
 L["Show the visible / total count on section headers"] = true
@@ -385,6 +389,9 @@ L["Sanctified Banner: Grand Spoils earned"] = true
 L["Sanctified Banner: bonus Spoils secured"] = true
 L["Sanctified Banner: kill the Voidfused Rager"] = true
 L["Sanctified Banner: find it for bonus loot"] = true
+
+-- Data/Widgets.lua
+L["Tier %d"] = true
 
 -- UI/AutoQuestPopup.lua
 L["Click to view quest"] = true

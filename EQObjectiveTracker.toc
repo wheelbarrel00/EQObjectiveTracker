@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 1.11.1
+## Version: 1.12.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -54,6 +54,8 @@ Data\AutoQuestPopups.lua
 Data\ZoneRouting.lua
 Data\ZoneProgress.lua
 Data\ScenarioBonus.lua
+Data\Widgets.lua
+Data\QuestGroups.lua
 
 # Providers. THE ONLY FLAVOR-VARYING SECTION OF THIS FILE.
 Data\Providers\Quests.lua
@@ -75,6 +77,7 @@ UI\ItemButtons.lua
 UI\AutoQuestPopup.lua
 UI\Sections.lua
 UI\Scenario.lua
+UI\WidgetBlock.lua
 UI\Tracker.lua
 UI\TaxiHighlight.lua
 UI\ZoneProgressBar.lua

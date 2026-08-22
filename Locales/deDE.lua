@@ -121,6 +121,8 @@ L["Show zone label under quest titles"] = "Gebietsbezeichnung unter Questtiteln 
 L["Adds the quest log heading each quest came from as a small line under its title."] = "Fügt unter dem Titel jeder Quest die Überschrift aus dem Questlog als kleine Zeile hinzu."
 L["Show objective progress numbers"] = "Fortschrittszahlen der Ziele anzeigen"
 L["For example, 0/4, 1/1, etc."] = "Zum Beispiel 0/4, 1/1 usw."
+L["Show progress bars"] = "Fortschrittsbalken anzeigen"
+L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "Zeichnet für Ziele, die einen Prozentwert oder einen laufenden Zähler melden, einen gefüllten Balken statt einer reinen Textzeile - so wie der Standardtracker. Gilt für Quests, Weltquests, Erfolge und Szenarioziele."
 L["Show quest ID"] = "Quest-ID anzeigen"
 L["Useful for bug reports."] = "Nützlich für Fehlermeldungen."
 L["Show the visible / total count on section headers"] = "Anzahl sichtbar / insgesamt in Abschnittsüberschriften anzeigen"
@@ -373,6 +375,9 @@ L["Sanctified Banner: Grand Spoils earned"] = "Geheiligtes Banner: Große Beute 
 L["Sanctified Banner: bonus Spoils secured"] = "Geheiligtes Banner: Bonusbeute gesichert"
 L["Sanctified Banner: kill the Voidfused Rager"] = "Geheiligtes Banner: Tobsüchtigen der Leere töten"
 L["Sanctified Banner: find it for bonus loot"] = "Geheiligtes Banner: für Bonusbeute finden"
+
+-- Data/Widgets.lua
+L["Tier %d"] = "Stufe %d"
 
 -- UI/AutoQuestPopup.lua
 L["Click to view quest"] = "Klicken, um die Quest anzuzeigen"

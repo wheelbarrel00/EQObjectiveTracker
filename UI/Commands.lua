@@ -148,6 +148,8 @@ handlers.status = function()
 
     debugLine("ZoneProgressBar")
     debugLine("ScenarioBonusHUD")
+    debugLine("Widgets")
+    debugLine("QuestGroups")
 end
 
 -- Bisection aid: skip a subsystem's OnEnable for a session so a fault can be narrowed to one
@@ -201,7 +203,7 @@ local function moduleCmd(cmd, rest)
             -- override left over from the previous one.
             wipe(on)
             wipe(onP)
-            ns:Print("|cffff5555safe mode ON|r - every optional module, every provider, quest item buttons and quest popups are off. /reload to apply.")
+            ns:Print("|cffff5555safe mode ON|r - every optional module, every provider, quest item buttons, quest popups and the event widget block are off. /reload to apply.")
         else
             db.global.safeMode = nil
             wipe(off)
@@ -311,6 +313,18 @@ function Commands:OnEnable()
                 for _, l in ipairs(QP:ZoneProbeLines()) do ns:Print(l) end
             else
                 ns:Print("zoneprobe: not available on this flavor")
+            end
+        elseif cmd == "widgetprobe" then
+            -- Undocumented for the same reason zoneprobe is. Read only: it never registers a
+            -- UIWidgetContainer, which is the thing UI/Scenario.lua forbids.
+            local SC = ns:GetModule("Registry"):Get("scenarios")
+            if SC and SC.WidgetProbeLines then
+                -- A set answers with everything registered against it, most of it not on
+                -- screen, so hidden widgets are left out unless they are asked for.
+                local all = strtrim(rest or ""):lower() == "all"
+                for _, l in ipairs(SC:WidgetProbeLines(all)) do ns:Print(l) end
+            else
+                ns:Print("widgetprobe: not available on this flavor")
             end
         elseif fn then
             fn()

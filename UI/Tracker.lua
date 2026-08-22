@@ -909,6 +909,12 @@ function Tracker:_RenderScenario(group, cfg)
     local scen = f.scenarioContainer
     if not scen then return 1 end
 
+    -- Blizzard draws its own widget sets inside the tracker it owns, and this addon hides
+    -- that frame, so these are drawn here or they are not drawn at all. Resolved defensively
+    -- rather than assumed, though every TOC lists it today.
+    local WB      = ns:GetModule("WidgetBlock")
+    local widgetH = WB and WB:Render(scen, cfg) or 0
+
     local entry = (group and group.visibleCount > 0) and group.entries[1] or nil
     local info
     if entry then
@@ -916,7 +922,7 @@ function Tracker:_RenderScenario(group, cfg)
         if provider and provider.GetBanner then info = provider:GetBanner() end
     end
 
-    local h = math.max(1, ns:GetModule("Scenario"):Render(scen, cfg, info, entry))
+    local h = widgetH + math.max(1, ns:GetModule("Scenario"):Render(scen, cfg, info, entry, widgetH))
 
     -- SetHeight fires OnSizeChanged, which calls Refresh, so only touch it on a real move
     -- Everything below hangs off this container's bottom, so resizing it moves the

@@ -134,6 +134,8 @@ L["Show zone label under quest titles"] = "Montrer le nom de la zone sous le nom
 L["Adds the quest log heading each quest came from as a small line under its title."] = "Ajoute l'en-tête du journal de quêtes dont provient chaque quête sur une petite ligne sous son titre."
 L["Show objective progress numbers"] = "Affichage numérique du progrès des quêtes"
 L["For example, 0/4, 1/1, etc."] = "Par exemple, 0/4, 1/1, etc."
+L["Show progress bars"] = "Afficher les barres de progression"
+L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "Dessine une barre remplie pour les objectifs qui indiquent un pourcentage ou un compteur, comme le fait le suivi par défaut, au lieu d'une simple ligne de texte. S'applique aux quêtes, aux expéditions, aux hauts faits et aux objectifs de scénario."
 L["Show quest ID"] = "Affiche l'ID de la quête"
 L["Useful for bug reports."] = "Utile pour signaler les bugs."
 L["Show the visible / total count on section headers"] = "Afficher le décompte visible / total sur les en-têtes de section"
@@ -386,6 +388,9 @@ L["Sanctified Banner: Grand Spoils earned"] = "Bannière sanctifiée: grand buti
 L["Sanctified Banner: bonus Spoils secured"] = "Bannière sanctifiée: butin bonus obtenu"
 L["Sanctified Banner: kill the Voidfused Rager"] = "Bannière sanctifiée: tuez l'Enragé fusionné au Vide"
 L["Sanctified Banner: find it for bonus loot"] = "Bannière sanctifiée: trouvez-la pour du butin bonus"
+
+-- Data/Widgets.lua
+L["Tier %d"] = "Palier %d"
 
 -- UI/AutoQuestPopup.lua
 L["Click to view quest"] = "Cliquez pour voir la quête"

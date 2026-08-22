@@ -77,23 +77,28 @@ saved world quest watches.
 
 ## What it tracks
 
-- **Quests and Campaign**, in separate sections, with objectives and completion
+- **Quests and Campaign**, in separate sections, with objectives, completion, and a Find
+  Group button on any quest the game will form a group for
 - **World quests** in their own capped area, with the quest type on the marker, a
   colour-coded countdown, and a Find Group button where the game allows one. Every world
   quest in your current zone is listed, not only the ones you have tracked, which you can
   turn off
-- **Scenarios and delves**, with the stage banner and its criteria
+- **Scenarios and delves**, with the stage banner, its criteria, the stage countdown and
+  the delve tier
 - **Bonus objectives**, on their own movable HUD, including the bonus loot
   mechanics inside a delve. Off by default
 - **Achievements**, **professions** with reagent counts, and **endeavors**
+- **Progress bars** for objectives that report a percentage or a running total, the way the
+  default tracker draws them, which you can turn off
 - **Quest items**, as a button on the row of any quest that carries one
 - **Quest popups** for newly discovered quests and ones ready to hand in remotely
 - **Hover any quest** for its objectives and full rewards, including item level
   comparisons against what you have equipped. World quests also show their faction and
   how long is left
 
-Also included: a zone progress bar, a sound when a quest is ready to turn in, and a
-highlight on the flight point nearest your tracked quest.
+Also included: a zone progress bar, a sound when a quest is ready to turn in, a highlight on
+the flight point nearest your tracked quest, and the extra bars and status lines the default
+tracker shows during world events, which would otherwise not appear anywhere.
 
 ## Usage
 

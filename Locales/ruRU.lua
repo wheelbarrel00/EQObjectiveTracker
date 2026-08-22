@@ -134,6 +134,8 @@ L["Show zone label under quest titles"] = "Показывать название
 L["Adds the quest log heading each quest came from as a small line under its title."] = "Добавляет под названием задания небольшую строку с заголовком журнала заданий, под которым оно находится."
 L["Show objective progress numbers"] = "Показывать цифры прогресса целей"
 L["For example, 0/4, 1/1, etc."] = "Пример: 0/4, 1/1 и т.д."
+L["Show progress bars"] = "Показывать полосы прогресса"
+L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "Для целей, которые показывают проценты или текущий счетчик, рисует заполненную полосу вместо обычной строки текста, как это делает стандартный трекер. Работает для заданий, локальных заданий, достижений и целей сценариев."
 L["Show quest ID"] = "Показывать ID задания"
 L["Useful for bug reports."] = "Полезно для отчётов об ошибках."
 L["Show the visible / total count on section headers"] = "Показывать счётчик видимых / всего в заголовках разделов"
@@ -386,6 +388,9 @@ L["Sanctified Banner: Grand Spoils earned"] = "Освящённое знамя: 
 L["Sanctified Banner: bonus Spoils secured"] = "Освящённое знамя: бонусная добыча получена"
 L["Sanctified Banner: kill the Voidfused Rager"] = "Освящённое знамя: убейте Пропитанного Бездной буяна"
 L["Sanctified Banner: find it for bonus loot"] = "Освящённое знамя: найдите его ради бонусной добычи"
+
+-- Data/Widgets.lua
+L["Tier %d"] = "Уровень %d"
 
 -- UI/AutoQuestPopup.lua
 L["Click to view quest"] = "Нажмите, чтобы посмотреть задание"

@@ -6,6 +6,10 @@ local L        = ns.L
 
 local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
 
+-- Midnight can hand back "secret values" that error when matched by tainted addon code,
+-- even though they still report type "string"
+local _issecret = _G.issecretvalue
+
 local Scenarios = {
     id       = "scenarios",
     groups   = { "scenarios" },
@@ -217,6 +221,241 @@ function Scenarios:OnEntryTooltip(entry, tooltip)
     if facts.numStages > 1 then
         tooltip:AddLine((L["Stage %d of %d"]):format(facts.stage, facts.numStages), 0.6, 0.6, 0.6)
     end
+end
+
+local PROBE_MAX_WIDGETS = 40
+local PROBE_MAX_FIELDS  = 22
+local PROBE_MAX_NESTED  = 10
+
+-- Printed first, in this order, and never truncated away. Sorting every field alphabetically
+-- buried shownState and the bar values behind a StatusBar's thirty-odd layout fields, which
+-- is what made the first capture unreadable.
+local PROBE_FIRST = {
+    "shownState", "text", "headerText", "tooltip", "dynamicTooltip",
+    "barValue", "barMin", "barMax", "barValueTextType", "barTextEnabledState",
+    "enabledState", "state", "hasTimer", "colorTint",
+    "textureKit", "frameTextureKit", "orderIndex", "widgetTag",
+}
+
+-- Expanded one level, because this is where the content actually is: a SpellDisplay's spell,
+-- an ItemDisplay's item, a row widget's entries.
+local PROBE_EXPAND = {
+    spellInfo = true, itemInfo = true, entries = true, buttons = true, lines = true,
+}
+
+-- Two naming conventions are in use on C_UIWidgetManager and neither covers every type, so
+-- both are tried rather than kept in a table that rots the next time Blizzard adds a kind.
+local INFO_SUFFIXES = { "VisualizationInfo", "WidgetVisualizationInfo" }
+
+local function widgetTypeNames()
+    local out = {}
+    local VT = Enum and Enum.UIWidgetVisualizationType
+    if type(VT) == "table" then
+        for name, value in pairs(VT) do out[value] = name end
+    end
+    return out
+end
+
+local function visualizationInfo(typeName, widgetID)
+    if not (typeName and C_UIWidgetManager) then return nil end
+    for i = 1, #INFO_SUFFIXES do
+        local fn = C_UIWidgetManager["Get" .. typeName .. INFO_SUFFIXES[i]]
+        if fn then
+            local ok, info = pcall(fn, widgetID)
+            if ok and type(info) == "table" then return info end
+        end
+    end
+    return nil
+end
+
+-- Midnight hands back secret values through this pipeline, which is the family the open
+-- widget report lives in, so no field VALUE reaches tostring or a comparison without coming
+-- through here first.
+local function safeValue(v)
+    if _issecret and _issecret(v) then return "<secret>" end
+    local t = type(v)
+    if t == "table" then
+        local n = 0
+        for _ in pairs(v) do n = n + 1 end
+        return ("{%d}"):format(n)
+    end
+    local ok, s = pcall(tostring, v)
+    return ok and s or "<?>"
+end
+
+-- A widget the server has registered but is not currently showing. The first capture proved
+-- these are returned: top center answered 33 widgets at once, spanning content that cannot
+-- all be live. Some types keep the flag on their payload table instead - a SpellDisplay
+-- carries spellInfo.shownState with nothing at the top - so both are read. A type carrying
+-- the flag nowhere is treated as shown.
+local PROBE_NESTED_STATE = { "spellInfo", "itemInfo" }
+
+local function widgetHidden(info)
+    local v = info.shownState
+    if v == nil then
+        for i = 1, #PROBE_NESTED_STATE do
+            local sub = info[PROBE_NESTED_STATE[i]]
+            if type(sub) == "table" and sub.shownState ~= nil then
+                v = sub.shownState
+                break
+            end
+        end
+    end
+    if v == nil then return false end
+    if _issecret and _issecret(v) then return false end
+    local SS = Enum and Enum.WidgetShownState
+    return v == ((SS and SS.Hidden) or 0)
+end
+
+local keyBuf, seenKey = {}, {}
+
+local function pushField(out, indent, k, v)
+    out[#out + 1] = ("%s%s = %s"):format(indent, k, safeValue(v))
+end
+
+-- Its own key list rather than the shared one, because it recurses: the inner call used to
+-- wipe the outer call's buffer mid-loop, which printed "nil = nil" rows for a nested array.
+local function dumpNested(out, indent, tbl)
+    local keys = {}
+    for k in pairs(tbl) do keys[#keys + 1] = k end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    local shown = math.min(#keys, PROBE_MAX_NESTED)
+    for i = 1, shown do
+        local k = keys[i]
+        local v = tbl[k]
+        if type(v) == "table" then
+            out[#out + 1] = ("%s%s ="):format(indent, tostring(k))
+            dumpNested(out, indent .. "    ", v)
+        else
+            pushField(out, indent, tostring(k), v)
+        end
+    end
+    if #keys > shown then
+        out[#out + 1] = ("%s... %d more"):format(indent, #keys - shown)
+    end
+end
+
+local function dumpFields(info, out)
+    wipe(seenKey)
+    local written = 0
+
+    for i = 1, #PROBE_FIRST do
+        local k = PROBE_FIRST[i]
+        if info[k] ~= nil then
+            seenKey[k] = true
+            written = written + 1
+            pushField(out, "        ", k, info[k])
+        end
+    end
+
+    for i = #keyBuf, 1, -1 do keyBuf[i] = nil end
+    for k in pairs(info) do
+        if type(k) == "string" and not seenKey[k] then keyBuf[#keyBuf + 1] = k end
+    end
+    table.sort(keyBuf)
+
+    local room = math.max(0, PROBE_MAX_FIELDS - written)
+    local shown = math.min(#keyBuf, room)
+    for i = 1, shown do
+        pushField(out, "        ", keyBuf[i], info[keyBuf[i]])
+    end
+    if #keyBuf > shown then
+        out[#out + 1] = ("        ... %d more field(s) not shown"):format(#keyBuf - shown)
+    end
+
+    for k in pairs(PROBE_EXPAND) do
+        local v = info[k]
+        if type(v) == "table" then
+            out[#out + 1] = ("        %s ="):format(k)
+            dumpNested(out, "            ", v)
+        end
+    end
+end
+
+local function dumpSet(out, label, setID, showAll)
+    if not setID or setID == 0 then
+        out[#out + 1] = ("%s: no set"):format(label)
+        return
+    end
+    local ok, widgets = pcall(C_UIWidgetManager.GetAllWidgetsBySetID, setID)
+    if not (ok and type(widgets) == "table") then
+        out[#out + 1] = ("%s: set %s could not be read"):format(label, tostring(setID))
+        return
+    end
+
+    local names = widgetTypeNames()
+    local printed, hiddenCount, capped = 0, 0, 0
+    local body = {}
+
+    for i = 1, #widgets do
+        local w     = widgets[i]
+        local tname = names[w.widgetType]
+        local info  = tname and visualizationInfo(tname, w.widgetID)
+        local hidden = info and widgetHidden(info) or false
+        if hidden and not showAll then
+            hiddenCount = hiddenCount + 1
+        elseif printed >= PROBE_MAX_WIDGETS then
+            capped = capped + 1
+        else
+            printed = printed + 1
+            body[#body + 1] = ("    #%d id=%s type=%s(%s)%s"):format(
+                printed, tostring(w.widgetID), tostring(tname), tostring(w.widgetType),
+                hidden and "  [hidden]" or "")
+            if info then
+                dumpFields(info, body)
+            else
+                body[#body + 1] = "        no visualization info"
+            end
+        end
+    end
+
+    out[#out + 1] = ("%s: set %s, %d widget(s), %d shown%s"):format(
+        label, tostring(setID), #widgets, printed,
+        hiddenCount > 0 and (", " .. hiddenCount .. " hidden (widgetprobe all)") or "")
+    for i = 1, #body do out[#out + 1] = body[i] end
+    if capped > 0 then
+        out[#out + 1] = ("    ... %d more widget(s) over the print cap"):format(capped)
+    end
+end
+
+local function setID(fnName)
+    local fn = C_UIWidgetManager and C_UIWidgetManager[fnName]
+    if not fn then return nil end
+    local ok, id = pcall(fn)
+    if ok and type(id) == "number" then return id end
+    return nil
+end
+
+-- Undocumented like flavorprobe and zoneprobe: a measurement, not a feature. It answers what
+-- a delve or a special event actually puts in a widget set, which is the only way to learn
+-- what the stock tracker draws there and this one does not. Read only - registering a
+-- UIWidgetContainer against these sets is what UI/Scenario.lua forbids.
+--
+-- Top center and below minimap are reported for orientation only. EQOT hides neither of those
+-- frames, so Blizzard still draws them and this addon must not draw them a second time.
+function Scenarios:WidgetProbeLines(showAll)
+    local out = {}
+    if not C_UIWidgetManager then
+        out[1] = "widgetprobe: C_UIWidgetManager is absent on this client"
+        return out
+    end
+
+    local stepSet
+    if C_ScenarioInfo and C_ScenarioInfo.GetScenarioStepInfo then
+        local ok, stepInfo = pcall(C_ScenarioInfo.GetScenarioStepInfo)
+        if ok and type(stepInfo) == "table" then stepSet = stepInfo.widgetSetID end
+    end
+
+    out[#out + 1] = ("scenario active %s | %s | GetStepInfo set %s | GetScenarioStepInfo set %s%s"):format(
+        tostring(facts.active), facts.active and tostring(facts.name) or "-",
+        tostring(facts.active and facts.widgetSetID or nil), tostring(stepSet),
+        showAll and " | showing hidden widgets too" or "")
+
+    dumpSet(out, "scenario step",     stepSet, showAll)
+    dumpSet(out, "objective tracker", setID("GetObjectiveTrackerWidgetSetID"), showAll)
+    dumpSet(out, "top center",        setID("GetTopCenterWidgetSetID"), showAll)
+    dumpSet(out, "below minimap",     setID("GetBelowMinimapWidgetSetID"), showAll)
+    return out
 end
 
 function Scenarios:DebugLine()
