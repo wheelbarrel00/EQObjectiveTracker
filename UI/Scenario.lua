@@ -233,6 +233,8 @@ function Scenario:_Clear()
     local WB = ns:GetModule("WidgetBlock")
     if WB then WB:ClearScenario() end
     self.widgetH = 0
+    local SS = ns:GetModule("ScenarioSpells")
+    if SS then SS:Clear() end
     if self.subHeader then self.subHeader:Hide() end
     local banner = self.banner
     if banner then
@@ -455,5 +457,10 @@ function Scenario:Render(container, cfg, info, entry, topOffset)
     for i = 1, #self.activeCriteria do
         h = h + CRITERIA_LINE_GAP + self.activeCriteria[i]:GetHeight()
     end
-    return h + 6
+
+    -- Under the criteria, where the stock tracker draws the scenario's own castable spells
+    local SS = ns:GetModule("ScenarioSpells")
+    local spellH = SS and SS:Place(container, info, (self.topOffset or 0) + h) or 0
+
+    return h + spellH + 6
 end

@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 1.12.0
+## Version: 1.13.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -79,6 +79,7 @@ UI\AutoQuestPopup.lua
 UI\Sections.lua
 UI\Scenario.lua
 UI\WidgetBlock.lua
+UI\ScenarioSpells.lua
 UI\Tracker.lua
 UI\TaxiHighlight.lua
 UI\ZoneProgressBar.lua

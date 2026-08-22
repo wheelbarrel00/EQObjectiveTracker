@@ -642,9 +642,10 @@ function Tracker:ApplyContentInset()
     local gutter = scrollGutter(ns:GetModule("DB"):Tracker())
     if f._scrollGutter == gutter then return end
 
-    -- The quest scroll anchors to this container, so re-anchoring it is a protected move
-    -- once a secure item button exists. The gutter is recorded only after the move lands,
-    -- or the guard above would swallow the deferred retry.
+    -- The quest scroll anchors to this container, so re-anchoring it is a protected move once
+    -- a secure button exists anywhere in the chain - a quest item button, or one of the
+    -- scenario spell buttons this container parents directly. The gutter is recorded only
+    -- after the move lands, or the guard above would swallow the deferred retry.
     if secureLocked() then
         ns:GetModule("Events"):RunWhenOutOfCombat("eqot.contentInset", applyContentInsetWhenSafe)
         return
@@ -663,8 +664,9 @@ function Tracker:ApplyWorldQuestsPosition()
     local scroll, region, scen = f.scroll, f.eventsRegion, f.scenarioContainer
     if not (scroll and region and scen) then return end
 
-    -- scroll is in the item button's protected ancestor chain, so re-anchoring it is a
-    -- protected move once one exists
+    -- scroll is in the quest item buttons' ancestor chain, so re-anchoring it is a protected
+    -- move once one exists. It is only ANCHORED to the scenario container, never parented by
+    -- it, so the spell buttons are not what protects this one
     if secureLocked() then
         ns:GetModule("Events"):RunWhenOutOfCombat("eqot.applyWQPos", applyWQPosWhenSafe)
         return
@@ -925,8 +927,8 @@ function Tracker:_RenderScenario(group, cfg)
     local h = widgetH + math.max(1, ns:GetModule("Scenario"):Render(scen, cfg, info, entry, widgetH))
 
     -- SetHeight fires OnSizeChanged, which calls Refresh, so only touch it on a real move
-    -- Everything below hangs off this container's bottom, so resizing it moves the
-    -- protected scroll subtree with it
+    -- This container parents the scenario spell buttons and everything below hangs off its
+    -- bottom, so resizing it is a protected move on two counts
     if math.abs((scen:GetHeight() or 0) - h) > 0.5 and not secureLocked() then
         scen:SetHeight(h)
     end

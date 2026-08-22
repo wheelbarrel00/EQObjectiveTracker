@@ -5,6 +5,48 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-08-21
+
+### New Features
+
+- A scenario that hands you a spell now draws that spell as a clickable button under its
+  objectives, where the default tracker puts it. In a delve this is the one that puts a stuck
+  headball back onto the field. Because this tracker replaces the default one, that button was
+  not being drawn anywhere.
+
+### Bug Fixes
+
+- A tracked world quest with no expiry timer, such as a lair, disappeared from the tracker while
+  you were inside a delve or another instance, and came back when you left. This was named as a
+  known issue in 1.12.0 and is the fix for it. The tracker was asking whether the quest is on the
+  map you are standing on, which nothing inside an instance can answer, and reading that silence
+  as the quest being gone. It now keeps a quest it cannot get an answer about, rather than
+  dropping it.
+- Quest rows were taller than their contents needed, so a gap remained between them however far
+  down you turned Block Spacing. The tracker was reserving the full height of the quest icon for
+  the title line alone and then stacking the objectives underneath it. A row is now as tall as
+  the taller of its two columns. Rows with no objectives are unchanged, and so are rows at larger
+  font sizes, where the title already fills that space. Reported and fixed by Rubio9.
+
+### Known Issues, and what is next
+
+- The bonus objectives HUD does not appear inside a delve. It looks for a marker that this season
+  moved, so it never starts counting, and everything else about the HUD is working behind that.
+  It is off by default, so you have only seen this if you turned it on. This is the next thing
+  being fixed.
+- The Endeavors section stays empty in places where the default tracker lists a monthly activity.
+  This is older than this update rather than new in it, and it is being worked on next as well.
+
+### Notes
+
+- A button that can cast a spell is a protected frame, so while one is on screen the tracker
+  cannot resize or re-anchor itself during combat. That has always been true for anyone tracking
+  a quest with a usable item. From this update it also begins the first time you enter a scenario
+  that hands you a spell, and it lasts until you reload. The button stays clickable throughout,
+  and it comes back on its own if the spell goes away and returns during a fight. If you would
+  rather these buttons were never drawn, `/eqot disable ScenarioSpells` stops them from the next
+  render, and a `/reload` after it also clears the combat restriction above.
+
 ## [1.12.0] - 2026-08-21
 
 Answers a report from Souseiseki87 about the World Quests panel, and about information that

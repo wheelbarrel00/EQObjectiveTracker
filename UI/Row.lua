@@ -855,9 +855,9 @@ function Row:Render(row, entry, width, cfg)
     end
     hideBlocks(row, nText + 1, nBar + 1)
 
-    local titleH = math.max(row.title:GetStringHeight(), iconW)
+    local titleH = row.title:GetStringHeight()
     local subH   = row.subtitle:IsShown() and (TITLE_TO_SUB + row.subtitle:GetStringHeight()) or 0
-    local h      = titleH + subH + linesH + padY * 2
+    local h      = math.max(titleH + subH + linesH, iconW) + padY * 2
 
     row:SetHeight(math.max(1, h))
 

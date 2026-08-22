@@ -84,8 +84,8 @@ saved world quest watches.
   colour-coded countdown, and a Find Group button where the game allows one. Every world
   quest in your current zone is listed, not only the ones you have tracked, which you can
   turn off
-- **Scenarios and delves**, with the stage banner, its criteria, the stage countdown and
-  the delve tier
+- **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
+  delve tier, and a clickable button for any spell the stage hands you
 - **Bonus objectives**, on their own movable HUD, including the bonus loot
   mechanics inside a delve. Off by default
 - **Achievements**, **professions** with reagent counts, and **endeavors**

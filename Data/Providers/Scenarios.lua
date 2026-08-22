@@ -103,6 +103,104 @@ local function readStep()
     return stageName, numCriteria or 0, widgetSetID
 end
 
+local MAX_SPELLS = 4
+
+-- The same split Data/Widgets.lua uses: spellPool owns the row tables and only ever grows,
+-- spellsOut is the view handed out on the banner and is emptied at the top of every read.
+-- Handing the pool out directly leaves # and ipairs reporting a previous, longer run.
+local spellPool, spellsOut = {}, {}
+local spellsN, spellsSeen, spellsFields, spellsNote = 0, 0, nil, nil
+
+local function plainValue(v)
+    if _issecret and _issecret(v) then return nil end
+    return v
+end
+
+local UNREAD_KEYS = 20
+
+-- Sorted BEFORE the cap. Capping first reported whichever keys pairs() reached first, which is
+-- hash order and says nothing about which of them matter - on a payload this wide the key the
+-- reader is hunting for survived by luck.
+local function fieldNames(v)
+    if type(v) ~= "table" then return type(v) end
+    local keys = {}
+    for k in pairs(v) do keys[#keys + 1] = tostring(k) end
+    table.sort(keys)
+    local n = #keys
+    for i = n, UNREAD_KEYS + 1, -1 do keys[i] = nil end
+    return table.concat(keys, ",") .. (n > UNREAD_KEYS and ",..." or "")
+end
+
+local function clearStepSpells()
+    spellsN, spellsSeen, spellsFields, spellsNote = 0, 0, nil, nil
+    for i = 1, #spellsOut do spellsOut[i] = nil end
+end
+
+-- The castable button the stock tracker draws under the criteria, which is a game mechanic
+-- rather than decoration: in a delve it is what moves a stuck headball back onto the field.
+-- Measured 2026-08-21 in The Ring of Glory - one entry of { icon, name, spellID }. The
+-- positional C_Scenario.GetStepInfo carries no spells, and C_Scenario.GetSpellInfo and
+-- C_ScenarioInfo.GetScenarioSpellInfo are both absent on this client, so the table form is the
+-- only source. Only a numeric spellID is accepted: a guessed key would bind the wrong spell,
+-- which is worse than drawing nothing and naming what could not be read.
+--
+-- Every way of coming back empty sets spellsNote except the two that genuinely mean no spell,
+-- an absent field and an empty list, so the status line says which one it was rather than
+-- reading the same as a scenario that grants none. A secret value is the likeliest of them.
+--
+-- Fourth caller of GetScenarioStepInfo outside the probe below - the others are two in
+-- Data/Widgets.lua and readTier in Data/ScenarioBonus.lua. Every one of them pcalls it.
+local function readStepSpells()
+    clearStepSpells()
+    if not (C_ScenarioInfo and C_ScenarioInfo.GetScenarioStepInfo) then
+        spellsNote = "no step info api"
+        return
+    end
+    local ok, step = pcall(C_ScenarioInfo.GetScenarioStepInfo)
+    if not ok then
+        spellsNote = "step info raised"
+        return
+    end
+    if type(step) ~= "table" then
+        spellsNote = "step info " .. type(step)
+        return
+    end
+
+    local list = step.spells
+    if list == nil then return end
+    if _issecret and _issecret(list) then
+        spellsNote = "spells secret"
+        return
+    end
+    if type(list) ~= "table" then
+        spellsNote = "spells " .. type(list)
+        return
+    end
+
+    for i = 1, #list do
+        spellsSeen = spellsSeen + 1
+        local raw = plainValue(list[i])
+        local id  = (type(raw) == "table") and plainValue(raw.spellID) or nil
+        if type(id) == "number" and id > 0 then
+            if spellsN < MAX_SPELLS then
+                spellsN = spellsN + 1
+                local s = spellPool[spellsN]
+                if not s then
+                    s = {}
+                    spellPool[spellsN] = s
+                end
+                local nm, ic = plainValue(raw.name), plainValue(raw.icon)
+                s.spellID = id
+                s.name    = (type(nm) == "string" and nm ~= "") and nm or nil
+                s.icon    = (type(ic) == "number" or type(ic) == "string") and ic or nil
+                spellsOut[spellsN] = s
+            end
+        elseif not spellsFields then
+            spellsFields = fieldNames(raw)
+        end
+    end
+end
+
 local function fillCriteria(e, numCriteria)
     Entry.BeginLines(e)
     local done, total = 0, 0
@@ -151,6 +249,7 @@ function Scenarios:GetEntries()
                    and currentStage and currentStage > 0
     if not active then
         facts.active = false
+        clearStepSpells()
         return store:Finish()
     end
 
@@ -169,6 +268,8 @@ function Scenarios:GetEntries()
 
     local done, total = fillCriteria(e, numCriteria)
     e.state = (total > 0 and done == total) and STATE.COMPLETE or STATE.ACTIVE
+
+    readStepSpells()
 
     facts.active       = true
     facts.category     = category
@@ -200,6 +301,9 @@ function Scenarios:GetBanner()
     banner.isFinalStage = facts.numStages > 1 and facts.stage == facts.numStages
     banner.textureKit   = facts.textureKit
     banner.widgetSetID  = facts.widgetSetID
+    -- Provider owned and refilled by the next GetEntries, like the rest of this table
+    banner.spells       = spellsOut
+    banner.spellsN      = spellsN
 
     banner.themeR, banner.themeG, banner.themeB = nil, nil, nil
     if C_ScenarioInfo.GetDisplayInfo then
@@ -225,7 +329,7 @@ end
 
 local PROBE_MAX_WIDGETS = 40
 local PROBE_MAX_FIELDS  = 22
-local PROBE_MAX_NESTED  = 10
+local PROBE_MAX_NESTED  = 20
 
 -- Printed first, in this order, and never truncated away. Sorting every field alphabetically
 -- buried shownState and the bar values behind a StatusBar's thirty-odd layout fields, which
@@ -238,9 +342,12 @@ local PROBE_FIRST = {
 }
 
 -- Expanded one level, because this is where the content actually is: a SpellDisplay's spell,
--- an ItemDisplay's item, a row widget's entries.
+-- an ItemDisplay's item, a row widget's entries, and the delve header's own spells array, which
+-- printed as a bare count on the first capture and left its shape unknown. That array turned out
+-- NOT to be the castable button under the criteria - see the note above dumpScenarioSpells.
 local PROBE_EXPAND = {
     spellInfo = true, itemInfo = true, entries = true, buttons = true, lines = true,
+    spells = true, currencies = true, rewardInfo = true,
 }
 
 -- Two naming conventions are in use on C_UIWidgetManager and neither covers every type, so
@@ -418,6 +525,42 @@ local function dumpSet(out, label, setID, showAll)
     end
 end
 
+-- The NAMED, castable button Blizzard draws under the criteria is NOT the header widget's
+-- spells array: measured 2026-08-21, that array held three entries at tier 6 and two at tier 7
+-- while the same named button stayed put, and its ids never included the button's. The button
+-- comes off C_ScenarioInfo.GetScenarioStepInfo().spells, which is what readStepSpells takes.
+-- This dumps three named sources and is the regression check for both shapes.
+local function dumpScenarioSpells(out)
+    local tried = false
+    local sources = {
+        { "C_Scenario.GetSpellInfo",            C_Scenario     and C_Scenario.GetSpellInfo },
+        { "C_ScenarioInfo.GetScenarioSpellInfo", C_ScenarioInfo and C_ScenarioInfo.GetScenarioSpellInfo },
+        { "C_ScenarioInfo.GetScenarioStepInfo",  C_ScenarioInfo and C_ScenarioInfo.GetScenarioStepInfo },
+    }
+    for i = 1, #sources do
+        local label, fn = sources[i][1], sources[i][2]
+        if not fn then
+            out[#out + 1] = ("scenario spells: %s absent"):format(label)
+        else
+            tried = true
+            local ok, info = pcall(fn)
+            if not ok then
+                out[#out + 1] = ("scenario spells: %s raised"):format(label)
+            elseif type(info) ~= "table" then
+                out[#out + 1] = ("scenario spells: %s returned %s"):format(label, safeValue(info))
+            else
+                local n = 0
+                for _ in pairs(info) do n = n + 1 end
+                out[#out + 1] = ("scenario spells: %s returned {%d}"):format(label, n)
+                dumpNested(out, "        ", info)
+            end
+        end
+    end
+    if not tried then
+        out[#out + 1] = "scenario spells: no scenario spell API on this client"
+    end
+end
+
 local function setID(fnName)
     local fn = C_UIWidgetManager and C_UIWidgetManager[fnName]
     if not fn then return nil end
@@ -451,6 +594,7 @@ function Scenarios:WidgetProbeLines(showAll)
         tostring(facts.active and facts.widgetSetID or nil), tostring(stepSet),
         showAll and " | showing hidden widgets too" or "")
 
+    dumpScenarioSpells(out)
     dumpSet(out, "scenario step",     stepSet, showAll)
     dumpSet(out, "objective tracker", setID("GetObjectiveTrackerWidgetSetID"), showAll)
     dumpSet(out, "top center",        setID("GetTopCenterWidgetSetID"), showAll)
@@ -460,10 +604,22 @@ end
 
 function Scenarios:DebugLine()
     if not facts.active then return "no active scenario" end
-    return ("%s | %s stage %d/%d | type %s kit %s diff %s inst %s | widgetSet %s | %d criteria"):format(
+    -- accepted over seen, then the field keys of the first entry no spell ID could be read
+    -- from, capped at UNREAD_KEYS with a trailing "..." when it did not fit. A read that never
+    -- reached the list says why instead. Silence means no spell: an absent field or an empty
+    -- list, which are the same answer.
+    local sp = ""
+    if spellsNote then
+        sp = (" | spells %s"):format(spellsNote)
+    elseif spellsSeen > 0 then
+        sp = (" | spells %d/%d %s"):format(spellsN, spellsSeen,
+            (spellsN > 0 and tostring(spellsOut[1].name or spellsOut[1].spellID)) or "-")
+        if spellsFields then sp = sp .. (" unread: %s"):format(spellsFields) end
+    end
+    return ("%s | %s stage %d/%d | type %s kit %s diff %s inst %s | widgetSet %s | %d criteria%s"):format(
         facts.category, tostring(facts.stageName), facts.stage, facts.numStages,
         tostring(facts.scenarioType), tostring(facts.textureKit), tostring(facts.diffID),
-        tostring(facts.instType), tostring(facts.widgetSetID), facts.criteria)
+        tostring(facts.instType), tostring(facts.widgetSetID), facts.criteria, sp)
 end
 
 -- EQ debounces its own scenario events. Tracker:Refresh already coalesces, so a second

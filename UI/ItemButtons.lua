@@ -12,6 +12,7 @@ local pool     = {}
 local wanted   = {}
 local stale    = {}
 local deferFns = {}
+local adopted  = {}
 local container
 local armed     = false
 local suspended = false
@@ -69,7 +70,7 @@ local function buildButton()
 
     b:SetScript("OnUpdate", onRangeUpdate)
     b:Hide()
-    armed = true
+    ItemButtons:Adopt(b)
     return b
 end
 
@@ -161,6 +162,16 @@ local function applySecure(self, questID)
     end
 end
 
+-- Every secure button the tracker's frame chain hosts registers here, whoever built it. The
+-- latch and the mouse sweep describe the CHAIN rather than quest items, so a second owner
+-- keeping its own copy of either would leave the tracker making protected calls this one
+-- already rules out. The one statement in the tree that arms the latch.
+function ItemButtons:Adopt(b)
+    armed = true
+    adopted[#adopted + 1] = b
+    b:EnableMouse(not suspended)
+end
+
 -- Once the tracker's frame chain has hosted a secure button, every size and anchor call
 -- on that chain stays combat-protected for the rest of the session. Retiring a button
 -- only pools it, so this deliberately never goes back to false.
@@ -180,7 +191,18 @@ function ItemButtons:SetMouseSuspended(v)
     v = v and true or false
     if suspended == v then return end
     suspended = v
-    for _, b in pairs(self.buttons) do b:EnableMouse(not v) end
+    for i = 1, #adopted do
+        local b = adopted[i]
+        -- _eqotInert marks a button its own owner blanked, in combat or out, which must not get
+        -- its mouse back just because the tracker became visible again. Do NOT clear it on
+        -- PLAYER_REGEN_ENABLED: every pooled button carries it, and they sit at alpha 0 over the
+        -- tracker with a hit rect spanning most of its width.
+        b:EnableMouse(not v and not b._eqotInert)
+    end
+end
+
+function ItemButtons:MouseSuspended()
+    return suspended
 end
 
 function ItemButtons:Gutter()

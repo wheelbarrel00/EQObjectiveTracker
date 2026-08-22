@@ -124,6 +124,7 @@ handlers.status = function()
     debugLine("Tracker", "scroll: ", "DebugScroll")
 
     debugLine("ItemButtons")
+    debugLine("ScenarioSpells")
     debugLine("ManualOrder")
     debugLine("Distance")
     debugLine("Migrate")

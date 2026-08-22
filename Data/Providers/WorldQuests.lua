@@ -39,6 +39,9 @@ local currentSource
 -- Values only, formatted on demand in DebugLine. GetEntries runs on the render path, so
 -- building the strings here would allocate on every repaint for a line nobody has asked for.
 local rawZoneList, autoListOn = 0, false
+-- Whether any map list came back this pass at all. A cold client answers nil for every map,
+-- which is not the same answer as a map that legitimately carries nothing.
+local mapListRead = false
 -- The map the zone list was actually read from, which is not the map underfoot whenever
 -- the zone-list walk below climbed out of a sub-area. On the one line a "my world quests are wrong"
 -- report is read from, that difference is the whole answer.
@@ -59,18 +62,23 @@ local detailBuf = {}
 
 function WorldQuests:DebugLine()
     local m = ns.Has.Map and C_Map.GetBestMapForUnit("player")
+    -- Named rather than counted: a watched quest kept because nothing could answer for it
+    -- reads /blind below, and this says which of the two reasons applied.
+    local liveness = (not mapListRead) and "blind, no map list read"
+                     or (IsInInstance and (IsInInstance())) and "blind, in an instance"
+                     or "readable"
     for i = 1, detailN do
         detailBuf[i] = ("%d:%s%s%s%s"):format(detailID[i], detailKind[i],
             detailMins[i] and ("/" .. detailMins[i] .. "m") or "",
             detailLive[i] or "",
             detailNamed[i] and "" or "/noname")
     end
-    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, list map %s%s, raw map list %d, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s\n      candidates: %s")
+    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, list map %s%s, raw map list %d, liveness %s, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s\n      candidates: %s")
         :format(sourceStats.watched, sourceStats.autozone, sourceStats.inzone,
                 sourceStats.questlog, tostring(m),
                 sourceStats.wq, sourceStats.bonus, sourceStats.logOwned,
                 tostring(autoListOn), tostring(zoneListMap),
-                zoneListClimbed and " (climbed)" or "", rawZoneList,
+                zoneListClimbed and " (climbed)" or "", rawZoneList, liveness,
                 tostring(C_QuestLog.IsWorldQuest ~= nil),
                 tostring(QuestUtils_IsQuestWorldQuest ~= nil),
                 tostring(ns.Has.WorldQuestTime and true or false),
@@ -91,13 +99,17 @@ end
 
 -- C_TaskQuest.GetQuestsForPlayerByMapID was renamed to GetQuestsOnMap - try the new
 -- name first, since the old one is gone on current retail.
+-- Both walks read through here, so the readable flag is set here and a third one cannot forget.
 local function taskQuestsForMap(mapID)
     if not (C_TaskQuest and mapID) then return nil end
-    if C_TaskQuest.GetQuestsOnMap then return C_TaskQuest.GetQuestsOnMap(mapID) end
-    if C_TaskQuest.GetQuestsForPlayerByMapID then
-        return C_TaskQuest.GetQuestsForPlayerByMapID(mapID)
+    local list
+    if C_TaskQuest.GetQuestsOnMap then
+        list = C_TaskQuest.GetQuestsOnMap(mapID)
+    elseif C_TaskQuest.GetQuestsForPlayerByMapID then
+        list = C_TaskQuest.GetQuestsForPlayerByMapID(mapID)
     end
-    return nil
+    if list then mapListRead = true end
+    return list
 end
 
 -- The bound both walks below need, and it is the one Quests:currentZoneSet already uses.
@@ -228,17 +240,30 @@ local function inQuestLog(questID)
             and C_QuestLog.GetLogIndexForQuestID(questID)) and true or false
 end
 
--- Liveness for a WATCHED candidate, and it takes three signals rather than one. A quest still
+-- All three signals below can fall silent for reasons that have nothing to do with the quest.
+-- Measured 2026-08-21 inside The Ring of Glory: a watched lair quest lost all three at once and
+-- the row vanished while the default tracker kept it. Whether that is the map lists answering
+-- for the instance rather than the world is NOT measured, so this refuses to judge liveness
+-- instead of guessing, the same nil-means-cannot-tell contract Quests:IsCurrentZone uses. A map
+-- that could not be read at all is refused on the same grounds.
+local function cannotTellLiveness()
+    if not mapListRead then return true end
+    return IsInInstance and (IsInInstance()) or false
+end
+
+-- Liveness for a WATCHED candidate, and it takes four signals rather than one. A quest still
 -- on a map list or still in the quest log is live whatever its timer says. Measured on
--- 2026-08-21: quest 97128, a watched lair world quest on The Coiled Isle, reported no minutes
--- at all - not zero, ABSENT - so a minutes-only test read it as an expired ghost and the row
--- vanished while the default tracker still showed it. Not every world quest expires.
+-- 2026-08-21: quest 97128, a watched lair world quest, reported no minutes at all - not zero,
+-- ABSENT - so a minutes-only test read it as an expired ghost and the row vanished while the
+-- default tracker still showed it. Not every world quest expires. Measured again inside The
+-- Ring of Glory, where the same quest lost the other two signals as well.
 --
 -- Strictly more permissive than the minutes test it replaces, so nothing that shows today can
--- stop showing. A genuine ghost still fails all three.
+-- stop showing. A genuine ghost, judged from a map the client could answer for, still fails.
 local function stillLive(questID, mins)
     if mins and mins > 0 then return true end
-    return onMap[questID] or inQuestLog(questID)
+    if onMap[questID] or inQuestLog(questID) then return true end
+    return cannotTellLiveness()
 end
 
 -- Both quest providers feed the shared group cache, so this keeps anything EITHER of them
@@ -322,6 +347,7 @@ function WorldQuests:GetEntries()
     sourceStats.autozone = 0
     sourceStats.wq, sourceStats.bonus, sourceStats.logOwned = 0, 0, 0
     rawZoneList = 0
+    mapListRead = false
     detailN = 0
     currentSource = "watched";  addWatched()
     currentSource = "autozone"; addZoneWorldQuests()
@@ -359,7 +385,8 @@ function WorldQuests:GetEntries()
             detailLive[detailN]  = onMap[qid] and "/map"
                                    or inQuestLog(qid) and "/log"
                                    or (watched[qid] and not (mins and mins > 0))
-                                      and "/ghost" or nil
+                                      and (cannotTellLiveness() and "/blind" or "/ghost")
+                                   or nil
             detailNamed[detailN] = name and true or false
         end
 
