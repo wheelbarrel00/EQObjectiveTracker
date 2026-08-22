@@ -48,6 +48,7 @@ focusing a quest also points a TomTom arrow at it.
   too, so on the tracker alone a focused quest is the tint and nothing more.
 - World quests, scenarios, achievements, endeavors and tracked recipes have no section.
   Most need APIs these clients do not have.
+- **No Find Group button.** These clients have no group finder for quests.
 - **Timed quests show no countdown**, and Blizzard's own timer box is left on screen.
 - The zone progress bar stays empty. Its zone routing data covers Midnight only.
 - Distance sorting does nothing, because the distance API is retail-only.
@@ -135,8 +136,9 @@ Almost everything is configurable: fonts (42 bundled, plus anything from
 LibSharedMedia, each shown in its own typeface in the picker), sizes, spacing, colours, a
 card layout, section order and visibility, filters by quest type, and eight sort modes
 including by distance and by hand. The current-zone filter shows only quests with an objective
-on the map you are standing on, so somewhere with no quests of its own, such as a capital city,
-reads empty while that filter is on.
+on the map you are standing on. If that map lists none of its own, such as a building interior,
+a covenant sanctum or a dungeon, it asks the zone around it instead, so you still get that
+zone's quests rather than an empty tracker.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.
@@ -194,7 +196,8 @@ Callbacks receive the provider ID and the entry ID, never the entry table, becau
 rebuilt on every quest event. `onFocus` is called with a nil quest ID when the focus is
 cleared, and only fires on clients with no super-tracking of their own, which today means
 Classic Era and TBC. `/eqot status` reports what is registered. Everything Quests uses this
-for its Chain Guide icon, its "Get Directions" menu entry, and its TomTom arrow.
+for two header icons, its Chain Guide and its own options, for its "Get Directions" menu entry,
+and for its TomTom arrow.
 
 ## License
 
