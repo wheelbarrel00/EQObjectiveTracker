@@ -27,7 +27,7 @@ achievements, professions, and Traveler's Log endeavors.
 ### What works on Classic today
 
 Quest tracking and the customization around it: sorting, manual drag ordering, per-quest
-pinning, filters, section visibility and ordering, the card layout, fonts and colours,
+pinning, filters, section visibility and ordering, the card layout, fonts and colors,
 profiles, row tooltips, and the row right-click menu. Blizzard's own quest watch frame is
 suppressed so you do not get two trackers.
 
@@ -81,7 +81,7 @@ saved world quest watches.
 - **Quests and Campaign**, in separate sections, with objectives, completion, and a Find
   Group button on any quest the game will form a group for
 - **World quests** in their own capped area, with the quest type on the marker, a
-  colour-coded countdown, and a Find Group button where the game allows one. Every world
+  color-coded countdown, and a Find Group button where the game allows one. Every world
   quest in your current zone is listed, not only the ones you have tracked, which you can
   turn off
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
@@ -133,7 +133,7 @@ The tracker can hide itself while you are in combat, inside an instance, on a My
 or while the world map is open. Each is its own toggle, and all are off by default.
 
 Almost everything is configurable: fonts (42 bundled, plus anything from
-LibSharedMedia, each shown in its own typeface in the picker), sizes, spacing, colours, a
+LibSharedMedia, each shown in its own typeface in the picker), sizes, spacing, colors, a
 card layout, section order and visibility, filters by quest type, and eight sort modes
 including by distance and by hand. The current-zone filter shows only quests with an objective
 on the map you are standing on. If that map lists none of its own, such as a building interior,
