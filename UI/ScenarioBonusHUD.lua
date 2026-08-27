@@ -30,6 +30,73 @@ local function enabled()
     return (st and st.enabled == true) or false
 end
 
+-- Lives are in NO widget and NO criterion - the delve header carries only the tier - so the
+-- only known source is the text Blizzard's own tracker draws: a bare digit right after the
+-- tier. Anchor on the tier and take the next digit, and stop on that ANSWER rather than on a
+-- word: the walk used to stop before a raw English "Challenge" or "Wave" label, which Blizzard
+-- draws LOCALIZED, so on six of the seven shipped locales it never fired at all.
+-- It does NOT close the residual - with no lives digit drawn, the digit after the tier is
+-- still taken, whatever it is. Nothing readable from here separates those two cases.
+-- This lives in UI/ because Data/ may never touch a frame, and it is handed to the model
+-- through ScenarioBonus:SetLivesReader rather than called from it.
+-- EQOT HIDES THE FRAME THIS READS, which the addon it was taken from does not, so finding
+-- nothing is a legitimate outcome and drops the Lives half of the line rather than guessing.
+-- IsShown is deliberate over IsVisible: a FontString under a hidden parent still reports
+-- shown, and that is the only reason this has any chance of working here.
+local LIVES_MAX_DEPTH = 8
+
+local function livesDigit(region)
+    if not (region.GetObjectType and region:GetObjectType() == "FontString"
+            and region:IsShown()) then
+        return nil
+    end
+    -- Guarded per region: tracker text can be a secret string that throws on any string
+    -- method, and one of those must not abort the walk and lose the digit after it.
+    local ok, res = pcall(function()
+        local t = region:GetText()
+        if not t or t == "" then return nil end
+        local clean = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        return tonumber(clean:match("^%s*(%d+)%s*$"))
+    end)
+    return ok and res or nil
+end
+
+local function readDelveLives(knownTier)
+    local tracker = _G.ScenarioObjectiveTracker or _G.ObjectiveTrackerFrame
+    if not tracker then return nil end
+
+    local digits, count, answer = {}, 0, nil
+    local function walk(f, depth)
+        if answer or not f or depth > LIVES_MAX_DEPTH then return end
+        if f.IsForbidden and f:IsForbidden() then return end
+        local okR, regions = pcall(function() return { f:GetRegions() } end)
+        if okR then
+            for i = 1, #regions do
+                local d = livesDigit(regions[i])
+                if d then
+                    if knownTier and digits[count] == knownTier then answer = d return end
+                    count = count + 1
+                    digits[count] = d
+                end
+            end
+        end
+        local okC, kids = pcall(function() return { f:GetChildren() } end)
+        if okC then
+            for i = 1, #kids do
+                walk(kids[i], depth + 1)
+                if answer then return end
+            end
+        end
+    end
+    pcall(walk, tracker, 0)
+
+    if answer then return answer end
+    -- Tier then lives and nothing else is the only unambiguous shape without the anchor, so a
+    -- third digit refuses rather than guesses.
+    if count == 2 then return digits[2] end
+    return nil
+end
+
 local function buildRow(parent)
     local row = CreateFrame("Frame", nil, parent)
 
@@ -255,18 +322,27 @@ function HUD:_Render(model)
         for c = 1, (crit and #crit or 0) do
             local info = crit[c]
             local crow = acquireRow(f)
+            local isStat = info.kind == "stat"
             crow.reward:Hide()
-            crow.icon:Show()
-            crow.icon:ClearAllPoints()
-            crow.icon:SetPoint("LEFT", crow, "LEFT", PAD + 6, 0)
-            Util.SafeSetAtlas(crow.icon, info.completed
-                and "ui-questtracker-tracker-check"
-                or  "ui-questtracker-objective-nub")
             crow.text:ClearAllPoints()
-            crow.text:SetPoint("LEFT",  crow.icon, "RIGHT", 6, 0)
+            if isStat then
+                -- Run state, not an objective, so no checkbox and no completed color.
+                crow.icon:Hide()
+                crow.text:SetPoint("LEFT", crow, "LEFT", PAD + 6, 0)
+            else
+                crow.icon:Show()
+                crow.icon:ClearAllPoints()
+                crow.icon:SetPoint("LEFT", crow, "LEFT", PAD + 6, 0)
+                Util.SafeSetAtlas(crow.icon, info.completed
+                    and "ui-questtracker-tracker-check"
+                    or  "ui-questtracker-objective-nub")
+                crow.text:SetPoint("LEFT", crow.icon, "RIGHT", 6, 0)
+            end
             crow.text:SetPoint("RIGHT", crow, "RIGHT", -6, 0)
             crow.text:SetText(info.text or "")
-            if info.completed then
+            if isStat then
+                crow.text:SetTextColor(0.62, 0.62, 0.62)
+            elseif info.completed then
                 crow.text:SetTextColor(0.27, 1.0, 0.27)
             else
                 crow.text:SetTextColor(0.85, 0.85, 0.85)
@@ -323,6 +399,7 @@ function HUD:ToggleTest()
             } },
             { name = "Bonus: Swift Delver", rewardQuestID = 999999, criteria = {
                 { text = "Finish within the time limit", completed = false },
+                { text = "Lives: 3   Deaths: 1", completed = false, kind = "stat" },
             } },
         })
     end
@@ -331,7 +408,14 @@ function HUD:ToggleTest()
 end
 
 function HUD:Dump()
-    local out = ns:GetModule("ScenarioBonus"):DumpLines({})
+    -- The data half reads live values that can throw, and this is the instrument this feature
+    -- is diagnosed from - an unguarded call let one throw kill the whole command.
+    local okData, out = pcall(function()
+        return ns:GetModule("ScenarioBonus"):DumpLines({})
+    end)
+    if not (okData and type(out) == "table") then
+        out = { "|cffff5555bonus data dump failed:|r " .. tostring(out) }
+    end
     out[#out + 1] = ("frame: %s  rows %d  test=%s"):format(
         self.frame and (self.frame:IsShown() and "shown" or "hidden") or "not created",
         #activeRows, tostring(self._test and true or false))
@@ -365,6 +449,7 @@ end
 function HUD:OnEnable()
     local Bonus = ns:GetModule("ScenarioBonus")
     if not Bonus then return end
+    if Bonus.SetLivesReader then Bonus:SetLivesReader(readDelveLives) end
     Bonus:OnDirty(function() HUD:Update() end)
     if enabled() then self:Update() end
 end

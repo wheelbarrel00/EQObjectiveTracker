@@ -9,6 +9,29 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.14.0", date = "2026-08-26",
+        sections = {
+            { head = "New Features", items = {
+                "The bonus objectives HUD now shows how many lives a delve has left and how many times you have died on this run. Both survive a reload, and both are cleared when you leave the delve. Lives are the whole group's, so in a party that number and your own death count will not agree, which is correct rather than a mistake.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The bonus objectives HUD showed nothing at all inside a delve. It recognizes the nemesis packs by a single marker, and this season changed that marker, so it never started counting and the strongbox line was never drawn. It now recognizes every season's marker and keeps the older ones, because older delves still use them. This was named as a known issue in 1.13.0.",
+                "A single marker the game would not describe could stop that count finding anything at all, with nothing on screen to say so. Each marker is now read on its own, so one bad one costs its own line and nothing else.",
+                "The pack count could show as complete, in green, while both packs were still alive, and then come back from the next reload reading 2/4 in a delve that only has two. A loading screen empties the list that count is read from, and an empty list was being taken to mean every pack had died. It is now treated as no reading at all, and the last good count stands.",
+                "The Sanctified Banner line could jump to \"Grand Spoils earned\" during a loading screen, for the same reason as the pack count above, and that line only ever moves forward, so it stayed wrong for the rest of the run.",
+                "A delve run from an earlier session could resume onto a new one and bring its deaths and pack count with it, if you logged out inside a delve and logged back in somewhere else. The saved record is now cleared whenever you are not in a delve, rather than only when the current session watched you leave one.",
+                "The HUD saved a per-character record for everyone who walked into a delve, including the large majority who have never switched it on. Nothing was shown to them, but the data was still being written. It now writes nothing at all unless the HUD is turned on.",
+                "On any client that is not English, the lives count could be a completely different number. The reader stopped at two English words, which the game draws translated, so on a translated client it never stopped and could pick up an unrelated counter instead. It no longer depends on any wording.",
+                "/eqot disable Widgets reported the module as off while it carried on doing its work, so it could not be used to narrow down where a problem was coming from.",
+                "/eqot bonushud could stop printing partway through if the game handed it a value it could not display, which took the rest of the report with it. It now prints one line saying so and carries on.",
+                "Reset all settings left the delve run tally behind, which is stored per character.",
+            } },
+            { head = "Notes", items = {
+                "With the bonus objectives HUD switched on, a delve now draws a run readout even where that delve has no bonus mechanics at all, so the lives and death counts are always there.",
+            } },
+        },
+    },
+    {
         version = "1.13.0", date = "2026-08-21",
         sections = {
             { head = "New Features", items = {

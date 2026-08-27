@@ -390,6 +390,8 @@ L["Sanctified Banner: Grand Spoils earned"] = "圣化旗帜：已获得丰厚战
 L["Sanctified Banner: bonus Spoils secured"] = "圣化旗帜：已获取额外战利品"
 L["Sanctified Banner: kill the Voidfused Rager"] = "圣化旗帜：击杀虚空融合狂怒者"
 L["Sanctified Banner: find it for bonus loot"] = "圣化旗帜：找到它获取额外奖励"
+L["Deaths:"] = "死亡："
+L["Lives:"] = "生命："
 
 -- Data/Widgets.lua
 L["Tier %d"] = "%d 层"

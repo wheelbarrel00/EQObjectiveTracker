@@ -375,6 +375,8 @@ L["Sanctified Banner: Grand Spoils earned"] = "Geheiligtes Banner: Große Beute 
 L["Sanctified Banner: bonus Spoils secured"] = "Geheiligtes Banner: Bonusbeute gesichert"
 L["Sanctified Banner: kill the Voidfused Rager"] = "Geheiligtes Banner: Tobsüchtigen der Leere töten"
 L["Sanctified Banner: find it for bonus loot"] = "Geheiligtes Banner: für Bonusbeute finden"
+L["Deaths:"] = "Tode:"
+L["Lives:"] = "Leben:"
 
 -- Data/Widgets.lua
 L["Tier %d"] = "Stufe %d"

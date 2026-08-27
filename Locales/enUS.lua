@@ -389,6 +389,8 @@ L["Sanctified Banner: Grand Spoils earned"] = true
 L["Sanctified Banner: bonus Spoils secured"] = true
 L["Sanctified Banner: kill the Voidfused Rager"] = true
 L["Sanctified Banner: find it for bonus loot"] = true
+L["Deaths:"] = true
+L["Lives:"] = true
 
 -- Data/Widgets.lua
 L["Tier %d"] = true

@@ -235,6 +235,9 @@ end
 -- ABSENCE is the flag for "nothing decided yet" and absence fails open to every quest tracked.
 -- An empty table is the opposite state and would hide the whole log. It clears where
 -- trackedWorldQuests does not because the two fail in opposite directions.
+--
+-- delveRun clears too, and it is not a third exemption: it is the delve HUD's live tally
+-- rather than a choice, and absence is already what it reads as "no run in progress".
 function DB:ResetAll()
     if not self.db then return end
     if self.db.ResetProfile then self.db:ResetProfile() end
@@ -256,6 +259,7 @@ function DB:ResetAll()
         c.hidden            = {}
         c.pinned            = {}
         c.trackedQuests     = nil
+        c.delveRun          = nil
     end
 end
 

@@ -388,6 +388,8 @@ L["Sanctified Banner: Grand Spoils earned"] = "Освящённое знамя: 
 L["Sanctified Banner: bonus Spoils secured"] = "Освящённое знамя: бонусная добыча получена"
 L["Sanctified Banner: kill the Voidfused Rager"] = "Освящённое знамя: убейте Пропитанного Бездной буяна"
 L["Sanctified Banner: find it for bonus loot"] = "Освящённое знамя: найдите его ради бонусной добычи"
+L["Deaths:"] = "Смертей:"
+L["Lives:"] = "Жизни:"
 
 -- Data/Widgets.lua
 L["Tier %d"] = "Уровень %d"

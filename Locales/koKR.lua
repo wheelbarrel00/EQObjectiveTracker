@@ -388,6 +388,8 @@ L["Sanctified Banner: Grand Spoils earned"] = "축성된 깃발: 큰 전리품 �
 L["Sanctified Banner: bonus Spoils secured"] = "축성된 깃발: 보너스 전리품 확보"
 L["Sanctified Banner: kill the Voidfused Rager"] = "축성된 깃발: 공허주입 분노령 처치"
 L["Sanctified Banner: find it for bonus loot"] = "축성된 깃발: 찾으면 보너스 전리품"
+L["Deaths:"] = "사망:"
+L["Lives:"] = "생명:"
 
 -- Data/Widgets.lua
 L["Tier %d"] = "%d단계"

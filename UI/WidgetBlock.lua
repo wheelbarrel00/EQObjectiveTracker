@@ -183,15 +183,20 @@ local function release(state)
     end
 end
 
+-- Render-driven, so IsModuleDisabled's OnEnable gate never reaches it and this asks for itself.
+-- IsModuleDisabled, never SafeMode, or an explicit /eqot enable cannot override it. Both names
+-- because /eqot modules lists both, and asked BEFORE the set id is fetched - behind that call a
+-- disabled module still reached C_UIWidgetManager once per render.
+local function widgetsOff(cfg)
+    return ns:IsModuleDisabled("WidgetBlock") or ns:IsModuleDisabled("Widgets")
+        or (cfg and cfg.showTrackerWidgets == false)
+end
+
 local function draw(state, container, cfg, top, setID)
     release(state)
 
     local W = ns:GetModule("Widgets")
-    -- Driven from Tracker:Render rather than from an event, so IsModuleDisabled's OnEnable gate
-    -- never reaches it. Without this check /eqot disable reports the module off while it is
-    -- still calling into C_UIWidgetManager, which is the axis a widget-pipeline bisection needs.
-    local off = ns:SafeMode() or (cfg and cfg.showTrackerWidgets == false)
-    if off or not setID or not (W and W:IsAvailable()) then
+    if not setID or not (W and W:IsAvailable()) then
         if W and W.Forget then W:Forget(setID) end
         return 0
     end
@@ -269,6 +274,7 @@ end
 
 -- The tracker's own set, at the top of the container. Blizzard draws it above its modules.
 function WidgetBlock:Render(container, cfg)
+    if widgetsOff(cfg) then release(self.top) return 0 end
     local W = ns:GetModule("Widgets")
     return draw(self.top, container, cfg, 0, W and W:TrackerSetID())
 end
@@ -276,6 +282,7 @@ end
 -- The scenario's set, between the banner and the criteria, which is where the stage block puts
 -- it. Driven from UI/Scenario.lua because only that knows where its banner ends.
 function WidgetBlock:RenderScenario(container, cfg, top)
+    if widgetsOff(cfg) then release(self.scenario) return 0 end
     local W = ns:GetModule("Widgets")
     return draw(self.scenario, container, cfg, top or 0, W and W:ScenarioSetID())
 end

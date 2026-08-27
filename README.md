@@ -86,8 +86,8 @@ saved world quest watches.
   turn off
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
   delve tier, and a clickable button for any spell the stage hands you
-- **Bonus objectives**, on their own movable HUD, including the bonus loot
-  mechanics inside a delve. Off by default
+- **Bonus objectives**, on their own movable HUD, including the bonus loot mechanics
+  inside a delve and a lives and deaths readout for the run. Off by default
 - **Achievements**, **professions** with reagent counts, and **endeavors**
 - **Progress bars** for objectives that report a percentage or a running total, the way the
   default tracker draws them, which you can turn off
