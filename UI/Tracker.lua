@@ -13,6 +13,10 @@ local REFRESH_THROTTLE = 0.25
 local WQ_PIN_FRACTION  = 0.40
 local PINNED_GROUP     = "worldquests"
 local CONTAINER_GROUP  = "scenarios"
+-- Registered by Quests on retail and QuestsClassic on Classic, so its own groups list is what
+-- names the sections the empty rule counts - campaign and quests on one flavor, quests on the
+-- other. Never a hardcoded pair here.
+local QUEST_PROVIDER   = "quests"
 
 -- Hiding the bar reclaims its gutter for text, so the inset is a function of the
 -- setting rather than a constant.
@@ -946,8 +950,12 @@ local EMPTY_GROUP = { visibleCount = 0, totalCount = 0, entries = {} }
 function Tracker:Render()
     local f = self.frame
     if not f then return end
-    -- Nothing on screen to lay out, so the work is deferred until Visibility shows it again
-    if f._eqotHidden or not f:IsShown() then
+    -- Nothing on screen to lay out, so the work is deferred until Visibility shows it again.
+    -- The one exception is the hide-when-no-quests rule, which is fed BY this count: stopping
+    -- here would leave the count frozen at zero and the tracker could never come back. It buys
+    -- that with a WHOLE render per quest event, feed build and world quest rows included, not
+    -- just the count.
+    if (f._eqotHidden or not f:IsShown()) and not f._eqotRenderWhileHidden then
         f._eqotPendingRender = true
         return
     end
@@ -1004,6 +1012,23 @@ function Tracker:Render()
     local gap      = Card:Gap(math.max(0, (cfg and cfg.blockSpacing) or 2), (Card:State(cfg)))
 
     local scenarioH = self:_RenderScenario(byGroup[CONTAINER_GROUP], cfg)
+
+    -- Counted off the group rather than off the row loop, because a COLLAPSED section draws no
+    -- rows and a collapsed quest list is not an empty one. A hidden section is skipped, since
+    -- the rule is about what is on screen. Popups count: a Quest Discovered box is the only
+    -- affordance that quest has, Blizzard's own being suppressed.
+    local questRows = 0
+    do
+        local provider = ns:GetModule("Registry"):Get(QUEST_PROVIDER)
+        local groups   = provider and provider.groups
+        for i = 1, (groups and #groups or 0) do
+            local gid = groups[i]
+            if not Sections:IsHidden(gid) then
+                local g = byGroup[gid]
+                questRows = questRows + ((g and g.visibleCount) or 0) + Popups:CountFor(gid)
+            end
+        end
+    end
 
     local y        = 0
     local hasTimed = false
@@ -1110,6 +1135,11 @@ function Tracker:Render()
     -- the anchor arithmetic reads settled positions.
     ItemButtons:Commit()
     self:_EnsureTimerTicker(hasTimed)
+
+    -- Last, so the layout is settled before a rule is allowed to paint over it. Apply is only
+    -- re-entered when the count crosses zero, so this is a no-op on almost every render.
+    local Visibility = ns:GetModule("Visibility")
+    if Visibility then Visibility:SetQuestRows(questRows) end
 end
 
 -- Row's change gate keys on the formatted time string, so a plain Render only repaints

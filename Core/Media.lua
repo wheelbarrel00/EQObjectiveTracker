@@ -106,6 +106,42 @@ local SOUNDS = {
     { name = "EQ: Worgen (F)",      file = 542028 },
 }
 
+-- Sound KITS, not file ids, so these play through PlaySound and cannot be registered with
+-- LibSharedMedia the way the list above is. The kit NAMES are read rather than their numbers,
+-- so a client that does not have one answers nil rather than a wrong number, which is what the
+-- filter below reads. Cooldown Master already plays the first, third and fourth
+-- of these in game, which is where they come from - the list above is voice lines and had no
+-- chime in it at all. Their names are the same migration contract the fonts are: add, never
+-- rename.
+local KIT_SOUNDS = {
+    { name = "EQ: Quest Ding",   kit = "IG_QUEST_LIST_COMPLETE" },
+    { name = "EQ: Quest Open",   kit = "IG_QUEST_LIST_OPEN" },
+    { name = "EQ: Ready Check",  kit = "READY_CHECK" },
+    { name = "EQ: Raid Warning", kit = "RAID_WARNING" },
+}
+
+-- Two questions, deliberately not one function. Answering "is this a kit name" with the kit's
+-- ID conflates it with "does this client know that kit", and every guard below asks the first
+-- while a client missing the kit answers the second - which sent a kit name through to
+-- GetSoundFile's fallback and played the first voice line instead.
+local function isKitName(name)
+    for i = 1, #KIT_SOUNDS do
+        if KIT_SOUNDS[i].name == name then return true end
+    end
+    return false
+end
+
+-- nil for a kit this client does not know, so a picker never offers a sound that could only
+-- ever be silence.
+local function kitID(name)
+    for i = 1, #KIT_SOUNDS do
+        if KIT_SOUNDS[i].name == name then
+            return _G.SOUNDKIT and _G.SOUNDKIT[KIT_SOUNDS[i].kit]
+        end
+    end
+    return nil
+end
+
 function Media:OnInitialize()
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     if not LSM then return end
@@ -122,6 +158,14 @@ function Media:GetSoundList()
     -- costs the manifest no phrase. The stored value stays the bare token.
     local none = _G.NONE or "None"
     local out, labels = { none }, { [none] = "NONE" }
+    -- Ahead of the voice lines, which are a long run nobody scrolls past
+    for _, s in ipairs(KIT_SOUNDS) do
+        if kitID(s.name) then
+            local label = s.name:gsub("^EQ: ", "")
+            out[#out + 1] = label
+            labels[label] = s.name
+        end
+    end
     for _, s in ipairs(SOUNDS) do
         local label = s.name:gsub("^EQ: ", "")
         out[#out + 1] = label
@@ -135,8 +179,26 @@ function Media:GetSoundLabel(value)
     return (value:gsub("^EQ: ", ""))
 end
 
+-- Everything that makes a noise goes through here rather than reaching for a file, or a kit
+-- sound falls through to the fallback at the bottom of GetSoundFile and the player hears the
+-- wrong one. A kit name this client cannot resolve is SILENT rather than substituted, which is
+-- the honest failure: the picker does not offer it either, so a substitute could not be
+-- recognised or changed.
+function Media:Play(name)
+    if not name or name == "NONE" then return end
+    if isKitName(name) then
+        local kit = kitID(name)
+        if kit and PlaySound then pcall(PlaySound, kit, "Master") end
+        return
+    end
+    local file = self:GetSoundFile(name)
+    if file and PlaySoundFile then pcall(PlaySoundFile, file, "Master") end
+end
+
 function Media:GetSoundFile(name)
     if name == "NONE" then return nil end
+    -- A kit has no file, and the fallback below would hand back the first voice line for one
+    if isKitName(name) then return nil end
     if self.LSM then
         local f = self.LSM:Fetch("sound", name)
         if f then return f end

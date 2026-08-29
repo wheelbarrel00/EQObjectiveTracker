@@ -102,9 +102,10 @@ local function onLeave()
     Util.Tooltip():Hide()
 end
 
--- A countdown ticks between server pushes, so it runs locally off a deadline stamped at draw
--- time and the next widget update re-stamps it. Bounded: installed only on a bar currently
--- drawing a timer, cleared when that bar is retired, and a hidden frame runs no OnUpdate.
+-- A countdown ticks between server pushes, so it runs locally off a deadline the READER stamps
+-- when it takes the value, and the next widget update re-stamps it. Bounded: installed only on
+-- a bar currently drawing a timer, cleared when that bar is retired, and a hidden frame runs no
+-- OnUpdate.
 local function onUpdateCountdown(bar, elapsed)
     bar._clock = (bar._clock or 0) + elapsed
     if bar._clock < TICK then return end
@@ -218,7 +219,12 @@ local function draw(state, container, cfg, top, setID)
             Media:ApplyFont(bar.label, -2)
             Media:ApplyFont(bar.value, -2)
             bar.label:SetText(w.text or "")
-            bar.value:SetText(valueText(w) or "")
+            -- A countdown's raw value is frozen between server pushes, so painting from it shows
+            -- the time as it was when the server last spoke and onUpdateCountdown corrects it one
+            -- tick later: a visible upward flash of the clock on every repaint. Both the text and
+            -- the fill below are seeded from the deadline instead, which is what the ticker reads.
+            local left = (w.countdown and w.deadline) and math.max(0, w.deadline - GetTime())
+            bar.value:SetText(left and clock(left) or (valueText(w) or ""))
             Media:ApplyTextShadow(bar.label)
             Media:ApplyTextShadow(bar.value)
 
@@ -230,14 +236,16 @@ local function draw(state, container, cfg, top, setID)
             local tint = tintFor(w.textureKit, w.colorTint)
             bar:SetStatusBarColor(tint[1], tint[2], tint[3])
             bar:SetMinMaxValues(w.min, w.max)
-            bar:SetValue(math.max(w.min, math.min(w.max, w.value)))
+            bar:SetValue(math.max(w.min, math.min(w.max, left or w.value)))
             bar:SetWidth(width)
             bar:ClearAllPoints()
             bar:SetPoint("TOPLEFT", container, "TOPLEFT", SIDE_PAD, -y)
             bar._tooltip = w.tooltip
 
             if w.countdown then
-                bar._deadline = GetTime() + (w.value or 0)
+                -- w.deadline, not GetTime() + w.value: the value is frozen between server
+                -- pushes, so re-deriving it here restarted the clock on every repaint.
+                bar._deadline = w.deadline or (GetTime() + (w.value or 0))
                 bar._cdMin, bar._cdMax, bar._clock = w.min, w.max, 0
                 bar:SetScript("OnUpdate", onUpdateCountdown)
             end

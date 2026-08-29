@@ -13,6 +13,9 @@ DB.defaults = {
             hideInInstances  = false,
             hideOnMapOpen    = false,
             hideInMythicPlus = false,
+            -- Counted by Tracker:Render and read by UI/Visibility.lua. New key, so no stored
+            -- value exists for a default to silently overrule - see the AceDB note below.
+            hideWhenNoQuests = false,
             autoTrackAccepted = true,
             restoreSuperTrackOnLogin = true,
             -- A NEW key defaulting to false is safe. This is not the AceDB default-flip
@@ -35,6 +38,11 @@ DB.defaults = {
 
             questSoundEnabled    = true,
             questCompleteSound   = "EQ: Work Complete",
+            -- Its own pair rather than sharing the two above, so accept and complete can be set
+            -- apart or either switched off. Off, because this reaches players who already have
+            -- the complete sound switched off and a new noise nobody asked for is worse.
+            questAcceptSoundEnabled = false,
+            questAcceptSound        = "EQ: Quest Ding",
 
             showOnlyWatched      = true,
             sortMode             = "zone",

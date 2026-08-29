@@ -97,7 +97,8 @@ saved world quest watches.
   comparisons against what you have equipped. World quests also show their faction and
   how long is left
 
-Also included: a zone progress bar, a sound when a quest is ready to turn in, a highlight on
+Also included: a zone progress bar, a sound when you accept a quest and another when one is
+ready to turn in, a highlight on
 the flight point nearest your tracked quest, and the extra bars and status lines the default
 tracker shows during world events, which would otherwise not appear anywhere.
 
@@ -130,7 +131,10 @@ A setting that only applies while another one is on is dimmed while that one is 
 clear which settings are actually in effect.
 
 The tracker can hide itself while you are in combat, inside an instance, on a Mythic+ run,
-or while the world map is open. Each is its own toggle, and all are off by default.
+while the world map is open, or while you have no quests showing. Each is its own toggle, and
+all are off by default. The last of those counts quest and campaign rows only, so nothing else
+keeps the tracker on screen by itself, including world quests, achievements, the zone progress
+bar, and the delve or scenario panel.
 
 Almost everything is configurable: fonts (42 bundled, plus anything from
 LibSharedMedia, each shown in its own typeface in the picker), sizes, spacing, colors, a

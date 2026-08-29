@@ -482,23 +482,42 @@ Options:RegisterTab({
         soundCheck:SetPoint("TOPLEFT", splitCheck, "BOTTOMLEFT", 0, -2)
 
         local function playSound(value)
-            local file = ns:GetModule("Media"):GetSoundFile(value)
-            if file and PlaySoundFile then PlaySoundFile(file, "Master") end
+            ns:GetModule("Media"):Play(value)
+        end
+        -- The list is rebuilt on every open rather than captured, which is what CreateDropdown's
+        -- function form is for, and both pickers want the identical one.
+        local function soundList()
+            local labels, values = ns:GetModule("Media"):GetSoundList()
+            local out = {}
+            for _, name in ipairs(labels) do
+                out[#out + 1] = { value = values[name] or "NONE", label = name }
+            end
+            return out
         end
         local soundDD = self:CreateDropdown(content, L["Quest Complete Sound"],
-            function()
-                local labels, values = ns:GetModule("Media"):GetSoundList()
-                local out = {}
-                for _, name in ipairs(labels) do
-                    out[#out + 1] = { value = values[name] or "NONE", label = name }
-                end
-                return out
-            end,
+            soundList,
             function() return DB().questCompleteSound or "NONE" end,
             function(v) DB().questCompleteSound = v; playSound(v) end,
             L["Which sound plays when a quest becomes ready to turn in."],
             nil, playSound)
         soundDD:SetPoint("TOPLEFT", soundCheck, "BOTTOMLEFT", 0, -8)
+
+        -- Its own switch rather than hanging off Quest Sound above, so a player can have one
+        -- without the other. == true, not ~= false: this one ships off.
+        local acceptCheck = self:CreateCheckbox(content,
+            L["Play a sound when you accept a quest"],
+            function() return DB().questAcceptSoundEnabled == true end,
+            function(v) DB().questAcceptSoundEnabled = v end,
+            L["Off by default. It has its own sound below, so accepting and completing can be told apart."])
+        acceptCheck:SetPoint("TOPLEFT", soundDD, "BOTTOMLEFT", 0, -8)
+
+        local acceptDD = self:CreateDropdown(content, L["Quest Accepted Sound"],
+            soundList,
+            function() return DB().questAcceptSound or "NONE" end,
+            function(v) DB().questAcceptSound = v; playSound(v) end,
+            L["Which sound plays when you accept a quest. World quests and bonus objectives are left silent, since walking into one accepts it."],
+            nil, playSound)
+        acceptDD:SetPoint("TOPLEFT", acceptCheck, "BOTTOMLEFT", 0, -8)
 
         -- The zone progress bar's two toggles used to sit here, with its nine styling
         -- controls on the Appearance tab. They live together under Appearance's Zone
@@ -509,7 +528,7 @@ Options:RegisterTab({
         -- functions and ships no scenarios behind them.
         if ns.Has.ScenarioBonus and Registry:Get("scenarios") then
             local sbHeader = self:CreateHeading(content, L["Scenario Bonus Objectives"])
-            sbHeader:SetPoint("TOPLEFT", soundDD, "BOTTOMLEFT", 0, self.GAP.aboveHead)
+            sbHeader:SetPoint("TOPLEFT", acceptDD, "BOTTOMLEFT", 0, self.GAP.aboveHead)
 
             local sbEnable = self:CreateCheckbox(content, L["Show bonus objectives HUD"],
                 function()

@@ -9,6 +9,19 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.15.0", date = "2026-08-29",
+        sections = {
+            { head = "New Features", items = {
+                "A new option under General, \"Hide tracker when no quests are showing\", takes the whole tracker off screen while you have no quest or campaign rows, and brings it back the moment you accept one. It is off by default. It counts quest and campaign rows only, so nothing else keeps the tracker on screen by itself: world quests, achievements, the zone progress bar, and the delve or scenario panel all go with it. If you want the tracker up for those, leave this switched off. Asked for by RobSaab.",
+                "A sound can play when you accept a quest, where before there was only one for a quest becoming ready to turn in. It has its own switch and its own sound under Tracker, so the two can be told apart or either one turned off on its own, and it is off by default. World quests and bonus objectives stay silent, since walking into one accepts it without you doing anything. Asked for by CF-Aphelion78.",
+                "Four short chimes have been added to the sound picker, at the top of the list ahead of the voice lines: Quest Ding, Quest Open, Ready Check and Raid Warning. The list had no chime in it before, only the Work Complete line and the race greetings. Quest Ding is the one the new accept sound starts on, and the other three are a click away in the picker, which plays each as you scroll it. Any your game does not have is left out of the list rather than offered as silence.",
+            } },
+            { head = "Improvements", items = {
+                "The tracker asked the game for its event and scenario widget information on every repaint, which on an ordinary quest day is many times a minute even when there are no such widgets to draw at all. It now asks only when the game says that information has changed. This does not on its own fix any reported error and is not claimed to. It is here to reduce how often the addon touches that part of the interface, which is where the outstanding Lua error reports from the world map appear to live. A scenario countdown moved with it: its deadline is now set when the game pushes a new time rather than every time the tracker repaints, so an ordinary repaint, or an unrelated widget in the same panel changing, no longer restarts the clock on screen.",
+            } },
+        },
+    },
+    {
         version = "1.14.0", date = "2026-08-26",
         sections = {
             { head = "New Features", items = {

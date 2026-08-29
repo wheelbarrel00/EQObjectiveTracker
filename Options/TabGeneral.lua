@@ -57,6 +57,14 @@ Options:RegisterTab({
             prev = mplus
         end
 
+        -- The tooltip has to name what does NOT count, because a player with world quests or a
+        -- zone bar on screen and the tracker gone would otherwise read this as a bug.
+        local noQuests = hideRule("hideWhenNoQuests",
+            L["Hide tracker when no quests are showing"],
+            L["Hides the whole tracker while you have no quest or campaign rows, and brings it back the moment you accept one. Nothing else keeps it on screen by itself, including world quests, achievements, the zone progress bar, and the delve or scenario panel."])
+        noQuests:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -2)
+        prev = noQuests
+
         local autoTrack = self:CreateCheckbox(content, L["Auto-track accepted quests"],
             function() return DB:General().autoTrackAccepted ~= false end,
             function(v) DB:General().autoTrackAccepted = v end,
