@@ -88,7 +88,9 @@ saved world quest watches.
   delve tier, and a clickable button for any spell the stage hands you
 - **Bonus objectives**, on their own movable HUD, including the bonus loot mechanics
   inside a delve and a lives and deaths readout for the run. Off by default
-- **Achievements**, **professions** with reagent counts, and **endeavors**
+- **Achievements**, **professions** with reagent counts, and **endeavors** - though the
+  Endeavors section is known to stay empty in places where the default tracker lists a monthly
+  activity, which is still being worked on
 - **Progress bars** for objectives that report a percentage or a running total, the way the
   default tracker draws them, which you can turn off
 - **Quest items**, as a button on the row of any quest that carries one
@@ -98,9 +100,9 @@ saved world quest watches.
   how long is left
 
 Also included: a zone progress bar, a sound when you accept a quest and another when one is
-ready to turn in, a highlight on
-the flight point nearest your tracked quest, and the extra bars and status lines the default
-tracker shows during world events, which would otherwise not appear anywhere.
+ready to turn in, a highlight on the flight point nearest your tracked quest, and the extra
+bars and status lines the default tracker shows during world events, which would otherwise not
+appear anywhere.
 
 ## Usage
 

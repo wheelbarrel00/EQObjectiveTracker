@@ -5,6 +5,29 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-08-29
+
+### New Features
+
+- The scenario panel at the top of the tracker can be drawn on a card of its own, matching the
+  quest cards below it. Delves, dungeons, raids, Mythic Plus runs and world events all use that
+  panel, and it was the one part of the tracker the card layout never reached. It takes the same
+  background color, border color, border thickness and padding the quest cards already use, so
+  there is nothing extra to set up, and it has a switch of its own under Appearance for anyone
+  who wants the quest cards without it. It is on by default and only ever appears while Row
+  Layout is set to Card, so nothing changes for anyone on the plain layout. Tint cards by quest
+  type does not reach it, since the panel is not a quest. Asked for by Da Warrior.
+- Let me know if something is off or not working correctly, and I can address it.
+
+### Improvements
+
+- Traditional Chinese now covers the last of what earlier releases added: the hide the tracker
+  when no quests are showing rule and its tooltip, the quest accepted sound with its own
+  picker, and the event and scenario widgets switch that had been waiting since 1.12.0. That
+  takes it to 408 of the addon's 410 phrases, the two outstanding being the new scenario card
+  option above. Contributed by BNS333.
+- Let me know if something is off or not working correctly, and I can address it.
+
 ## [1.15.0] - 2026-08-29
 
 ### New Features

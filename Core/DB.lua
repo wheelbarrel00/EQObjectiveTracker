@@ -79,6 +79,7 @@ DB.defaults = {
             cardTintLegendary    = { r = 0.24, g = 0.12, b = 0.01, a = 0.80 },
             cardTintDungeon      = { r = 0.02, g = 0.11, b = 0.20, a = 0.80 },
             cardTintRaid         = { r = 0.02, g = 0.15, b = 0.03, a = 0.80 },
+            scenarioCard         = true,
 
             showBackground     = false,
             backgroundColor    = { r = 0, g = 0, b = 0, a = 0.6 },
@@ -211,6 +212,7 @@ local APPEARANCE_KEYS = {
     "blockSpacing", "lineSpacing", "headerSpacing", "scale",
     "blockLayout", "cardColor", "cardBorderColor", "cardBorderSize", "cardPadding",
     "cardTintByType", "cardTintCampaign", "cardTintLegendary", "cardTintDungeon", "cardTintRaid",
+    "scenarioCard",
     "showBackground", "backgroundColor", "showBorder", "borderColor", "borderSize",
     "scrollBarBg", "scrollBarBgColor", "skinScrollBar",
     "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows",

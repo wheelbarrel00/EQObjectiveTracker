@@ -21,6 +21,15 @@ function Card:State(t)
     return true, t.cardPadding or PAD_DEFAULT, t.cardBorderSize or 1
 end
 
+-- The scenario block is one panel rather than a run of rows, so it answers separately - but
+-- only ever as a card while the rows are, or it would sit alone on an otherwise plain tracker.
+function Card:ScenarioState(t)
+    local on, pad, border = self:State(t)
+    t = tracker(t)
+    if not on or (t and t.scenarioCard == false) then return false, 0, 0 end
+    return true, pad, border
+end
+
 function Card:Gap(base, enabled)
     if not enabled then return base end
     local t = tracker()

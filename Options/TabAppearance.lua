@@ -470,11 +470,17 @@ Options:RegisterTab({
             L["Breathing room between a card's edge and the text inside it. Larger values make taller cards."])
         cardPaddingSlider:SetPoint("TOPLEFT", cardBorderSlider, "BOTTOMLEFT", 0, -16)
 
+        local scenarioCardCheck = self:CreateCheckbox(content, L["Card behind the scenario panel"],
+            function() return DB().scenarioCard ~= false end,
+            function(v) relayout("scenarioCard", v) end,
+            L["Draws the delve, dungeon, raid and world event panel at the top of the tracker on a card of its own, matching the quest cards below it. Only used while Row Layout is set to Card."])
+        scenarioCardCheck:SetPoint("TOPLEFT", cardPaddingSlider, "BOTTOMLEFT", 0, -16)
+
         local tintCheck = self:CreateCheckbox(content, L["Tint cards by quest type"],
             function() return DB().cardTintByType end,
             function(v) restyle("cardTintByType", v); syncDependents() end,
             L["Gives campaign, legendary, dungeon and raid entries their own card color. Anything else uses the plain background color above."])
-        tintCheck:SetPoint("TOPLEFT", cardPaddingSlider, "BOTTOMLEFT", 0, -16)
+        tintCheck:SetPoint("TOPLEFT", scenarioCardCheck, "BOTTOMLEFT", 0, -16)
 
         local campaignTint = self:CreateColorPicker(content, L["Campaign"],
             function() return DB().cardTintCampaign end,
@@ -636,6 +642,7 @@ Options:RegisterTab({
             dim(cardBorderPicker, card)
             dim(cardBorderSlider, card)
             dim(cardPaddingSlider, card)
+            dim(scenarioCardCheck, card)
             dim(tintCheck,        card)
             local tint = card and cfg.cardTintByType
             dim(campaignTint,  tint)

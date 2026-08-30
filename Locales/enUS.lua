@@ -281,6 +281,8 @@ L["Outline color around each quest card. Only used while Row Layout is set to Ca
 L["How thick the card outline is, in pixels. 0 hides the outline and leaves just the fill."] = true
 L["Card Padding"] = true
 L["Breathing room between a card's edge and the text inside it. Larger values make taller cards."] = true
+L["Card behind the scenario panel"] = true
+L["Draws the delve, dungeon, raid and world event panel at the top of the tracker on a card of its own, matching the quest cards below it. Only used while Row Layout is set to Card."] = true
 L["Tint cards by quest type"] = true
 L["Gives campaign, legendary, dungeon and raid entries their own card color. Anything else uses the plain background color above."] = true
 L["Campaign"] = true

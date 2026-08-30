@@ -915,11 +915,17 @@ function Tracker:_RenderScenario(group, cfg)
     local scen = f.scenarioContainer
     if not scen then return 1 end
 
+    -- Zero while the card is off, which is what keeps this path byte-identical to the one that
+    -- shipped before it: every offset below collapses back to what it was.
+    local Card = ns:GetModule("Card")
+    local cardOn, cardPad, cardBorderSize = Card:ScenarioState(cfg)
+    local inset = cardOn and cardPad or 0
+
     -- Blizzard draws its own widget sets inside the tracker it owns, and this addon hides
     -- that frame, so these are drawn here or they are not drawn at all. Resolved defensively
     -- rather than assumed, though every TOC lists it today.
     local WB      = ns:GetModule("WidgetBlock")
-    local widgetH = WB and WB:Render(scen, cfg) or 0
+    local widgetH = WB and WB:Render(scen, cfg, inset) or 0
 
     local entry = (group and group.visibleCount > 0) and group.entries[1] or nil
     local info
@@ -928,7 +934,18 @@ function Tracker:_RenderScenario(group, cfg)
         if provider and provider.GetBanner then info = provider:GetBanner() end
     end
 
-    local h = widgetH + math.max(1, ns:GetModule("Scenario"):Render(scen, cfg, info, entry, widgetH))
+    local h = widgetH + math.max(1, ns:GetModule("Scenario"):Render(scen, cfg, info, entry,
+                                                                   inset + widgetH))
+
+    -- An idle container is one pixel tall, so the card is asked for CONTENT rather than for the
+    -- option - without this it draws a bare padded strip across the top of the tracker all day.
+    if cardOn and (info or widgetH > 0) then
+        local bg, border = Card:Colors(cfg)
+        Card:Draw(scen, nil, 0, cardBorderSize, bg, border)
+        h = h + inset * 2
+    else
+        Card:Clear(scen)
+    end
 
     -- SetHeight fires OnSizeChanged, which calls Refresh, so only touch it on a real move
     -- This container parents the scenario spell buttons and everything below hangs off its

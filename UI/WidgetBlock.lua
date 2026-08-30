@@ -280,11 +280,11 @@ function WidgetBlock:OnEnable()
     end)
 end
 
--- The tracker's own set, at the top of the container. Blizzard draws it above its modules.
-function WidgetBlock:Render(container, cfg)
+-- The tracker's own set, at the top of the block. Blizzard draws it above its modules.
+function WidgetBlock:Render(container, cfg, top)
     if widgetsOff(cfg) then release(self.top) return 0 end
     local W = ns:GetModule("Widgets")
-    return draw(self.top, container, cfg, 0, W and W:TrackerSetID())
+    return draw(self.top, container, cfg, top or 0, W and W:TrackerSetID())
 end
 
 -- The scenario's set, between the banner and the criteria, which is where the stage block puts
