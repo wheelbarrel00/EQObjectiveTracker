@@ -23,6 +23,18 @@ function Util.StripLeadingCount(text)
     return (text:gsub("^%s*%d+%s*/%s*%d+%s*", ""))
 end
 
+-- requirementText arrives pre-bulleted and with padded fractions, like "- 1 / 15 Quests
+-- completed". Both are presentation the renderer owns, so they are stripped before the string
+-- becomes an objective line. The bullet must be followed by whitespace or the pattern eats the
+-- minus sign off a requirement that opens with a negative number.
+--
+-- Shared because the Traveler's Log and the neighborhood initiative hand back the identical
+-- shape, measured on both, and two copies of a pattern this fiddly would drift.
+function Util.CleanRequirement(text)
+    text = (text or ""):gsub("^%s*%-%s+", "")
+    return (text:gsub("(%d+)%s*/%s*(%d+)", "%1/%2"))
+end
+
 function Util.Hex(r, g, b)
     return ("%02x%02x%02x"):format(
         math.floor((r or 0) * 255 + 0.5),

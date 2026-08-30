@@ -254,10 +254,15 @@ end
 -- and read the note on the event list before adding to it.
 local generation = 1
 local idGen, trackerID, scenarioID
+-- Set by whatever can MOVE a widget set id, and cleared by the render that re-reads the pair.
+-- A widget ticking inside a set moves no id, so a burst leaves this alone and the filter stays
+-- tight; a scenario starting or a zone change does move one, and until the next render the pair
+-- still names the previous sets.
+local idsStale = true
 
 local function resolveIDs()
-    if idGen == generation then return end
-    idGen = generation
+    if idGen == generation and not idsStale then return end
+    idGen, idsStale = generation, false
     local prevScenario = scenarioID
     trackerID, scenarioID, stageTitle = nil, nil, nil
 
@@ -438,14 +443,54 @@ function Widgets:OnEnable()
         end
     end
 
-    -- UPDATE_UI_WIDGET fires per widget and a busy event fires it in bursts, so it is
-    -- coalesced rather than repainting the tracker once per widget.
-    local function dirty()
+    -- UPDATE_UI_WIDGET carries the SET its widget belongs to, and this addon reads exactly two.
+    -- The payload used to be discarded, so a widget changing anywhere in the game - top center,
+    -- below minimap, another addon's - rebuilt the whole feed. OnEnable returns above on a
+    -- client with no C_UIWidgetManager, so Classic registers none of this at all.
+    --
+    -- Fail OPEN while the resolved pair is stale. Only a render resolves it, so between a
+    -- scenario starting and the next render the pair still names the previous sets, and the new
+    -- scenario's first widget events were refused - their Invalidate along with them.
+    -- The set id goes through num() for the reason every other Blizzard read here does: a
+    -- secret value reads as absent and fails open rather than raising on ==.
+    -- The TYPE is tested, never the truthiness. This handler is shared with
+    -- PLAYER_ENTERING_WORLD, whose first payload argument is isInitialLogin - a BOOLEAN - so
+    -- `widgetInfo and widgetInfo.widgetSetID` indexes `true` on the first login of a session
+    -- and raises. Zoning and a reload both pass false and were silently fine, which is what
+    -- made it a once-a-session error rather than an obvious one.
+    local function ours(widgetInfo)
+        if type(widgetInfo) ~= "table" then return true end
+        local setID = num(widgetInfo.widgetSetID)
+        if not setID then return true end
+        if idsStale or not (trackerID or scenarioID) then return true end
+        return setID == trackerID or setID == scenarioID
+    end
+
+    -- Coalesced rather than repainting once per widget, because UPDATE_UI_WIDGET fires per
+    -- widget and a busy event fires it in bursts.
+    --
+    -- Invalidate even when the repaint is refused, or the snapshot the next render serves is
+    -- older than the widgets it describes. Only the REPAINT is switched off, never the
+    -- bookkeeping that keeps the cache honest.
+    local function dirty(_, widgetInfo)
+        -- No widget set in the payload means "assume everything moved" - UPDATE_ALL_UI_WIDGETS
+        -- and PLAYER_ENTERING_WORLD both land here - so the resolved pair stops being trusted.
+        if type(widgetInfo) ~= "table" then idsStale = true end
+        if not ours(widgetInfo) then return end
         self:Invalidate()
+        local DB  = ns:GetModule("DB")
+        local cfg = DB and DB:Tracker()
+        if cfg and cfg.showTrackerWidgets == false then return end
         Events:Debounce("widgets", REFRESH_DEBOUNCE, fire)
     end
 
-    local function invalidate() self:Invalidate() end
+    -- These MOVE a set id rather than changing a widget inside one, so they mark the resolved
+    -- pair stale as well. Invalidate alone bumps the generation and leaves the ids in place,
+    -- which is right for a burst and wrong for a scenario that has just started.
+    local function invalidate()
+        idsStale = true
+        self:Invalidate()
+    end
 
     Events:On("UPDATE_UI_WIDGET",      dirty)
     Events:On("UPDATE_ALL_UI_WIDGETS", dirty)

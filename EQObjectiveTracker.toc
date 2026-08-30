@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 1.16.0
+## Version: 1.17.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -56,6 +56,7 @@ Data\ZoneProgress.lua
 Data\ScenarioBonus.lua
 Data\Widgets.lua
 Data\QuestGroups.lua
+Data\QuestProgress.lua
 
 # Providers. THE ONLY FLAVOR-VARYING SECTION OF THIS FILE.
 Data\Providers\Quests.lua
@@ -63,6 +64,7 @@ Data\Providers\WorldQuests.lua
 Data\Providers\Scenarios.lua
 Data\Providers\Achievements.lua
 Data\Providers\Endeavors.lua
+Data\Providers\Initiative.lua
 Data\Providers\Professions.lua
 
 # Display layer. Operates on frames, never on a quest API.

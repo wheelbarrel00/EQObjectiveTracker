@@ -92,6 +92,9 @@ function Entry.PushLine(e)
     ln.text, ln.completed  = "", false
     ln.current, ln.required = nil, nil
     ln.kind, ln.richText    = Entry.LINE.OBJECTIVE, false
+    -- Lines are pooled and this list is the whole reset, so a field added above and not cleared
+    -- here carries a previous quest's value onto the next row that reuses the table.
+    ln.percent = nil
     return ln
 end
 

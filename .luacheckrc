@@ -50,6 +50,9 @@ read_globals = {
     -- Namespaced API
     "C_Timer", "C_Map", "C_QuestLog", "C_QuestInfoSystem", "C_CampaignInfo",
     "C_SuperTrack", "C_TaskQuest", "C_ContentTracking", "C_PerksActivities",
+    -- The Midnight neighborhood initiative, which is what Blizzard draws under its own
+    -- ENDEAVORS header. A different system from the Traveler's Log above it.
+    "C_NeighborhoodInitiative",
     "C_Scenario", "C_ScenarioInfo", "GetInstanceInfo", "C_Texture", "C_AddOns", "Enum",
     "C_VignetteInfo", "C_UnitAuras", "C_UIWidgetManager",
     "IsInInstance", "C_ChallengeMode", "WorldMapFrame",
@@ -77,6 +80,10 @@ read_globals = {
     "GetNumQuestLogEntries", "GetQuestLogTitle", "GetQuestLogIndexByID",
     "SelectQuestLogEntry", "GetNumQuestLeaderBoards", "GetQuestLogLeaderBoard",
     "IsQuestWatched", "AddQuestWatch", "RemoveQuestWatch", "GetQuestTagInfo",
+
+    -- A percentage objective's real fill, and it is a bare global on retail with no C_QuestLog
+    -- twin - C_QuestLog.GetQuestProgressBarPercent does not exist.
+    "GetQuestProgressBarPercent",
 
     -- Read on every flavor, not only Classic. BackdropTemplateMixin guards 13 CreateFrame
     -- template arguments across UI/ and Options/, and QuestWatchFrame is Blizzard's tracker

@@ -50,6 +50,7 @@ FLAVOR_ONLY = frozenset({
     "UI/QuestLogChecks.lua",
     "Data/Providers/Achievements.lua",
     "Data/Providers/Endeavors.lua",
+    "Data/Providers/Initiative.lua",
     "Data/Providers/Professions.lua",
     "Data/Providers/Quests.lua",
     "Data/Providers/QuestsClassic.lua",

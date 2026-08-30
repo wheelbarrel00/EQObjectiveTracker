@@ -519,6 +519,24 @@ Options:RegisterTab({
             nil, playSound)
         acceptDD:SetPoint("TOPLEFT", acceptCheck, "BOTTOMLEFT", 0, -8)
 
+        -- Its own switch and its own sound, like the accept pair above. This one fires at the
+        -- quest giver, which is where the Quest Complete sound was landing on Classic by
+        -- accident.
+        local turnInCheck = self:CreateCheckbox(content,
+            L["Play a sound when you turn a quest in"],
+            function() return DB().questTurnInSoundEnabled == true end,
+            function(v) DB().questTurnInSoundEnabled = v end,
+            L["Off by default. It has its own sound below, so handing a quest in and finishing its objectives can be told apart."])
+        turnInCheck:SetPoint("TOPLEFT", acceptDD, "BOTTOMLEFT", 0, -8)
+
+        local turnInDD = self:CreateDropdown(content, L["Quest Turned In Sound"],
+            soundList,
+            function() return DB().questTurnInSound or "NONE" end,
+            function(v) DB().questTurnInSound = v; playSound(v) end,
+            L["Which sound plays when you hand a quest in at the quest giver."],
+            nil, playSound)
+        turnInDD:SetPoint("TOPLEFT", turnInCheck, "BOTTOMLEFT", 0, -8)
+
         -- The zone progress bar's two toggles used to sit here, with its nine styling
         -- controls on the Appearance tab. They live together under Appearance's Zone
         -- Progress Bar heading now - one feature, one place.
@@ -528,7 +546,7 @@ Options:RegisterTab({
         -- functions and ships no scenarios behind them.
         if ns.Has.ScenarioBonus and Registry:Get("scenarios") then
             local sbHeader = self:CreateHeading(content, L["Scenario Bonus Objectives"])
-            sbHeader:SetPoint("TOPLEFT", acceptDD, "BOTTOMLEFT", 0, self.GAP.aboveHead)
+            sbHeader:SetPoint("TOPLEFT", turnInDD, "BOTTOMLEFT", 0, self.GAP.aboveHead)
 
             local sbEnable = self:CreateCheckbox(content, L["Show bonus objectives HUD"],
                 function()

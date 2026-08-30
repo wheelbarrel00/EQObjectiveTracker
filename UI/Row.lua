@@ -246,6 +246,10 @@ local function isBarLine(ln, cfg)
     -- WEIGHTED is already a percentage against a fixed 100, so it has no denominator to test
     if ln.kind == LINE.WEIGHTED then return true end
     if ln.kind ~= LINE.PROGRESSBAR then return false end
+    -- A percentage supplied out of band fills a real bar even though the objective's own
+    -- denominator is 1. That is the whole shape of a world quest percentage: the meter carries
+    -- a yes or no and the fill is somewhere else entirely.
+    if ln.percent then return true end
     -- Only a real meter. A 0/1 objective is a yes or no, and a bar for it reads as broken.
     return (ln.required and ln.required > 1) and true or false
 end
@@ -272,9 +276,9 @@ local function buildBlocks(entry, cfg)
                 -- The meter moves into the bar, so a label already carrying one would show
                 -- the same numbers twice
                 _bText[_nBlocks] = Util.StripLeadingCount(ln.text or "")
-                _bPct[_nBlocks]  = (ln.kind == LINE.WEIGHTED) or nil
+                _bPct[_nBlocks]  = (ln.kind == LINE.WEIGHTED or ln.percent ~= nil) or nil
                 if _bPct[_nBlocks] then
-                    _bCur[_nBlocks] = math.max(0, math.min(100, ln.current or 0))
+                    _bCur[_nBlocks] = math.max(0, math.min(100, ln.percent or ln.current or 0))
                     _bReq[_nBlocks] = 100
                 else
                     _bCur[_nBlocks] = ln.current or 0

@@ -22,7 +22,8 @@ fixes, so the gaps listed below are real ones rather than a disclaimer. Please r
 you find rather than assuming it is known.
 
 On retail it tracks quests and campaign quests, world quests, scenarios and delves,
-achievements, professions, and Traveler's Log endeavors.
+achievements, professions, and endeavors, covering both the Traveler's Log monthly
+activities and the neighborhood tasks you have tracked.
 
 ### What works on Classic today
 
@@ -88,9 +89,9 @@ saved world quest watches.
   delve tier, and a clickable button for any spell the stage hands you
 - **Bonus objectives**, on their own movable HUD, including the bonus loot mechanics
   inside a delve and a lives and deaths readout for the run. Off by default
-- **Achievements**, **professions** with reagent counts, and **endeavors** - though the
-  Endeavors section is known to stay empty in places where the default tracker lists a monthly
-  activity, which is still being worked on
+- **Achievements**, **professions** with reagent counts, and **endeavors**, covering both the
+  Traveler's Log monthly activities and the neighborhood tasks you have tracked, which the
+  default tracker draws together under that same header
 - **Progress bars** for objectives that report a percentage or a running total, the way the
   default tracker draws them, which you can turn off
 - **Quest items**, as a button on the row of any quest that carries one
@@ -99,10 +100,10 @@ saved world quest watches.
   comparisons against what you have equipped. World quests also show their faction and
   how long is left
 
-Also included: a zone progress bar, a sound when you accept a quest and another when one is
-ready to turn in, a highlight on the flight point nearest your tracked quest, and the extra
-bars and status lines the default tracker shows during world events, which would otherwise not
-appear anywhere.
+Also included: a zone progress bar, three optional sounds (when you accept a quest, when its
+last objective falls, and when you hand it in), a highlight on the flight point nearest your
+tracked quest, and the extra bars and status lines the default tracker shows during world
+events, which would otherwise not appear anywhere.
 
 ## Usage
 
@@ -138,13 +139,13 @@ all are off by default. The last of those counts quest and campaign rows only, s
 keeps the tracker on screen by itself, including world quests, achievements, the zone progress
 bar, and the delve or scenario panel.
 
-Almost everything is configurable: fonts (42 bundled, plus anything from
-LibSharedMedia, each shown in its own typeface in the picker), sizes, spacing, colors, a
-card layout, section order and visibility, filters by quest type, and eight sort modes
-including by distance and by hand. The current-zone filter shows only quests with an objective
-on the map you are standing on. If that map lists none of its own, such as a building interior,
-a covenant sanctum or a dungeon, it asks the zone around it instead, so you still get that
-zone's quests rather than an empty tracker.
+Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
+shown in its own typeface in the picker), sizes, spacing, colors, a card layout that can wrap
+the delve and scenario panel as well as your quests, section order and visibility, filters by
+quest type, and eight sort modes including by distance and by hand. The current-zone filter
+shows only quests with an objective on the map you are standing on. If that map lists none of
+its own, such as a building interior, a covenant sanctum or a dungeon, it asks the zone around
+it instead, so you still get that zone's quests rather than an empty tracker.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.

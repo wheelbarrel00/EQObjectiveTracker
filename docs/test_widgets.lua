@@ -56,8 +56,11 @@ C_UIWidgetManager = {
     GetScenarioHeaderTimerWidgetVisualizationInfo  = byID,
     GetScenarioHeaderDelvesWidgetVisualizationInfo = byID,
 }
+local scenarioSetID = 777
 C_ScenarioInfo = {
-    GetScenarioStepInfo = function() return { title = "Stage One", widgetSetID = 777 } end,
+    GetScenarioStepInfo = function()
+        return { title = "Stage One", widgetSetID = scenarioSetID }
+    end,
 }
 geterrorhandler = function() return function(e) error(e) end end
 local fakeNow = 1000
@@ -66,6 +69,16 @@ GetTime = function() return fakeNow end
 -- Captured at chunk load by Data/Widgets.lua, so it has to exist before loadfile
 local SECRET = setmetatable({}, { __tostring = function() return "secret" end })
 issecretvalue = function(v) return v == SECRET end
+
+-- Events and DB, so OnEnable's own listeners can be driven. mods.Events is what the module
+-- takes at OnEnable time, so it has to be registered before then rather than before loadfile.
+local handlers, debounced = {}, 0
+mods.Events = {
+    On       = function(_, e, fn) handlers[e] = fn end,
+    Debounce = function() debounced = debounced + 1 end,
+}
+local cfg = {}
+mods.DB = { Tracker = function() return cfg end }
 
 local chunk = assert(loadfile(repoFile("Data/Widgets.lua")))
 chunk("EQObjectiveTracker", ns)
@@ -318,6 +331,142 @@ ok(noneN == 0, "a nil set id reads as nothing")
 ok(none ~= held, "and does not hand back the list another caller is holding")
 ok(#none == 0, "the empty answer is empty by length too, got: " .. tostring(#none))
 ok(held[1] and held[1].text == "still here", "and the held list is untouched")
+
+-- ------------------------------------------------- which widget events reach the tracker
+
+-- UPDATE_UI_WIDGET names the SET its widget belongs to, and this addon reads exactly two. The
+-- payload used to be discarded, so a widget ticking anywhere in the game - top center, below
+-- minimap, another addon's - asked for a full tracker repaint, and every provider rebuilt
+-- behind it. Classic registers none of this, because OnEnable returns on a client with no
+-- C_UIWidgetManager.
+W:OnEnable()
+ok(handlers.UPDATE_UI_WIDGET ~= nil, "the widget event is subscribed")
+
+-- Resolve the ids first, the way the first render does. Without this the filter is in its
+-- fail-open state and proves nothing.
+W:TrackerSetID()
+W:ScenarioSetID()
+
+local function fire(payload)
+    debounced = 0
+    local sent, err = pcall(handlers.UPDATE_UI_WIDGET, "UPDATE_UI_WIDGET", payload)
+    ok(sent, "the widget handler does not raise: " .. tostring(err))
+    if not sent then return -1 end
+    return debounced
+end
+local function widgetEvent(setID)
+    return fire(setID and { widgetSetID = setID } or nil)
+end
+
+ok(widgetEvent(trackerSetID) == 1, "a widget in the tracker's own set asks for a repaint")
+ok(widgetEvent(777) == 1, "so does one in the scenario set")
+ok(widgetEvent(999999) == 0, "a widget in a set this addon never reads asks for nothing")
+ok(widgetEvent(nil) == 1,
+   "and a payload with no set at all still does, so UPDATE_ALL_UI_WIDGETS is unaffected")
+
+-- A payload that IS a table and carries no set. This guard had NO case: inverting it to
+-- `return false` left the whole file green, because the nil payload above is answered by the
+-- type test one line higher and never reaches it.
+local rawEvent = fire
+W:TrackerSetID(); W:ScenarioSetID()
+ok(rawEvent({}) == 1, "a widget payload carrying no set at all fails open")
+
+-- A secret set id has to read as ABSENT, the way every other Blizzard read in this file does.
+-- Read raw it failed CLOSED - refusing the repaint AND the Invalidate behind it - which is the
+-- opposite of what the comment above the filter promises.
+W:TrackerSetID(); W:ScenarioSetID()
+ok(rawEvent({ widgetSetID = SECRET }) == 1,
+   "a secret widget set id fails open rather than closed")
+
+-- Our own widget ticking must not LOOSEN the filter. Invalidate bumps the generation and the
+-- burst behind it is exactly the case the snapshot reuse exists for, so a foreign set is still
+-- refused straight after one of ours has been through.
+W:TrackerSetID(); W:ScenarioSetID()
+ok(widgetEvent(trackerSetID) == 1, "our own set asks for a repaint")
+ok(widgetEvent(999999) == 0, "and a foreign set is still refused straight after it")
+
+-- A payload with no set at all means "assume everything moved", so the resolved pair stops
+-- being trusted until a render re-reads it. Nothing asserted that, so deleting the line left
+-- the file green while a set that moved across a loading screen was refused.
+scenarioSetID = 4242
+W:TrackerSetID(); W:ScenarioSetID()
+scenarioSetID = 5150
+ok(widgetEvent(5150) == 0, "a set the resolved pair does not name is refused")
+ok(widgetEvent(nil) == 1, "a payload with no set is let through")
+ok(widgetEvent(5150) == 1, "and retires the pair, so the moved set is no longer refused")
+scenarioSetID = 777
+W:TrackerSetID(); W:ScenarioSetID()
+
+-- The filter compares against ids only a RENDER resolves, so a scenario STARTING left the pair
+-- naming the sets from before it and the new scenario's first widget events were dropped, the
+-- Invalidate with them. SCENARIO_UPDATE marks the pair stale for exactly this.
+scenarioSetID = 4242
+ok(widgetEvent(4242) == 0, "a set the last render never saw is refused while nothing says otherwise")
+handlers.SCENARIO_UPDATE("SCENARIO_UPDATE")
+ok(widgetEvent(4242) == 1,
+   "a widget in a scenario that started since the last render is not dropped")
+W:TrackerSetID(); W:ScenarioSetID()
+ok(widgetEvent(999999) == 0, "and the filter is tight again once a render has re-resolved")
+scenarioSetID = 777
+W:TrackerSetID(); W:ScenarioSetID()
+
+-- This handler is SHARED with PLAYER_ENTERING_WORLD, which passes isInitialLogin - a BOOLEAN -
+-- where a widget event passes a table. Testing the truthiness rather than the type indexed
+-- `true` and raised, once per session, on the first login of every retail player. Zoning and a
+-- reload both pass false and were silently fine, which is exactly why the harness has to drive
+-- all three payloads rather than the one it was written for.
+ok(handlers.PLAYER_ENTERING_WORLD ~= nil, "the login event shares this handler")
+for _, p in ipairs({ { "first login", true, false }, { "reload", false, true },
+                     { "zoning", false, false } }) do
+    debounced = 0
+    local rang, err = pcall(handlers.PLAYER_ENTERING_WORLD,
+                            "PLAYER_ENTERING_WORLD", p[2], p[3])
+    ok(rang, p[1] .. " does not raise: " .. tostring(err))
+    ok(rang and debounced == 1, p[1] .. " still asks for a repaint, got " .. debounced)
+end
+
+-- The generation still moves for our own sets even when the repaint is refused below, so a
+-- snapshot can never outlive the widgets it describes.
+cfg.showTrackerWidgets = false
+ok(widgetEvent(trackerSetID) == 0,
+   "with the widgets option off, our own set asks for no repaint either")
+
+-- Only the REPAINT is refused, never the bookkeeping. Skipping Invalidate here would let the
+-- snapshot outlive the widgets it describes, so the render after the option is switched back
+-- on would draw whatever was true when it was switched off. The API call count is the only
+-- thing that can see this: the entries look identical either way.
+SETS[trackerSetID] = { widget(801, "StatusBar", bar(3, "moved while off")) }
+W:Read(trackerSetID)
+before = apiCalls
+W:Read(trackerSetID)
+ok(apiCalls == before, "a repeat read is served from the snapshot, as always")
+SETS[trackerSetID] = { widget(802, "StatusBar", bar(4, "moved again")) }
+widgetEvent(trackerSetID)
+before = apiCalls
+local reread = W:Read(trackerSetID)
+ok(apiCalls > before,
+   "a widget event with the option OFF still drops the snapshot, so the next read is fresh")
+ok(reread[1] and reread[1].text == "moved again",
+   "and it is the new widget that is read, got " .. tostring(reread[1] and reread[1].text))
+
+cfg.showTrackerWidgets = nil
+
+-- Fail OPEN before anything has resolved a set id, which is the state at login: the filter may
+-- only ever remove work, never introduce a case where a real change is missed.
+local fresh = {}
+local nsFresh = { L = ns.L }
+function nsFresh:RegisterModule(name, t) fresh[name] = t return t end
+function nsFresh:GetModule(name) return fresh[name] end
+local h2, d2 = {}, 0
+fresh.Events = {
+    On       = function(_, e, fn) h2[e] = fn end,
+    Debounce = function() d2 = d2 + 1 end,
+}
+fresh.DB = { Tracker = function() return {} end }
+assert(loadfile(repoFile("Data/Widgets.lua")))("EQObjectiveTracker", nsFresh)
+fresh.Widgets:OnEnable()
+h2.UPDATE_UI_WIDGET("UPDATE_UI_WIDGET", { widgetSetID = 424242 })
+ok(d2 == 1, "before any set id is resolved, an unknown set is let through rather than dropped")
 
 print(string.format("test_widgets: %d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

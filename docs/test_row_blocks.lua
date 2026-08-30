@@ -95,6 +95,48 @@ ok(R.cur(1) == 43 and R.req(1) == 100, "a count keeps its own numbers")
 R.build(entry({ { text = "Do the thing", kind = LINE.PROGRESSBAR,
                   current = 0, required = 1 } }), ON)
 ok(R.n() == 1 and R.kind(1) == nil, "a 0/1 objective stays text")
+
+-- The world quest progress bar. The percentage is carried BESIDE current and required rather
+-- than replacing them, so a 0 of 1 objective draws a real bar while the numbers a bars-off row
+-- prints stay the ones Blizzard gave us.
+R.build(entry({ { text = "Camp destroyed", kind = LINE.PROGRESSBAR,
+                  current = 0, required = 1, percent = 30 } }), ON)
+ok(R.kind(1) == "bar", "a supplied percentage draws a bar on a 0/1 objective")
+ok(R.pct(1) and R.cur(1) == 30 and R.req(1) == 100,
+   "drawn against a fixed 100 rather than that denominator, got "
+   .. tostring(R.cur(1)) .. "/" .. tostring(R.req(1)))
+
+-- ZERO, on the CONSUMING side. The provider carrying `percent = 0` is asserted in
+-- docs/test_quest_progress.lua, and that is the produce half - the same split that let a
+-- deleted consumer sit green for a release once already. Quest 92149 was MEASURED at 0%, so a
+-- gate written `ln.percent and ln.percent > 0` refuses the one quest the feature exists for
+-- while every assertion in both files still passes.
+R.build(entry({ { text = "Camp destroyed", kind = LINE.PROGRESSBAR,
+                  current = 0, required = 1, percent = 0 } }), ON)
+ok(R.kind(1) == "bar", "a percentage of zero still draws a bar")
+ok(R.cur(1) == 0 and R.req(1) == 100,
+   "empty rather than absent, got " .. tostring(R.cur(1)) .. "/" .. tostring(R.req(1)))
+
+-- The clamp. usable() already range-checks, so this is belt and braces, but it costs one case.
+R.build(entry({ { text = "Overflow", kind = LINE.PROGRESSBAR,
+                  current = 0, required = 1, percent = 140 } }), ON)
+ok(R.cur(1) == 100, "a percentage over 100 is clamped, got " .. tostring(R.cur(1)))
+
+-- The property that makes the option a real off switch, and the one this change broke once:
+-- an earlier draft rewrote current and required to 30/100, so a row with bars switched off read
+-- `0/100 Camp destroyed` where it had always read `0/1 Camp destroyed`.
+R.build(entry({ { text = "Camp destroyed", kind = LINE.PROGRESSBAR,
+                  current = 0, required = 1, percent = 30 } }), OFF)
+ok(R.n() == 1 and R.kind(1) == nil, "bars off collapses a percentage line to text")
+ok(R.text(1):find("0/1 Camp destroyed", 1, true) ~= nil,
+   "and prints the objective's OWN numbers, not the percentage: " .. tostring(R.text(1)))
+ok(R.text(1):find("0/100", 1, true) == nil,
+   "the percentage denominator never reaches the text path: " .. tostring(R.text(1)))
+
+-- A weighted line still draws against 100 from its own current, which is the achievement and
+-- scenario path and predates all of this.
+R.build(entry({ { text = "Ritual", kind = LINE.WEIGHTED, current = 45, required = 100 } }), ON)
+ok(R.pct(1) and R.cur(1) == 45, "a weighted line still fills from its own current")
 R.build(entry({ { text = "Done", kind = LINE.WEIGHTED, current = 100,
                   required = 100, completed = true } }), ON)
 ok(R.kind(1) == nil, "a completed weighted line stays text")
@@ -154,6 +196,98 @@ R.build(entry({ { text = "p", kind = LINE.WEIGHTED, current = 5, required = 100 
 ok(R.pct(1) == true, "the percentage flag is set")
 R.build(entry({ { text = "c", kind = LINE.PROGRESSBAR, current = 5, required = 20 } }), ON)
 ok(R.pct(1) == nil, "a stale percentage flag does not survive into a count block")
+
+-- ------------------------------------------------------------------ the text path
+
+-- Every styling option is applied here, once, so it reaches every content type - and none of it
+-- was asserted. Five mutants survived on a green file: the checkmark, the dimmed note, the
+-- objective-number strip, the finished meter and the bar's own label strip.
+R.build(entry({ { text = "Gate opened", kind = LINE.OBJECTIVE, completed = true } }), ON)
+ok(R.text(1):find("common%-icon%-checkmark") ~= nil,
+   "a completed line keeps its checkmark: " .. tostring(R.text(1)))
+ok(R.text(1):find("40ff40", 1, true) ~= nil, "and takes the complete color")
+
+R.build(entry({ { text = "no meter here", kind = LINE.NOTE } }), ON)
+ok(R.text(1):find("|cff999999- ", 1, true) ~= nil,
+   "a NOTE is dimmed with the dash INSIDE the grey: " .. tostring(R.text(1)))
+
+R.build(entry({ { text = "5/10 Bandages", kind = LINE.OBJECTIVE } }), ON)
+ok(R.text(1):find("5/10", 1, true) ~= nil, "the count is kept by default")
+R.build(entry({ { text = "5/10 Bandages", kind = LINE.OBJECTIVE } }),
+        { showObjectiveNumbers = false })
+ok(R.text(1):find("5/10", 1, true) == nil,
+   "and stripped when the option is off: " .. tostring(R.text(1)))
+
+-- A finished meter reads as its label alone, matching the default tracker.
+R.build(entry({ { text = "Supplies", kind = LINE.PROGRESSBAR,
+                  current = 10, required = 10, completed = true } }), OFF)
+ok(R.text(1):find("10/10", 1, true) == nil,
+   "a finished meter drops its numbers: " .. tostring(R.text(1)))
+R.build(entry({ { text = "Supplies", kind = LINE.PROGRESSBAR,
+                  current = 4, required = 10 } }), OFF)
+ok(R.text(1):find("4/10 Supplies", 1, true) ~= nil,
+   "while an unfinished one keeps them: " .. tostring(R.text(1)))
+
+-- The meter moves INTO the bar, so a label that already carries one would print it twice.
+R.build(entry({ { text = "7/20 Camps burned", kind = LINE.PROGRESSBAR,
+                  current = 7, required = 20 } }), ON)
+ok(R.kind(1) == "bar", "the meter draws a bar")
+ok(R.text(1) == "Camps burned",
+   "and its label drops the count the bar is already showing, got: " .. tostring(R.text(1)))
+
+-- ------------------------------------------------------------------ simplify mode
+
+-- Nothing in this file ever set a simplify flag, so hideDone was false on every case above and
+-- the whole branch loaded without ever running. Five separate mutants survived on a green file,
+-- one of them INVERTING the filter so simplify hid every unfinished objective and showed only
+-- the completed ones.
+local SIMPLE = { simplifyMode = true }
+local mixed  = {
+    { text = "found the gate", kind = LINE.OBJECTIVE, completed = true },
+    { text = "kill the boss",  kind = LINE.OBJECTIVE },
+    { text = "loot the chest", kind = LINE.OBJECTIVE },
+}
+
+R.build(entry(mixed), ON)
+ok(R.n() == 1, "with simplify off the run is one text block, got " .. tostring(R.n()))
+local allThree = R.text(1)
+ok(allThree:find("found the gate", 1, true) ~= nil, "holding the completed line")
+ok(allThree:find("loot the chest", 1, true) ~= nil, "and the last unfinished one")
+
+R.build(entry(mixed), SIMPLE)
+ok(R.n() == 1, "simplify still draws a block")
+local firstOnly = R.text(1)
+ok(firstOnly:find("kill the boss", 1, true) ~= nil,
+   "simplify keeps the first UNFINISHED objective, got: " .. tostring(firstOnly))
+ok(firstOnly:find("found the gate", 1, true) == nil,
+   "and drops the completed one rather than the unfinished ones")
+ok(firstOnly:find("loot the chest", 1, true) == nil,
+   "and stops at the first, so the run is one line not two")
+
+-- The per-group switch is the same branch reached by a different input, and UI/Row.lua reads it
+-- generically off entry.groupID while both writers in the tree only ever set `achievements`.
+local grouped = { simplifyGroups = { quests = true } }
+R.build(entry(mixed), grouped)
+ok(R.text(1):find("found the gate", 1, true) == nil,
+   "the per-group switch hides completed lines too: " .. tostring(R.text(1)))
+ok(R.text(1):find("loot the chest", 1, true) ~= nil,
+   "but does NOT break after the first, which is simplifyMode's own job")
+
+R.build({ lines = mixed, groupID = "worldquests" }, grouped)
+ok(R.text(1):find("found the gate", 1, true) ~= nil,
+   "and a group it does not name is untouched")
+
+-- Everything finished would otherwise leave a bare title reading as an entry with no objectives
+-- at all, so the last line comes back with its checkmark.
+local done = {
+    { text = "step one", kind = LINE.OBJECTIVE, completed = true },
+    { text = "step two", kind = LINE.OBJECTIVE, completed = true },
+}
+R.build(entry(done), SIMPLE)
+ok(R.n() == 1, "an all-finished entry still draws one block, got " .. tostring(R.n()))
+ok(R.text(1):find("step two", 1, true) ~= nil,
+   "the LAST line, not the first: " .. tostring(R.text(1)))
+ok(R.text(1):find("common%-icon%-checkmark") ~= nil, "and it keeps its checkmark")
 
 print(string.format("test_row_blocks: %d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

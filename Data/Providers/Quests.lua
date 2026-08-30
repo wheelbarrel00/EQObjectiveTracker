@@ -147,12 +147,21 @@ local function fillLines(e, id)
             ln.completed = o.finished and true or false
             ln.current   = o.numFulfilled
             ln.required  = o.numRequired
-            -- A progressbar objective reports a percentage out of 100, which is what WEIGHTED
-            -- means, and the renderer draws it as one rather than inferring it from
-            -- the denominator.
-            -- Anything else under that type is a real count and stays a count.
+            -- A progressbar objective whose denominator is already 100 reports a percentage,
+            -- which is what WEIGHTED means. Otherwise the real fill is in NEITHER number and
+            -- has to be asked for: quest 92149 reads 0 of 1 while Blizzard draws a filling bar
+            -- beside it, and the bar gate refuses a 0/1 for the good reason that it is a yes
+            -- or no. Anything neither source can answer for stays the count it always was.
             if o.type == "progressbar" then
                 ln.kind = (o.numRequired == 100) and LINE.WEIGHTED or LINE.PROGRESSBAR
+                if ln.kind ~= LINE.WEIGHTED then
+                    -- Carried BESIDE current and required rather than overwriting them. The
+                    -- bars-off path renders those two as `cur/req`, so rewriting them turned
+                    -- `0/1 Camp destroyed` into `0/100 Camp destroyed` for anyone with bars
+                    -- switched off - and a byte-identical off switch is the property that
+                    -- makes it a real one.
+                    ln.percent = ns:GetModule("QuestProgress"):Percent(id)
+                end
             end
         end
     end

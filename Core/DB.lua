@@ -43,6 +43,16 @@ DB.defaults = {
             -- the complete sound switched off and a new noise nobody asked for is worse.
             questAcceptSoundEnabled = false,
             questAcceptSound        = "EQ: Quest Ding",
+            -- The hand in used to be reached only by accident, as the chat line standing in for
+            -- the objectives sound. It has its own event and its own pair now, and it ships off
+            -- because it is a moment nobody was being told about on purpose.
+            questTurnInSoundEnabled = false,
+            -- Deliberately NOT the objectives sound above. Its own tooltip promises the two
+            -- moments can be told apart, and a player who switches this on and leaves the seed
+            -- alone would hear one voice line at the last objective and again at the quest
+            -- giver. The scan walks both quest log surfaces, so that is every flavor, not just
+            -- Classic where the accident used to live.
+            questTurnInSound        = "EQ: Ready Check",
 
             showOnlyWatched      = true,
             sortMode             = "zone",

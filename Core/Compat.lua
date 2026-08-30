@@ -41,6 +41,10 @@ Has.WorldQuestTime      = method(C_TaskQuest, "GetQuestTimeLeftMinutes")
 Has.TaskQuests          = method(C_TaskQuest, "GetQuestsOnMap")
                           or method(C_TaskQuest, "GetQuestsForPlayerByMapID")
 Has.TaskQuestInfo       = method(C_TaskQuest, "GetQuestInfoByQuestID")
+-- A percentage objective's real fill is in neither numFulfilled nor numRequired. The first is a
+-- BARE GLOBAL and has no C_QuestLog twin, so it is probed with global() rather than method().
+Has.QuestProgressBar    = global("GetQuestProgressBarPercent")
+Has.TaskQuestProgressBar = method(C_TaskQuest, "GetQuestProgressBarInfo")
 Has.WorldQuestWatchAPI  = method(C_QuestLog, "RemoveWorldQuestWatch")
 Has.WorldQuestWatchAdd  = method(C_QuestLog, "AddWorldQuestWatch")
 Has.ContentTracking     = method(C_ContentTracking, "GetTrackedIDs")
