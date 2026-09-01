@@ -134,8 +134,6 @@ L["Show zone label under quest titles"] = "Показывать название
 L["Adds the quest log heading each quest came from as a small line under its title."] = "Добавляет под названием задания небольшую строку с заголовком журнала заданий, под которым оно находится."
 L["Show objective progress numbers"] = "Показывать цифры прогресса целей"
 L["For example, 0/4, 1/1, etc."] = "Пример: 0/4, 1/1 и т.д."
-L["Show progress bars"] = "Показывать полосы прогресса"
-L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "Для целей, которые показывают проценты или текущий счетчик, рисует заполненную полосу вместо обычной строки текста, как это делает стандартный трекер. Работает для заданий, локальных заданий, достижений и целей сценариев."
 L["Show quest ID"] = "Показывать ID задания"
 L["Useful for bug reports."] = "Полезно для отчётов об ошибках."
 L["Show the visible / total count on section headers"] = "Показывать счётчик видимых / всего в заголовках разделов"
@@ -303,6 +301,7 @@ L["Header Color"] = "Цвет заголовка"
 L["Color of the zone name on the floating bar. The docked section uses the section header color."] = "Цвет названия зоны на плавающей полосе. Закреплённый раздел использует цвет заголовка раздела."
 L["Count Color"] = "Цвет счётчика"
 L["Color of the completed-of-total count on the floating bar."] = "Цвет счётчика «выполнено / всего» на плавающей полосе."
+L["Show progress bars"] = "Показывать полосы прогресса"
 
 -- Options/TabAbout.lua
 L["Open this window"] = "Открыть это окно"

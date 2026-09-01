@@ -318,6 +318,62 @@ function Media:ApplyScenarioCriteriaFont(fs)
     end
 end
 
+function Media:ProgressBarStyle()
+    local cfg = ns:GetModule("DB"):Tracker()
+    return (cfg and cfg.progressBar) or {}
+end
+
+-- The range must match the Bar Height slider's in Options/TabAppearance.lua. Clamped here as
+-- well as there because nothing else bounds a value that reached the profile by another route,
+-- and a height outside this range draws a bar that does not fit the row measured for it.
+function Media:ProgressBarHeight()
+    local st = self:ProgressBarStyle()
+    return math.max(8, math.min(24, st.height or 16))
+end
+
+-- Three bar families share this: the quest row bars (UI/Row.lua), the scenario criteria bars
+-- (UI/Scenario.lua) and the event widget bars (UI/WidgetBlock.lua), which draw in the same
+-- panel as the criteria and would otherwise be the one bar the settings do not reach.
+-- skipFill is for that third caller alone. A widget bar's FILL COLOR is Blizzard's, decoded
+-- per widget from its textureKit, and that color is the only thing separating one widget's
+-- state from another - overwriting it with one user color would throw real information away.
+-- Everything else about a widget bar carries no meaning and is styled like the rest.
+-- A caller must build its own .bg texture and .border backdrop. This creates neither, and
+-- both guards below fail SILENTLY, so a new caller missing one simply loses that half.
+function Media:ApplyProgressBar(bar, skipFill)
+    if not bar then return end
+    local st = self:ProgressBarStyle()
+
+    bar:SetStatusBarTexture(self:GetStatusBarFile(st.barTexture))
+    if not skipFill then
+        local fill = st.barColor
+        if fill then bar:SetStatusBarColor(fill.r, fill.g, fill.b, fill.a or 1)
+        else         bar:SetStatusBarColor(0.26, 0.42, 1.0) end
+    end
+
+    if bar.bg then
+        if st.showBackground == false then
+            bar.bg:Hide()
+        else
+            local c = st.backgroundColor
+            bar.bg:SetColorTexture(c and c.r or 0.04, c and c.g or 0.07,
+                                   c and c.b or 0.18, c and c.a or 0.9)
+            bar.bg:Show()
+        end
+    end
+
+    if bar.border then
+        if st.showBorder == false then
+            bar.border:Hide()
+        else
+            local c = st.borderColor
+            bar.border:SetBackdropBorderColor(c and c.r or 0, c and c.g or 0,
+                                              c and c.b or 0, c and c.a or 0.9)
+            bar.border:Show()
+        end
+    end
+end
+
 function Media:LineSpacing()
     local cfg = ns:GetModule("DB"):Tracker()
     return math.max(-8, math.min(24, (cfg and cfg.lineSpacing) or 0))

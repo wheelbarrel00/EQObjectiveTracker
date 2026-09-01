@@ -11,7 +11,13 @@ local SUBHEADER_H       = 26
 local CAT_GAP           = 1
 local BANNER_GAP        = 6
 local CRITERIA_LINE_GAP = 4
+-- Only a build-time seed for a pooled row's frame. The bar's real height is the user's, read
+-- from Media's shared progress bar block, and _DrawCriteria overwrites this before any draw.
 local BAR_H             = 16
+-- Between a criterion's label and its bar. The bar's border is anchored a pixel OUTSIDE it on
+-- every edge, so this is one more than the gap that actually shows. Matches BAR_GAP + BAR_PAD
+-- in UI/Row.lua, which draws the same bar under the same label above the same tracker.
+local BAR_TEXT_GAP      = 6
 local BAR_W_RATIO       = 0.85
 local BANNER_W          = 201
 local BANNER_H          = 83
@@ -57,21 +63,19 @@ local function buildCriteriaRow(parent)
     row.text:SetJustifyH("LEFT")
     row.text:SetTextColor(1, 0.82, 0)
 
+    -- Texture, colors and height come from Media:ApplyProgressBar in _DrawCriteria, shared
+    -- with the quest row bars. The bg and border are built here because that helper styles
+    -- them by name and creates neither.
     row.bar = CreateFrame("StatusBar", nil, row)
-    row.bar:SetHeight(BAR_H)
     row.bar:SetMinMaxValues(0, 100)
-    row.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    row.bar:SetStatusBarColor(0.26, 0.42, 1.0)
 
     row.bar.bg = row.bar:CreateTexture(nil, "BACKGROUND")
     row.bar.bg:SetAllPoints()
-    row.bar.bg:SetColorTexture(0.04, 0.07, 0.18, 0.9)
 
     row.bar.border = CreateFrame("Frame", nil, row.bar, BackdropTemplateMixin and "BackdropTemplate")
     row.bar.border:SetPoint("TOPLEFT", -1, 1)
     row.bar.border:SetPoint("BOTTOMRIGHT", 1, -1)
     row.bar.border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-    row.bar.border:SetBackdropBorderColor(0, 0, 0, 0.9)
 
     row.bar.label = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     row.bar.label:SetPoint("CENTER", row.bar, "CENTER", 0, 0)
@@ -310,19 +314,28 @@ function Scenario:_DrawCriteria(container, cfg, lines)
     local width    = math.max(1, container:GetWidth() or 1)
     local barWidth = math.max(1, math.floor(width * BAR_W_RATIO))
     local rowWidth = math.max(1, width - 16)
+    local barH     = Media:ProgressBarHeight()
     local firstRowY = (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H)
                       + BANNER_GAP + BANNER_H + (self.widgetH or 0) + CRITERIA_LINE_GAP
 
-    local prev
+    local prev, prevBar
     for i = 1, #lines do
         local ln  = lines[i]
         local row = self:AcquireCriteria(container)
         Media:ApplyScenarioCriteriaFont(row.text)
         Media:ApplyScenarioCriteriaFont(row.bar.label)
 
+        -- Recorded on the row because Scenario:Render sums the gaps again to size the
+        -- container, and a gap it does not know about leaves the panel short by that much.
+        row._gapAbove = (prev and prevBar) and BAR_TEXT_GAP or CRITERIA_LINE_GAP
+
         row:ClearAllPoints()
         if prev then
-            row:SetPoint("TOP", prev, "BOTTOM", 0, -CRITERIA_LINE_GAP)
+            -- A row that follows a BAR pays the same gap the bar gets above it, or the border
+            -- drawn a pixel below the bar eats into the plain criteria gap and the bar sits
+            -- closer to the row under it than to its own label. UI/Row.lua pays BAR_PAD on
+            -- both sides of a bar for this reason, and this is that same rule one file over.
+            row:SetPoint("TOP", prev, "BOTTOM", 0, -row._gapAbove)
         else
             -- Anchored to the container, not the banner, so a side-aligned banner does
             -- not drag the rows off center with it
@@ -332,7 +345,8 @@ function Scenario:_DrawCriteria(container, cfg, lines)
         -- WEIGHTED already carries a percentage, so its denominator is fixed at 100.
         -- PROGRESSBAR is a running total and keeps its own.
         local barValue, barMax, barLabel
-        if not ln.completed and (not cfg or cfg.showProgressBars ~= false) then
+        if not ln.completed and (not cfg or (cfg.showProgressBars ~= false
+                                             and cfg.showScenarioProgressBars ~= false)) then
             if ln.kind == LINE.WEIGHTED then
                 barValue, barMax = math.max(0, math.min(100, ln.current or 0)), 100
                 barLabel = ("%d%%"):format(barValue)
@@ -352,9 +366,11 @@ function Scenario:_DrawCriteria(container, cfg, lines)
             row.bar:Show()
             row.bar:ClearAllPoints()
             row.bar:SetWidth(barWidth)
+            row.bar:SetHeight(barH)
             row.bar:SetMinMaxValues(0, barMax)
             row.bar:SetValue(barValue)
             row.bar.label:SetText(barLabel)
+            Media:ApplyProgressBar(row.bar)
 
             row.text:ClearAllPoints()
             if ln.text ~= "" then
@@ -366,12 +382,12 @@ function Scenario:_DrawCriteria(container, cfg, lines)
                 row.text:SetWidth(barWidth)
                 row.text:SetText(ln.text)
                 row.text:SetTextColor(1, 0.82, 0)
-                row.bar:SetPoint("TOP", row.text, "BOTTOM", 0, -2)
-                row:SetHeight(row.text:GetStringHeight() + 2 + BAR_H)
+                row.bar:SetPoint("TOP", row.text, "BOTTOM", 0, -BAR_TEXT_GAP)
+                row:SetHeight(row.text:GetStringHeight() + BAR_TEXT_GAP + barH)
             else
                 row.text:SetText("")
                 row.bar:SetPoint("TOP", row, "TOP", 0, 0)
-                row:SetHeight(BAR_H)
+                row:SetHeight(barH)
             end
         else
             row:SetWidth(rowWidth)
@@ -417,7 +433,7 @@ function Scenario:_DrawCriteria(container, cfg, lines)
 
         Media:ApplyTextShadow(row.text)
         Media:ApplyTextShadow(row.bar.label)
-        prev = row
+        prev, prevBar = row, barValue ~= nil
     end
 end
 
@@ -455,7 +471,8 @@ function Scenario:Render(container, cfg, info, entry, topOffset)
 
     local h = (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + BANNER_H + self.widgetH
     for i = 1, #self.activeCriteria do
-        h = h + CRITERIA_LINE_GAP + self.activeCriteria[i]:GetHeight()
+        local row = self.activeCriteria[i]
+        h = h + (row._gapAbove or CRITERIA_LINE_GAP) + row:GetHeight()
     end
 
     -- Under the criteria, where the stock tracker draws the scenario's own castable spells

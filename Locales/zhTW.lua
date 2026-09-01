@@ -138,8 +138,6 @@ L["Show zone label under quest titles"] = "任務標題下方顯示所屬區域�
 L["Adds the quest log heading each quest came from as a small line under its title."] = "在任務標題下方小字顯示該任務所屬的任務日志分類。"
 L["Show objective progress numbers"] = "顯示目標進度數字"
 L["For example, 0/4, 1/1, etc."] = "例如：0/4、1/1。"
-L["Show progress bars"] = "顯示進度條"
-L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "對於會給出百分比或累計數值的目標，像預設追蹤器那樣繪製一條填滿的進度條，而不是單純的一行文字。適用於任務、世界任務、成就和場景戰目標。"
 L["Show event and scenario widgets"] = "顯示事件與場景組件"
 L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."] = "在預設追蹤器繪製世界事件、探究和場景期間顯示的額外長條圖和狀態線，例如事件的進度條或探究層數。該追蹤器取代了預設追蹤器，因此如果沒有此追蹤器，這些追蹤器將不會顯示在任何地方。"
 L["Show quest ID"] = "顯示任務ID"
@@ -313,6 +311,7 @@ L["Header Color"] = "標題顏色"
 L["Color of the zone name on the floating bar. The docked section uses the section header color."] = "浮動條區域名稱顏色；固定板塊使用板塊標題顏色。"
 L["Count Color"] = "計數文字顏色"
 L["Color of the completed-of-total count on the floating bar."] = "浮動條上已完成/總計數文字顏色。"
+L["Show progress bars"] = "顯示進度條"
 
 -- Options/TabAbout.lua
 L["Open this window"] = "打開本視窗"

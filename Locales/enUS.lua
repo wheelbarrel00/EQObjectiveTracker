@@ -135,8 +135,6 @@ L["Show zone label under quest titles"] = true
 L["Adds the quest log heading each quest came from as a small line under its title."] = true
 L["Show objective progress numbers"] = true
 L["For example, 0/4, 1/1, etc."] = true
-L["Show progress bars"] = true
-L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = true
 L["Show event and scenario widgets"] = true
 L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."] = true
 L["Show quest ID"] = true
@@ -316,6 +314,18 @@ L["Header Color"] = true
 L["Color of the zone name on the floating bar. The docked section uses the section header color."] = true
 L["Count Color"] = true
 L["Color of the completed-of-total count on the floating bar."] = true
+L["Progress Bars"] = true
+L["Show progress bars"] = true
+L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. The two boxes under this pick which of them get one."] = true
+L["Bars on quest, World Quest and achievement rows. The objective's own text is drawn above its bar, matching the default tracker."] = true
+L["Scenario Criteria"] = true
+L["Bars on the objective lines shown under a scenario or delve banner."] = true
+L["Fills the unfinished part of the bar. Unticked, only the filled part is drawn."] = true
+L["Color and opacity of the unfilled part of the bar."] = true
+L["Draws a one pixel border around the bar."] = true
+L["Color and opacity of the bar's border."] = true
+L["How tall each progress bar is drawn."] = true
+L["Sets the fill texture of the progress bars. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."] = true
 
 -- Options/TabAbout.lua
 L["Open this window"] = true

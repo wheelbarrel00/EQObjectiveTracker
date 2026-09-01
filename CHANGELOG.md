@@ -5,6 +5,28 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-08-31
+
+### Improvements
+
+- A progress bar no longer draws its objective's text inside itself. The text sits on its own
+  line above the bar and the bar shows only its percentage or count, centered, which is how the
+  default tracker draws it and how this tracker has always drawn the scenario criteria. On a
+  long objective the text used to run into the numbers at the other end of the bar.
+- There is more room between an objective's text and its bar. The bar's border is drawn just
+  outside the bar itself, so the old spacing left a single pixel showing and the bar read as
+  though it were touching the line above it. Scenario and delve criteria gained the same room.
+- Progress bars can be styled. A new Progress Bars group on the Appearance tab sets the fill
+  texture, the fill color, the background, the border and the height, and applies to the bars on
+  quest rows and the ones under a scenario or delve banner alike. Textures from other media
+  addons, such as SharedMedia, ElvUI or Details, appear in the list.
+- Quest rows and scenario criteria now have a switch each, under the same Show progress bars
+  box that has always controlled them together. Turning that box off still turns off both, so
+  nothing changes for anyone who had already switched progress bars off.
+- Show progress bars has moved from the Tracker tab to the new Progress Bars group on the
+  Appearance tab, so the switch that turns the bars on sits with the settings that style them.
+  This is the same move the zone progress bar's own switches made.
+
 ## [1.17.0] - 2026-08-30
 
 ### Bug Fixes

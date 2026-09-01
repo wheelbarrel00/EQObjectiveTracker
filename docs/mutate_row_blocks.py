@@ -13,7 +13,8 @@ would have hidden every unfinished objective and shown only the completed ones.
 Every mutation reintroduces a defect the harness is supposed to stand guard over. Any that still
 reports "0 failed" is an assertion that does not discriminate, and the run exits 1 naming it -
 unless the entry is marked EQUIVALENT, which means the mutation provably cannot change behavior
-and so nothing could catch it. There is ONE of those and it is worth reading:
+and so nothing could catch it. There are THREE of those, each with its reasoning above it in
+the list below. The one worth reading first:
 
   - flushText returns at its first line when the text run is empty, so clearing _bPct there is
     unreachable for a block index that never gets written. The clear that matters is the one in
@@ -103,9 +104,46 @@ MUTANTS = [
      "                        if true then"),
 
     # ------------------------------------------------------------------ the bar branch
+    # Re-pointed 2026-08-31: the label moved out of the bar and into the text run, so the line
+    # that strips the meter is the label local now rather than the _bText write.
     ("the bar label keeps the meter Blizzard already put in it, printing the numbers twice",
-     '                _bText[_nBlocks] = Util.StripLeadingCount(ln.text or "")',
-     '                _bText[_nBlocks] = ln.text or ""'),
+     '                local label = Util.StripLeadingCount(ln.text or "")',
+     '                local label = ln.text or ""'),
+
+    # The label is what the whole 2026-08-31 change is. Drawn INSIDE the bar it was anchored
+    # against the meter's left edge with wrap off, so a long objective was truncated hard
+    # against the numbers, which is what the author reported.
+    ("the label goes back inside the bar instead of sitting above it",
+     '                if label ~= "" then\n'
+     '                    _nText = _nText + 1\n'
+     '                    _scratch[_nText] = "- " .. Util.ColorizeProgress(label)\n'
+     '                end\n'
+     '                flushText()',
+     '                flushText()'),
+
+    # An empty label must draw the bar ALONE. Dropping the guard pushes "- " and draws a stray
+    # bullet above every bar whose objective carried nothing but its own meter.
+    ("an empty label is pushed anyway, drawing a stray bullet above the bar",
+     '                if label ~= "" then',
+     '                if true then'),
+
+    # Nothing in production indexes _bText on a bar block today, so this pins an invariant
+    # rather than preventing a live defect: it keeps the slot clean for any future reader.
+    ("the bar stops clearing its own label, so a stale one survives onto a reused block",
+     '                _bText[_nBlocks] = ""',
+     '                _bText[_nBlocks] = _bText[_nBlocks] or ""'),
+
+    # The new half-switch. Its own key, so the master being on is not enough.
+    ("the quest half-switch is ignored, so unticking Quest rows changes nothing",
+     "    if cfg and cfg.showQuestProgressBars == false then return false end\n",
+     ""),
+
+    # Both guards sit on one line, and BOTH assertions covering it read index 1 - which is a
+    # text block either way now that the label sits above the bar. Added 2026-08-31 after a
+    # scan proved this line could be deleted outright with the file still green.
+    ("a completed or richText line is allowed to draw a bar, losing its checkmark",
+     "    if ln.richText or ln.completed then return false end\n",
+     ""),
 
     ("a supplied percentage stops flagging the block, so it draws against its own denominator",
      "                _bPct[_nBlocks]  = (ln.kind == LINE.WEIGHTED or ln.percent ~= nil) or nil",
@@ -126,11 +164,12 @@ MUTANTS = [
      "                end"),
 
     # ------------------------------------------------------------------ the repaint key
+    # Re-pointed 2026-08-31: the bar carries no label any more, so the key format lost its %s.
     ("the key drops the fill, so a bar whose percentage moved never repaints",
-     '            _keyBuf[i] = ("%d bar%s %s %s/%s"):format(\n'
-     '                i, _bPct[i] and " pct" or "", _bText[i], _bCur[i], _bReq[i])',
-     '            _keyBuf[i] = ("%d bar%s %s"):format(\n'
-     '                i, _bPct[i] and " pct" or "", _bText[i])'),
+     '            _keyBuf[i] = ("%d bar%s %s/%s"):format(\n'
+     '                i, _bPct[i] and " pct" or "", _bCur[i], _bReq[i])',
+     '            _keyBuf[i] = ("%d bar%s"):format(\n'
+     '                i, _bPct[i] and " pct" or "")'),
 
     ("the key stops being bounded by the run length, so a shorter run inherits a longer tail",
      '    return table.concat(_keyBuf, "\\n", 1, _nBlocks)',

@@ -16,11 +16,11 @@ local Util        = ns.Util
 -- The frames here are our own. Nothing registers a UIWidgetContainer against a Blizzard widget
 -- set, and nothing may - see the note in UI/Scenario.lua.
 
-local BAR_H       = 16
+-- Height and texture come from Media's shared progress bar block, so there is no constant for
+-- either here. See buildBar for what a widget bar does NOT take from it.
 local ROW_GAP     = 3
 local SIDE_PAD    = 8
 local TICK        = 0.1
-local BAR_TEXTURE = [[Interface\TargetingFrame\UI-StatusBar]]
 
 local DEFAULT_TINT = { 0.26, 0.42, 1.00 }
 
@@ -123,20 +123,20 @@ end
 WidgetBlock.top      = newState()
 WidgetBlock.scenario = newState()
 
+-- Texture, background and border come from Media's shared progress bar block in Render below,
+-- so a widget bar matches the criteria bars it draws beside. The fill color does NOT: it is
+-- decoded per widget from Blizzard's textureKit and is what separates one widget's state from
+-- another. The bg and border are built here because that helper styles them and creates neither.
 local function buildBar(parent)
     local bar = CreateFrame("StatusBar", nil, parent)
-    bar:SetHeight(BAR_H)
-    bar:SetStatusBarTexture(BAR_TEXTURE)
 
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
     bar.bg:SetAllPoints()
-    bar.bg:SetColorTexture(0.04, 0.07, 0.18, 0.9)
 
     bar.border = CreateFrame("Frame", nil, bar, BackdropTemplateMixin and "BackdropTemplate")
     bar.border:SetPoint("TOPLEFT", -1, 1)
     bar.border:SetPoint("BOTTOMRIGHT", 1, -1)
     bar.border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-    bar.border:SetBackdropBorderColor(0, 0, 0, 0.9)
 
     bar.value = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     bar.value:SetJustifyH("RIGHT")
@@ -228,9 +228,12 @@ local function draw(state, container, cfg, top, setID)
             Media:ApplyTextShadow(bar.label)
             Media:ApplyTextShadow(bar.value)
 
-            -- The label is drawn at the user's Font Size, so the bar is measured from it rather
-            -- than left at the constant, which a large font overflows into the block below.
-            local barH = math.max(BAR_H, math.ceil((bar.label:GetStringHeight() or 0) + 4))
+            -- A widget bar keeps its label INSIDE it, unlike the criteria bars, so the user's
+            -- height is a FLOOR here rather than the answer: the label is drawn at their Font
+            -- Size and a large font would otherwise overflow into the block below.
+            Media:ApplyProgressBar(bar, true)
+            local barH = math.max(Media:ProgressBarHeight(),
+                                  math.ceil((bar.label:GetStringHeight() or 0) + 4))
             bar:SetHeight(barH)
 
             local tint = tintFor(w.textureKit, w.colorTint)

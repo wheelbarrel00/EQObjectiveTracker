@@ -39,10 +39,11 @@ local DEFAULT_DONE_HEX = "44ff44"
 -- sit between two text lines instead of being pushed under them. With bars switched off every
 -- line is text, the run collapses to the single block that shipped before it existed, and the
 -- layout below is unchanged.
+-- Height, texture and colors all come from Media's shared progress bar block, which the
+-- scenario criteria bars read too, so there is no local constant for any of them.
 local BLOCK_BAR   = "bar"
-local BAR_H       = 14
 local BAR_GAP     = 2
-local BAR_TEXTURE = [[Interface\TargetingFrame\UI-StatusBar]]
+local BAR_PAD     = 4
 
 -- A client with super-track marks its focused row with the -SuperTracked atlas, and that art
 -- does not exist anywhere else, so a client without the API gets a title tint instead. Nil is
@@ -242,6 +243,7 @@ end
 -- the default tracker. richText is pre-colored engine output and is never re-formatted.
 local function isBarLine(ln, cfg)
     if cfg and cfg.showProgressBars == false then return false end
+    if cfg and cfg.showQuestProgressBars == false then return false end
     if ln.richText or ln.completed then return false end
     -- WEIGHTED is already a percentage against a fixed 100, so it has no denominator to test
     if ln.kind == LINE.WEIGHTED then return true end
@@ -270,12 +272,25 @@ local function buildBlocks(entry, cfg)
         local ln = lines[i]
         if not (hideDone and ln.completed) then
             if isBarLine(ln, cfg) then
+                -- The label sits ABOVE the bar as an ordinary objective line, matching the
+                -- default tracker and matching what UI/Scenario.lua has always done. It joins
+                -- the text run rather than being drawn inside the bar, so it picks up every
+                -- styling option the text path below applies and needs none of its own. The
+                -- leading meter goes because the bar is already showing those numbers. The
+                -- trailing "(N%)" Blizzard bakes into some objectives stays, because the stock
+                -- tracker prints it in the label beside a bar showing that same percentage.
+                local label = Util.StripLeadingCount(ln.text or "")
+                if label ~= "" then
+                    _nText = _nText + 1
+                    _scratch[_nText] = "- " .. Util.ColorizeProgress(label)
+                end
                 flushText()
                 _nBlocks = _nBlocks + 1
                 _bKind[_nBlocks] = BLOCK_BAR
-                -- The meter moves into the bar, so a label already carrying one would show
-                -- the same numbers twice
-                _bText[_nBlocks] = Util.StripLeadingCount(ln.text or "")
+                -- Defensive and currently unread: nothing indexes _bText on a bar block, since
+                -- both readers sit in the not-a-bar branch. Kept so a future reader added here
+                -- cannot pick up a pooled string, and asserted so that stays true.
+                _bText[_nBlocks] = ""
                 _bPct[_nBlocks]  = (ln.kind == LINE.WEIGHTED or ln.percent ~= nil) or nil
                 if _bPct[_nBlocks] then
                     _bCur[_nBlocks] = math.max(0, math.min(100, ln.percent or ln.current or 0))
@@ -327,13 +342,15 @@ end
 
 -- One key for the whole run rather than a thirteenth gate field. A bar whose fill moved has to
 -- repaint even when every string on the row is identical, so the values are in here as well.
+-- A bar carries no label of its own any more, so only its numbers are keyed - the label it used
+-- to hold is a text block now and is keyed as one.
 local _keyBuf = {}
 local function blocksKey()
     if _nBlocks == 0 then return "" end
     for i = 1, _nBlocks do
         if _bKind[i] == BLOCK_BAR then
-            _keyBuf[i] = ("%d bar%s %s %s/%s"):format(
-                i, _bPct[i] and " pct" or "", _bText[i], _bCur[i], _bReq[i])
+            _keyBuf[i] = ("%d bar%s %s/%s"):format(
+                i, _bPct[i] and " pct" or "", _bCur[i], _bReq[i])
         else
             _keyBuf[i] = i .. " " .. _bText[i]
         end
@@ -364,34 +381,26 @@ local function acquireBarBlock(row, i)
     local bar = row._barBlocks[i]
     if bar then return bar end
 
+    -- Texture, colors and height are left to Media:ApplyProgressBar in the layout below, which
+    -- runs before this bar is ever shown. The bg and border are built here because that helper
+    -- styles them by name and creates neither.
     bar = CreateFrame("StatusBar", nil, row)
-    bar:SetHeight(BAR_H)
-    bar:SetStatusBarTexture(BAR_TEXTURE)
-    bar:SetStatusBarColor(0.26, 0.42, 1.0)
 
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
     bar.bg:SetAllPoints()
-    bar.bg:SetColorTexture(0.04, 0.07, 0.18, 0.9)
 
     bar.border = CreateFrame("Frame", nil, bar, BackdropTemplateMixin and "BackdropTemplate")
     bar.border:SetPoint("TOPLEFT", -1, 1)
     bar.border:SetPoint("BOTTOMRIGHT", 1, -1)
     bar.border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
-    bar.border:SetBackdropBorderColor(0, 0, 0, 0.9)
 
+    -- The bar carries its own numbers and nothing else. The label is a text block above it,
+    -- so there is no second string to bound this one against and it sits centered, the way
+    -- the scenario criteria bars and the default tracker both draw it.
     bar.value = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    bar.value:SetJustifyH("RIGHT")
+    bar.value:SetJustifyH("CENTER")
     bar.value:SetWordWrap(false)
-    bar.value:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
-
-    -- Bounded on the right by the meter rather than left to run under it. A criterion label
-    -- can be far wider than the bar, and word wrap is off, so an unbounded string would
-    -- print straight through the numbers.
-    bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    bar.text:SetJustifyH("LEFT")
-    bar.text:SetWordWrap(false)
-    bar.text:SetPoint("LEFT",  bar, "LEFT", 4, 0)
-    bar.text:SetPoint("RIGHT", bar.value, "LEFT", -4, 0)
+    bar.value:SetPoint("CENTER", bar, "CENTER", 0, 0)
 
     row._barBlocks[i] = bar
     return bar
@@ -818,28 +827,32 @@ function Row:Render(row, entry, width, cfg)
     end
     local blockW = math.max(1, textW)
 
-    local nText, nBar, linesH = 0, 0, 0
+    local nText, nBar, linesH, prevBar = 0, 0, 0, false
     for i = 1, _nBlocks do
+        local isBar = _bKind[i] == BLOCK_BAR
         -- The first block keeps the old gap under the title, so a row that is all text sits
-        -- exactly where it used to. Blocks after it are spaced against each other.
-        local gap = (i == 1) and subGap or BAR_GAP
+        -- exactly where it used to. Blocks after it are spaced against each other, and a bar
+        -- pays BAR_PAD on the side it meets a neighbor on. Its border is anchored a pixel
+        -- OUTSIDE it on every edge, so BAR_GAP alone leaves one visible pixel and the bar reads
+        -- as though it is touching the label above it.
+        local gap = BAR_GAP + ((isBar or prevBar) and BAR_PAD or 0)
+        if i == 1 then gap = subGap + (isBar and BAR_PAD or 0) end
+        prevBar = isBar
         local block, blockH
-        if _bKind[i] == BLOCK_BAR then
+        if isBar then
             nBar  = nBar + 1
             block = acquireBarBlock(row, nBar)
             local cur, req = _bCur[i], _bReq[i]
             block:SetWidth(blockW)
             block:SetMinMaxValues(0, req)
             block:SetValue(math.max(0, math.min(req, cur)))
-            Media:ApplyFont(block.text,  -2)
+            Media:ApplyProgressBar(block)
             Media:ApplyFont(block.value, -2)
-            block.text:SetText(_bText[i])
             block.value:SetText(_bPct[i] and ("%d%%"):format(cur) or (cur .. "/" .. req))
-            Media:ApplyTextShadow(block.text)
             Media:ApplyTextShadow(block.value)
-            -- The label is drawn at the user's Font Size, so the bar is measured from it
-            -- rather than left at the constant, which a large font spills into the next row.
-            blockH = math.max(BAR_H, math.ceil((block.text:GetStringHeight() or 0) + 4))
+            -- The height is the user's now rather than measured off a label the bar no longer
+            -- holds. Shared with the scenario criteria bars, which is the point of the block.
+            blockH = Media:ProgressBarHeight()
             block:SetHeight(blockH)
             block:Show()
         else

@@ -121,8 +121,6 @@ L["Show zone label under quest titles"] = "Gebietsbezeichnung unter Questtiteln 
 L["Adds the quest log heading each quest came from as a small line under its title."] = "Fügt unter dem Titel jeder Quest die Überschrift aus dem Questlog als kleine Zeile hinzu."
 L["Show objective progress numbers"] = "Fortschrittszahlen der Ziele anzeigen"
 L["For example, 0/4, 1/1, etc."] = "Zum Beispiel 0/4, 1/1 usw."
-L["Show progress bars"] = "Fortschrittsbalken anzeigen"
-L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "Zeichnet für Ziele, die einen Prozentwert oder einen laufenden Zähler melden, einen gefüllten Balken statt einer reinen Textzeile - so wie der Standardtracker. Gilt für Quests, Weltquests, Erfolge und Szenarioziele."
 L["Show quest ID"] = "Quest-ID anzeigen"
 L["Useful for bug reports."] = "Nützlich für Fehlermeldungen."
 L["Show the visible / total count on section headers"] = "Anzahl sichtbar / insgesamt in Abschnittsüberschriften anzeigen"
@@ -290,6 +288,7 @@ L["Header Color"] = "Überschriftenfarbe"
 L["Color of the zone name on the floating bar. The docked section uses the section header color."] = "Farbe des Gebietsnamens auf der verschiebbaren Leiste. Der angedockte Abschnitt verwendet die Farbe der Abschnittsüberschrift."
 L["Count Color"] = "Anzahlfarbe"
 L["Color of the completed-of-total count on the floating bar."] = "Farbe der Anzahl abgeschlossener von insgesamt vorhandenen Quests auf der verschiebbaren Leiste."
+L["Show progress bars"] = "Fortschrittsbalken anzeigen"
 
 -- Options/TabAbout.lua
 L["Open this window"] = "Dieses Fenster öffnen"

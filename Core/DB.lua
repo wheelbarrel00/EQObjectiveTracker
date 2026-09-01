@@ -121,6 +121,12 @@ DB.defaults = {
             -- A NEW key, so nobody has a stored value a default could silently revert.
             -- On matches the default tracker, which draws a real bar for these.
             showProgressBars     = true,
+            -- The two halves under that master. Both are NEW keys and showProgressBars keeps
+            -- the meaning it shipped with, which is the whole reason the split is shaped this
+            -- way: a player who had already switched bars off stays off on both halves rather
+            -- than having the scenario one silently handed back to them.
+            showQuestProgressBars    = true,
+            showScenarioProgressBars = true,
             -- Also a NEW key. Blizzard shows these inside the tracker EQOT hides, so on
             -- is what restores what the stock tracker was already showing.
             showTrackerWidgets   = true,
@@ -179,6 +185,21 @@ DB.defaults = {
                 borderColor = { r = 0.635, g = 0.000, b = 0.039, a = 1 },
                 headerColor = { r = 0.93,  g = 0.32,  b = 0.10,  a = 1 },
                 countColor  = { r = 0.92,  g = 0.72,  b = 0.02,  a = 1 },
+            },
+
+            -- ONE style block shared by the quest row bars, the scenario criteria bars and the
+            -- event widget bars, which all draw identically. Splitting the styling as well as
+            -- the switches would mean setting the same seven controls three times over just to
+            -- keep the look they already have. Real defaults rather than fallbacks synthesized
+            -- in the options getter, for the reason the zone bar's block above gives.
+            -- barTexture is deliberately unset: Media falls back to Blizzard's own.
+            progressBar = {
+                height          = 16,
+                showBackground  = true,
+                showBorder      = true,
+                barColor        = { r = 0.26, g = 0.42, b = 1.00, a = 1 },
+                backgroundColor = { r = 0.04, g = 0.07, b = 0.18, a = 0.9 },
+                borderColor     = { r = 0.00, g = 0.00, b = 0.00, a = 0.9 },
             },
 
             scenarioBonusHUD = {
@@ -243,6 +264,19 @@ function DB:ResetTrackerAppearance()
         zb.showBackground, zb.showBorder, zb.scale = nil, nil, nil
         zb.borderColor, zb.headerColor, zb.countColor, zb.font = nil, nil, nil, nil
         zb.barTexture, zb.barColor, zb.backgroundColor = nil, nil, nil
+    end
+    -- Only the STYLE block is cleared. The three progress bar switches are deliberately left
+    -- alone, and NOT for the reason showZoneProgressBar is: those two default to OFF, so
+    -- clearing them switches a configured bar off, where all three of these default to ON
+    -- and clearing would simply re-enable the bars. They are held back because they are
+    -- behavior rather than appearance, which is a narrower rule than the rest of this list
+    -- uses. The Appearance tab's Reset tooltip therefore overclaims for these three exactly
+    -- as it already did for the zone bar's two.
+    local pb = prof.progressBar
+    if pb then
+        pb.height, pb.showBackground, pb.showBorder = nil, nil, nil
+        pb.barTexture, pb.barColor = nil, nil
+        pb.backgroundColor, pb.borderColor = nil, nil
     end
 end
 

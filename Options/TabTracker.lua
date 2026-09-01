@@ -411,15 +411,12 @@ Options:RegisterTab({
         self:AttachTooltip(objCheck, L["Show objective progress numbers"],
             L["For example, 0/4, 1/1, etc."])
 
-        local barCheck = self:CreateCheckbox(content, L["Show progress bars"],
-            rowSetting("showProgressBars", true))
-        barCheck:SetPoint("TOPLEFT", objCheck, "BOTTOMLEFT", 0, -2)
-        self:AttachTooltip(barCheck, L["Show progress bars"],
-            L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."])
-
+        -- Show progress bars moved to the Appearance tab's Progress Bars group, so the switch
+        -- that turns the bars on is not two tabs away from the controls that style them. Same
+        -- move the zone progress bar's own toggles made, for the same reason.
         local widgetCheck = self:CreateCheckbox(content, L["Show event and scenario widgets"],
             rowSetting("showTrackerWidgets", true))
-        widgetCheck:SetPoint("TOPLEFT", barCheck, "BOTTOMLEFT", 0, -2)
+        widgetCheck:SetPoint("TOPLEFT", objCheck, "BOTTOMLEFT", 0, -2)
         self:AttachTooltip(widgetCheck, L["Show event and scenario widgets"],
             L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."])
 

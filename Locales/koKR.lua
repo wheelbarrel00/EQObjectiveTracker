@@ -134,8 +134,6 @@ L["Show zone label under quest titles"] = "퀘스트 제목 아래 지역 표시
 L["Adds the quest log heading each quest came from as a small line under its title."] = "각 퀘스트가 속한 퀘스트 일지 머리글을 제목 아래 작은 글씨로 붙입니다."
 L["Show objective progress numbers"] = "목표 진행 숫자 표시"
 L["For example, 0/4, 1/1, etc."] = "예: 0/4, 1/1 등."
-L["Show progress bars"] = "진행도 막대 표시"
-L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. Applies to quests, World Quests, achievements and scenario objectives."] = "백분율이나 누적 수치를 보여주는 목표에 기본 추적기처럼 채워지는 막대를 그립니다. 단순한 텍스트 줄 대신 표시되며, 퀘스트, 전역 퀘스트, 업적, 시나리오 목표에 적용됩니다."
 L["Show quest ID"] = "퀘스트 ID 표시"
 L["Useful for bug reports."] = "버그 신고에 유용."
 L["Show the visible / total count on section headers"] = "섹션 머리글에 표시/전체 개수 표시"
@@ -303,6 +301,7 @@ L["Header Color"] = "헤더 색상"
 L["Color of the zone name on the floating bar. The docked section uses the section header color."] = "떠 있는 막대의 지역명 색상입니다. 도킹된 섹션은 섹션 머리글 색상을 사용합니다."
 L["Count Color"] = "개수 색상"
 L["Color of the completed-of-total count on the floating bar."] = "떠 있는 막대의 완료/전체 개수 색상입니다."
+L["Show progress bars"] = "진행도 막대 표시"
 
 -- Options/TabAbout.lua
 L["Open this window"] = "이 창 열기"

@@ -95,6 +95,24 @@ local function zbSet(key, v, shared)
     if shared then ns:GetModule("Tracker"):Render() end
 end
 
+local function pbState()
+    local t = DB()
+    if not t then return nil end
+    t.progressBar = t.progressBar or {}
+    return t.progressBar
+end
+
+-- Every bar this styles is drawn inside the tracker, so every key here needs a full repaint.
+-- Row memoizes on a set of stored fields and returns before it would touch a bar at all, so a
+-- bare Render would leave every existing row exactly as it was - Invalidate is what makes the
+-- new texture, color or height reach a row that is already on screen.
+local function pbSet(key, v)
+    local st = pbState()
+    if st then st[key] = v end
+    ns:GetModule("Row"):Invalidate()
+    ns:GetModule("Tracker"):Render()
+end
+
 local function barTextureSwatch(frame, name)
     if not frame.swatch then return end
     frame.swatch:SetTexture(ns:GetModule("Media"):GetStatusBarFile(name))
@@ -598,6 +616,81 @@ Options:RegisterTab({
         zbCountPicker:SetPoint("TOPLEFT", zbHeaderPicker, "BOTTOMLEFT", 0, -10)
         self:AlignPickerColumn(zbBarColorPicker, zbHeaderPicker, zbCountPicker)
 
+        -- The quest row bars, the scenario criteria bars and the event widget bars share one
+        -- style block. They all draw identically, so splitting the styling as well as the
+        -- switches would mean setting the same seven controls three times over.
+        local pbHeader = self:CreateHeading(content, L["Progress Bars"])
+        pbHeader:SetPoint("TOPLEFT", zbCountPicker, "BOTTOMLEFT", 0, self.GAP.aboveHead)
+
+        -- This key came off the Tracker tab and keeps the meaning it shipped with, so a
+        -- profile that had already switched bars off is unchanged by the split. The two
+        -- halves below are NEW keys, which is why neither can silently revert a stored choice.
+        local pbEnable = self:CreateCheckbox(content, L["Show progress bars"],
+            function() return DB().showProgressBars ~= false end,
+            function(v) restyle("showProgressBars", v); syncDependents() end,
+            L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. The two boxes under this pick which of them get one."])
+        pbEnable:SetPoint("TOPLEFT", pbHeader, "BOTTOMLEFT", 0, self.GAP.head)
+
+        local pbQuests = self:CreateCheckbox(content, L["Quest Rows"],
+            function() return DB().showQuestProgressBars ~= false end,
+            function(v) restyle("showQuestProgressBars", v); syncDependents() end,
+            L["Bars on quest, World Quest and achievement rows. The objective's own text is drawn above its bar, matching the default tracker."])
+        pbQuests:SetPoint("TOPLEFT", pbEnable, "BOTTOMLEFT", 0, -2)
+
+        local pbScenario = self:CreateCheckbox(content, L["Scenario Criteria"],
+            function() return DB().showScenarioProgressBars ~= false end,
+            function(v) restyle("showScenarioProgressBars", v); syncDependents() end,
+            L["Bars on the objective lines shown under a scenario or delve banner."])
+        pbScenario:SetPoint("TOPLEFT", pbQuests, "BOTTOMLEFT", 0, -2)
+
+        local pbBgCheck = self:CreateCheckbox(content, L["Background"],
+            function() local st = pbState(); return not (st and st.showBackground == false) end,
+            function(v) pbSet("showBackground", v); syncDependents() end,
+            L["Fills the unfinished part of the bar. Unticked, only the filled part is drawn."])
+        pbBgCheck:SetPoint("TOPLEFT", pbScenario, "BOTTOMLEFT", 0, -2)
+
+        local pbBgPicker = self:CreateColorPicker(content, L["Background Color"],
+            function() local st = pbState(); return st and st.backgroundColor end,
+            function(v) pbSet("backgroundColor", v) end,
+            L["Color and opacity of the unfilled part of the bar."], true)
+
+        local pbBorderCheck = self:CreateCheckbox(content, L["Border"],
+            function() local st = pbState(); return not (st and st.showBorder == false) end,
+            function(v) pbSet("showBorder", v); syncDependents() end,
+            L["Draws a one pixel border around the bar."])
+        pbBorderCheck:SetPoint("TOPLEFT", pbBgCheck, "BOTTOMLEFT", 0, -2)
+
+        local pbBorderPicker = self:CreateColorPicker(content, L["Border Color"],
+            function() local st = pbState(); return st and st.borderColor end,
+            function(v) pbSet("borderColor", v) end,
+            L["Color and opacity of the bar's border."], true)
+        self:AlignSatelliteColumn({ pbBgCheck, pbBgPicker }, { pbBorderCheck, pbBorderPicker })
+        self:AlignPickerColumn(pbBgPicker, pbBorderPicker)
+
+        -- Keep this range and Media:ProgressBarHeight's clamp in step. CreateSlider's own
+        -- suppress flag is what stops a stored value outside the range being written back on
+        -- every tab view, so the two disagreeing is a silently clamped bar rather than a
+        -- corrupted profile - but only while that flag survives.
+        local pbHeightSlider = self:CreateSlider(content, L["Bar Height"], 8, 24, 1,
+            function() local st = pbState(); return (st and st.height) or 16 end,
+            function(v) pbSet("height", v) end,
+            L["How tall each progress bar is drawn."])
+        pbHeightSlider:SetPoint("TOPLEFT", pbBorderCheck, "BOTTOMLEFT", 0, -14)
+
+        local pbTexDD = self:CreateDropdown(content, L["Bar Texture"],
+            function() return mediaOptions(ns:GetModule("Media"):GetStatusBarList()) end,
+            function() local st = pbState(); return (st and st.barTexture) or "Blizzard" end,
+            function(v) pbSet("barTexture", v) end,
+            L["Sets the fill texture of the progress bars. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."],
+            barTextureSwatch)
+        pbTexDD:SetPoint("TOPLEFT", pbHeightSlider, "BOTTOMLEFT", 0, -14)
+
+        local pbBarColorPicker = self:CreateColorPicker(content, L["Bar Color"],
+            function() local st = pbState(); return st and st.barColor end,
+            function(v) pbSet("barColor", v) end,
+            L["Fill color and opacity of the bar itself."], true)
+        pbBarColorPicker:SetPoint("TOPLEFT", pbTexDD, "BOTTOMLEFT", 0, -16)
+
         trackerHeader:SetPoint("TOPLEFT", hideArrowsCheck, "BOTTOMLEFT", 0, self.GAP.aboveHead)
 
         syncDependents = function()
@@ -665,6 +758,24 @@ Options:RegisterTab({
             dim(zbCountPicker,  float)
             dim(zbBgPicker,     float and zb.showBackground ~= false)
             dim(zbBorderPicker, float and zb.showBorder ~= false)
+
+            -- showProgressBars heads this group and so is never dimmed. The two half-switches
+            -- are inert while it is off, and the STYLING is inert unless at least one half is
+            -- actually drawing a bar - master on with both halves off leaves nothing on screen
+            -- for a texture or a height to reach.
+            local pb    = pbState() or {}
+            local bars  = cfg.showProgressBars ~= false
+            local drawn = bars and (cfg.showQuestProgressBars ~= false
+                                    or cfg.showScenarioProgressBars ~= false)
+            dim(pbQuests,          bars)
+            dim(pbScenario,        bars)
+            dim(pbBgCheck,         drawn)
+            dim(pbBorderCheck,     drawn)
+            dim(pbHeightSlider,    drawn)
+            dim(pbTexDD,           drawn)
+            dim(pbBarColorPicker,  drawn)
+            dim(pbBgPicker,        drawn and pb.showBackground ~= false)
+            dim(pbBorderPicker,    drawn and pb.showBorder ~= false)
         end
         syncDependents()
         content._syncDependents = syncDependents

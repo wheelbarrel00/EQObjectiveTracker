@@ -92,8 +92,10 @@ saved world quest watches.
 - **Achievements**, **professions** with reagent counts, and **endeavors**, covering both the
   Traveler's Log monthly activities and the neighborhood tasks you have tracked, which the
   default tracker draws together under that same header
-- **Progress bars** for objectives that report a percentage or a running total, the way the
-  default tracker draws them, which you can turn off
+- **Progress bars** for objectives that report a percentage or a running total, drawn the way
+  the default tracker draws them with the objective's own text on the line above the bar. Quest
+  rows and scenario criteria each have their own switch, and the bar's texture, fill color,
+  background, border and height are all yours to set
 - **Quest items**, as a button on the row of any quest that carries one
 - **Quest popups** for newly discovered quests and ones ready to hand in remotely
 - **Hover any quest** for its objectives and full rewards, including item level
@@ -140,9 +142,9 @@ keeps the tracker on screen by itself, including world quests, achievements, the
 bar, and the delve or scenario panel.
 
 Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
-shown in its own typeface in the picker), sizes, spacing, colors, a card layout that can wrap
-the delve and scenario panel as well as your quests, section order and visibility, filters by
-quest type, and eight sort modes including by distance and by hand. The current-zone filter
+shown in its own typeface in the picker), sizes, spacing, colors, the progress bars, a card
+layout that can wrap the delve and scenario panel as well as your quests, section order and
+visibility, filters by quest type, and eight sort modes including by distance and by hand. The current-zone filter
 shows only quests with an objective on the map you are standing on. If that map lists none of
 its own, such as a building interior, a covenant sanctum or a dungeon, it asks the zone around
 it instead, so you still get that zone's quests rather than an empty tracker.
