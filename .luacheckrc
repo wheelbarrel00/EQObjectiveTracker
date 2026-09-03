@@ -37,8 +37,13 @@ read_globals = {
     "GetLocale",
     -- Picks which Classic Wowhead site a row menu link opens
     "GetExpansionLevel",
-    -- Blizzard's Classic quest log, whose tracked checkmarks UI/QuestLogChecks.lua repaints
+    -- Blizzard's Classic quest log, whose tracked checkmarks UI/QuestLogChecks.lua repaints.
+    -- UI/Row.lua reads ChatEdit_GetActiveWindow too, to tell a link click from an ordinary one.
     "QuestLog_Update", "IsShiftKeyDown", "ChatEdit_GetActiveWindow", "NONE",
+
+    -- Shift-clicking a tracker row into chat. GetQuestLink is the quest API half and stays in
+    -- Data/, ChatEdit_InsertLink is the frame half and stays in UI/.
+    "GetQuestLink", "ChatEdit_InsertLink",
 
     -- Everything Quests' saved variable, read one way for the config import. Never its
     -- addon table: EQ depends on EQOT, so EQOT loads first and that table is always nil.

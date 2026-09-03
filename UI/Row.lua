@@ -481,18 +481,38 @@ local function overIcon(row)
     return mx <= iconRight
 end
 
+-- The chat-link modifier, shift by default, drops the quest into an open chat box, gated on
+-- the modifier AND a focused edit box the way Blizzard's frames and Everything Quests both are.
+-- Any button, because the hide gesture this replaced took any button too. With no edit box
+-- focused it answers false and the row's ordinary click runs, rather than swallowing a click
+-- from a player who was not linking anything.
+-- UI/QuestLogChecks.lua diverges, and only halfway: its IsShiftKeyDown fallback already stands
+-- down while chat is open, but its explicit QUESTWATCHTOGGLE branch does not.
+--
+-- The same idSpace test the reward tooltip uses, so it covers quests, campaign and world quests
+-- without naming a provider. GetQuestLink is a quest API and so belongs in Data/, which is why
+-- the string is resolved there and only the insert happens here.
+local function chatLinkClick(row)
+    if not (IsModifiedClick and IsModifiedClick("CHATLINK")) then return false end
+    if not (ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()) then return false end
+
+    local provider = row._providerID and ns:GetModule("Registry"):Get(row._providerID)
+    if not (provider and provider.idSpace == "quest") then return false end
+
+    local entry = row._entry
+    local text  = ns:GetModule("QuestLink"):For(entry.id, entry.title, entry.level)
+    if not text then return false end
+
+    return (ChatEdit_InsertLink and ChatEdit_InsertLink(text)) and true or false
+end
+
 local function onMouseUp(row, button)
     local wasDragging = row._wasDragging
     row._wasDragging = nil
     if wasDragging then return end
     if not row._entry or clickThrough() then return end
-    if IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE") then
-        local Filter = ns:GetModule("Filter")
-        Filter:SetHidden(row._entry, not Filter:IsHidden(row._entry))
-        local Tracker = ns:GetModule("Tracker")
-        if Tracker then Tracker:Refresh() end
-        return
-    end
+
+    if chatLinkClick(row) then return end
 
     if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
         dispatch(row, "OnEntryOpenLog")

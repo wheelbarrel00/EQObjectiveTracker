@@ -16,15 +16,14 @@ local GITHUB_URL     = "https://github.com/wheelbarrel00/EQObjectiveTracker"
 local BUG_URL        = "https://github.com/wheelbarrel00/EQObjectiveTracker/issues"
 
 -- Slash tokens are never translated. Only the description beside each one is.
--- unhide and importeq are the two recovery commands: nothing else brings back a
--- shift-click-hidden entry, or re-runs the EQ import for someone who installed this first.
+-- importeq is the recovery command: nothing else re-runs the EQ import for someone who
+-- installed this addon first.
 local COMMANDS = {
     { "/eqot",          L["Open this window"] },
     { "/eqot lock",     L["Lock moving and resizing"] },
     { "/eqot unlock",   L["Unlock moving and resizing"] },
     { "/eqot reset",    L["Restore the default position and size"] },
     { "/eqot toggle",   L["Show or hide the tracker"] },
-    { "/eqot unhide",   L["Bring back every entry you have hidden"] },
     { "/eqot importeq", L["Import your Everything Quests settings"] },
     { "/eqot status",   L["Print provider status to chat"] },
     { "/eqot debug",    L["Toggle entry validation warnings"] },

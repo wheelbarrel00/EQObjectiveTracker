@@ -151,7 +151,7 @@ Options:RegisterTab({
                     ReloadUI()
                 end,
             })
-        end, L["Restores every setting on every tab to its default and reloads the interface. This also clears the Options Window Scale, which every character shares, and this character's collapsed sections and individually hidden entries."])
+        end, L["Restores every setting on every tab to its default and reloads the interface. This also clears the Options Window Scale, which every character shares, and this character's collapsed sections and pinned entries."])
         resetAll:SetSize(160, 24)
         resetAll:SetPoint("TOPLEFT", resetPos, "BOTTOMLEFT", 0, -10)
 

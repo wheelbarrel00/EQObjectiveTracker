@@ -542,7 +542,8 @@ local function setWatched(id, watch)
     if watch then
         -- Typed Manual on purpose: an untyped watch is AUTOMATIC, which the engine silently
         -- evicts past a small cap, so the quest would drop off the tracker on its own.
-        local manual = Enum and Enum.QuestWatchType and Enum.QuestWatchType.Manual
+        -- Literal 1 from Data/WatchPersist.lua: a nil type IS the automatic watch refused above.
+        local manual = (Enum and Enum.QuestWatchType and Enum.QuestWatchType.Manual) or 1
         C_QuestLog.AddQuestWatch(id, manual)
     else
         C_QuestLog.RemoveQuestWatch(id)

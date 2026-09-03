@@ -74,8 +74,8 @@ Installing it pulls this tracker in automatically. Without it, this addon is the
 
 If you already ran Everything Quests, your tracker settings are imported the first time this
 addon loads, so it starts out looking the way yours already did. Your per-character state
-comes across too, on every character: pinned quests, hidden quests, collapsed sections and
-saved world quest watches.
+comes across too, on every character: pinned quests, collapsed sections and saved world
+quest watches.
 
 ## What it tracks
 
@@ -115,7 +115,6 @@ events, which would otherwise not appear anywhere.
 | `/eqot lock` / `unlock` | Lock or unlock moving and resizing |
 | `/eqot reset` | Restore the default position and size |
 | `/eqot toggle` | Show or hide the tracker |
-| `/eqot unhide` | Bring back every entry you have hidden from the tracker |
 | `/eqot status` | Print what each provider emitted and what reached the screen |
 | `/eqot bonushud` | Print what the bonus objectives HUD can see, or `test` to place it |
 | `/eqot importeq` | Replace this profile with your Everything Quests tracker settings |
@@ -125,8 +124,9 @@ events, which would otherwise not appear anywhere.
 | `/eqot debug` | Toggle entry validation warnings |
 
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
-Left-click a quest to super-track it on retail, or to focus it on Classic, and shift-click to
-hide it. Right-click opens a menu to pin, track, focus, open the quest log, pop out the
+Left-click a quest to super-track it on retail, or to focus it on Classic. Shift-click a quest
+while a chat box is open to drop it into chat. Right-click opens a menu to pin, track, focus,
+open the quest log, pop out the
 details, look the quest up on Wowhead, or abandon it - the Classic menu is shorter, since
 popping out and abandoning need frames those clients do not have. A pinned quest stays on the
 tracker whatever your filters say. In manual sort mode you can also drag quests into whatever

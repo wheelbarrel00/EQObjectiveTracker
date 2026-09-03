@@ -27,6 +27,10 @@ Has.QuestSpecialItem    = global("GetQuestLogSpecialItemInfo")
                           and (method(C_QuestLog, "GetLogIndexForQuestID")
                                or global("GetQuestLogIndexByID"))
 Has.AutoQuestPopUp      = global("GetNumAutoQuestPopUps") and global("GetAutoQuestPopUp")
+-- Measured on 1.15.9: GetQuestLink(65) answered a link for a quest in the log and
+-- GetQuestLink(1) answered nil, so it takes a quest ID and not a log index. Probed rather
+-- than assumed present - no reading has been taken on 2.5.6 or on retail.
+Has.QuestLink           = global("GetQuestLink")
 Has.QuestDistance       = method(C_QuestLog, "GetDistanceSqToQuest")
 Has.QuestsOnMap         = method(C_QuestLog, "GetQuestsOnMap")
 Has.NextWaypoint        = method(C_QuestLog, "GetNextWaypoint")

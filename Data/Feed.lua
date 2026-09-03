@@ -19,10 +19,6 @@ Feed.stats = {}
 -- emit-time claim would block the world quest provider from rendering an entry nobody
 -- ends up showing, and it vanishes from the tracker entirely.
 --
--- The single exception is an entry the user has hidden, which claims despite not being
--- displayed. That is a decision about the quest rather than about the row showing it, so it
--- has to outlive the provider that happened to own the row.
---
 -- Claims are also never taken against the quest log directly: GetLogIndexForQuestID
 -- returns non-nil for hidden task quests, so a log check would wrongly swallow them.
 local spaces = {}
@@ -77,19 +73,13 @@ function Feed:Build()
                     e.providerID = p.id
                     local g = group(self, e.groupID)
                     g.totalCount = g.totalCount + 1
-                    local visible, userHidden = Filter:Visible(e, cfg, p)
-                    if visible then
+                    if Filter:Visible(e, cfg, p) then
                         g.visibleCount = g.visibleCount + 1
                         g.entries[g.visibleCount] = e
                         st.shown = st.shown + 1
                         if claimed then claimed[e.id] = true end
                     else
                         st.filtered = st.filtered + 1
-                        -- The one rejection that still claims. Hiding is a decision about the
-                        -- QUEST, not about the row that happened to show it, so without this
-                        -- the claim is withdrawn and the next provider in the space renders
-                        -- the entry the player just hid.
-                        if userHidden and claimed then claimed[e.id] = true end
                     end
                 end
             end

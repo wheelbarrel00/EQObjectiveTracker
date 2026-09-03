@@ -19,34 +19,14 @@ Filter.CATEGORIES = {
 -- Feed reports "filtered N" and could never say why, which has cost a misdiagnosis: a stale
 -- isTracked and an active zone filter look identical from that number. One integer bump per
 -- rejected entry, so it stays on in release.
-Filter.rejects = { hidden = 0, popup = 0, watched = 0, category = 0, zone = 0 }
+Filter.rejects = { popup = 0, watched = 0, category = 0, zone = 0 }
 
 function Filter:BeginPass()
     local r = self.rejects
-    r.hidden, r.popup, r.watched, r.category, r.zone = 0, 0, 0, 0, 0
+    r.popup, r.watched, r.category, r.zone = 0, 0, 0, 0
 end
 
--- Hidden is keyed by provider then entry id so two providers can never collide on a
--- bare numeric id.
-function Filter:IsHidden(entry)
-    local DB   = ns:GetModule("DB")
-    local char = DB and DB:Char()
-    local byProvider = char and char.hidden and char.hidden[entry.providerID]
-    return (byProvider and byProvider[entry.id]) and true or false
-end
-
-function Filter:SetHidden(entry, hidden)
-    local DB   = ns:GetModule("DB")
-    local char = DB and DB:Char()
-    if not char then return end
-    char.hidden = char.hidden or {}
-    local byProvider = char.hidden[entry.providerID]
-    if not byProvider then byProvider = {}; char.hidden[entry.providerID] = byProvider end
-    byProvider[entry.id] = hidden or nil
-end
-
--- Keyed the same way as hidden, and for the same reason: two providers must never collide on
--- a bare numeric id.
+-- Keyed by provider then entry id so two providers can never collide on a bare numeric id.
 function Filter:IsPinned(entry)
     local DB   = ns:GetModule("DB")
     local char = DB and DB:Char()
@@ -62,9 +42,6 @@ function Filter:SetPinned(entry, pinned)
     local byProvider = char.pinned[entry.providerID]
     if not byProvider then byProvider = {}; char.pinned[entry.providerID] = byProvider end
     byProvider[entry.id] = pinned or nil
-    -- Pinning something you had hidden would otherwise store a contradiction the UI resolves
-    -- silently in hidden's favor, leaving a pin the player cannot see.
-    if pinned then self:SetHidden(entry, false) end
 end
 
 local function countSet(char, key)
@@ -84,31 +61,12 @@ local function countSet(char, key)
     return total, parts
 end
 
--- A hidden entry keeps claiming its ID space, so it never resurfaces under another provider
--- for a second modified-click to undo. Without this the only way back is resetting the profile.
-function Filter:ClearHidden()
-    local DB   = ns:GetModule("DB")
-    local char = DB and DB:Char()
-    if not char then return 0 end
-    local total = countSet(char, "hidden")
-    char.hidden = {}
-    return total
-end
-
 function Filter:DebugLine()
     local DB   = ns:GetModule("DB")
     local char = DB and DB:Char()
-    local hidden, hParts = countSet(char, "hidden")
     local pinned, pParts = countSet(char, "pinned")
-
-    local out = (hidden == 0) and "hidden entries: none"
-        or ("hidden entries: %d (%s) - /eqot unhide restores them")
-            :format(hidden, table.concat(hParts, ", "))
-
-    if pinned > 0 then
-        out = out .. ("  | pinned: %d (%s)"):format(pinned, table.concat(pParts, ", "))
-    end
-    return out
+    if pinned == 0 then return "pinned entries: none" end
+    return ("pinned entries: %d (%s)"):format(pinned, table.concat(pParts, ", "))
 end
 
 -- Categories are walked from CATEGORIES rather than listed, so a new one reports itself.
@@ -124,11 +82,11 @@ function Filter:FiltersLine()
         cats[i] = ("%s=%s"):format(key, tostring((f and f[key]) ~= false))
     end
 
-    return ("filters: onlyWatched=%s onlyCurrentZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, hidden %d, popup %d")
+    return ("filters: onlyWatched=%s onlyCurrentZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, popup %d")
         :format(tostring(cfg and cfg.showOnlyWatched and true or false),
                 tostring(f and f.onlyCurrentZone and true or false),
                 f and table.concat(cats, " ") or "no filters table",
-                r.watched, r.category, r.zone, r.hidden, r.popup)
+                r.watched, r.category, r.zone, r.popup)
 end
 
 function Filter:PassesCategory(entry, f)
@@ -146,12 +104,8 @@ end
 -- Category filters are opt-in per provider. Without that gate an untagged entry from
 -- any other provider falls through to showNormal, and unchecking "Normal" would hide
 -- every achievement too.
--- The second return says the rejection was the user hiding this entry rather than a display
--- setting. Feed needs the difference: a hidden quest must claim its ID space, a filtered one
--- must not.
 function Filter:Visible(entry, cfg, provider)
     local rejects = self.rejects
-    if self:IsHidden(entry) then rejects.hidden = rejects.hidden + 1; return false, true end
 
     -- A quest with a Complete popup is drawn as a popup box instead, so it must not also
     -- appear as a row. The suppression set is empty whenever the option is off, so this
@@ -165,9 +119,8 @@ function Filter:Visible(entry, cfg, provider)
         end
     end
 
-    -- Below hidden and the popup, above everything else, matching EQ: a pin is the player
-    -- saying "keep this on screen", so it outranks every display setting but not their own
-    -- decision to hide the row.
+    -- Below the popup, above everything else, matching EQ: a pin is the player saying
+    -- "keep this on screen", so it outranks every display setting below it.
     if self:IsPinned(entry) then return true end
 
     if cfg and cfg.showOnlyWatched and entry.isTracked == false then

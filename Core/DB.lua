@@ -220,7 +220,6 @@ DB.defaults = {
     },
     char = {
         sectionsCollapsed  = {},
-        hidden             = {},
         pinned             = {},
         trackedWorldQuests = {},
     },
@@ -251,10 +250,14 @@ local APPEARANCE_KEYS = {
     -- they default to off and floating, so clearing them switches a configured bar off and
     -- undocks it. hideScrollBar defaults to false, so clearing it restores the bar.
     "hideScrollBar",
+    -- Same test as hideScrollBar rather than the zone bar's: all three default to ON, so
+    -- clearing re-enables the bars instead of switching a configured one off.
+    "showProgressBars", "showQuestProgressBars", "showScenarioProgressBars",
 }
 
--- Clearing a key lets AceDB re-apply its default. Behavior keys and the zone bar's saved
--- position are left alone by design, so this resets how the tracker looks and nothing else.
+-- Clearing a key lets AceDB re-apply its default. Left alone by design: the zone bar's saved
+-- position, and any switch whose default is OFF, because clearing one of those switches a
+-- configured feature off rather than restoring a look.
 function DB:ResetTrackerAppearance()
     local prof = self:Tracker()
     if not prof then return end
@@ -265,13 +268,9 @@ function DB:ResetTrackerAppearance()
         zb.borderColor, zb.headerColor, zb.countColor, zb.font = nil, nil, nil, nil
         zb.barTexture, zb.barColor, zb.backgroundColor = nil, nil, nil
     end
-    -- Only the STYLE block is cleared. The three progress bar switches are deliberately left
-    -- alone, and NOT for the reason showZoneProgressBar is: those two default to OFF, so
-    -- clearing them switches a configured bar off, where all three of these default to ON
-    -- and clearing would simply re-enable the bars. They are held back because they are
-    -- behavior rather than appearance, which is a narrower rule than the rest of this list
-    -- uses. The Appearance tab's Reset tooltip therefore overclaims for these three exactly
-    -- as it already did for the zone bar's two.
+    -- The switches live in APPEARANCE_KEYS, so only the STYLE block is left to clear here.
+    -- Clearing restores the default look rather than blanking a bar: every key has a visible
+    -- default except barTexture, which has none and falls back to Blizzard's in Core/Media.lua.
     local pb = prof.progressBar
     if pb then
         pb.height, pb.showBackground, pb.showBorder = nil, nil, nil
@@ -310,7 +309,6 @@ function DB:ResetAll()
     local c = self.db.char
     if c then
         c.sectionsCollapsed = {}
-        c.hidden            = {}
         c.pinned            = {}
         c.trackedQuests     = nil
         c.delveRun          = nil

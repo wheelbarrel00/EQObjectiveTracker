@@ -123,9 +123,9 @@ local function eqChar()
     return (type(sv) == "table") and sv or nil
 end
 
--- EQ keys hidden and pinned by bare quest ID. EQOT keys them by provider first so two
--- providers can never collide on the same number, and quests is the only provider EQ could
--- have been talking about.
+-- EQ keys pinned by bare quest ID. EQOT keys it by provider first so two providers can never
+-- collide on the same number, and quests is the only provider EQ could have been talking about.
+-- EQ's own "hidden" set is deliberately NOT imported: EQOT has no per-entry hiding to put it in.
 local function importIDSet(dst, src, key)
     if type(src[key]) ~= "table" then return 0 end
     local n = 0
@@ -149,7 +149,7 @@ local function importChar(db)
     local dst = db and db.char
     if not (src and dst) then return 0 end
 
-    local n = importIDSet(dst, src, "hidden") + importIDSet(dst, src, "pinned")
+    local n = importIDSet(dst, src, "pinned")
 
     if type(src.sectionsCollapsed) == "table" then
         for id, on in pairs(src.sectionsCollapsed) do
@@ -309,7 +309,7 @@ function Migrate:Run(db, isFreshInstall)
     end
 
     -- Gated per CHARACTER, not on the fresh-install flag. That flag reads an account-wide
-    -- saved variable, while EQ's pins, hidden quests and collapsed sections live in a
+    -- saved variable, while EQ's pins and collapsed sections live in a
     -- per-character one - so keying this off the same flag would import the first character
     -- to log in and silently drop every alt's state.
     self:ImportCharFromEQ(db)
@@ -318,6 +318,12 @@ function Migrate:Run(db, isFreshInstall)
 
     local ManualOrder = ns:GetModule("ManualOrder")
     if ManualOrder then ManualOrder:Reconcile() end
+
+    -- Per-entry hiding is gone, so this set has no reader and no writer left. Cleared rather
+    -- than left in place because it is per character and nothing would ever empty it again.
+    -- Unconditional rather than schema gated: the key is only ever leftover now, so a second
+    -- pass finds nothing.
+    if db and db.char then db.char.hidden = nil end
 
     local g = db and db.global
     if not g then return end

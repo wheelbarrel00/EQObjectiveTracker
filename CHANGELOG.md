@@ -5,6 +5,37 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-09-02
+
+### New Features
+
+- Shift-clicking a quest on the tracker now puts it into an open chat box, the way the modifier
+  works everywhere else in the game. On retail it shares the client's own quest link. On
+  Classic Era and TBC Anniversary it sends the same readable text that Everything Quests' quest
+  browser uses, so a quest shared from either addon reads the same and anyone running Everything
+  Quests sees it as a clickable link. It only fires while a chat box is actually open, so an
+  ordinary shift-click still does whatever your left-click normally does.
+
+### Bug Fixes
+
+- Shift-clicking a quest on the tracker no longer hides it. That gesture removed the quest from
+  the tracker for that character, with nothing on screen to say what had happened and no way
+  back except a slash command, and people trying to link a quest into chat lost quests to it.
+
+### Improvements
+
+- Hiding individual entries has been removed. Nothing on the tracker ever showed that an entry
+  was hidden, the only way in was a shift-click and the only way back was a slash command, and
+  untracking a quest, the seven category filters and the two only-show rules all do the same job
+  in a place you can find. Anything you had hidden comes back on its own, and `/eqot unhide` is
+  gone with it.
+- Shift-clicking a row that is not a quest now does whatever an ordinary left-click on it
+  does, so a tracked achievement opens the achievement and a recipe opens the recipe. That
+  gesture used to hide the row instead.
+- Reset to Defaults on the Appearance tab now also restores the three Show progress bars
+  switches. It used to leave them alone while its tooltip said it restored every control on
+  the tab. All three are on by default, so a reset turns the bars back on rather than off.
+
 ## [1.18.0] - 2026-08-31
 
 ### Improvements

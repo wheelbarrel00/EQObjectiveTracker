@@ -472,7 +472,8 @@ function WorldQuests:OnEntryMenuSelect(entryID, itemID)
         -- Manual, not the proximity auto-watch: only a manual watch is mirrored into the
         -- saved list, so an automatic one would not survive a reload.
         if ns.Has.WorldQuestWatchAdd then
-            local manual = Enum and Enum.QuestWatchType and Enum.QuestWatchType.Manual
+            -- Literal 1 from Data/WatchPersist.lua: a nil type IS the automatic watch refused above.
+            local manual = (Enum and Enum.QuestWatchType and Enum.QuestWatchType.Manual) or 1
             C_QuestLog.AddWorldQuestWatch(entryID, manual)
         end
     elseif itemID == "untrack" then

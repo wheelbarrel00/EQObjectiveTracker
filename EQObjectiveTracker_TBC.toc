@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 1.18.0
+## Version: 1.19.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -59,6 +59,7 @@ Data\ScenarioBonus.lua
 Data\Widgets.lua
 Data\QuestGroups.lua
 Data\QuestProgress.lua
+Data\QuestLink.lua
 
 # Providers. THE ONLY FLAVOR-VARYING SECTION OF THIS FILE. World quests are Legion and
 # later, endeavors are the retail Traveler's Log, and tracked recipes need the retail

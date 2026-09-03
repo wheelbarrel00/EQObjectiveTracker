@@ -28,16 +28,6 @@ handlers.toggle = function()
     tracker():Toggle()
 end
 
-handlers.unhide = function()
-    local n = ns:GetModule("Filter"):ClearHidden()
-    if n == 0 then
-        ns:Print(L["nothing is hidden."])
-        return
-    end
-    ns:Print((L["%d hidden entries restored."]):format(n))
-    tracker():Render()
-end
-
 handlers.debug = function()
     ns.DEBUG = not ns.DEBUG
     ns:Print("debug validation " .. (ns.DEBUG and "on" or "off") .. ".")
@@ -336,7 +326,7 @@ function Commands:OnEnable()
         else
             -- The subcommands are literals the dispatcher matches, so they stay outside
             -- L. Only the word introducing them is translated.
-            ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, unhide, status, debug, "
+            ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, status, debug, "
                 .. "bonushud [test], importeq, modules, disable <m>, enable <m>")
         end
     end
