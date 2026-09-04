@@ -45,6 +45,10 @@ Has.WorldQuestTime      = method(C_TaskQuest, "GetQuestTimeLeftMinutes")
 Has.TaskQuests          = method(C_TaskQuest, "GetQuestsOnMap")
                           or method(C_TaskQuest, "GetQuestsForPlayerByMapID")
 Has.TaskQuestInfo       = method(C_TaskQuest, "GetQuestInfoByQuestID")
+-- Answers whether a task quest is live. The other signals only ever say a quest is timed, in
+-- the log, or on a map near the player, and a watched world quest in another zone is none of
+-- those. Measured present on 12.1, 2026-09-03.
+Has.TaskQuestActive     = method(C_TaskQuest, "IsActive")
 -- A percentage objective's real fill is in neither numFulfilled nor numRequired. The first is a
 -- BARE GLOBAL and has no C_QuestLog twin, so it is probed with global() rather than method().
 Has.QuestProgressBar    = global("GetQuestProgressBarPercent")

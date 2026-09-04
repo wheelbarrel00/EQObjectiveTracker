@@ -5,38 +5,11 @@ local ZoneProgress = ns:RegisterModule("ZoneProgress", {})
 local MAX_HOPS = 5
 
 local _rootID, _rootName, _rootDirty = nil, nil, true
-
--- Walks up to the containing Zone, so a micro-dungeon counts against the zone around it.
-local function zoneRoot()
-    if not _rootDirty then return _rootID, _rootName end
-    if not ns.Has.Map then return nil end
-    local mapID = C_Map.GetBestMapForUnit("player")
-    if not mapID or mapID <= 0 then return nil end
-
-    _rootDirty = false
-    _rootID, _rootName = nil, nil
-
-    local id = mapID
-    for _ = 1, MAX_HOPS do
-        local info = C_Map.GetMapInfo(id)
-        if not info then break end
-        if info.mapType == Enum.UIMapType.Zone then
-            _rootID, _rootName = id, info.name
-            break
-        end
-        if not info.parentMapID or info.parentMapID == 0 then break end
-        id = info.parentMapID
-    end
-
-    -- Fall back to the player's own map, as EQ does. Without this a map with no Zone
-    -- ancestor latches nil until the next zone change, and the mapID routing entries for
-    -- Zul'Aman, Voidstorm and Void Acropolis could never be reached.
-    if not _rootID then
-        local info = C_Map.GetMapInfo(mapID)
-        _rootID, _rootName = mapID, info and info.name or nil
-    end
-    return _rootID, _rootName
-end
+-- The map the walk STARTED from, recorded only when it actually climbed past it. The one
+-- line a "my zone bar vanished" report is read from cannot otherwise say that the zone it
+-- names is not the zone underfoot. Cleared on every walk, or it announces a climb that did
+-- not happen on the next pass that stays put.
+local _rootVia = nil
 
 local RETRY_DELAY = 0.3
 local RETRY_MAX   = 5
@@ -70,6 +43,66 @@ local function categoryByName(name)
         end
     end
     return nil
+end
+
+-- Walks up to the containing Zone, so a micro-dungeon counts against the zone around it.
+--
+-- Midnight NESTS zones, measured 2026-09-03: Slayer's Rise (2444) is mapType Zone and so is
+-- its parent Voidstorm (2405). Stopping at the first Zone therefore answered Slayer's Rise,
+-- which no category names, and Voidstorm's own routed questlines drew no bar at all. So a
+-- Zone that resolves to no category is passed THROUGH rather than accepted, and the first
+-- Zone seen is kept as the answer for when nothing above it resolves either. Every zone that
+-- works today resolves on its own hop and never climbs.
+--
+-- The per-hop test is the same pair Count uses, mapID AND name, and that is load-bearing:
+-- Eversong Woods carries no mapID entry in either addon - the one listed is Silvermoon City -
+-- so a mapID-only climb would pass it over from a sub-area inside it, answer the sub-area,
+-- and draw no bar at all: the same NO ROUTING this walk was fixed for.
+local function zoneRoot()
+    if not _rootDirty then return _rootID, _rootName end
+    if not ns.Has.Map then return nil end
+    local mapID = C_Map.GetBestMapForUnit("player")
+    if not mapID or mapID <= 0 then return nil end
+
+    _rootDirty = false
+    _rootID, _rootName, _rootVia = nil, nil, nil
+
+    local ZONE = Enum and Enum.UIMapType and Enum.UIMapType.Zone
+    local firstID, firstName
+
+    local id = mapID
+    for _ = 1, MAX_HOPS do
+        local info = C_Map.GetMapInfo(id)
+        if not info then break end
+        if ZONE and info.mapType == ZONE then
+            if not firstID then firstID, firstName = id, info.name end
+            if categoryByMapID(id) or categoryByName(info.name) then
+                _rootID, _rootName = id, info.name
+                if firstID and firstID ~= id then _rootVia = firstID end
+                break
+            end
+        end
+        -- The top of a hierarchy answers parentMapID 0, and 0 is truthy in Lua.
+        if not info.parentMapID or info.parentMapID == 0 then break end
+        local pinfo = C_Map.GetMapInfo(info.parentMapID)
+        -- Never climb above zone level: a continent's questlines are not this zone's, and
+        -- Quel'Thalas sits one hop over Voidstorm. Same above-zone test as
+        -- WorldQuests:zoneParent, which ALSO refuses to climb from a Zone - this walk must
+        -- not, or the nesting above is unreachable again.
+        if ZONE and pinfo and pinfo.mapType and pinfo.mapType < ZONE then break end
+        id = info.parentMapID
+    end
+
+    -- No Zone above resolved either, so answer the one the old walk would have.
+    if not _rootID then _rootID, _rootName = firstID, firstName end
+
+    -- Fall back to the player's own map, as EQ does. Without this a map with no Zone
+    -- ancestor latches nil until the next zone change.
+    if not _rootID then
+        local info = C_Map.GetMapInfo(mapID)
+        _rootID, _rootName = mapID, info and info.name or nil
+    end
+    return _rootID, _rootName
 end
 
 local _catIndex
@@ -203,6 +236,10 @@ function ZoneProgress:Current()
     return _count.done, _count.total, _count.name, _count.catID
 end
 
+local function viaText()
+    return _rootVia and ((" via %d"):format(_rootVia)) or ""
+end
+
 function ZoneProgress:DebugLines()
     local lines = {}
     local rootID, rootName = zoneRoot()
@@ -214,8 +251,8 @@ function ZoneProgress:DebugLines()
     local done, total, catID = self:Count(rootID, rootName)
     local cat = catID and ns.ZONE_CATEGORIES and ns.ZONE_CATEGORIES[catID]
     if not total then
-        lines[1] = ("zone progress: %s (%d) -> NO ROUTING, no bar here")
-            :format(rootName or "?", rootID)
+        lines[1] = ("zone progress: %s (%d)%s -> NO ROUTING, no bar here")
+            :format(rootName or "?", rootID, viaText())
         return lines
     end
 
@@ -225,8 +262,9 @@ function ZoneProgress:DebugLines()
         if qlQuests[qls[i]] then loaded = loaded + 1 end
     end
 
-    lines[1] = ("zone progress: %s (%d) -> %s, %d/%d complete")
-        :format(rootName or "?", rootID, (cat and cat.name) or tostring(catID), done, total)
+    lines[1] = ("zone progress: %s (%d)%s -> %s, %d/%d complete")
+        :format(rootName or "?", rootID, viaText(),
+                (cat and cat.name) or tostring(catID), done, total)
     lines[2] = ("  %d/%d routed questlines loaded"):format(loaded, #qls)
     return lines
 end

@@ -9,6 +9,18 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.19.1", date = "2026-09-03",
+        sections = {
+            { head = "Notes", items = {
+                "A note on the shift-click change in 1.19.0, which has caused some confusion. It applies to every version of the game, Retail included, and shift-clicking a quest on the tracker has not been removed. What that entry did not make clear is that the replacement needs a chat box to be open: shift-click puts the quest into chat while you are typing, and with no chat box open it does whatever your ordinary left-click does. That is what makes it look like the gesture stopped working. Open chat first and it will link.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The zone progress bar now draws in a zone that sits inside another zone. Standing anywhere in Voidstorm it stayed blank, because the tracker stopped at the first zone it found and a sub-area like Slayer's Rise has no quest routing of its own. It now looks past a zone that nothing is routed to and uses the one that is. Zones that already showed a bar are unchanged.",
+                "A world quest you are tracking in a different zone no longer disappears from the tracker. It worked out whether a world quest was still live from its timer, the map you are standing on and your quest log, so a lair quest with no timer, in a zone you have since left, failed all three tests and the row was dropped while Blizzard's own tracker kept showing it. It now asks the game whether the quest is active, so the row stays until the quest really ends.",
+            } },
+        },
+    },
+    {
         version = "1.19.0", date = "2026-09-02",
         sections = {
             { head = "New Features", items = {

@@ -4,6 +4,10 @@ local Entry    = ns:GetModule("Entry")
 local Registry = ns:GetModule("Registry")
 local L        = ns.L
 
+-- Midnight can hand back "secret values" that still report an ordinary type and then error the
+-- moment tainted code matches them
+local _issecret = _G.issecretvalue
+
 local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
 
 local WorldQuests = {
@@ -114,8 +118,8 @@ end
 
 -- The bound both walks below need, and it is the one Quests:currentZoneSet already uses.
 -- A continent answers with every in-progress task quest on it, so the climb stops at the
--- first Zone and refuses a parent above zone level - a chain that skips Zone entirely does
--- exist, and Data/ZoneProgress.lua names three. Returns nil when there is nowhere to go.
+-- first Zone and refuses a parent above zone level - Zul'Aman, Voidstorm and Void Acropolis
+-- are the chains this was written for. Returns nil when there is nowhere to go.
 local function zoneParent(mapID)
     if not (C_Map.GetMapInfo and mapID and mapID > 0) then return nil end
     local ZONE = Enum and Enum.UIMapType and Enum.UIMapType.Zone
@@ -251,7 +255,22 @@ local function cannotTellLiveness()
     return IsInInstance and (IsInInstance()) or false
 end
 
--- Liveness for a WATCHED candidate, and it takes four signals rather than one. A quest still
+-- The client's own answer, where every other signal only ever says a quest is timed, in the
+-- log, or on a map near the player. Measured 2026-09-03 standing in Voidstorm: the watched
+-- lair quest 97128 reported IsActive true with GetQuestZoneID 2512, The Coiled Isle - a live
+-- world quest in ANOTHER zone, so it had no timer here, was not in the log and was on no map
+-- list. All three said dead.
+local function taskIsActive(questID)
+    if not ns.Has.TaskQuestActive then return false end
+    local ok, active = pcall(C_TaskQuest.IsActive, questID)
+    -- The truth test is guarded, not just the call. A Midnight secret value raises when it is
+    -- matched, and it would raise HERE rather than inside the pcall - taking stillLive,
+    -- GetEntries and the whole section with it.
+    if not ok or (_issecret and _issecret(active)) then return false end
+    return active and true or false
+end
+
+-- Liveness for a WATCHED candidate, and it takes five signals rather than one. A quest still
 -- on a map list or still in the quest log is live whatever its timer says. Measured on
 -- 2026-08-21: quest 97128, a watched lair world quest, reported no minutes at all - not zero,
 -- ABSENT - so a minutes-only test read it as an expired ghost and the row vanished while the
@@ -263,6 +282,8 @@ end
 local function stillLive(questID, mins)
     if mins and mins > 0 then return true end
     if onMap[questID] or inQuestLog(questID) then return true end
+    -- Asked before the refusal below, because it is an ANSWER where that is a shrug.
+    if taskIsActive(questID) then return true end
     return cannotTellLiveness()
 end
 
@@ -390,9 +411,15 @@ function WorldQuests:GetEntries()
             detailID[detailN]    = qid
             detailKind[detailN]  = wq and "wq" or (logOwned and "log" or "bonus")
             detailMins[detailN]  = mins
-            -- Which signal vouched for the candidate, which a bare count could never say
+            -- Which signal vouched for the candidate, which a bare count could never say.
+            -- The map, log and active signals in stillLive's own order. The timer it asks
+            -- FIRST is not here at all: it prints as the minutes beside the id.
+            -- /active is gated on watched because liveness is only ever JUDGED for a watched
+            -- candidate - asking otherwise labels a row nothing judged, and pays an API call
+            -- per render to do it.
             detailLive[detailN]  = onMap[qid] and "/map"
                                    or inQuestLog(qid) and "/log"
+                                   or (watched[qid] and taskIsActive(qid)) and "/active"
                                    or (watched[qid] and not (mins and mins > 0))
                                       and (cannotTellLiveness() and "/blind" or "/ghost")
                                    or nil

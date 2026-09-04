@@ -251,9 +251,9 @@ local function currentZoneSet()
             local parent = info.parentMapID
             if not parent or parent <= 0 then break end
             -- Refusing a parent ABOVE zone level is what actually bounds this. Breaking on a
-            -- Zone underfoot only stops the climb once one is reached, and a chain that skips
-            -- Zone entirely does exist - Data/ZoneProgress.lua names three - so without this
-            -- the set could be filled from a continent, which is every quest on it.
+            -- Zone underfoot only stops the climb once one is reached, and a chain that
+            -- skips Zone entirely does exist - so without this the set could be filled from
+            -- a continent, which is every quest on it.
             local pinfo = C_Map.GetMapInfo and C_Map.GetMapInfo(parent)
             if ZONE and pinfo and pinfo.mapType and pinfo.mapType < ZONE then break end
             id = parent
