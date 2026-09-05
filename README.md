@@ -84,7 +84,8 @@ quest watches.
 - **World quests** in their own capped area, with the quest type on the marker, a
   color-coded countdown, and a Find Group button where the game allows one. Every world
   quest in your current zone is listed, not only the ones you have tracked, which you can
-  turn off
+  turn off. Pick one on the world map and it stays on the tracker wherever you go, for as
+  long as it is the quest you are following
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
   delve tier, and a clickable button for any spell the stage hands you
 - **Bonus objectives**, on their own movable HUD, including the bonus loot mechanics
