@@ -209,6 +209,11 @@ DB.defaults = {
                 locked = false,
                 showBorder = true,
                 showBackground = true,
+                -- A real default rather than a fallback synthesized in the options getter,
+                -- for the reason the zone bar's block above gives. backgroundColor is
+                -- deliberately still unset, so the backdrop keeps its locked/unlocked alpha
+                -- fade until the user picks a color.
+                borderColor = { r = 0.635, g = 0.000, b = 0.039, a = 1 },
             },
 
             autoListZoneWorldQuests      = true,
@@ -276,6 +281,16 @@ function DB:ResetTrackerAppearance()
         pb.height, pb.showBackground, pb.showBorder = nil, nil, nil
         pb.barTexture, pb.barColor = nil, nil
         pb.backgroundColor, pb.borderColor = nil, nil
+    end
+    -- Only the HUD's LOOK. The switch is spared for the reason showZoneProgressBar is:
+    -- enabled defaults OFF, so clearing it would switch a configured feature off rather than
+    -- restore a default look. The saved position and the lock are spared as position state,
+    -- per the note on this function - clearing those WOULD restore a default, and would move
+    -- every user's HUD back to the middle of their screen.
+    local sb = prof.scenarioBonusHUD
+    if sb then
+        sb.showBackground, sb.showBorder, sb.scale = nil, nil, nil
+        sb.backgroundColor, sb.borderColor = nil, nil
     end
 end
 

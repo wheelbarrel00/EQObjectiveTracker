@@ -153,13 +153,6 @@ L["Quest Sound"] = "任务音效"
 L["Plays when a quest is ready to turn in."] = "任务可以提交时播放。"
 L["Quest Complete Sound"] = "任务完成音效"
 L["Which sound plays when a quest becomes ready to turn in."] = "任务可提交时播放的提示音效。"
-L["Scenario Bonus Objectives"] = "场景战役额外目标"
-L["Show bonus objectives HUD"] = "显示额外目标HUD界面"
-L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "显示可拖动小清单，展示部分场景战役、地下堡的额外目标，避免错过奖励。拖拽移动，右键锁定/重置。默认关闭。"
-L["Test"] = "测试"
-L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "显示两个模拟额外目标用于调整HUD位置大小，无需进入场景/地下堡，再次点击清除模拟。"
-L["HUD Scale"] = "HUD缩放"
-L["Sizes the bonus objectives HUD."] = "设置额外目标HUD界面缩放。"
 
 -- Options/TabAppearance.lua
 L["None"] = "无"
@@ -303,6 +296,13 @@ L["Color of the zone name on the floating bar. The docked section uses the secti
 L["Count Color"] = "计数文字颜色"
 L["Color of the completed-of-total count on the floating bar."] = "浮动条带上已完成/总计数文字颜色。"
 L["Show progress bars"] = "显示进度条"
+L["Scenario Bonus Objectives"] = "场景战役额外目标"
+L["Show bonus objectives HUD"] = "显示额外目标HUD界面"
+L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "显示可拖动小清单，展示部分场景战役、地下堡的额外目标，避免错过奖励。拖拽移动，右键锁定/重置。默认关闭。"
+L["Test"] = "测试"
+L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "显示两个模拟额外目标用于调整HUD位置大小，无需进入场景/地下堡，再次点击清除模拟。"
+L["HUD Scale"] = "HUD缩放"
+L["Sizes the bonus objectives HUD."] = "设置额外目标HUD界面缩放。"
 
 -- Options/TabAbout.lua
 L["Open this window"] = "打开本窗口"

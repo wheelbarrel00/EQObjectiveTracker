@@ -151,13 +151,6 @@ L["Quest Sound"] = "Son de quête"
 L["Plays when a quest is ready to turn in."] = "Joue quand une quête est prête à être rendue."
 L["Quest Complete Sound"] = "Son pour Quête Complétée"
 L["Which sound plays when a quest becomes ready to turn in."] = "Le son qui est joué lorsqu'une quête devient prête à être rendue."
-L["Scenario Bonus Objectives"] = "Objectifs bonus de scénario"
-L["Show bonus objectives HUD"] = "Afficher le HUD des objectifs bonus"
-L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "Affiche une petite liste déplaçable des objectifs bonus supplémentaires qui apparaissent dans certains scénarios et gouffres, pour ne pas manquer leurs récompenses. Glisser-déposer pour déplacer, clic droit pour verrouiller ou réinitialiser. Désactivé par défaut."
-L["Test"] = "Tester"
-L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "Dessine le HUD avec deux objectifs bonus fictifs pour vous permettre de le positionner et de le dimensionner sans être en scénario ou en gouffre. Cliquez à nouveau pour l'effacer."
-L["HUD Scale"] = "Échelle du HUD"
-L["Sizes the bonus objectives HUD."] = "Dimensionne le HUD des objectifs bonus."
 
 -- Options/TabAppearance.lua
 L["None"] = "Aucun"
@@ -301,6 +294,13 @@ L["Color of the zone name on the floating bar. The docked section uses the secti
 L["Count Color"] = "Couleur du compteur"
 L["Color of the completed-of-total count on the floating bar."] = "Couleur du compteur accompli / total sur la barre flottante."
 L["Show progress bars"] = "Afficher les barres de progression"
+L["Scenario Bonus Objectives"] = "Objectifs bonus de scénario"
+L["Show bonus objectives HUD"] = "Afficher le HUD des objectifs bonus"
+L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "Affiche une petite liste déplaçable des objectifs bonus supplémentaires qui apparaissent dans certains scénarios et gouffres, pour ne pas manquer leurs récompenses. Glisser-déposer pour déplacer, clic droit pour verrouiller ou réinitialiser. Désactivé par défaut."
+L["Test"] = "Tester"
+L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "Dessine le HUD avec deux objectifs bonus fictifs pour vous permettre de le positionner et de le dimensionner sans être en scénario ou en gouffre. Cliquez à nouveau pour l'effacer."
+L["HUD Scale"] = "Échelle du HUD"
+L["Sizes the bonus objectives HUD."] = "Dimensionne le HUD des objectifs bonus."
 
 -- Options/TabAbout.lua
 L["Open this window"] = "Ouvrir cette fenêtre"

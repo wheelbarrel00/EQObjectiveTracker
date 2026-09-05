@@ -486,8 +486,6 @@ end
 -- Any button, because the hide gesture this replaced took any button too. With no edit box
 -- focused it answers false and the row's ordinary click runs, rather than swallowing a click
 -- from a player who was not linking anything.
--- UI/QuestLogChecks.lua diverges, and only halfway: its IsShiftKeyDown fallback already stands
--- down while chat is open, but its explicit QUESTWATCHTOGGLE branch does not.
 --
 -- The same idSpace test the reward tooltip uses, so it covers quests, campaign and world quests
 -- without naming a provider. GetQuestLink is a quest API and so belongs in Data/, which is why
@@ -506,6 +504,49 @@ local function chatLinkClick(row)
     return (ChatEdit_InsertLink and ChatEdit_InsertLink(text)) and true or false
 end
 
+-- With no chat box focused the same press untracks the row instead, which is what Blizzard's own
+-- tracker does with this modifier. The quest stays in the quest log, so unlike the gesture this
+-- one shares a modifier with there is nothing to recover and nothing to warn about.
+-- The IsShiftKeyDown fallback is UI/QuestLogChecks.lua's, for its reason: QUESTWATCHTOGGLE's
+-- presence on 1.15.9 is unmeasured, and without it the gesture would be absent from the tracker
+-- on that flavor. That file is one step looser - its own QUESTWATCHTOGGLE branch toggles with
+-- chat open, where the chat test here runs first for every branch. Note it fails OPEN if
+-- ChatEdit_GetActiveWindow is ever absent, where chatLinkClick above fails closed on the same
+-- global, so "cannot fire while typing" holds only on a client that has it.
+--
+-- The provider's own menu is the capability test, so this path names no provider and calls no
+-- tracking API. A row falls through to its ordinary click rather than being swallowed either
+-- way: a quest that is already untracked reaches the loop below and finds no item, while an
+-- achievement or a recipe stops at the capability guard, their providers having no menu at all.
+local UNTRACK_ITEM = "untrack"
+
+local function untrackClick(row)
+    if ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow() then return false end
+    if not ((IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE"))
+            or (IsShiftKeyDown and IsShiftKeyDown())) then return false end
+
+    local provider = row._providerID and ns:GetModule("Registry"):Get(row._providerID)
+    if not (provider and provider.GetEntryMenu and provider.OnEntryMenuSelect) then return false end
+
+    local entry = row._entry
+    local items = provider:GetEntryMenu(entry)
+    if not items then return false end
+
+    local offered = false
+    for i = 1, #items do
+        if items[i].id == UNTRACK_ITEM then
+            offered = true
+            break
+        end
+    end
+    if not offered then return false end
+
+    provider:OnEntryMenuSelect(entry.id, UNTRACK_ITEM)
+    local Tracker = ns:GetModule("Tracker")
+    if Tracker then Tracker:Refresh() end
+    return true
+end
+
 local function onMouseUp(row, button)
     local wasDragging = row._wasDragging
     row._wasDragging = nil
@@ -513,6 +554,7 @@ local function onMouseUp(row, button)
     if not row._entry or clickThrough() then return end
 
     if chatLinkClick(row) then return end
+    if button == "LeftButton" and untrackClick(row) then return end
 
     if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
         dispatch(row, "OnEntryOpenLog")

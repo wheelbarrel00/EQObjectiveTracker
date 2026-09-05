@@ -460,7 +460,13 @@ function Quests:GetEntryMenu(entry)
 
     menuOut[#menuOut + 1] = { kind = "title", text = entry.title, order = 0 }
     menuOut[#menuOut + 1] = { id = Filter:IsPinned(entry) and "unpin" or "pin", order = 10 }
-    menuOut[#menuOut + 1] = { id = isWatched(id) and "untrack" or "track",      order = 20 }
+    -- An absent set reads as TRACKED, the same mapping TrackedSet's Toggle and
+    -- IsTrackedAtIndex apply. Without it a character who has never untracked anything is
+    -- offered Track on every already-tracked quest, and UI/Row.lua's shift-click untrack finds
+    -- no item to act on and falls through to whatever an ordinary left-click does.
+    local watched = isWatched(id)
+    if watched == nil then watched = true end
+    menuOut[#menuOut + 1] = { id = watched and "untrack" or "track",             order = 20 }
     menuOut[#menuOut + 1] = { id = Focus:Is(self.id, id) and "unfocus" or "focus", order = 30 }
     menuOut[#menuOut + 1] = { id = "openlog", order = 40 }
     menuOut[#menuOut + 1] = { id = "wowhead", order = 60 }

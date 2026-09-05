@@ -163,13 +163,6 @@ L["Play a sound when you turn a quest in"] = true
 L["Off by default. It has its own sound below, so handing a quest in and finishing its objectives can be told apart."] = true
 L["Quest Turned In Sound"] = true
 L["Which sound plays when you hand a quest in at the quest giver."] = true
-L["Scenario Bonus Objectives"] = true
-L["Show bonus objectives HUD"] = true
-L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = true
-L["Test"] = true
-L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = true
-L["HUD Scale"] = true
-L["Sizes the bonus objectives HUD."] = true
 
 -- Options/TabAppearance.lua
 L["None"] = true
@@ -326,6 +319,17 @@ L["Draws a one pixel border around the bar."] = true
 L["Color and opacity of the bar's border."] = true
 L["How tall each progress bar is drawn."] = true
 L["Sets the fill texture of the progress bars. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."] = true
+L["Scenario Bonus Objectives"] = true
+L["Show bonus objectives HUD"] = true
+L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = true
+L["Test"] = true
+L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = true
+L["Fills the HUD behind its text."] = true
+L["Background color and opacity for the HUD. While this is unset it uses a plain black fill that fades slightly once locked."] = true
+L["Draws a border around the HUD."] = true
+L["Border color and opacity for the HUD."] = true
+L["HUD Scale"] = true
+L["Sizes the bonus objectives HUD."] = true
 
 -- Options/TabAbout.lua
 L["Open this window"] = true

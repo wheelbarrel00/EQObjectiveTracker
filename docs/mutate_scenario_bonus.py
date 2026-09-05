@@ -22,50 +22,12 @@ Anchors are exact source text and they rot. A SKIPPED line means an anchor stopp
 fix the anchor rather than dropping the mutant, the same rule test_row_blocks.lua carries.
 """
 import io
+import re
 import subprocess
 import sys
 
 LUA = r"C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe"
 DATA = "Data/ScenarioBonus.lua"
-HUD = "UI/ScenarioBonusHUD.lua"
-
-# The pre-fix lives reader, restored faithfully: the word-matching stop guard AND the walk that
-# obeyed it. Mutating only one half does not reproduce the bug, which is worth knowing - a
-# half-mutation reported a false SURVIVED the first time this battery ran.
-LIVES_REVERT = [
-    ("""        local clean = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-        return tonumber(clean:match("^%s*(%d+)%s*$"))""",
-     """        local clean = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-        if clean:find("Challenge", 1, true) or clean:find("Wave", 1, true) then
-            return "stop"
-        end
-        return tonumber(clean:match("^%s*(%d+)%s*$"))"""),
-    ("""    local digits, count, answer = {}, 0, nil
-    local function walk(f, depth)
-        if answer or not f or depth > LIVES_MAX_DEPTH then return end""",
-     """    local digits, count, stop = {}, 0, false
-    local function walk(f, depth)
-        if stop or not f or depth > LIVES_MAX_DEPTH then return end"""),
-    ("""                local d = livesDigit(regions[i])
-                if d then
-                    if knownTier and digits[count] == knownTier then answer = d return end
-                    count = count + 1
-                    digits[count] = d
-                end""",
-     """                local d = livesDigit(regions[i])
-                if d == "stop" then stop = true return end
-                if d then count = count + 1; digits[count] = d end"""),
-    ("""                walk(kids[i], depth + 1)
-                if answer then return end""",
-     """                walk(kids[i], depth + 1)
-                if stop then return end"""),
-    ("""    if answer then return answer end""",
-     """    if knownTier then
-        for i = 1, count - 1 do
-            if digits[i] == knownTier then return digits[i + 1] end
-        end
-    end"""),
-]
 
 MUTANTS = [
     ("dedupe on the regenerating vignette guid", DATA, [
@@ -84,14 +46,15 @@ MUTANTS = [
         ("    r.deaths      = runDeaths",
          "    r.deaths      = math.max(r.deaths or 0, runDeaths)")]),
 
-    ("checkRun's exit arm deleted outright", DATA, [
+    # The exit arm neutered rather than deleted: an earlier version opened an "if false then"
+    # against an end it never wrote, so the mutant did not PARSE and the driver reported it as
+    # caught for as long as this battery had only an exit code to go on.
+    ("checkRun's exit arm does nothing, so leaving a delve keeps the run", DATA, [
         ("""    if not playerInDelve() then
         trackedDelve = nil
         resetRun()""",
          """    if not playerInDelve() then
-        if false then
-        trackedDelve = nil
-        resetRun()""")]),
+        trackedDelve = trackedDelve""")]),
 
     ("the saved-run clear put back behind the trackedDelve guard", DATA, [
         ("""        trackedDelve = nil
@@ -134,9 +97,9 @@ MUTANTS = [
                     or ("  vig [%d] holds values that will not print"):format(i)""",
          """                out[#out + 1] = vignetteDumpLine(i, g, ok2 and v or nil)""")]),
 
-    ("the lives reader called unguarded from the model", DATA, [
-        ("    if livesReader then okLives, lives = pcall(livesReader, delveTier) end",
-         "    if livesReader then okLives, lives = true, livesReader(delveTier) end")]),
+    ("the lives read called unguarded from the model", DATA, [
+        ("    local okLives, lives = pcall(readLives)",
+         "    local okLives, lives = true, readLives()")]),
 
     ("the rager despawn test back on a flushed list", DATA, [
         ('    if listed > 0 and ragerGUID and not ragerSeen and bannerState == "eliteUp" then',
@@ -146,34 +109,99 @@ MUTANTS = [
         ("        local total  = math.max(expected, packsKilledBase + nemesisSeenCount)",
          "        local total  = packsKilledBase + nemesisSeenCount")]),
 
-    ("the whole pre-fix lives reader restored, word-matching stop guard and all", HUD,
-     LIVES_REVERT),
+    # Lives moved off a frame scrape and onto the delve header widget on 2026-09-05, measured
+    # in a tier 7 delve: currencies[1].text read "5" and then "4" after one death. These six
+    # stand where the old walk's four did.
+    ("the lives read takes the currency tooltip instead of its number", DATA, [
+        ("    return c and tonumber(plain(c.text)) or nil",
+         "    return c and tonumber(plain(c.tooltip)) or nil")]),
 
-    ("the lives walk reading past the answer", HUD, [
-        ("                    if knownTier and digits[count] == knownTier then answer = d return end",
-         "                    if false then answer = d return end")]),
+    ("the lives read takes the tier, which is on the same widget", DATA, [
+        ("    local c  = hv and type(hv.currencies) == \"table\" and hv.currencies[1]\n"
+         "    return c and tonumber(plain(c.text)) or nil",
+         "    return hv and tonumber(plain(hv.tierText)) or nil")]),
 
-    ("the lives reader guessing from a stream it cannot resolve", HUD, [
-        ("    if count == 2 then return digits[2] end",
-         "    if count >= 2 then return digits[2] end")]),
+    ("tonumber dropped, so an empty widget string draws a blank Lives half", DATA, [
+        ("    return c and tonumber(plain(c.text)) or nil",
+         "    return c and plain(c.text) or nil")]),
+
+    ("the currencies table guard dropped, so a widget without them raises", DATA, [
+        ("    local c  = hv and type(hv.currencies) == \"table\" and hv.currencies[1]",
+         "    local c  = hv and hv.currencies[1]")]),
+
+    ("the lives read takes the second currency rather than the first", DATA, [
+        ("    local c  = hv and type(hv.currencies) == \"table\" and hv.currencies[1]",
+         "    local c  = hv and type(hv.currencies) == \"table\" and hv.currencies[2]")]),
+
+    # ------------------------------------------------ the walk, which had one mutant until now
+    ("the shared walk is unguarded, so a throwing client kills the whole delve model", DATA, [
+        ("local function delveHeader()\n"
+         "    local ok, hv = pcall(findDelveHeader)\n"
+         "    return ok and hv or nil",
+         "local function delveHeader()\n"
+         "    local hv = findDelveHeader()\n"
+         "    return hv")]),
+
+    ("the widget list is asked for by a literal set id rather than the step's own", DATA, [
+        ("    local widgets = C_UIWidgetManager.GetAllWidgetsBySetID(stepInfo.widgetSetID)",
+         "    local widgets = C_UIWidgetManager.GetAllWidgetsBySetID(0)")]),
+
+    # Equivalent only because delveHeader's own pcall now catches everything under it: ipairs
+    # on a nil or a number raises, and that pcall answers nil, which is what the guard returns.
+    # It stops being equivalent the day that pcall moves or narrows.
+    ("EQUIVALENT: the widget list shape guard is dropped, so a non-table is walked", DATA, [
+        ('    if type(widgets) ~= "table" then return nil end', "")]),
+
+    ("the getter is handed the widget TYPE instead of the widget id", DATA, [
+        ("            local hv = getter(w.widgetID)", "            local hv = getter(w.widgetType)")]),
+
+    ("the delves type filter is dropped, so the first widget of any type is read", DATA, [
+        ("        if w.widgetType == VT.ScenarioHeaderDelves then", "        if true then")]),
+
+    ("the widgetSetID requirement is dropped, so nil reaches the widget API", DATA, [
+        ("    if not (stepInfo and stepInfo.widgetSetID) then return nil end",
+         "    if not stepInfo then return nil end")]),
+
+    ("the tier drops its secret filter, so a secret tier is taken as a real number", DATA, [
+        ("    return hv and tonumber(plain(hv.tierText)) or nil",
+         "    return hv and tonumber(hv.tierText) or nil")]),
+
+    ("the lives read drops its secret filter", DATA, [
+        ("    return c and tonumber(plain(c.text)) or nil",
+         "    return c and tonumber(c.text) or nil")]),
+
 ]
 
 
+SUMMARY = re.compile(r"^test_scenario_bonus: (\d+) passed, (\d+) failed$")
+
+
 def run():
+    """(verdict, note). verdict is "green", "failed" or "crashed".
+
+    A nonzero exit is NOT evidence that an assertion discriminated - a mutant that does not
+    parse, or one that makes the harness raise, exits nonzero too, and reporting either as
+    "caught" is a false pass in the one tool whose job is to catch false passes. So the
+    harness's own summary line is matched rather than its exit code.
+    """
     r = subprocess.run([LUA, "docs/test_scenario_bonus.lua"], capture_output=True, text=True)
-    out = (r.stdout + r.stderr).strip()
-    return r.returncode, (out.splitlines()[-1] if out else "(no output)")
+    for line in reversed([l for l in r.stdout.splitlines() if l.strip()]):
+        m = SUMMARY.match(line.strip())
+        if m:
+            return ("failed" if int(m.group(2)) else "green"), line.strip()
+    err = (r.stderr.strip().splitlines() or r.stdout.strip().splitlines() or ["no output"])
+    return "crashed", err[0][:90]
 
 
-originals = {p: io.open(p, encoding="utf-8", newline="").read() for p in (DATA, HUD)}
+originals = {p: io.open(p, encoding="utf-8", newline="").read() for p in (DATA,)}
 
-code, last = run()
+verdict, last = run()
 print("baseline: %s\n" % last)
-if code != 0:
+if verdict != "green":
     print("BASELINE IS NOT GREEN - stopping")
     sys.exit(1)
 
-survivors = []
+failures = []
 for name, path, hunks in MUTANTS:
     src = originals[path]
     mutated, bad = src, False
@@ -184,27 +212,37 @@ for name, path, hunks in MUTANTS:
             break
         mutated = mutated.replace(old, new, 1)
     if bad:
-        survivors.append(name)
+        failures.append(("SKIPPED", name))
         continue
     try:
         io.open(path, "w", encoding="utf-8", newline="").write(mutated)
-        code, last = run()
+        verdict, last = run()
     finally:
         io.open(path, "w", encoding="utf-8", newline="").write(src)
     expected_equivalent = name.startswith("EQUIVALENT:")
-    if code == 0 and not expected_equivalent:
+    if verdict == "crashed":
+        print("CRASHED   %-72s %s" % (name, last))
+        failures.append(("CRASHED", name))
+    elif verdict == "green" and not expected_equivalent:
         print("SURVIVED  %-72s %s" % (name, last))
-        survivors.append(name)
-    elif code != 0 and expected_equivalent:
+        failures.append(("SURVIVED", name))
+    elif verdict != "green" and expected_equivalent:
         print("UNEXPECTED %-71s %s" % (name + " (was caught)", last))
-        survivors.append(name)
+        failures.append(("UNEXPECTED", name))
     else:
         print("caught    %-72s %s" % (name, last))
 
 print()
-if survivors:
-    print("%d mutant(s) survived - those assertions do not discriminate:" % len(survivors))
-    for s in survivors:
-        print("  - " + s)
+if failures:
+    for kind, label in (
+            ("SURVIVED",   "mutant(s) survived - those assertions do not discriminate"),
+            ("UNEXPECTED", "EQUIVALENT mutant(s) were caught - the equivalence claim is wrong"),
+            ("CRASHED",    "mutant(s) aborted the harness rather than failing it"),
+            ("SKIPPED",    "anchor(s) rotted - fix the anchor, never drop the mutant")):
+        named = [n for verdict, n in failures if verdict == kind]
+        if named:
+            print("%d %s:" % (len(named), label))
+            for n in named:
+                print("  - " + n)
     sys.exit(1)
 print("every mutant behaved as expected")

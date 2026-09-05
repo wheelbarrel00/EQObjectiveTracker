@@ -161,13 +161,6 @@ L["Play a sound when you accept a quest"] = "當接受任務時播放聲音"
 L["Off by default. It has its own sound below, so accepting and completing can be told apart."] = "預設為關閉，下面有自己的聲音可選，因此可以區分接受和完成。"
 L["Quest Accepted Sound"] = "任務接受聲音"
 L["Which sound plays when you accept a quest. World quests and bonus objectives are left silent, since walking into one accepts it."] = "當您接受任務時會播放哪種聲音。世界任務和獎勵目標保持靜音，因為走近會自動接受。"
-L["Scenario Bonus Objectives"] = "場景戰役額外目標"
-L["Show bonus objectives HUD"] = "顯示額外目標HUD界面"
-L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "顯示可拖動小清單，展示部分場景戰役、探究的額外目標，避免錯過獎勵。拖拽移動，右鍵鎖定/重置。預設關閉。"
-L["Test"] = "測試"
-L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "顯示兩個模擬額外目標用於調整HUD位置大小，無需進入場景/探究，再次點擊清除模擬。"
-L["HUD Scale"] = "HUD縮放"
-L["Sizes the bonus objectives HUD."] = "設置額外目標HUD界面縮放。"
 
 -- Options/TabAppearance.lua
 L["None"] = "無"
@@ -311,6 +304,13 @@ L["Color of the zone name on the floating bar. The docked section uses the secti
 L["Count Color"] = "計數文字顏色"
 L["Color of the completed-of-total count on the floating bar."] = "浮動條上已完成/總計數文字顏色。"
 L["Show progress bars"] = "顯示進度條"
+L["Scenario Bonus Objectives"] = "場景戰役額外目標"
+L["Show bonus objectives HUD"] = "顯示額外目標HUD界面"
+L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "顯示可拖動小清單，展示部分場景戰役、探究的額外目標，避免錯過獎勵。拖拽移動，右鍵鎖定/重置。預設關閉。"
+L["Test"] = "測試"
+L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "顯示兩個模擬額外目標用於調整HUD位置大小，無需進入場景/探究，再次點擊清除模擬。"
+L["HUD Scale"] = "HUD縮放"
+L["Sizes the bonus objectives HUD."] = "設置額外目標HUD界面縮放。"
 
 -- Options/TabAbout.lua
 L["Open this window"] = "打開本視窗"

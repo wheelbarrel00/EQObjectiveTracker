@@ -151,13 +151,6 @@ L["Quest Sound"] = "퀘스트 소리"
 L["Plays when a quest is ready to turn in."] = "퀘스트를 완료할 수 있을 때 재생됩니다."
 L["Quest Complete Sound"] = "퀘스트 완료 소리"
 L["Which sound plays when a quest becomes ready to turn in."] = "퀘스트가 완료 가능해질 때 재생할 소리입니다."
-L["Scenario Bonus Objectives"] = "시나리오 보너스 목표"
-L["Show bonus objectives HUD"] = "보너스 목표 HUD 표시"
-L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "일부 시나리오와 구렁에서 나타나는 추가 보너스 목표를 작은 이동식 체크리스트로 표시하여 보상을 놓치지 않게 합니다. 드래그로 이동, 우클릭으로 잠금 또는 초기화. 기본은 꺼짐."
-L["Test"] = "테스트"
-L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "가짜 보너스 목표 두 개로 HUD를 그려서, 시나리오나 구렁에 들어가지 않고도 위치와 크기를 잡을 수 있게 합니다. 다시 누르면 지웁니다."
-L["HUD Scale"] = "HUD 배율"
-L["Sizes the bonus objectives HUD."] = "보너스 목표 HUD의 크기를 조정합니다."
 
 -- Options/TabAppearance.lua
 L["None"] = "없음"
@@ -301,6 +294,13 @@ L["Color of the zone name on the floating bar. The docked section uses the secti
 L["Count Color"] = "개수 색상"
 L["Color of the completed-of-total count on the floating bar."] = "떠 있는 막대의 완료/전체 개수 색상입니다."
 L["Show progress bars"] = "진행도 막대 표시"
+L["Scenario Bonus Objectives"] = "시나리오 보너스 목표"
+L["Show bonus objectives HUD"] = "보너스 목표 HUD 표시"
+L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "일부 시나리오와 구렁에서 나타나는 추가 보너스 목표를 작은 이동식 체크리스트로 표시하여 보상을 놓치지 않게 합니다. 드래그로 이동, 우클릭으로 잠금 또는 초기화. 기본은 꺼짐."
+L["Test"] = "테스트"
+L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "가짜 보너스 목표 두 개로 HUD를 그려서, 시나리오나 구렁에 들어가지 않고도 위치와 크기를 잡을 수 있게 합니다. 다시 누르면 지웁니다."
+L["HUD Scale"] = "HUD 배율"
+L["Sizes the bonus objectives HUD."] = "보너스 목표 HUD의 크기를 조정합니다."
 
 -- Options/TabAbout.lua
 L["Open this window"] = "이 창 열기"

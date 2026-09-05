@@ -68,12 +68,33 @@ GetInstanceInfo = function() return INSTANCE_NAME, "scenario", DIFF end
 local TIER = 6
 Enum = { UIWidgetVisualizationType = { ScenarioHeaderDelves = 30 } }
 C_ScenarioInfo = { GetScenarioStepInfo = function() return { widgetSetID = 842 } end }
+-- The lives value is a STRING here because the client hands back a string: measured as "5",
+-- then "4" after one death. A stub answering a number would let a build that never called
+-- tonumber pass, and the empty-string case below is the one that needs it most.
+local LIVES_TEXT = "5"
+-- Recorded rather than ignored. A stub that discards its arguments tests only the three lines
+-- that DECODE the widget and says nothing about the walk that FINDS it, so asking for the wrong
+-- widget set or handing the getter the wrong id both read as passing.
+local sawSetID, sawWidgetID
+-- The decoy is first and carries a type this walk must skip, so a build that dropped the type
+-- filter hands the getter widget 7 and the id assertion below catches it.
 C_UIWidgetManager = {
-    GetAllWidgetsBySetID = function() return { { widgetType = 30, widgetID = 1 } } end,
-    GetScenarioHeaderDelvesWidgetVisualizationInfo = function()
-        return { tierText = tostring(TIER) }
+    GetAllWidgetsBySetID = function(setID)
+        sawSetID = setID
+        return { { widgetType = 99, widgetID = 7 }, { widgetType = 30, widgetID = 1 } }
+    end,
+    GetScenarioHeaderDelvesWidgetVisualizationInfo = function(widgetID)
+        sawWidgetID = widgetID
+        local hv = { tierText = tostring(TIER) }
+        -- nil LIVES_TEXT means the widget carried no currencies at all, which is a different
+        -- shape from one carrying an empty string and has to be reachable separately.
+        if LIVES_TEXT then
+            hv.currencies = { { text = LIVES_TEXT, tooltip = "Total deaths: 0" } }
+        end
+        return hv
     end,
 }
+local function setLives(text) LIVES_TEXT = text end
 C_Scenario   = { GetBonusSteps = function() return {} end }
 C_UnitAuras  = { GetPlayerAuraBySpellID = function() return nil end }
 HaveQuestRewardData = function() return true end
@@ -173,11 +194,19 @@ end
 
 -- Force a clean run: the module resets per-run state when the delve NAME changes.
 local runSeq = 0
+-- pcall'd at the one place every case enters production. A mutant that makes the model raise
+-- has to FAIL a case, never kill the file: the summary line would not print, and this battery
+-- reads a missing summary as a mutant that survived.
 local function newRun(vigs)
     runSeq = runSeq + 1
     INSTANCE_NAME = "Delve Run " .. runSeq
     VIGNETTES = vigs or {}
-    return Bonus:GetModel()
+    local okBuild, built = pcall(Bonus.GetModel, Bonus)
+    if not okBuild then
+        ok(false, "the model build raised: " .. tostring(built))
+        return nil
+    end
+    return built
 end
 
 local function strongboxLine(m)
@@ -367,27 +396,44 @@ ok(okDump and dumpU:find("id=7869 (guid id 7869) PACK", 1, true) ~= nil,
 
 -- 22-33. Lives and the death counter.
 
--- The reader is registered by UI/ScenarioBonusHUD.lua in the real addon, and its frame walk is
--- tested against the shipped source at the bottom of this file. Here it is a stub, so what is
--- under test is the seam and the model.
-local livesAnswer, livesSawTier = nil, nil
-Bonus:SetLivesReader(function(tier) livesSawTier = tier return livesAnswer end)
+-- Lives come off the delve header WIDGET since 2026-09-05, so there is no seam and no reader
+-- stub here any more - setLives moves the value the client would hand back, and the 67-line
+-- frame walk this replaced is gone from UI/ScenarioBonusHUD.lua along with the slice that
+-- tested it.
+--
+-- The pair below is MEASURED, not invented: in a tier 7 delve currencies[1].text read "5", and
+-- "4" after one death, while that entry's tooltip moved from "Total deaths: 0" to
+-- "Total deaths: 1". The tooltip is never parsed - it is localized, and reading localized
+-- tracker text is the defect the old walk was rewritten for and then deleted over.
 
-livesAnswer = nil
+setLives(nil)
 m = newRun({ pack("npc-B") })
 ok(statLine(m) ~= nil, "a stat line is drawn in a delve")
 ok(statText(m):find("Deaths: 0", 1, true) ~= nil, "deaths start at zero: " .. statText(m))
 ok(statText(m):find("Lives", 1, true) == nil,
-   "the Lives half is omitted when the reader finds nothing: " .. statText(m))
+   "the Lives half is omitted when the widget carries no currencies: " .. statText(m))
 
--- The reader must be handed the tier: it anchors on it to pick the right digit.
 TIER = 7
-livesAnswer = 6
+setLives("5")
 m = newRun({ pack("npc-B") })
-ok(livesSawTier == 7, "the lives reader is handed the delve tier to anchor on")
-ok(statText(m):find("Lives: 6", 1, true) ~= nil,
-   "lives are drawn when the reader answers: " .. statText(m))
+ok(statText(m):find("Lives: 5", 1, true) ~= nil,
+   "the widget's currency text is the lives count: " .. statText(m))
+-- Lives and tier are read off the SAME widget, so a build that crossed the two fields reads 7.
+ok(statText(m):find("Lives: 7", 1, true) == nil, "the tier is not mistaken for the lives count")
+
+setLives("4")
+m = newRun({ pack("npc-B") })
+ok(statText(m):find("Lives: 4", 1, true) ~= nil,
+   "and it follows the widget down after a death: " .. statText(m))
+
+-- An empty string is a real answer meaning the widget drew no number, and tonumber is what
+-- turns it into nil. A truth test would print "Lives: " with nothing after it.
+setLives("")
+m = newRun({ pack("npc-B") })
+ok(statText(m):find("Lives", 1, true) == nil,
+   "an empty currency text drops the Lives half rather than drawing a blank: " .. statText(m))
 TIER = 6
+setLives(nil)
 
 -- Deaths come from the real PLAYER_DEAD registration, so Reconcile has to have wired it.
 Bonus:Reconcile()
@@ -409,19 +455,96 @@ m = newRun({ pack("npc-D") })
 ok(statText(m):find("Deaths: 0", 1, true) ~= nil,
    "a new run resets the death count: " .. statText(m))
 
--- The reader walks Blizzard's frames and is registered from another module, so a throw there
--- has to cost the Lives half of one line rather than the whole model.
-Bonus:SetLivesReader(function() error("the tracker moved", 0) end)
+-- The widget read sits one pcall away from the model, so a client API that throws has to cost
+-- the Lives half of one line rather than the whole run readout.
+local savedGetter = C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo
+C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo =
+    function() error("the widget moved", 0) end
 m = newRun({ pack("npc-B") })
-ok(statLine(m) ~= nil and statText(m):find("Lives", 1, true) == nil,
-   "a lives reader that throws drops the Lives half rather than the model: " .. statText(m))
+ok(m ~= nil and statLine(m) ~= nil and statText(m):find("Lives", 1, true) == nil,
+   "a widget read that throws drops the Lives half rather than the model: "
+   .. (m and statText(m) or "no model"))
 ok(pcall(function() return Bonus:DumpLines({}) end),
    "and it does not take the dump down either")
-Bonus:SetLivesReader(function() return livesAnswer end)
+C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo = savedGetter
+
+-- Classic has no widget manager at all. This runs on every flavor, so it may not raise.
+local savedMgr = C_UIWidgetManager
+C_UIWidgetManager = nil
+ok(pcall(function() return newRun({ pack("npc-B") }) end),
+   "a client with no C_UIWidgetManager at all does not raise")
+C_UIWidgetManager = savedMgr
+
+-- The WALK, which nothing reached until 2026-09-05: the stubs above ignored their arguments, so
+-- every plumbing mutant below shipped against a green file.
+sawSetID, sawWidgetID = nil, nil
+setLives("5")
+m = newRun({ pack("npc-B") })
+ok(statText(m):find("Lives: 5", 1, true) ~= nil, "the walk still finds the header")
+ok(sawSetID == 842, "the step's own widgetSetID is what the widget list is asked for, not a "
+   .. "literal or nil: " .. tostring(sawSetID))
+ok(sawWidgetID == 1, "and the delves widget's id is what the getter is handed, not its type "
+   .. "and not the decoy's: " .. tostring(sawWidgetID))
+
+-- A step carrying no widget set at all. The guard is what stops nil reaching the widget API.
+local savedStep = C_ScenarioInfo.GetScenarioStepInfo
+sawSetID = nil
+C_ScenarioInfo.GetScenarioStepInfo = function() return {} end
+m = newRun({ pack("npc-B") })
+ok(m ~= nil and statText(m):find("Lives", 1, true) == nil,
+   "a step with no widgetSetID drops the Lives half rather than the model")
+ok(sawSetID == nil, "and the widget list is never asked for at all")
+
+-- GetScenarioStepInfo itself throwing. readTier reaches this walk BEFORE the guarded lives read
+-- and its callers do not protect it, so an unguarded walk cost the WHOLE model - and
+-- permanently, because the statement that caches the tier is the one that died.
+C_ScenarioInfo.GetScenarioStepInfo = function() error("secret step", 0) end
+local okStep = pcall(function() return newRun({ pack("npc-B") }) end)
+ok(okStep, "a step read that throws does not take the model down")
+-- pcall'd because an unguarded walk raises HERE, and an abort would take the summary line with
+-- it - which every battery in this tree reads as a mutant that SURVIVED.
+local okModel, mStep = pcall(function() return Bonus:GetModel() end)
+ok(okModel, "and GetModel does not raise on the next repaint either")
+m = okModel and mStep or nil
+ok(m ~= nil and statLine(m) ~= nil,
+   "the run readout still draws when the step read throws")
+ok(m ~= nil and statText(m):find("Lives", 1, true) == nil, "with the Lives half dropped")
+ok(pcall(function() return Bonus:DumpLines({}) end),
+   "and the dump, which is how this feature is diagnosed, survives it too")
+C_ScenarioInfo.GetScenarioStepInfo = savedStep
+setLives(nil)
+
+-- There are TWO ways the Lives half goes quiet and only the dump line separates them: the
+-- widget carried no number, or the read threw. Asserting the missing half alone let the
+-- currencies guard and the pcall around the read each hide the other's absence - both mutants
+-- survived together and neither did alone.
+setLives(nil)
+newRun({ pack("npc-B") })
+local livesDump = {}
+Bonus:DumpLines(livesDump)
+ok(table.concat(livesDump, "\n"):find("lives=nil", 1, true) ~= nil,
+   "a widget carrying no currencies reads as no lives rather than as a read that threw")
+
+-- A currencies table that raises when indexed. type() still calls it a table, so the guard
+-- passes and readLives itself throws - the only shape that proves the pcall at the call site
+-- is load-bearing, and the shape a Midnight secret value would take.
+local savedGetter2 = C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo
+C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo = function()
+    return {
+        tierText   = tostring(TIER),
+        currencies = setmetatable({}, { __index = function() error("secret", 0) end }),
+    }
+end
+m = newRun({ pack("npc-B") })
+ok(m ~= nil and statLine(m) ~= nil, "a lives read that throws still builds the model")
+ok(m ~= nil and statText(m):find("Lives", 1, true) == nil,
+   "and drops the Lives half rather than the run: " .. (m and statText(m) or "no model"))
+C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo = savedGetter2
+setLives(nil)
 
 -- The stat line alone keeps the model non-empty, so the HUD now draws in a delve that has no
 -- pack and no banner at all. That is a deliberate behavior change, not a leak.
-livesAnswer = nil
+setLives(nil)
 m = newRun({ { 6127, "npc-X", "Exit" } })
 ok(m ~= nil and statLine(m) ~= nil,
    "a delve with no bonus mechanics still draws the run readout")
@@ -429,7 +552,7 @@ ok(m ~= nil and statLine(m) ~= nil,
 -- 34-37. A vignette the scan cannot read must not take the rest of the list with it. This is
 -- what a live T7 delve showed: five vignettes counted, four listed.
 
-livesAnswer = nil
+setLives(nil)
 
 -- A guid that resolves to nothing, with a real pack listed after it.
 m = newRun({ { dead = 6116 }, pack("npc-B") })
@@ -501,7 +624,7 @@ ok(dump4:find("UNREADABLE guid id=7869 PACK", 1, true) ~= nil,
 -- killed at once. It drew green with both packs alive, wrote that into the saved run, and a
 -- math.max there kept it: a two-pack delve came back from the next reload reading 2/4.
 
-livesAnswer = nil
+setLives(nil)
 m = newRun({ pack("npc-B"), pack("npc-C") })
 ok(boxReads(m, "0/2"), "both packs alive reads 0/2: " .. boxText(m))
 
@@ -542,9 +665,26 @@ local function reloadAddon()
     Bonus = mods.ScenarioBonus
     -- The tier capture is not re-armed: it was asserted before the reload and nothing after
     -- this point reads it.
-    Bonus:SetLivesReader(function() return livesAnswer end)
+    setLives(nil)
     Bonus:OnEnable()
 end
+
+-- A Midnight secret value reports a real type and reads fine until it is USED, so the defense
+-- is issecretvalue rather than a pcall - and Data/Widgets.lua filters this SAME tierText on this
+-- SAME widget exactly this way. Captured as a file-local at load, so installing it needs a
+-- reload, which is why this case sits down here rather than beside the other widget cases.
+_G.issecretvalue = function(v) return v == "6" or v == "5" end
+reloadAddon()
+setLives("5")
+m = newRun({ pack("npc-B") })
+ok(m ~= nil and statLine(m) ~= nil, "a secret widget value does not take the run readout down")
+ok(statText(m):find("Lives", 1, true) == nil,
+   "a secret lives value is dropped rather than drawn: " .. statText(m))
+local secretDump = {}
+Bonus:DumpLines(secretDump)
+ok(table.concat(secretDump, "\n"):find("tier=nil", 1, true) ~= nil,
+   "and a secret tier reads as no tier rather than as a number")
+_G.issecretvalue = nil
 
 -- The flush case survives a reload too, which is where it used to surface: 2/4 packs in a
 -- delve that has two.
@@ -555,7 +695,7 @@ ok(boxReads(m, "0/2"), "a reload after a flushed scan still reads 0/2, not 2/4: 
 -- The rager despawn test reads the SAME empty list, and a banner state only ever goes up - so
 -- a promotion taken from a loading screen stands for the rest of the run. Same bug as the pack
 -- count, one branch over, and it was found while fixing that one.
-livesAnswer = nil
+setLives(nil)
 m = newRun({ { 9001, "npc-R", "A Voidfused Rager" } })
 ok(bannerText(m):find("Voidfused Rager", 1, true) ~= nil,
    "a rager on the list draws the kill-it line: " .. bannerText(m))
@@ -570,7 +710,7 @@ m = Bonus:GetModel()
 ok(bannerText(m):find("Grand Spoils", 1, true) ~= nil,
    "a real reading with the rager gone does promote it: " .. bannerText(m))
 
-livesAnswer = nil
+setLives(nil)
 newRun({ pack("npc-B"), pack("npc-C") })
 Bonus:Reconcile()
 handlers.PLAYER_DEAD()
@@ -605,7 +745,7 @@ ok(statText(m):find("Deaths: 0", 1, true) ~= nil,
 -- hours later. The clear used to sit behind a file-local that is nil at login, so a player who
 -- logged back in OUTSIDE the delve never cleared anything - and their old deaths and pack
 -- tally landed on the next run.
-livesAnswer = nil
+setLives(nil)
 newRun({ pack("npc-B") })
 Bonus:Reconcile()
 handlers.PLAYER_DEAD()
@@ -634,141 +774,6 @@ reloadAddon()
 m = Bonus:GetModel()
 ok(statText(m):find("Deaths: 0", 1, true) ~= nil,
    "a stale saved run is refused rather than resumed: " .. statText(m))
-
--- ---------------------------------------------------------------------------------------
--- The lives reader itself, sliced out of UI/ScenarioBonusHUD.lua by TEXT ANCHOR the way
--- test_row_blocks.lua slices UI/Row.lua - the file cannot be loaded whole without a frame
--- stub, and line numbers rot. If an anchor below stops matching, fix the anchor rather than
--- deleting the test.
---
--- What earns it: the walk used to stop before a "Challenge" or "Wave" label matched as RAW
--- ENGLISH. Blizzard draws that text localized, so on deDE, frFR, ruRU, koKR, zhCN and zhTW the
--- guard never fired, and the reader could hand back a confident wrong integer while testing
--- perfectly on an English client.
-
-local hudSrc = assert(io.open(repoFile("UI/ScenarioBonusHUD.lua"), "r"))
-local hudText = hudSrc:read("*a")
-hudSrc:close()
-
-local FROM_ANCHOR = "local LIVES_MAX_DEPTH = "
-local TO_ANCHOR   = "local function buildRow"
-local from = hudText:find(FROM_ANCHOR, 1, true)
-local to   = hudText:find(TO_ANCHOR, 1, true)
-assert(from, "anchor not found in UI/ScenarioBonusHUD.lua: " .. FROM_ANCHOR)
-assert(to,   "anchor not found in UI/ScenarioBonusHUD.lua: " .. TO_ANCHOR)
-assert(to > from, "anchors are out of order in UI/ScenarioBonusHUD.lua")
-
-local FAKEG = {}
-local chunk = assert(loadstring(
-    hudText:sub(from, to - 1) .. "\nreturn { read = readDelveLives }",
-    "@UI/ScenarioBonusHUD.lua slice"))
-setfenv(chunk, setmetatable({ _G = FAKEG }, { __index = _G }))
-local LIVES = chunk()
-
-local function fsRegion(text, shown)
-    return {
-        GetObjectType = function() return "FontString" end,
-        IsShown       = function() return shown ~= false end,
-        GetText       = function() return text end,
-    }
-end
-
-local function fakeFrame(regions, kids)
-    return {
-        GetRegions  = function() return unpack(regions or {}) end,
-        GetChildren = function() return unpack(kids or {}) end,
-    }
-end
-
-local function tracker(f) FAKEG.ScenarioObjectiveTracker = f end
-
--- 66-77. The delve header as the reader expects it: the delve name, the tier, then the
--- lives digit.
-tracker(fakeFrame({}, {
-    fakeFrame({ fsRegion("The Ring of Glory"), fsRegion("7") }),
-    fakeFrame({ fsRegion("5") }),
-}))
-ok(LIVES.read(7) == 5, "the digit after the tier is the lives count")
-ok(LIVES.read(nil) == 5, "with no tier to anchor on, two digits and nothing else still reads")
-
--- THE FIX. The same tracker text must give the same answer whatever language its labels are
--- in. The old stop guard matched raw English, so the English arrangement below refused to read
--- anything at all while every translated client read 5 - locale-dependent behavior, which is
--- how a wrong number gets drawn with nothing on screen to say so.
--- The labels stand in for translated text and their BYTES do not matter, because nothing here
--- reads them - which is the property under test. They are kept ASCII so this file adds no hit
--- to the decimal-escape grep, whose count is read on every release.
-local function withLabel(label)
-    return fakeFrame({}, {
-        fakeFrame({ fsRegion(label), fsRegion("3") }),
-        fakeFrame({ fsRegion("The Ring of Glory"), fsRegion("7") }),
-        fakeFrame({ fsRegion("5") }),
-    })
-end
-tracker(withLabel("Challenge"))
-local enAnswer = LIVES.read(7)
-tracker(withLabel("Herausforderung"))
-local deAnswer = LIVES.read(7)
-tracker(withLabel("Vague"))
-local frAnswer = LIVES.read(7)
-ok(enAnswer == deAnswer and deAnswer == frAnswer,
-   "the answer does not depend on the language a label is drawn in: "
-   .. tostring(enAnswer) .. " / " .. tostring(deAnswer) .. " / " .. tostring(frAnswer))
-ok(enAnswer == 5, "and it is still the digit after the tier: " .. tostring(enAnswer))
-
--- Nothing drawn past the answer is read at all, so no label has to be recognized to stop.
-tracker(fakeFrame({}, {
-    fakeFrame({ fsRegion("7") }),
-    fakeFrame({ fsRegion("5") }),
-    fakeFrame({ fsRegion("9"), fsRegion("11") }),
-}))
-ok(LIVES.read(7) == 5, "digits after the answer cannot displace it")
-
--- Without an anchor, a third digit is what makes this refuse rather than guess.
-ok(LIVES.read(nil) == nil, "with no anchor and more than two digits it refuses to answer")
-
--- Only a BARE digit counts. A criterion counter and a labeled tier are not lives.
-tracker(fakeFrame({}, {
-    fakeFrame({ fsRegion("Tier 7"), fsRegion("0/1 Defeat the boss") }),
-    fakeFrame({ fsRegion("7"), fsRegion("5") }),
-}))
-ok(LIVES.read(7) == 5, "a slash counter and a labeled tier are not read as digits")
-
--- Color escapes are stripped, or every colored digit is invisible to this.
-tracker(fakeFrame({}, {
-    fakeFrame({ fsRegion("|cff00ff007|r"), fsRegion("|cffff00005|r") }),
-}))
-ok(LIVES.read(7) == 5, "color escapes are stripped before the digit is read")
-
--- A FontString that throws must not abort the walk and lose the digit after it.
-local throwing = {
-    GetObjectType = function() return "FontString" end,
-    IsShown       = function() return true end,
-    GetText       = function() error("attempt to use a secret value", 0) end,
-}
-tracker(fakeFrame({}, {
-    fakeFrame({ throwing, fsRegion("7") }),
-    fakeFrame({ fsRegion("5") }),
-}))
-ok(LIVES.read(7) == 5, "a FontString that throws does not abort the walk")
-
--- A hidden FontString is not on screen, so it is not a reading.
-tracker(fakeFrame({}, {
-    fakeFrame({ fsRegion("7"), fsRegion("99", false) }),
-    fakeFrame({ fsRegion("5") }),
-}))
-ok(LIVES.read(7) == 5, "a hidden FontString is skipped")
-
--- No tracker at all, which is every client that is not in a scenario.
-tracker(nil)
-FAKEG.ObjectiveTrackerFrame = nil
-ok(LIVES.read(7) == nil, "no tracker frame means no answer rather than an error")
-
--- The depth cap is real: a digit buried deeper than the walk goes is not read.
-local deep = fakeFrame({ fsRegion("5") })
-for _ = 1, 12 do deep = fakeFrame({}, { deep }) end
-tracker(fakeFrame({}, { fakeFrame({ fsRegion("7") }), deep }))
-ok(LIVES.read(7) == nil, "a digit past the depth cap is not read")
 
 print(("test_scenario_bonus: %d passed, %d failed"):format(pass, fail))
 if fail > 0 then os.exit(1) end

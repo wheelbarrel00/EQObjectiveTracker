@@ -9,6 +9,30 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.20.0", date = "2026-09-05",
+        sections = {
+            { head = "Notes", items = {
+                "The note in 1.19.1 said that with no chat box open, shift-clicking a quest on the tracker does whatever your ordinary left-click does. That is no longer true as of this release: it untracks the quest. See the first entry below.",
+            } },
+            { head = "New Features", items = {
+                "The bonus objectives HUD can be styled. Its background and its border have a box each and a color each, so the panel can be recolored, made more or less transparent, or have its frame taken away entirely to leave the text floating over the world. Unticking both boxes is what removes the frame. Until you pick a background color it keeps the plain black fill it has always had, which fades a little once the HUD is locked, and picking one hands that opacity to you.",
+                "Shift-clicking a quest on the tracker untracks it again, whenever no chat box is open. With a chat box open it still drops the quest into chat, which is what 1.19.0 added, so the two halves of the gesture no longer get in each other's way: start typing and shift-click links the quest, shift-click with chat closed and the quest is untracked. This is not the old hide gesture returning. That was removed in 1.19.0, on every version of the game. The quest stays in your quest log and you track it again from there, the way you always have.",
+                "Worth knowing, because the row does not always vanish when you do it: a quest only leaves the tracker if Show only tracked quests is on. With that setting off, for a pinned quest, and for a world quest listed because it is in your zone, the quest is untracked but the row stays where it is.",
+            } },
+            { head = "Bug Fixes", items = {
+                "Fixed a stream of Lua errors reading \"Auras cannot be accessed when secret while tainted by 'EQObjectiveTracker'\", reported in scenarios and other instanced content. The game's own objective tracker goes on laying its sections out even while it is hidden, and its scenario section reads one of your buffs without the check that reading a buff now needs, so the read failed and the error named whichever addon was in the way. This one always is, because hiding the game's tracker is the whole job. It now takes those sections off the hidden tracker instead, so there is nothing left on that path for the game to lay out. Reported by tflo.",
+                "A world quest no longer takes up to half a minute to appear after you walk into its area. The tracker had the quest ready the whole time and simply was not redrawing: it noticed world quests coming and going only when the game happened to send it an unrelated quest update, so the row waited, and anything that forced a redraw - opening the options window, toggling a setting - made it appear at once. It now redraws when quests appear around you, and the row arrives at about the same moment the default tracker's does.",
+                "A world quest you are super-tracking now appears on the tracker wherever you are standing. The game draws its arrow the moment you click one on the map, and the default tracker lists it, but this one only ever listed world quests you had watched, ones on the map under your feet, or ones already in your quest log. A quest you picked from the map and then flew away from matched none of those, so you were left with an arrow pointing at something the tracker never showed, and it came and went as you crossed zones. It is now listed for as long as it is the quest you are super-tracking.",
+                "On Classic Era and TBC Anniversary, the tracker's right-click menu offered Track on a quest that was already being tracked, on any character that had never untracked anything. The tracker keeps its own tracking list on those versions and reads an untouched list as everything tracked, which is what makes the whole log show; the menu was the one place reading it the other way round. It now agrees with the rest, so the menu says Untrack, and the new shift-click untrack above works on those characters instead of doing nothing.",
+            } },
+            { head = "Improvements", items = {
+                "The bonus objectives HUD's settings moved from the Tracker tab to the Appearance tab, under a Scenario Bonus Objectives heading, next to the new frame controls above. The switch that turns the HUD on, the Test button and the HUD Scale slider are the same controls doing the same thing, only somewhere else. It is the move the zone progress bar made in 1.18.0 and for the same reason: a switch sitting two tabs away from the settings it governs leaves you with no way to work out why they appear to do nothing.",
+                "Reset to Defaults on the Appearance tab now also restores the bonus objectives HUD's frame and its scale. It deliberately leaves the HUD's own switch and its position alone, so a reset never switches the HUD off and never moves it back to the middle of your screen.",
+                "The Lives count in the delve readout is read from the game's own delve header now, rather than being scraped off the text of the hidden tracker. The scrape was why it was unreliable: it could pick up a neighboring number instead, and it only ever worked on an English client. It had to move for the fix above as well, which stops that text being drawn at all.",
+            } },
+        },
+    },
+    {
         version = "1.19.1", date = "2026-09-03",
         sections = {
             { head = "Notes", items = {

@@ -10,8 +10,9 @@ raised, nothing was logged, and every gate in this project was green throughout.
 below put the shape of that back: a modifier branch that fires when it should not, and a refusal
 that answers true and swallows the row's ordinary click.
 
-Two files, because the feature is two halves - the link string in Data/QuestLink.lua and the
-click that inserts it in UI/Row.lua - and one harness covers both.
+Two files, because the feature is three parts - the link string in Data/QuestLink.lua, the
+click that inserts it and the click that untracks when no chat box is open, both in
+UI/Row.lua - and one harness covers all three.
 
 Every mutation reintroduces a defect the harness is supposed to stand guard over. Any that still
 reports "0 failed" is an assertion that does not discriminate, and the run exits 1 naming it.
@@ -47,10 +48,19 @@ MUTANTS = [
             "end\n\n"
             "function Filter:IsPinned(entry)")]),
 
-    ("the registry is asked for a hardcoded provider rather than the row's own", [
+    ("the link asks the registry for a hardcoded provider rather than the row's own", [
         (ROW,
-         '    local provider = row._providerID and ns:GetModule("Registry"):Get(row._providerID)',
-         '    local provider = ns:GetModule("Registry"):Get("quests")')]),
+         '    local provider = row._providerID and ns:GetModule("Registry"):Get(row._providerID)\n'
+         '    if not (provider and provider.idSpace == "quest") then return false end',
+         '    local provider = ns:GetModule("Registry"):Get("quests")\n'
+         '    if not (provider and provider.idSpace == "quest") then return false end')]),
+
+    ("the untrack asks the registry for a hardcoded provider rather than the row's own", [
+        (ROW,
+         '    local provider = row._providerID and ns:GetModule("Registry"):Get(row._providerID)\n'
+         '    if not (provider and provider.GetEntryMenu and provider.OnEntryMenuSelect) then return false end',
+         '    local provider = ns:GetModule("Registry"):Get("quests")\n'
+         '    if not (provider and provider.GetEntryMenu and provider.OnEntryMenuSelect) then return false end')]),
 
     # ------------------------------------------------- Data/QuestLink.lua, the string
     ("Classic reaches for the client's own link", [
@@ -126,21 +136,85 @@ MUTANTS = [
     # onMouseUp's ORDER, which the slice cannot reach and which this session's own fix moved.
     ("the link branch is moved BELOW split-click, so a split-click row never links", [
         (ROW, """    if chatLinkClick(row) then return end
+    if button == "LeftButton" and untrackClick(row) then return end
 
     if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
         dispatch(row, "OnEntryOpenLog")
         return
     end""",
-              """    if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
+              """    if button == "LeftButton" and untrackClick(row) then return end
+
+    if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
         dispatch(row, "OnEntryOpenLog")
         return
     end
 
     if chatLinkClick(row) then return end""")]),
 
+    # The untrack asked FIRST is the one that matters most: with both bound to shift by default,
+    # it would untrack the quest the player was trying to link.
+    ("the untrack branch is asked BEFORE the link", [
+        (ROW, """    if chatLinkClick(row) then return end
+    if button == "LeftButton" and untrackClick(row) then return end""",
+              """    if button == "LeftButton" and untrackClick(row) then return end
+    if chatLinkClick(row) then return end""")]),
+
+    ("the untrack loses its LeftButton gate, so shift+right-click stops opening the row menu", [
+        (ROW, '    if button == "LeftButton" and untrackClick(row) then return end',
+              "    if untrackClick(row) then return end")]),
+
     ("the link is gated on LeftButton again, so shift+right-click stops linking", [
         (ROW, "    if chatLinkClick(row) then return end",
               '    if button == "LeftButton" and chatLinkClick(row) then return end')]),
+
+    # ------------------------------------------------- UI/Row.lua, the untrack half
+    # This is the branch that changes state, so its refusals are the ones worth breaking. The
+    # first mutant is the shape of the original defect wearing the new gesture: a modified click
+    # reaching a state change while the player was doing something else with the modifier.
+    ("the untrack fires with a chat box open, so a link that will not resolve untracks instead", [
+        (ROW, "    if ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow() then return false end",
+              "    -- unchecked")]),
+
+    ("the modifier is not checked, so every left-click untracks", [
+        (ROW, '    if not ((IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE"))\n'
+              "            or (IsShiftKeyDown and IsShiftKeyDown())) then return false end",
+              "    -- unchecked")]),
+
+    ("the shift fallback is dropped, so a client that does not know the binding loses the gesture", [
+        (ROW, '    if not ((IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE"))\n'
+              "            or (IsShiftKeyDown and IsShiftKeyDown())) then return false end",
+              '    if not (IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE")) then return false end')]),
+
+    ("the explicit binding is dropped, so a rebound modifier stops untracking", [
+        (ROW, '    if not ((IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE"))\n'
+              "            or (IsShiftKeyDown and IsShiftKeyDown())) then return false end",
+              "    if not (IsShiftKeyDown and IsShiftKeyDown()) then return false end")]),
+
+    ("the provider is not asked whether it can be told, so a menu-only provider raises", [
+        (ROW, "    if not (provider and provider.GetEntryMenu and provider.OnEntryMenuSelect) then return false end",
+              "    if not (provider and provider.GetEntryMenu) then return false end")]),
+
+    ("a nil menu is walked anyway", [
+        (ROW, "    if not items then return false end", "    -- unchecked")]),
+
+    ("the menu is not consulted, so a quest that is already untracked is untracked again", [
+        (ROW, "    local offered = false", "    local offered = true")]),
+
+    ("a row the gesture cannot act on swallows the click anyway", [
+        (ROW, "    if not offered then return false end", "    if not offered then return true end")]),
+
+    ("the entry table is dispatched rather than its id", [
+        (ROW, "    provider:OnEntryMenuSelect(entry.id, UNTRACK_ITEM)",
+              "    provider:OnEntryMenuSelect(entry, UNTRACK_ITEM)")]),
+
+    ("the wrong menu item is dispatched, so the gesture re-tracks instead", [
+        (ROW, "    provider:OnEntryMenuSelect(entry.id, UNTRACK_ITEM)",
+              '    provider:OnEntryMenuSelect(entry.id, "track")')]),
+
+    ("the tracker is never asked to repaint, so the row sits there until the next quest event", [
+        (ROW, '    local Tracker = ns:GetModule("Tracker")\n'
+              "    if Tracker then Tracker:Refresh() end",
+              "    -- no repaint")]),
 ]
 
 SUMMARY = re.compile(r"^test_quest_link: (\d+) passed, (\d+) failed$")
@@ -205,12 +279,19 @@ for name, hunks in MUTANTS:
         verdict, last = run()
     finally:
         restore()
+    # EQUIVALENT: marks a mutant that provably cannot change behavior, so it is EXPECTED to
+    # survive and being caught is the finding. Without this the summary below advertises a
+    # verdict the loop can never produce.
+    expected_equivalent = name.startswith("EQUIVALENT:")
     if verdict == "crashed":
         print("CRASHED   %-74s %s" % (name, last))
         failures.append(("CRASHED", name))
-    elif verdict == "green":
+    elif verdict == "green" and not expected_equivalent:
         print("SURVIVED  %-74s %s" % (name, last))
         failures.append(("SURVIVED", name))
+    elif verdict != "green" and expected_equivalent:
+        print("UNEXPECTED %-73s %s" % (name + " (was caught)", last))
+        failures.append(("UNEXPECTED", name))
     else:
         print("caught    %-74s %s" % (name, last))
 

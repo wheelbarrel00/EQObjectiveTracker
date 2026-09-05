@@ -88,7 +88,9 @@ quest watches.
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
   delve tier, and a clickable button for any spell the stage hands you
 - **Bonus objectives**, on their own movable HUD, including the bonus loot mechanics
-  inside a delve and a lives and deaths readout for the run. Off by default
+  inside a delve and a lives and deaths readout for the run. Its background and its border
+  are yours to recolor, or to switch off entirely and leave the text floating. Off by
+  default
 - **Achievements**, **professions** with reagent counts, and **endeavors**, covering both the
   Traveler's Log monthly activities and the neighborhood tasks you have tracked, which the
   default tracker draws together under that same header
@@ -125,12 +127,11 @@ events, which would otherwise not appear anywhere.
 
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
 Left-click a quest to super-track it on retail, or to focus it on Classic. Shift-click a quest
-while a chat box is open to drop it into chat. Right-click opens a menu to pin, track, focus,
-open the quest log, pop out the
-details, look the quest up on Wowhead, or abandon it - the Classic menu is shorter, since
-popping out and abandoning need frames those clients do not have. A pinned quest stays on the
-tracker whatever your filters say. In manual sort mode you can also drag quests into whatever
-order you like.
+while a chat box is open to drop it into chat, or with no chat box open to untrack it. Right-click
+opens a menu to pin, track, focus, open the quest log, pop out the details, look the quest up on
+Wowhead, or abandon it - the Classic menu is shorter, since popping out and abandoning need frames
+those clients do not have. A pinned quest stays on the tracker whatever your filters say. In
+manual sort mode you can also drag quests into whatever order you like.
 
 A setting that only applies while another one is on is dimmed while that one is off, so it is
 clear which settings are actually in effect.

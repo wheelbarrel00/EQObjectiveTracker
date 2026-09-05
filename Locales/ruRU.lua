@@ -151,13 +151,6 @@ L["Quest Sound"] = "Звук задания"
 L["Plays when a quest is ready to turn in."] = "Проигрывается, когда задание готово к сдаче."
 L["Quest Complete Sound"] = "Звук выполнения задания"
 L["Which sound plays when a quest becomes ready to turn in."] = "Какой звук проигрывается, когда задание становится готовым к сдаче."
-L["Scenario Bonus Objectives"] = "Бонусные цели сценария"
-L["Show bonus objectives HUD"] = "Показывать HUD бонусных целей"
-L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "Показывает небольшой перемещаемый список дополнительных бонусных целей, которые появляются в некоторых сценариях и вылазках, чтобы вы не пропустили их награды. Перетащите, чтобы переместить, ПКМ - чтобы заблокировать или сбросить. По умолчанию выкл."
-L["Test"] = "Проверить"
-L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "Рисует HUD с двумя вымышленными бонусными целями, чтобы вы могли разместить и настроить его размер вне сценария или вылазки. Нажмите ещё раз, чтобы убрать."
-L["HUD Scale"] = "Масштаб HUD"
-L["Sizes the bonus objectives HUD."] = "Изменяет размер HUD бонусных целей."
 
 -- Options/TabAppearance.lua
 L["None"] = "Нет"
@@ -301,6 +294,13 @@ L["Color of the zone name on the floating bar. The docked section uses the secti
 L["Count Color"] = "Цвет счётчика"
 L["Color of the completed-of-total count on the floating bar."] = "Цвет счётчика «выполнено / всего» на плавающей полосе."
 L["Show progress bars"] = "Показывать полосы прогресса"
+L["Scenario Bonus Objectives"] = "Бонусные цели сценария"
+L["Show bonus objectives HUD"] = "Показывать HUD бонусных целей"
+L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."] = "Показывает небольшой перемещаемый список дополнительных бонусных целей, которые появляются в некоторых сценариях и вылазках, чтобы вы не пропустили их награды. Перетащите, чтобы переместить, ПКМ - чтобы заблокировать или сбросить. По умолчанию выкл."
+L["Test"] = "Проверить"
+L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."] = "Рисует HUD с двумя вымышленными бонусными целями, чтобы вы могли разместить и настроить его размер вне сценария или вылазки. Нажмите ещё раз, чтобы убрать."
+L["HUD Scale"] = "Масштаб HUD"
+L["Sizes the bonus objectives HUD."] = "Изменяет размер HUD бонусных целей."
 
 -- Options/TabAbout.lua
 L["Open this window"] = "Открыть это окно"

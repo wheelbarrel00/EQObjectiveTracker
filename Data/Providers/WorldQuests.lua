@@ -37,7 +37,7 @@ local candidates, seen, watched = {}, {}, {}
 -- Marked for every id a map list carries, INCLUDING one that push has already seen, because
 -- this answers "is it still out there" rather than "who found it first".
 local onMap = {}
-local sourceStats = { watched = 0, autozone = 0, inzone = 0, questlog = 0,
+local sourceStats = { watched = 0, autozone = 0, inzone = 0, questlog = 0, supertrack = 0,
                       wq = 0, bonus = 0, logOwned = 0 }
 local currentSource
 -- Values only, formatted on demand in DebugLine. GetEntries runs on the render path, so
@@ -53,6 +53,8 @@ local zoneListMap, zoneListClimbed = nil, false
 local detailN = 0
 local detailID, detailKind, detailMins, detailNamed = {}, {}, {}, {}
 local detailLive = {}
+
+local superTracked = 0
 
 local function push(qid)
     if qid and not seen[qid] then
@@ -77,9 +79,9 @@ function WorldQuests:DebugLine()
             detailLive[i] or "",
             detailNamed[i] and "" or "/noname")
     end
-    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, list map %s%s, raw map list %d, liveness %s, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s\n      candidates: %s")
+    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d, super-track %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, list map %s%s, raw map list %d, liveness %s, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s\n      candidates: %s")
         :format(sourceStats.watched, sourceStats.autozone, sourceStats.inzone,
-                sourceStats.questlog, tostring(m),
+                sourceStats.questlog, sourceStats.supertrack, tostring(m),
                 sourceStats.wq, sourceStats.bonus, sourceStats.logOwned,
                 tostring(autoListOn), tostring(zoneListMap),
                 zoneListClimbed and " (climbed)" or "", rawZoneList, liveness,
@@ -87,6 +89,23 @@ function WorldQuests:DebugLine()
                 tostring(QuestUtils_IsQuestWorldQuest ~= nil),
                 tostring(ns.Has.WorldQuestTime and true or false),
                 detailN > 0 and table.concat(detailBuf, "  ", 1, detailN) or "none")
+end
+
+-- Blizzard's own tracker always draws what the player is super-tracking, and an arrow on
+-- screen is the player asking for exactly that. The other four sources can only find a world
+-- quest that is watched, on a map underfoot, or in the log, so one super-tracked from the map
+-- and then flown away from was the shape none of them could see.
+local function addSuperTracked()
+    superTracked = 0
+    if not ns.Has.SuperTrack then return end
+    local qid = C_SuperTrack.GetSuperTrackedQuestID()
+    -- Nothing super-tracked answers 0, and 0 is truthy in Lua. A super-tracked quest that is
+    -- not a world quest is dropped by the kind test in the walk below, exactly as an ordinary
+    -- log quest already is, so this cannot take one away from the Quests provider.
+    if qid and qid > 0 then
+        superTracked = qid
+        push(qid)
+    end
 end
 
 local function addWatched()
@@ -118,8 +137,12 @@ end
 
 -- The bound both walks below need, and it is the one Quests:currentZoneSet already uses.
 -- A continent answers with every in-progress task quest on it, so the climb stops at the
--- first Zone and refuses a parent above zone level - Zul'Aman, Voidstorm and Void Acropolis
--- are the chains this was written for. Returns nil when there is nowhere to go.
+-- first Zone and refuses a parent above zone level. Midnight DOES nest zones - measured
+-- 2026-09-05: 2393 Silvermoon City (Zone) inside 2395 Eversong Woods (Zone) inside 2537
+-- Quel'Thalas (Continent) - and climbing through one was tried and REVERTED: it did not fix
+-- the late-listing world quest it was written for, and it would start listing the enclosing
+-- zone's quests while the player stands in a city inside it. Returns nil when there is
+-- nowhere to go.
 local function zoneParent(mapID)
     if not (C_Map.GetMapInfo and mapID and mapID > 0) then return nil end
     local ZONE = Enum and Enum.UIMapType and Enum.UIMapType.Zone
@@ -374,19 +397,25 @@ function WorldQuests:GetEntries()
     wipe(seen)
     wipe(onMap)
     sourceStats.watched, sourceStats.inzone, sourceStats.questlog = 0, 0, 0
-    sourceStats.autozone = 0
+    sourceStats.autozone, sourceStats.supertrack = 0, 0
     sourceStats.wq, sourceStats.bonus, sourceStats.logOwned = 0, 0, 0
     rawZoneList = 0
     mapListRead = false
     detailN = 0
+    -- Super-track runs LAST, deliberately. push credits the FIRST source to find an id, so
+    -- running it earlier billed every other source's quests to it and the count could not tell
+    -- "only super-track found this" from "everything found it". Last, `super-track N` means the
+    -- rows that exist for no other reason, which is the whole point of the source. It changes
+    -- no behavior: push dedupes on `seen`, and superTracked is set wherever this runs.
     currentSource = "watched";  addWatched()
     currentSource = "autozone"; addZoneWorldQuests()
     currentSource = "inzone";   addInZoneTaskQuests()
     currentSource = "questlog"; addQuestLogTaskQuests()
+    currentSource = "supertrack"; addSuperTracked()
     currentSource = nil
 
     store:Begin()
-    local superID = ns.Has.SuperTrack and C_SuperTrack.GetSuperTrackedQuestID() or 0
+    local superID = superTracked
 
     for i = 1, #candidates do
         local qid  = candidates[i]
@@ -417,18 +446,25 @@ function WorldQuests:GetEntries()
             -- /active is gated on watched because liveness is only ever JUDGED for a watched
             -- candidate - asking otherwise labels a row nothing judged, and pays an API call
             -- per render to do it.
+            -- The marker set has to match the JUDGED set below, or a candidate that was
+            -- dropped prints with no verdict at all and the reader cannot tell it from one
+            -- that was never judged. Widened with the expiry test when super-track became a
+            -- source.
+            local judged = watched[qid] or superID == qid
             detailLive[detailN]  = onMap[qid] and "/map"
                                    or inQuestLog(qid) and "/log"
-                                   or (watched[qid] and taskIsActive(qid)) and "/active"
-                                   or (watched[qid] and not (mins and mins > 0))
+                                   or (judged and taskIsActive(qid)) and "/active"
+                                   or (judged and not (mins and mins > 0))
                                       and (cannotTellLiveness() and "/blind" or "/ghost")
                                    or nil
             detailNamed[detailN] = name and true or false
         end
 
         -- A watched entry nothing vouches for any more is an expired ghost. Liveness cannot
-        -- come from IsWorldQuest: that stays true forever once a quest has been one.
-        local expired = watched[qid] and not stillLive(qid, mins)
+        -- come from IsWorldQuest: that stays true forever once a quest has been one. The
+        -- super-tracked one is judged the same way, or the row it now lists would outlive the
+        -- quest.
+        local expired = (watched[qid] or superID == qid) and not stillLive(qid, mins)
 
         if name and not expired and not logOwned then
             local complete = ns.Has.QuestIsComplete and C_QuestLog.IsComplete(qid) or false
@@ -511,6 +547,110 @@ function WorldQuests:OnEntryMenuSelect(entryID, itemID)
     if self._notifyDirty then self._notifyDirty() end
 end
 
+-- Answers "why is that world quest not on my tracker" in one reading rather than a round trip
+-- per hypothesis. Candidacy is read out of the walk's own `seen` set rather than re-derived, so
+-- it cannot disagree with the walk the way a reimplementation would, and every candidate gets a
+-- line whether or not a map list carries it. Undocumented, like zoneprobe and widgetprobe.
+function WorldQuests:ProbeLines()
+    local out = {}
+    local function add(fmt, ...)
+        out[#out + 1] = select("#", ...) > 0 and fmt:format(...) or fmt
+    end
+
+    if not ns.Has.Map then
+        add("wqprobe: this client has no map API")
+        return out
+    end
+
+    -- Rebuilt first so everything below describes THIS moment, and the result is READ: a walk
+    -- that raised leaves the previous build's entries in the store, and reporting off those
+    -- looks exactly like a healthy reading.
+    local okBuild, buildErr = pcall(function() return self:GetEntries() end)
+    if not okBuild then
+        add("wqprobe: THE REBUILD RAISED, so every verdict below is the PREVIOUS build's: %s",
+            tostring(buildErr))
+    end
+
+    local cfg = ns:GetModule("DB"):Tracker() or {}
+    local flt = cfg.filters or {}
+    local hid = cfg.sectionsHidden or {}
+    -- showOnlyWatched is deliberately not printed: this provider never writes entry.isTracked,
+    -- so the store default of true means that filter can never reject one of these rows. The
+    -- three below can, and none of them was reported before.
+    add("wqprobe: autoList=%s showWorld=%s showBonus=%s sectionHidden=%s superTracked=%s",
+        tostring(autoListOn), tostring(flt.showWorld ~= false),
+        tostring(flt.showBonus ~= false), tostring(hid.worldquests == true),
+        tostring(superTracked ~= 0 and superTracked or nil))
+
+    -- Verdicts in the order the walk actually decides, so the FIRST one printed is the cause.
+    -- `seen` is the walk's own candidate set, and `store:Get` is what it emitted.
+    local function verdict(qid, nm, own, mins)
+        if store:Get(qid) then
+            return "EMITTED (a category toggle or a hidden section can still keep it off screen)"
+        elseif not seen[qid] then return "not a candidate: no source pushed it"
+        elseif own then           return "left to the Quests section: a normal log entry"
+        elseif not nm then        return "dropped: no title yet"
+        elseif not stillLive(qid, mins) then return "dropped: judged expired"
+        end
+        return "not listed, and no gate here explains it"
+    end
+
+    local function report(prefix, qid, ip)
+        local okLine, line = pcall(function()
+            local nm   = title(qid)
+            local wq   = isWorldQuest(qid)
+            local own  = (not wq) and ownedByQuestLog(qid) or false
+            local mins = minutesLeft(qid)
+            return ("%s%s %s | inProgress=%s wq=%s logOwned=%s mins=%s active=%s | %s"):format(
+                prefix, tostring(qid), nm or "(no title)", tostring(ip), tostring(wq),
+                tostring(own), tostring(mins), tostring(taskIsActive(qid)),
+                verdict(qid, nm, own, mins))
+        end)
+        add(okLine and line or ("%s%s READING THIS QUEST RAISED: %s")
+            :format(prefix, tostring(qid), tostring(line)))
+    end
+
+    local printed = {}
+    local m = C_Map.GetBestMapForUnit("player")
+    for _ = 1, MAP_DEPTH do
+        if not m or m <= 0 then break end
+        local minfo = C_Map.GetMapInfo and C_Map.GetMapInfo(m)
+        local list  = taskQuestsForMap(m)
+        add("map %s %s (mapType %s): %s entries",
+            tostring(m), minfo and minfo.name or "?",
+            minfo and tostring(minfo.mapType) or "?",
+            list and tostring(#list) or "UNREADABLE")
+
+        for i = 1, (list and #list or 0) do
+            local q   = list[i]
+            local qid = q and (q.questId or q.questID)
+            if qid and not printed[qid] then
+                printed[qid] = true
+                report("  ", qid, q.inProgress and true or false)
+            end
+        end
+        m = zoneParent(m)
+    end
+
+    -- The candidates no map list carries: watched, super-tracked, or found in the quest log. A
+    -- probe that walked the map lists alone printed nothing at all for these, which is the one
+    -- shape the super-track source was added for.
+    local off = 0
+    for i = 1, #candidates do
+        local qid = candidates[i]
+        if not printed[qid] then
+            if off == 0 then add("candidates on no map list:") end
+            off = off + 1
+            printed[qid] = true
+            report("  ", qid, "n/a")
+        end
+    end
+    if off == 0 then add("candidates on no map list: none") end
+
+    add("counts: %s", self:DebugLine())
+    return out
+end
+
 function WorldQuests:Enable(notifyDirty)
     local Events = ns:GetModule("Events")
 
@@ -534,6 +674,17 @@ function WorldQuests:Enable(notifyDirty)
     Events:On("QUEST_LOG_UPDATE",          notifyDirty)
     Events:On("SUPER_TRACKING_CHANGED",    notifyDirty)
     Events:On("TASK_PROGRESS_UPDATE",      notifyDirty)
+    -- A world quest becomes in-progress when the player walks into its area, and nothing here
+    -- noticed until 2026-09-05: the row waited for QUEST_LOG_UPDATE to come round, 18 to 30
+    -- seconds later. /eqot wqprobe read LISTED off the entry store while the tracker was empty,
+    -- so the entry existed and only the repaint was missing.
+    -- Debounced on its own key because this fires freely while traveling and GetEntries here
+    -- rebuilds unconditionally, roughly 90 KB a time. Two seconds rather than one: at one the
+    -- row landed about two seconds AHEAD of Blizzard's own tracker, which is margin this does
+    -- not need, and the wider window halves the churn.
+    Events:On("QUEST_POI_UPDATE", function()
+        Events:Debounce("eqot.wqPoi", 2.0, notifyDirty)
+    end)
     Events:On("QUEST_ACCEPTED",            notifyDirty)
     Events:On("ZONE_CHANGED_NEW_AREA",     notifyDirty)
     Events:On("PLAYER_ENTERING_WORLD",     notifyDirty)

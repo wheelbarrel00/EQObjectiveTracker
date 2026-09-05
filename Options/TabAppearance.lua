@@ -113,6 +113,21 @@ local function pbSet(key, v)
     ns:GetModule("Tracker"):Render()
 end
 
+local function sbState()
+    local t = DB()
+    if not t then return nil end
+    t.scenarioBonusHUD = t.scenarioBonusHUD or {}
+    return t.scenarioBonusHUD
+end
+
+-- The HUD is parented to UIParent rather than to the tracker, so none of this needs a
+-- tracker repaint. ApplySettings is the whole apply path.
+local function sbSet(key, v)
+    local st = sbState()
+    if st then st[key] = v end
+    ns:GetModule("ScenarioBonusHUD"):ApplySettings()
+end
+
 local function barTextureSwatch(frame, name)
     if not frame.swatch then return end
     frame.swatch:SetTexture(ns:GetModule("Media"):GetStatusBarFile(name))
@@ -351,6 +366,78 @@ Options:RegisterTab({
             function(v) relayout("headerBarSoftEdgeStrength", v) end,
             L["How soft the header bar's feathered edges are when Soft edges is on. Higher is softer, lower tightens toward a hard edge."])
         hbSoftSlider:SetPoint("TOPLEFT", hbHeightSlider, "BOTTOMLEFT", 0, -14)
+
+        -- Whether the provider registered, which the TOC already decides per flavor. ns.Has
+        -- is a CAPABILITY probe and reads true on Classic, where the client keeps the
+        -- functions and ships no scenarios behind them.
+        if ns.Has.ScenarioBonus and ns:GetModule("Registry"):Get("scenarios") then
+            local sbHeader = self:CreateHeading(content, L["Scenario Bonus Objectives"])
+            sbHeader:SetPoint("TOPLEFT", hbSoftSlider, "BOTTOMLEFT", 0, self.GAP.aboveHead)
+
+            local sbEnable = self:CreateCheckbox(content, L["Show bonus objectives HUD"],
+                function() local st = sbState(); return st and st.enabled end,
+                function(v) ns:GetModule("ScenarioBonusHUD"):SetEnabled(v) end,
+                L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."])
+            sbEnable:SetPoint("TOPLEFT", sbHeader, "BOTTOMLEFT", 0, self.GAP.head)
+
+            -- The HUD only draws inside a scenario or delve, so without this the position,
+            -- scale and colors below can only be set somewhere the player cannot see them.
+            local sbTest = self:CreateButton(content, L["Test"], 120, function()
+                ns:GetModule("ScenarioBonusHUD"):ToggleTest()
+            end, L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."])
+            sbTest:SetSize(120, 22)
+            sbTest:SetPoint("TOPLEFT", sbEnable, "BOTTOMLEFT", 0, -10)
+
+            -- This group sweeps itself rather than joining syncDependents below, and that is
+            -- a hard constraint rather than a preference: that closure is within a couple of
+            -- upvalues of Lua's limit of 60, past which this FILE stops compiling and the
+            -- Appearance tab disappears. Nothing here may become an upvalue of it.
+            local syncHUD
+
+            local sbBgCheck = self:CreateCheckbox(content, L["Background"],
+                function() local st = sbState(); return not (st and st.showBackground == false) end,
+                function(v) sbSet("showBackground", v); syncHUD() end,
+                L["Fills the HUD behind its text."])
+            sbBgCheck:SetPoint("TOPLEFT", sbTest, "BOTTOMLEFT", 0, -12)
+
+            -- The onClear below is what the border picker does not have: this key is the one
+            -- with no DB default, so unset is a state the user can get back to.
+            local sbBgPicker = self:CreateColorPicker(content, L["Background Color"],
+                function() local st = sbState(); return st and st.backgroundColor end,
+                function(v) sbSet("backgroundColor", v) end,
+                L["Background color and opacity for the HUD. While this is unset it uses a plain black fill that fades slightly once locked."], true,
+                function() sbSet("backgroundColor", nil) end)
+
+            local sbBorderCheck = self:CreateCheckbox(content, L["Border"],
+                function() local st = sbState(); return not (st and st.showBorder == false) end,
+                function(v) sbSet("showBorder", v); syncHUD() end,
+                L["Draws a border around the HUD."])
+            sbBorderCheck:SetPoint("TOPLEFT", sbBgCheck, "BOTTOMLEFT", 0, -2)
+
+            local sbBorderPicker = self:CreateColorPicker(content, L["Border Color"],
+                function() local st = sbState(); return st and st.borderColor end,
+                function(v) sbSet("borderColor", v) end,
+                L["Border color and opacity for the HUD."], true)
+            self:AlignSatelliteColumn({ sbBgCheck, sbBgPicker }, { sbBorderCheck, sbBorderPicker })
+            self:AlignPickerColumn(sbBgPicker, sbBorderPicker)
+
+            local sbScale = self:CreateSlider(content, L["HUD Scale"], 0.5, 2.0, 0.05,
+                function() local st = sbState(); return (st and st.scale) or 1.0 end,
+                function(v) ns:GetModule("ScenarioBonusHUD"):SetScale(v) end,
+                L["Sizes the bonus objectives HUD."])
+            sbScale:SetPoint("TOPLEFT", sbBorderCheck, "BOTTOMLEFT", 0, -14)
+
+            -- Each picker dims on its own box, and nothing dims on the HUD's own switch. Test
+            -- draws the HUD with that switch off, which is what the button is for, so the
+            -- colors and the scale are reachable settings there rather than inert ones.
+            syncHUD = function()
+                local st = sbState() or {}
+                self:SetDependent(sbBgPicker,     st.showBackground ~= false)
+                self:SetDependent(sbBorderPicker, st.showBorder ~= false)
+            end
+            syncHUD()
+            content._syncHUD = syncHUD
+        end
 
         local colorsHeader = self:CreateHeading(content, L["Colors & Dimensions"])
         colorsHeader:SetPoint("TOPLEFT", h, "TOPLEFT", COLUMN_X, 0)
@@ -786,5 +873,6 @@ Options:RegisterTab({
     -- whole picture. Re-running per view costs one pass over ~30 SetAlpha calls.
     refresh = function(_, content)
         if content._syncDependents then content._syncDependents() end
+        if content._syncHUD then content._syncHUD() end
     end,
 })

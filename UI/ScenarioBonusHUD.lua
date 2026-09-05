@@ -30,73 +30,6 @@ local function enabled()
     return (st and st.enabled == true) or false
 end
 
--- Lives are in NO widget and NO criterion - the delve header carries only the tier - so the
--- only known source is the text Blizzard's own tracker draws: a bare digit right after the
--- tier. Anchor on the tier and take the next digit, and stop on that ANSWER rather than on a
--- word: the walk used to stop before a raw English "Challenge" or "Wave" label, which Blizzard
--- draws LOCALIZED, so on six of the seven shipped locales it never fired at all.
--- It does NOT close the residual - with no lives digit drawn, the digit after the tier is
--- still taken, whatever it is. Nothing readable from here separates those two cases.
--- This lives in UI/ because Data/ may never touch a frame, and it is handed to the model
--- through ScenarioBonus:SetLivesReader rather than called from it.
--- EQOT HIDES THE FRAME THIS READS, which the addon it was taken from does not, so finding
--- nothing is a legitimate outcome and drops the Lives half of the line rather than guessing.
--- IsShown is deliberate over IsVisible: a FontString under a hidden parent still reports
--- shown, and that is the only reason this has any chance of working here.
-local LIVES_MAX_DEPTH = 8
-
-local function livesDigit(region)
-    if not (region.GetObjectType and region:GetObjectType() == "FontString"
-            and region:IsShown()) then
-        return nil
-    end
-    -- Guarded per region: tracker text can be a secret string that throws on any string
-    -- method, and one of those must not abort the walk and lose the digit after it.
-    local ok, res = pcall(function()
-        local t = region:GetText()
-        if not t or t == "" then return nil end
-        local clean = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-        return tonumber(clean:match("^%s*(%d+)%s*$"))
-    end)
-    return ok and res or nil
-end
-
-local function readDelveLives(knownTier)
-    local tracker = _G.ScenarioObjectiveTracker or _G.ObjectiveTrackerFrame
-    if not tracker then return nil end
-
-    local digits, count, answer = {}, 0, nil
-    local function walk(f, depth)
-        if answer or not f or depth > LIVES_MAX_DEPTH then return end
-        if f.IsForbidden and f:IsForbidden() then return end
-        local okR, regions = pcall(function() return { f:GetRegions() } end)
-        if okR then
-            for i = 1, #regions do
-                local d = livesDigit(regions[i])
-                if d then
-                    if knownTier and digits[count] == knownTier then answer = d return end
-                    count = count + 1
-                    digits[count] = d
-                end
-            end
-        end
-        local okC, kids = pcall(function() return { f:GetChildren() } end)
-        if okC then
-            for i = 1, #kids do
-                walk(kids[i], depth + 1)
-                if answer then return end
-            end
-        end
-    end
-    pcall(walk, tracker, 0)
-
-    if answer then return answer end
-    -- Tier then lives and nothing else is the only unambiguous shape without the anchor, so a
-    -- third digit refuses rather than guesses.
-    if count == 2 then return digits[2] end
-    return nil
-end
-
 local function buildRow(parent)
     local row = CreateFrame("Frame", nil, parent)
 
@@ -176,6 +109,10 @@ function HUD:ApplySettings()
 
     if st.showBackground == false then
         f:SetBackdropColor(0, 0, 0, 0)
+    elseif st.backgroundColor then
+        local c = st.backgroundColor
+        -- A picked color carries its own alpha, so the lock fade below stops applying.
+        f:SetBackdropColor(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
     else
         -- Fades slightly once locked, so an unlocked HUD reads as draggable
         f:SetBackdropColor(0, 0, 0, st.locked and 0.40 or 0.55)
@@ -184,7 +121,9 @@ function HUD:ApplySettings()
     if st.showBorder == false then
         f:SetBackdropBorderColor(0, 0, 0, 0)
     else
-        f:SetBackdropBorderColor(BORDER_RED[1], BORDER_RED[2], BORDER_RED[3], BORDER_RED[4])
+        local bc = st.borderColor
+        if bc then f:SetBackdropBorderColor(bc.r, bc.g, bc.b, bc.a or 1)
+        else       f:SetBackdropBorderColor(BORDER_RED[1], BORDER_RED[2], BORDER_RED[3], BORDER_RED[4]) end
     end
 end
 
@@ -449,7 +388,6 @@ end
 function HUD:OnEnable()
     local Bonus = ns:GetModule("ScenarioBonus")
     if not Bonus then return end
-    if Bonus.SetLivesReader then Bonus:SetLivesReader(readDelveLives) end
     Bonus:OnDirty(function() HUD:Update() end)
     if enabled() then self:Update() end
 end

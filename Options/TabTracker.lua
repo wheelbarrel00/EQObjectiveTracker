@@ -534,43 +534,9 @@ Options:RegisterTab({
             nil, playSound)
         turnInDD:SetPoint("TOPLEFT", turnInCheck, "BOTTOMLEFT", 0, -8)
 
-        -- The zone progress bar's two toggles used to sit here, with its nine styling
-        -- controls on the Appearance tab. They live together under Appearance's Zone
-        -- Progress Bar heading now - one feature, one place.
-
-        -- Whether the provider registered, which the TOC already decides per flavor. ns.Has
-        -- is a CAPABILITY probe and reads true on Classic, where the client keeps the
-        -- functions and ships no scenarios behind them.
-        if ns.Has.ScenarioBonus and Registry:Get("scenarios") then
-            local sbHeader = self:CreateHeading(content, L["Scenario Bonus Objectives"])
-            sbHeader:SetPoint("TOPLEFT", turnInDD, "BOTTOMLEFT", 0, self.GAP.aboveHead)
-
-            local sbEnable = self:CreateCheckbox(content, L["Show bonus objectives HUD"],
-                function()
-                    local st = DB().scenarioBonusHUD
-                    return st and st.enabled
-                end,
-                function(v) ns:GetModule("ScenarioBonusHUD"):SetEnabled(v) end,
-                L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."])
-            sbEnable:SetPoint("TOPLEFT", sbHeader, "BOTTOMLEFT", 0, self.GAP.head)
-
-            -- The HUD only draws inside a scenario or delve, so without this the position
-            -- and scale below can only be set somewhere the player cannot see the result.
-            local sbTest = self:CreateButton(content, L["Test"], 120, function()
-                ns:GetModule("ScenarioBonusHUD"):ToggleTest()
-            end, L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."])
-            sbTest:SetSize(120, 22)
-            sbTest:SetPoint("TOPLEFT", sbEnable, "BOTTOMLEFT", 0, -10)
-
-            local sbScale = self:CreateSlider(content, L["HUD Scale"], 0.5, 2.0, 0.05,
-                function()
-                    local st = DB().scenarioBonusHUD
-                    return (st and st.scale) or 1.0
-                end,
-                function(v) ns:GetModule("ScenarioBonusHUD"):SetScale(v) end,
-                L["Sizes the bonus objectives HUD."])
-            sbScale:SetPoint("TOPLEFT", sbTest, "BOTTOMLEFT", 0, -16)
-        end
+        -- The zone progress bar's two toggles used to sit here, and so did the bonus
+        -- objectives HUD's three. Both features live under their own Appearance heading now,
+        -- beside the controls that style them - one feature, one place.
     end,
 
     refresh = function(_, content)

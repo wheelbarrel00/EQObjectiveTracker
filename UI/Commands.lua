@@ -307,6 +307,20 @@ function Commands:OnEnable()
             else
                 ns:Print("zoneprobe: not available on this flavor")
             end
+        elseif cmd == "wqprobe" then
+            -- Undocumented for the same reason zoneprobe is. It rebuilds the provider, so it
+            -- CURES the half it reports on - read it while the row is missing, not after.
+            local WQ = ns:GetModule("Registry"):Get("worldquests")
+            if WQ and WQ.ProbeLines then
+                local okProbe, lines = pcall(function() return WQ:ProbeLines() end)
+                if okProbe and type(lines) == "table" then
+                    for _, l in ipairs(lines) do ns:Print(l) end
+                else
+                    ns:Print("wqprobe failed: " .. tostring(lines))
+                end
+            else
+                ns:Print("wqprobe: not available on this flavor")
+            end
         elseif cmd == "widgetprobe" then
             -- Undocumented for the same reason zoneprobe is. Read only: it never registers a
             -- UIWidgetContainer, which is the thing UI/Scenario.lua forbids.

@@ -100,13 +100,6 @@ function Bonus:Enabled()
     return (st and st.enabled == true) or false
 end
 
--- Lives are in NO widget and NO criterion - the delve header carries only the tier - so the
--- only known source is the text of Blizzard's own tracker, which Data/ may never read. UI
--- registers a reader here and this file just asks it, so no frame call lands in Data/. A nil
--- answer is normal and means the line is skipped rather than drawn wrong.
-local livesReader
-function Bonus:SetLivesReader(fn) livesReader = fn end
-
 local function playerInDelve()
     if not GetInstanceInfo then return false end
     local _, _, diffID = GetInstanceInfo()
@@ -205,24 +198,59 @@ local function gatherScenarioSteps()
     return #model > 0
 end
 
-local function readTier()
+-- Matches Data/Widgets.lua, which reads tierText off this same widget: a secret value reports
+-- a real type and raises the moment it is used, so it has to be filtered rather than tested for.
+local function plain(v)
+    if v == nil then return nil end
+    if _issecret and _issecret(v) then return nil end
+    return v
+end
+
+-- The delve header widget carries the tier AND the lives, so both readers share this walk.
+local function findDelveHeader()
     if not (C_ScenarioInfo and C_ScenarioInfo.GetScenarioStepInfo
             and C_UIWidgetManager and C_UIWidgetManager.GetAllWidgetsBySetID) then return nil end
-    local ok, stepInfo = pcall(C_ScenarioInfo.GetScenarioStepInfo)
-    if not (ok and stepInfo and stepInfo.widgetSetID) then return nil end
+    local stepInfo = C_ScenarioInfo.GetScenarioStepInfo()
+    if not (stepInfo and stepInfo.widgetSetID) then return nil end
     local VT     = Enum and Enum.UIWidgetVisualizationType
     local getter = C_UIWidgetManager.GetScenarioHeaderDelvesWidgetVisualizationInfo
     if not (VT and VT.ScenarioHeaderDelves and getter) then return nil end
-    local ok2, widgets = pcall(C_UIWidgetManager.GetAllWidgetsBySetID, stepInfo.widgetSetID)
-    if not (ok2 and type(widgets) == "table") then return nil end
+    local widgets = C_UIWidgetManager.GetAllWidgetsBySetID(stepInfo.widgetSetID)
+    if type(widgets) ~= "table" then return nil end
     for _, w in ipairs(widgets) do
         if w.widgetType == VT.ScenarioHeaderDelves then
-            local ok3, hv = pcall(getter, w.widgetID)
-            local tt = ok3 and hv and tonumber(hv.tierText)
-            if tt then return tt end
+            local hv = getter(w.widgetID)
+            if hv then return hv end
         end
     end
     return nil
+end
+
+-- readTier's callers do not protect it and it runs BEFORE the guarded lives read, so a raise
+-- anywhere in the shared walk cost the whole delve model rather than one line - and permanently,
+-- because the statement that caches delveTier is the one that died. The widgetType test is the
+-- vector: a secret value raises when it is COMPARED.
+local function delveHeader()
+    local ok, hv = pcall(findDelveHeader)
+    return ok and hv or nil
+end
+
+local function readTier()
+    local hv = delveHeader()
+    return hv and tonumber(plain(hv.tierText)) or nil
+end
+
+-- Lives remaining, measured 2026-09-05 in a tier 7 delve: currencies[1].text read 5, then 4
+-- after one death, with that entry's tooltip moving from "Total deaths: 0" to "Total deaths: 1".
+-- The tooltip is deliberately NOT parsed - it is localized, which is the English-only defect the
+-- frame-scraping reader this replaced was rewritten to remove. runDeaths below stays this addon's
+-- own count.
+-- tonumber rather than a truth test: an empty string is a real answer meaning the widget drew no
+-- number, and it must read as no lives rather than as zero lives.
+local function readLives()
+    local hv = delveHeader()
+    local c  = hv and type(hv.currencies) == "table" and hv.currencies[1]
+    return c and tonumber(plain(c.text)) or nil
 end
 
 local function setBannerState(s)
@@ -407,7 +435,7 @@ local function gatherDelveModel()
 
     local step = pushStep(L["Delve Bonus Loot"], nil, nil)
 
-    -- Read once per run for both the pack total and the lives reader, which anchors on it.
+    -- Read once per run for the pack total below.
     if not delveTier then delveTier = readTier() end
 
     -- packsKilledBase alone is enough: after a reload every pack may already be dead, so the
@@ -434,11 +462,11 @@ local function gatherDelveModel()
         pushCriterion(step, L["Sanctified Banner: find it for bonus loot"], false)
     end
 
-    -- pcall'd like every registered callback here: a throw in that frame walk must cost the
-    -- Lives half of one line, not the model. Concatenated rather than formatted because a
-    -- stray percent in a translation would make string.format raise here.
-    local okLives, lives = false, nil
-    if livesReader then okLives, lives = pcall(livesReader, delveTier) end
+    -- pcall'd for the currencies index, which delveHeader's own guard does not cover: a throw
+    -- must cost the Lives half of one line rather than the whole run readout. Concatenated
+    -- rather than formatted because a stray percent in a translation would make string.format
+    -- raise here.
+    local okLives, lives = pcall(readLives)
     local stat = L["Deaths:"] .. " " .. runDeaths
     if okLives and lives then stat = L["Lives:"] .. " " .. lives .. "   " .. stat end
     pushCriterion(step, stat, false, "stat")
@@ -502,17 +530,15 @@ local function vignetteDumpLine(i, guid, v)
 end
 
 function Bonus:DumpLines(out)
-    -- lives=nil means the reader found no digit, which is the one thing only a delve run can
-    -- answer: this addon hides the frame that number is read from.
+    -- lives=nil is the reading only a delve run can produce, and it separates the two ways
+    -- this can go quiet: the widget carried no number, or the read threw.
     out[#out + 1] = ("enabled=%s inDelve=%s tier=%s banner=%s nemesisSeen=%d remaining=%s")
         :format(tostring(self:Enabled()), tostring(playerInDelve()), tostring(readTier()),
                 tostring(bannerState), nemesisSeenCount, tostring(nemesisRemaining))
-    local okL, lv = false, nil
-    if livesReader then okL, lv = pcall(livesReader, delveTier) end
-    out[#out + 1] = ("lives=%s (reader %s) deaths=%d packsKilled=%d (restored %d) | "
+    local okL, lv = pcall(readLives)
+    out[#out + 1] = ("lives=%s deaths=%d packsKilled=%d (restored %d) | "
         .. "vignettes the scan could not read: %d")
-        :format(okL and tostring(lv) or "reader threw",
-                livesReader and "registered" or "MISSING", runDeaths,
+        :format(okL and tostring(lv) or "read threw", runDeaths,
                 packsKilledNow(), packsKilledBase, vignetteMisses)
 
     if GetInstanceInfo then
