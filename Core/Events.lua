@@ -27,14 +27,6 @@ function Events:On(event, fn)
     return true
 end
 
-function Events:DebugLine()
-    local names = {}
-    for event in pairs(unknown) do names[#names + 1] = event end
-    if #names == 0 then return "events: every registration accepted by this client" end
-    table.sort(names)
-    return ("events: %d unknown on this client - %s"):format(#names, table.concat(names, ", "))
-end
-
 function Events:Off(event, fn)
     local list = listeners[event]
     if not list then return end
@@ -103,12 +95,28 @@ function Events:RunWhenOutOfCombat(key, fn)
     return false
 end
 
-local _debounce   = {}
-local _debTickFns = {}
+local _debounce     = {}
+local _debTickFns   = {}
+local _debOrder     = {}
+local _debRecovered = 0
+local _debWorstLate = 0
+
+-- A key is disarmed only by its own timer callback, so before this a C_Timer.After that never
+-- fired left the key armed for the rest of the session and every later request on it was dropped
+-- in silence - no work, no error. Read off a user's client: the quest sound scan had not run for
+-- 39 minutes while the events driving it kept firing. The stamp is what lets a later request
+-- notice its timer is overdue and schedule a fresh one.
+local LOST_SLACK = 3
 
 local function debounceTick(key)
     local d = _debounce[key]
     if not d then return end
+    -- A recovery leaves the lost timer outstanding, so two ticks can be in flight on one key.
+    -- Only the one whose own arming is due may take the work. A tick arriving early still
+    -- disarms the key on its way past, so the next request arms a second timer of its own and
+    -- the pair then runs the key twice per window for the rest of the session - measured at a
+    -- sustained 2x, which is the render rate v1.17.0 was released to cut.
+    if GetTime() < d.at + d.delay then return end
     local fn = d.fn
     d.armed = false
     d.fn    = nil
@@ -130,14 +138,53 @@ end
 function Events:Debounce(key, delay, fn)
     local d = _debounce[key]
     if d and d.armed then
-        d.fn = fn
-        return false
+        -- Collapsing a burst is the whole point of this, so only an OVERDUE key counts as lost.
+        local late = GetTime() - d.at - d.delay
+        if late <= LOST_SLACK then
+            d.fn = fn
+            return false
+        end
+        _debRecovered = _debRecovered + 1
+        if late > _debWorstLate then _debWorstLate = late end
     end
-    if not d then d = {}; _debounce[key] = d end
+    if not d then
+        d = {}
+        _debounce[key] = d
+        _debOrder[#_debOrder + 1] = key
+    end
     d.armed = true
     d.fn    = fn
+    d.at    = GetTime()
+    -- Stamped per arming rather than read back from the caller, so a key ever debounced at two
+    -- different delays still measures its lateness against the deadline it was actually given.
+    d.delay = delay
     C_Timer.After(delay, getDebTickFn(key))
     return true
+end
+
+-- The debounce half lives on this line because an armed key is invisible everywhere else: a
+-- request landing on one returns false, schedules nothing, and neither the work nor an error ever
+-- appears. The AGE beside it separates a burst being collapsed from a timer that never came.
+function Events:DebugLine()
+    local names = {}
+    for event in pairs(unknown) do names[#names + 1] = event end
+    local first = "events: every registration accepted by this client"
+    if #names > 0 then
+        table.sort(names)
+        first = ("events: %d unknown on this client - %s"):format(#names, table.concat(names, ", "))
+    end
+
+    local now, armed = GetTime(), {}
+    for i = 1, #_debOrder do
+        local key = _debOrder[i]
+        local d = _debounce[key]
+        if d and d.armed then
+            armed[#armed + 1] = ("%s %.0fs"):format(key, now - d.at)
+        end
+    end
+    return first .. ("\n      debounce: %d keys | armed now: %s | recovered %d, worst %.0fs late")
+        :format(#_debOrder, #armed > 0 and table.concat(armed, ", ") or "none",
+                _debRecovered, _debWorstLate)
 end
 
 ns.Events = Events

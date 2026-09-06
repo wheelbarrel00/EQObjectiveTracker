@@ -9,6 +9,15 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.20.1", date = "2026-09-05",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Fixed the tracker going stale and staying that way until you reloaded. Accepting a quest, finishing an objective or handing a quest in would all leave it showing whatever it showed before, and the only way back was to force a redraw yourself by toggling a setting, opening the options window or reloading. Reported by AIR.",
+                "Behind it, the tracker gathers up a burst of game events and redraws once a fraction of a second later, rather than redrawing for every event on its own. If the game ever dropped that scheduled redraw, nothing noticed and nothing scheduled another, so every later request to redraw was folded into one that was never coming. The tracker went quiet for the rest of the session with no error on screen to explain it, and the quest completion sound could stop the same way. A redraw asked for well past its due time now schedules a fresh one, so a dropped redraw costs you one or two rather than all of them.",
+            } },
+        },
+    },
+    {
         version = "1.20.0", date = "2026-09-05",
         sections = {
             { head = "Notes", items = {
