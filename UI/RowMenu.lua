@@ -24,6 +24,7 @@ local LABELS = {
     supertrack = L["Super-track (follow arrow)"],
     openlog    = L["Open in Map & Quest Log"],
     popout     = L["Pop Out Quest Details"],
+    findgroup  = L["Find Group"],
     wowhead    = L["Search on Wowhead"],
     abandon    = L["Abandon Quest"],
 }

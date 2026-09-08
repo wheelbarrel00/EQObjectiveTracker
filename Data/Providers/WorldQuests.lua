@@ -526,6 +526,7 @@ function WorldQuests:GetEntryMenu(entry)
     menuOut[#menuOut + 1] = { kind = "title", text = entry.title, order = 0 }
     menuOut[#menuOut + 1] = { id = tracked and "untrack" or "track", order = 10 }
     menuOut[#menuOut + 1] = { id = "supertrack", order = 20 }
+    if entry.canGroup then menuOut[#menuOut + 1] = { id = "findgroup", order = 25 } end
     menuOut[#menuOut + 1] = { id = "wowhead",    order = 30 }
     return menuOut
 end
@@ -543,6 +544,8 @@ function WorldQuests:OnEntryMenuSelect(entryID, itemID)
         if ns.Has.WorldQuestWatchAPI then C_QuestLog.RemoveWorldQuestWatch(entryID) end
     elseif itemID == "supertrack" then
         if ns.Has.SuperTrack then C_SuperTrack.SetSuperTrackedQuestID(entryID) end
+    elseif itemID == "findgroup" then
+        self:OnEntryGroupFinder({ id = entryID })
     end
     if self._notifyDirty then self._notifyDirty() end
 end

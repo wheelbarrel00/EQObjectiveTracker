@@ -627,6 +627,8 @@ function Quests:GetEntryMenu(entry)
     menuOut[#menuOut + 1] = { id = isFocused(id) and "unfocus" or "focus",      order = 30 }
     menuOut[#menuOut + 1] = { id = "openlog", order = 40 }
     menuOut[#menuOut + 1] = { id = "popout",  order = 50 }
+    -- Not 35, which EQ claims above: a collision does not raise, it reorders by id spelling.
+    if entry.canGroup then menuOut[#menuOut + 1] = { id = "findgroup", order = 55 } end
     menuOut[#menuOut + 1] = { id = "wowhead", order = 60 }
     menuOut[#menuOut + 1] = { kind = "divider", order = 70 }
     menuOut[#menuOut + 1] = { id = "abandon", order = 80, danger = true }
@@ -650,6 +652,8 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
         self:OnEntryOpenLog({ id = entryID })
     elseif itemID == "popout" then
         openQuestDetailsPopup(entryID)
+    elseif itemID == "findgroup" then
+        self:OnEntryGroupFinder({ id = entryID })
     elseif itemID == "abandon" then
         refused = abandonQuest(entryID)
     end

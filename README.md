@@ -79,13 +79,14 @@ quest watches.
 
 ## What it tracks
 
-- **Quests and Campaign**, in separate sections, with objectives, completion, and a Find
-  Group button on any quest the game will form a group for
+- **Quests and Campaign**, in separate sections, with objectives, completion, and Find
+  Group on any quest the game will form a group for, both as a button on the row and on the
+  right-click menu
 - **World quests** in their own capped area, with the quest type on the marker, a
-  color-coded countdown, and a Find Group button where the game allows one. Every world
-  quest in your current zone is listed, not only the ones you have tracked, which you can
-  turn off. Pick one on the world map and it stays on the tracker wherever you go, for as
-  long as it is the quest you are following
+  color-coded countdown, and the same Find Group button and menu item where the game allows
+  one. Every world quest in your current zone is listed, not only the ones you have tracked,
+  which you can turn off. Pick one on the world map and it stays on the tracker wherever you
+  go, for as long as it is the quest you are following
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
   delve tier, and a clickable button for any spell the stage hands you
 - **Bonus objectives**, on their own movable HUD, including the bonus loot mechanics
@@ -129,10 +130,11 @@ events, which would otherwise not appear anywhere.
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
 Left-click a quest to super-track it on retail, or to focus it on Classic. Shift-click a quest
 while a chat box is open to drop it into chat, or with no chat box open to untrack it. Right-click
-opens a menu to pin, track, focus, open the quest log, pop out the details, look the quest up on
-Wowhead, or abandon it - the Classic menu is shorter, since popping out and abandoning need frames
-those clients do not have. A pinned quest stays on the tracker whatever your filters say. In
-manual sort mode you can also drag quests into whatever order you like.
+opens a menu to pin, track, focus, open the quest log, pop out the details, find a group, look
+the quest up on Wowhead, or abandon it - the Classic menu is shorter, since those clients have no
+group finder and popping out and abandoning need frames they do not have. A pinned quest stays
+on the tracker whatever your filters say. In manual sort mode you can also drag quests into
+whatever order you like.
 
 A setting that only applies while another one is on is dimmed while that one is off, so it is
 clear which settings are actually in effect.

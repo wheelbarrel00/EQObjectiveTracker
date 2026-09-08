@@ -123,8 +123,15 @@ function QuestGroups:Find(questID)
 end
 
 function QuestGroups:DebugLine()
-    local n, p = 0, 0
-    for _ in pairs(cache) do n = n + 1 end
+    local n, p, yes = 0, 0, {}
+    for qid, answer in pairs(cache) do
+        n = n + 1
+        if answer then yes[#yes + 1] = qid end
+    end
     for _ in pairs(pending) do p = p + 1 end
-    return ("quest groups: %d cached, %d pending, %d listener(s)"):format(n, p, #listeners)
+    -- Sorted, or pairs order makes two readings of an unchanged cache differ.
+    table.sort(yes)
+    local eligible = #yes > 0 and table.concat(yes, " ") or "none"
+    return ("quest groups: %d cached, %d can group (%s), %d pending, %d listener(s)")
+        :format(n, #yes, eligible, p, #listeners)
 end

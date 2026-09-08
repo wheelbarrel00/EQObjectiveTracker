@@ -9,6 +9,14 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.21.0", date = "2026-09-07",
+        sections = {
+            { head = "New Features", items = {
+                "Find Group is now on a quest's right-click menu, so you no longer have to hit the small eye icon on the row to reach it. It is there on ordinary quests and on world quests, and only on a quest the game will actually form a group for, so the menu does not offer it where it cannot work. Asked for by AIR.",
+            } },
+        },
+    },
+    {
         version = "1.20.1", date = "2026-09-05",
         sections = {
             { head = "Bug Fixes", items = {
