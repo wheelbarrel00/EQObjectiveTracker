@@ -5,6 +5,36 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.22.0] - 2026-09-08
+
+### New Features
+
+- Bonus objectives now show up on the tracker. Walking into one, such as a Temple Patrol in the
+  Vaults of Atal'Utek, gave you an objective the game was tracking and the tracker was not, with
+  nothing on screen to say why and no setting that brought it back. They now have a Bonus
+  Objectives section of their own, the way the default tracker gives them one, and the Bonus
+  Objectives filter turns them off again. It arrives under Quests, or at the bottom of the run if
+  you have already rearranged your sections, and you can move it wherever you want it under
+  Tracker, Section Order, the same as any other. Reported by Entmoot.
+
+### Bug Fixes
+
+- A long scenario name no longer runs off the side of the tracker. Names such as "Temple
+  Incursion: Cache of the Three" were drawn on a single line that simply carried on past the
+  edge of the frame. They wrap onto a second line now, and the header grows to fit. The
+  category line above the name wraps with it. Reported by Entmoot.
+- The stage name inside the scenario banner wraps instead of being cut short. "Defeat the Looming
+  Mutagenitor" read "Defeat the Looming Mutageni..." where the default tracker showed it in full.
+  A name too long for the banner art is still shortened, since there is only so much room on it.
+- The text inside the scenario banner is centered properly. It was lined up on the banner's frame
+  rather than on the banner art itself, and the two are not the same width, so the stage and its
+  name both sat noticeably to the left of the plaque they are drawn on. Reported by Entmoot.
+- Banner Alignment now puts the banner where it says it will. The banner art is wider than the
+  invisible frame it hangs in, and Left, Center and Right all lined up that frame rather than the
+  art you actually see. Right pushed the banner well off the side of the tracker, Center sat
+  noticeably right of center, and Left was the only setting that looked correct. The frame follows
+  the art now, so all three land where you would expect.
+
 ## [1.21.0] - 2026-09-07
 
 ### New Features

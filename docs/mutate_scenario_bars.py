@@ -14,6 +14,11 @@ adversarial pass found 7 of its 9 statements deletable with the harness green - 
 among them, which is what takes an orphaned criterion off SCREEN when a stage shrinks, and
 the one an #activeCriteria length check can never see.
 
+WIDENED 2026-09-08 to the sub-header's sizing and to _DrawBanner, after a user reported a long
+scenario name running off the right edge of the tracker and the banner's strings sitting
+off-center on the plaque. Everything above _DrawCriteria was out of scope by construction until
+then, so every mutant in those two sections below would have survived the whole tree green.
+
 Every mutation reintroduces a defect the harness is supposed to stand guard over. Any that still
 reports "0 failed" is an assertion that does not discriminate, and the run exits 1 naming it -
 unless the entry is marked EQUIVALENT, which means the mutation provably cannot change behavior
@@ -304,6 +309,199 @@ MUTANTS = [
     ("a container that answers no width at all raises inside math.max",
      "    local width    = math.max(1, container:GetWidth() or 1)",
      "    local width    = math.max(1, container:GetWidth())"),
+
+    # ------------------------------------------------- the sub-header, reported 2026-09-08
+    ("the title is never given a wrap width, which is the reported bug: it runs off the tracker",
+     "    subHeader.text:SetWidth(w)\n",
+     ""),
+
+    ("the category is never bounded, so a long one runs the same way the title did",
+     "    subHeader.cat:SetWidth(w)\n",
+     ""),
+
+    ("the width lands AFTER the height is measured, so a wrapped title still measures one line",
+     """    local w = headerTextWidth(self)
+    subHeader.text:SetWidth(w)
+    subHeader.cat:SetWidth(w)
+
+    -- Render reads subHeaderH for the first criteria row and the container height, so keep it
+    -- in step after a re-font
+    local h = headerHeight(self)""",
+     """    local h = headerHeight(self)
+    local w = headerTextWidth(self)
+    subHeader.text:SetWidth(w)
+    subHeader.cat:SetWidth(w)"""),
+
+    ("the one-tier header goes back to a flat 26, so a wrapped title is drawn over",
+     "    return math.max(SUBHEADER_H, textH + 6)",
+     "    return SUBHEADER_H"),
+
+    ("the padding is not taken off, so the title is bounded at the full tracker width",
+     "    local w = ((self.frame and self.frame:GetWidth()) or 0) - HEADER_PAD * 2",
+     "    local w = ((self.frame and self.frame:GetWidth()) or 0)"),
+
+    ("the substitution goes back to 1, so a container mid-layout wraps one character per line",
+     "    if w < 1 then return BANNER_W end",
+     "    if w < 1 then return 1 end"),
+
+    ("the substitution goes entirely, so nothing to measure sizes the title to minus sixteen",
+     "    if w < 1 then return BANNER_W end\n",
+     ""),
+
+    # Turned into a CLAMP rather than a substitution. That is the shape the first cut of this
+    # fix had, and the narrow-container case is the only thing that separates the two.
+    ("the substitution becomes a clamp, so a tracker narrower than the banner overflows",
+     """    if w < 1 then return BANNER_W end
+    return w""",
+     "    return math.max(BANNER_W, w)"),
+
+    ("a container with no width raises inside the subtraction rather than substituting",
+     "    local w = ((self.frame and self.frame:GetWidth()) or 0) - HEADER_PAD * 2",
+     "    local w = self.frame:GetWidth() - HEADER_PAD * 2"),
+
+    ("the stage stacks an anchor per draw, so a sizeless art after a sized one carries both",
+     "    banner.Stage:ClearAllPoints()\n",
+     ""),
+
+    ("the stage anchors to the art even when the art has no size, so it centers on nothing",
+     '    banner.Stage:SetPoint("TOP", hasArt and banner.NormalBG or banner, "TOP", 0, -STAGE_TOP)',
+     '    banner.Stage:SetPoint("TOP", banner.NormalBG, "TOP", 0, -STAGE_TOP)'),
+
+    ("an unthemed scenario keeps the previous one's tint on the plaque",
+     "        banner.ThemeOverlay:Hide()\n",
+     ""),
+
+    ("the name is drawn from the MIDDLE of its box, so a one-line name sinks down the plaque",
+     'banner.Name:SetJustifyV("TOP")',
+     'banner.Name:SetJustifyV("MIDDLE")'),
+
+    ("the name stops being centered in its box, so centering the box on the art buys nothing",
+     'banner.Name:SetJustifyH("CENTER")',
+     'banner.Name:SetJustifyH("LEFT")'),
+
+    ("ApplyHeaderFont's own nil guard goes, so a state with no sub-header raises",
+     "    local subHeader = self.subHeader\n    if not subHeader then return end\n",
+     "    local subHeader = self.subHeader\n"),
+
+    ("the two-tier header is measured without the gap between its tiers",
+     "        return (subHeader.cat:GetStringHeight() or 0) + CAT_GAP + textH + 6",
+     "        return (subHeader.cat:GetStringHeight() or 0) + textH + 6"),
+
+    ("the two-tier header is measured as though only the title were in it",
+     "        return (subHeader.cat:GetStringHeight() or 0) + CAT_GAP + textH + 6",
+     "        return textH + 6"),
+
+    ("the category is never re-fonted, so an appearance change never reaches it",
+     "    if subHeader.cat:IsShown() then Media:ApplyFont(subHeader.cat, -1) end\n",
+     ""),
+
+    # ------------------------------------------------------ the banner, reported the same day
+    ("the banner strings go back to being centered on the FRAME, which is the second report",
+     '    banner.Stage:SetPoint("TOP", hasArt and banner.NormalBG or banner, "TOP", 0, -STAGE_TOP)',
+     '    banner.Stage:SetPoint("TOP", banner, "TOP", 0, -STAGE_TOP)'),
+
+    ("the ART loses its kit offset while the frame keeps it, so their right edges stop agreeing",
+     '    banner.NormalBG:SetPoint("TOPLEFT", banner, "TOPLEFT", offsets.nx, offsets.ny)',
+     '    banner.NormalBG:SetPoint("TOPLEFT", banner, "TOPLEFT", 0, offsets.ny)'),
+
+    ("the frame goes back to a fixed BANNER_W, so RIGHT overhangs and CENTER sits right of center",
+     "    banner:SetSize(hasArt and (artW + offsets.nx) or BANNER_W, BANNER_H)",
+     "    banner:SetSize(BANNER_W, BANNER_H)"),
+
+    ("the frame takes the art's width raw, so a kit whose art hangs left overhangs by its offset",
+     "    banner:SetSize(hasArt and (artW + offsets.nx) or BANNER_W, BANNER_H)",
+     "    banner:SetSize(hasArt and artW or BANNER_W, BANNER_H)"),
+
+    ("art the client cannot size stops falling back, so the frame collapses to nothing",
+     "    banner:SetSize(hasArt and (artW + offsets.nx) or BANNER_W, BANNER_H)",
+     "    banner:SetSize(artW + offsets.nx, BANNER_H)"),
+
+    ("the atlas lands after the width is read, so the frame tracks the PREVIOUS scenario's art",
+     """    Util.SafeSetAtlas(banner.NormalBG, normalAtlas, true)
+    local artW   = banner.NormalBG:GetWidth() or 0
+    local hasArt = artW > 1""",
+     """    local artW   = banner.NormalBG:GetWidth() or 0
+    local hasArt = artW > 1
+    Util.SafeSetAtlas(banner.NormalBG, normalAtlas, true)"""),
+
+    ("the text width comes off the frame, so a wider header leaves the strings off-center",
+     "    local textW  = math.max(1, (hasArt and artW or BANNER_W) - BANNER_TEXT_PAD)",
+     "    local textW  = math.max(1, BANNER_W - BANNER_TEXT_PAD)"),
+
+    ("art the client could not size collapses both strings to a single pixel",
+     "    local textW  = math.max(1, (hasArt and artW or BANNER_W) - BANNER_TEXT_PAD)",
+     "    local textW  = math.max(1, artW - BANNER_TEXT_PAD)"),
+
+    ("the padding either side goes, so the strings run to the art's own edges",
+     "    local textW  = math.max(1, (hasArt and artW or BANNER_W) - BANNER_TEXT_PAD)",
+     "    local textW  = math.max(1, (hasArt and artW or BANNER_W))"),
+
+    ("the stage name keeps whatever width it was built with",
+     "    banner.Name:SetWidth(textW)\n",
+     ""),
+
+    # --------------------------------------------- the name box's height: wrap versus truncate
+    ("the name box keeps its fixed height, so a long stage name truncates instead of wrapping",
+     "    banner.Name:SetHeight(math.max(BANNER_NAME_H, room))\n",
+     ""),
+
+    ("the floor goes, so art too short for a second line collapses the name box",
+     "    banner.Name:SetHeight(math.max(BANNER_NAME_H, room))",
+     "    banner.Name:SetHeight(room)"),
+
+    ("the room is measured off the FRAME rather than the art, so it ignores the real header",
+     "    local room = (math.min(hasArt and artH or BANNER_H, BANNER_H)",
+     "    local room = (math.min(BANNER_H, BANNER_H)"),
+
+    ("the stage line's own height is dropped from the room, so the name overruns the art",
+     "                  - (STAGE_TOP + (banner.Stage:GetHeight() or 0) + STAGE_NAME_GAP)",
+     "                  - (STAGE_TOP + STAGE_NAME_GAP)"),
+
+    ("the bottom padding is dropped, so the name may sit flush against the art's edge",
+     "                  - BANNER_BOTTOM_PAD)",
+     "                  - 0)"),
+
+    ("the frame bound goes, so art taller than the banner puts the name over the criteria",
+     "    local room = (math.min(hasArt and artH or BANNER_H, BANNER_H)",
+     "    local room = ((hasArt and artH or BANNER_H)"),
+
+    ("the stage anchor stops falling back, so art with no size centers the text on its left edge",
+     '    banner.Stage:SetPoint("TOP", hasArt and banner.NormalBG or banner, "TOP", 0, -STAGE_TOP)',
+     '    banner.Stage:SetPoint("TOP", banner.NormalBG, "TOP", 0, -STAGE_TOP)'),
+
+    ("the title stops pinning its justification, so a widthed title draws centered",
+     '    subHeader.text:SetJustifyH("LEFT")\n',
+     ""),
+
+    # ------------------------------------ the three the singleton cases exist for. Every one of
+    # these was deletable with the file green while each case built its own sub-header.
+    ("the category is never re-shown, so a delve after an ordinary scenario draws no category",
+     "        subHeader.cat:Show()\n",
+     ""),
+
+    ("the title keeps its one-tier anchor, so a two-tier title is drawn at both",
+     "        subHeader.cat:ClearAllPoints()\n        subHeader.text:ClearAllPoints()",
+     "        subHeader.cat:ClearAllPoints()"),
+
+    ("the category stacks an anchor per scenario rather than being re-anchored",
+     "        subHeader.cat:ClearAllPoints()\n        subHeader.text:ClearAllPoints()",
+     "        subHeader.text:ClearAllPoints()"),
+
+    ("the banner keeps every alignment it has ever been given",
+     "    banner:ClearAllPoints()\n",
+     ""),
+
+    ("the art is centered on the frame rather than pinned to its top-left, which is the bug",
+     '    banner.NormalBG:SetPoint("TOPLEFT", banner, "TOPLEFT", offsets.nx, offsets.ny)',
+     '    banner.NormalBG:SetPoint("CENTER", banner, "CENTER", offsets.nx, offsets.ny)'),
+
+    ("the art is not sized from its own atlas, so there is no width to center anything on",
+     "    Util.SafeSetAtlas(banner.NormalBG, normalAtlas, true)",
+     "    Util.SafeSetAtlas(banner.NormalBG, normalAtlas)"),
+
+    ("the texture kit fallback is inverted, so a kit that HAS header art is refused it",
+     "    if not Util.AtlasExists(normal) then",
+     "    if Util.AtlasExists(normal) then"),
 ]
 
 

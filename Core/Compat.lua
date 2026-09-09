@@ -45,6 +45,11 @@ Has.WorldQuestTime      = method(C_TaskQuest, "GetQuestTimeLeftMinutes")
 Has.TaskQuests          = method(C_TaskQuest, "GetQuestsOnMap")
                           or method(C_TaskQuest, "GetQuestsForPlayerByMapID")
 Has.TaskQuestInfo       = method(C_TaskQuest, "GetQuestInfoByQuestID")
+-- Blizzard's own bonus objective tracker reads these two and nothing else, gating each entry
+-- on GetTaskInfo's numObjectives and isInArea. Bare globals with no C_ twin, so global().
+-- Measured present on 12.1, 2026-09-08.
+Has.TasksTable          = global("GetTasksTable")
+Has.TaskInfo            = global("GetTaskInfo")
 -- Answers whether a task quest is live. The other signals only ever say a quest is timed, in
 -- the log, or on a map near the player, and a watched world quest in another zone is none of
 -- those. Measured present on 12.1, 2026-09-03.

@@ -18,6 +18,11 @@ Sections.TITLES = {
     quests       = L["Quests"],
     campaign     = L["Campaign"],
     worldquests  = L["World Quests"],
+    -- Blizzard's own string rather than a phrase of ours: it is already translated on every
+    -- client, and the addon has no business inventing a word the game already has. It is nil
+    -- on a client without the header, where Title falls back to the raw id - unreachable,
+    -- because only the retail-only WorldQuests provider declares this group.
+    bonusobjectives = TRACKER_HEADER_BONUS_OBJECTIVES,
     achievements = L["Achievements"],
     scenarios    = L["Scenario"],
     endeavors    = L["Endeavors"],
@@ -40,9 +45,14 @@ Sections.VIRTUAL = { zoneprogress = true }
 
 -- Kept out of the AceDB defaults on purpose. AceDB merges an array default per index and
 -- strips matching indices at logout, so a saved order comes back sparse and adding an entry
--- here would shift every later index and rewrite the user's run. worldquests is absent
+-- to THAT table would shift every later index and rewrite the user's run. Adding one here is
+-- free, which is the whole reason this list lives outside the defaults. worldquests is absent
 -- because its placement comes from worldQuestsPosition, not from this order.
-Sections.DEFAULT_ORDER = { "zoneprogress", "campaign", "quests", "profession", "endeavors" }
+-- bonusobjectives sits after quests to match where the stock tracker draws it. An existing
+-- profile has a saved order without it, so Order's fallback pass appends it at the end there
+-- rather than moving anything the player arranged.
+Sections.DEFAULT_ORDER = { "zoneprogress", "campaign", "quests", "bonusobjectives",
+                           "profession", "endeavors" }
 
 function Sections:Title(groupID)
     return self.TITLES[groupID] or groupID

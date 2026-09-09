@@ -89,6 +89,12 @@ read_globals = {
     -- A percentage objective's real fill, and it is a bare global on retail with no C_QuestLog
     -- twin - C_QuestLog.GetQuestProgressBarPercent does not exist.
     "GetQuestProgressBarPercent",
+    -- Bare globals with no C_ twin, and the only route to a bonus objective this addon has.
+    "GetTasksTable", "GetTaskInfo",
+    -- A Blizzard global string, so it is translated on every client and costs the manifest
+    -- nothing. Named to match the Bonus Objectives filter rather than the stock tracker,
+    -- which draws these under OBJECTIVES_TRACKER_LABEL.
+    "TRACKER_HEADER_BONUS_OBJECTIVES",
 
     -- Read on every flavor, not only Classic. BackdropTemplateMixin guards 13 CreateFrame
     -- template arguments across UI/ and Options/, and QuestWatchFrame is Blizzard's tracker

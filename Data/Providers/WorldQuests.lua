@@ -12,7 +12,7 @@ local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
 
 local WorldQuests = {
     id       = "worldquests",
-    groups   = { "worldquests" },
+    groups   = { "worldquests", "bonusobjectives" },
     -- Ahead of the quests provider on purpose. A world quest you are standing inside is
     -- also in the quest log, so both providers emit it - and in EQ a world quest always
     -- belongs to its own section, never to Quests. Claiming first is what guarantees
@@ -38,7 +38,7 @@ local candidates, seen, watched = {}, {}, {}
 -- this answers "is it still out there" rather than "who found it first".
 local onMap = {}
 local sourceStats = { watched = 0, autozone = 0, inzone = 0, questlog = 0, supertrack = 0,
-                      wq = 0, bonus = 0, logOwned = 0 }
+                      tasktable = 0, wq = 0, bonus = 0, logOwned = 0 }
 local currentSource
 -- Values only, formatted on demand in DebugLine. GetEntries runs on the render path, so
 -- building the strings here would allocate on every repaint for a line nobody has asked for.
@@ -79,15 +79,16 @@ function WorldQuests:DebugLine()
             detailLive[i] or "",
             detailNamed[i] and "" or "/noname")
     end
-    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d, super-track %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, list map %s%s, raw map list %d, liveness %s, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s\n      candidates: %s")
+    return ("sources: watched %d, zone-list %d, in-zone %d, quest log %d, tasks %d, super-track %d   map %s\n      kinds: %d real world quests, %d task/bonus, %d normal log quests (left to Quests)\n      autoList %s, list map %s%s, raw map list %d, liveness %s, api IsWorldQuest=%s IsQuestWorldQuest=%s time=%s tasks=%s\n      candidates: %s")
         :format(sourceStats.watched, sourceStats.autozone, sourceStats.inzone,
-                sourceStats.questlog, sourceStats.supertrack, tostring(m),
+                sourceStats.questlog, sourceStats.tasktable, sourceStats.supertrack, tostring(m),
                 sourceStats.wq, sourceStats.bonus, sourceStats.logOwned,
                 tostring(autoListOn), tostring(zoneListMap),
                 zoneListClimbed and " (climbed)" or "", rawZoneList, liveness,
                 tostring(C_QuestLog.IsWorldQuest ~= nil),
                 tostring(QuestUtils_IsQuestWorldQuest ~= nil),
                 tostring(ns.Has.WorldQuestTime and true or false),
+                tostring(ns.Has.TasksTable and ns.Has.TaskInfo or false),
                 detailN > 0 and table.concat(detailBuf, "  ", 1, detailN) or "none")
 end
 
@@ -198,6 +199,28 @@ local function isWorldQuest(qid)
     return false
 end
 
+-- The only source that can see a BONUS OBJECTIVE: 95580 is in the quest log only as a HIDDEN
+-- entry, so addQuestLogTaskQuests's not info.isHidden gate excludes it and no map list carries
+-- it. World quests are skipped, as Blizzard skips them here, which also keeps this from listing
+-- them for a player who has autoListZoneWorldQuests switched off.
+local function addTaskTableQuests()
+    if not (ns.Has.TasksTable and ns.Has.TaskInfo) then return end
+    local ok, tasks = pcall(GetTasksTable)
+    if not ok or type(tasks) ~= "table" then return end
+    for i = 1, #tasks do
+        local qid = tasks[i]
+        if qid and not isWorldQuest(qid) then
+            -- Blizzard's own gate. GetTaskInfo answers nil for every field until the player is
+            -- inside the area, which is what separates a live bonus objective from one merely
+            -- registered nearby. The truth test is guarded rather than only the call, for the
+            -- reason taskIsActive records.
+            local infoOK, isInArea, _, numObjectives = pcall(GetTaskInfo, qid)
+            local secret = _issecret and (_issecret(isInArea) or _issecret(numObjectives))
+            if infoOK and not secret and numObjectives and isInArea then push(qid) end
+        end
+    end
+end
+
 -- Lists every world quest on the map you are standing in, watched or not. No inProgress
 -- gate, which is what makes unstarted ones appear.
 --
@@ -287,8 +310,8 @@ local function taskIsActive(questID)
     if not ns.Has.TaskQuestActive then return false end
     local ok, active = pcall(C_TaskQuest.IsActive, questID)
     -- The truth test is guarded, not just the call. A Midnight secret value raises when it is
-    -- matched, and it would raise HERE rather than inside the pcall - taking stillLive,
-    -- GetEntries and the whole section with it.
+    -- matched, and it would raise HERE rather than inside the pcall - taking stillLive and
+    -- GetEntries with it, and Data/Feed.lua calls GetEntries bare, so that is the whole render.
     if not ok or (_issecret and _issecret(active)) then return false end
     return active and true or false
 end
@@ -397,7 +420,7 @@ function WorldQuests:GetEntries()
     wipe(seen)
     wipe(onMap)
     sourceStats.watched, sourceStats.inzone, sourceStats.questlog = 0, 0, 0
-    sourceStats.autozone, sourceStats.supertrack = 0, 0
+    sourceStats.autozone, sourceStats.supertrack, sourceStats.tasktable = 0, 0, 0
     sourceStats.wq, sourceStats.bonus, sourceStats.logOwned = 0, 0, 0
     rawZoneList = 0
     mapListRead = false
@@ -411,6 +434,9 @@ function WorldQuests:GetEntries()
     currentSource = "autozone"; addZoneWorldQuests()
     currentSource = "inzone";   addInZoneTaskQuests()
     currentSource = "questlog"; addQuestLogTaskQuests()
+    -- Ahead of super-track for the same reason super-track runs last: push credits the FIRST
+    -- source to find an id, so `tasks N` means the bonus objectives nothing else could see.
+    currentSource = "tasktable"; addTaskTableQuests()
     currentSource = "supertrack"; addSuperTracked()
     currentSource = nil
 
@@ -475,6 +501,14 @@ function WorldQuests:GetEntries()
 
             wipe(e.tags)
             if wq then e.tags.worldquest = true else e.tags.bonus = true end
+            -- A bonus objective is not a world quest and Blizzard draws it under a header of
+            -- its own, so it gets a section of its own here too. Same shape as Quests, which
+            -- splits campaign off the same way: one provider, two groups, chosen per entry.
+            -- Both have to be DECLARED above or Entry:Validate refuses the entry in debug.
+            e.groupID = wq and "worldquests" or "bonusobjectives"
+            -- Written on both branches: a pooled entry keeps the store default from whatever
+            -- it drew last, and Blizzard gives a bonus objective no icon at all.
+            e.icon.kind  = wq and ICON.WORLDQUEST or ICON.NONE
 
             e.icon.atlas = typeAtlas(qid)
             e.canGroup   = canCreateGroup(qid)
@@ -519,12 +553,18 @@ local menuOut = {}
 -- abandon - which is exactly the set EQ offers on its own world quest rows.
 function WorldQuests:GetEntryMenu(entry)
     local id = entry.id
-    local tracked = ns.Has.WorldQuests and C_QuestLog.GetQuestWatchType
+    -- A bonus objective has no world quest watch, so it is offered neither verb: Track would
+    -- dispatch AddWorldQuestWatch at a quest that API does not take, and the row would go on
+    -- saying Track however often it was pressed. Asked so an unset groupID keeps today's answer.
+    local isWQ = entry.groupID ~= "bonusobjectives"
+    local tracked = isWQ and ns.Has.WorldQuests and C_QuestLog.GetQuestWatchType
                     and C_QuestLog.GetQuestWatchType(id) ~= nil
 
     for i = #menuOut, 1, -1 do menuOut[i] = nil end
     menuOut[#menuOut + 1] = { kind = "title", text = entry.title, order = 0 }
-    menuOut[#menuOut + 1] = { id = tracked and "untrack" or "track", order = 10 }
+    if isWQ then
+        menuOut[#menuOut + 1] = { id = tracked and "untrack" or "track", order = 10 }
+    end
     menuOut[#menuOut + 1] = { id = "supertrack", order = 20 }
     if entry.canGroup then menuOut[#menuOut + 1] = { id = "findgroup", order = 25 } end
     menuOut[#menuOut + 1] = { id = "wowhead",    order = 30 }
@@ -580,9 +620,10 @@ function WorldQuests:ProbeLines()
     -- showOnlyWatched is deliberately not printed: this provider never writes entry.isTracked,
     -- so the store default of true means that filter can never reject one of these rows. The
     -- three below can, and none of them was reported before.
-    add("wqprobe: autoList=%s showWorld=%s showBonus=%s sectionHidden=%s superTracked=%s",
+    add("wqprobe: autoList=%s showWorld=%s showBonus=%s hidden=wq:%s bonus:%s superTracked=%s",
         tostring(autoListOn), tostring(flt.showWorld ~= false),
         tostring(flt.showBonus ~= false), tostring(hid.worldquests == true),
+        tostring(hid.bonusobjectives == true),
         tostring(superTracked ~= 0 and superTracked or nil))
 
     -- Verdicts in the order the walk actually decides, so the FIRST one printed is the cause.
@@ -633,6 +674,40 @@ function WorldQuests:ProbeLines()
             end
         end
         m = zoneParent(m)
+    end
+
+    -- Every tasks-table entry, pushed or not. A bonus objective is on no map list and is in
+    -- the quest log only as a hidden entry, so without this the probe prints nothing for one. inArea and objectives
+    -- are printed because they are the gate: nil means the player is outside the area.
+    -- Gated on BOTH globals, as the source is, or a client carrying only one prints every entry
+    -- as though the gate had rejected it.
+    if not (ns.Has.TasksTable and ns.Has.TaskInfo) then
+        add("tasks table: this client is missing %s",
+            not ns.Has.TasksTable and "GetTasksTable" or "GetTaskInfo")
+    else
+        local okT, tasks = pcall(GetTasksTable)
+        add("tasks table: %s entries", (okT and type(tasks) == "table")
+            and tostring(#tasks) or "UNREADABLE")
+        for i = 1, ((okT and type(tasks) == "table") and #tasks or 0) do
+            local qid = tasks[i]
+            -- A hole in the table would otherwise reach the client APIs below as a nil id.
+            if qid then
+                local okLine, line = pcall(function()
+                    local infoOK, isInArea, _, numObjectives = pcall(GetTaskInfo, qid)
+                    return ("  %s %s | wq=%s inArea=%s objectives=%s | %s"):format(
+                        tostring(qid), tostring(title(qid) or "(no title)"),
+                        tostring(isWorldQuest(qid)),
+                        tostring(infoOK and isInArea), tostring(infoOK and numObjectives),
+                        store:Get(qid) and "EMITTED"
+                            or (seen[qid] and "a candidate, not emitted") or "not pushed")
+                end)
+                add(okLine and line
+                    or ("  %s READING THIS TASK RAISED: %s"):format(tostring(qid), tostring(line)))
+                -- Deliberately NOT marked printed. The candidates block below is what carries
+                -- verdict(), and a bonus objective dropped before emit is exactly the candidate
+                -- somebody needs the reason for.
+            end
+        end
     end
 
     -- The candidates no map list carries: watched, super-tracked, or found in the quest log. A

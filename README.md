@@ -21,8 +21,8 @@ supported.** That support is newer than the retail support and has had several r
 fixes, so the gaps listed below are real ones rather than a disclaimer. Please report anything
 you find rather than assuming it is known.
 
-On retail it tracks quests and campaign quests, world quests, scenarios and delves,
-achievements, professions, and endeavors, covering both the Traveler's Log monthly
+On retail it tracks quests and campaign quests, world quests and bonus objectives, scenarios
+and delves, achievements, professions, and endeavors, covering both the Traveler's Log monthly
 activities and the neighborhood tasks you have tracked.
 
 ### What works on Classic today
@@ -47,8 +47,8 @@ focusing a quest also points a TomTom arrow at it.
 
 - **No map pins.** Those come from the companion addon - see below. The TomTom arrow needs it
   too, so on the tracker alone a focused quest is the tint and nothing more.
-- World quests, scenarios, achievements, endeavors and tracked recipes have no section.
-  Most need APIs these clients do not have.
+- World quests and bonus objectives, scenarios, achievements, endeavors and tracked recipes
+  have no section. Most need APIs these clients do not have.
 - **No Find Group button.** These clients have no group finder for quests.
 - **Timed quests show no countdown**, and Blizzard's own timer box is left on screen.
 - The zone progress bar stays empty. Its zone routing data covers Midnight only.
@@ -87,12 +87,15 @@ quest watches.
   one. Every world quest in your current zone is listed, not only the ones you have tracked,
   which you can turn off. Pick one on the world map and it stays on the tracker wherever you
   go, for as long as it is the quest you are following
+- **Bonus objectives**, in a section of their own the way the default tracker gives them one.
+  They appear when you walk into one and go away when you leave, and they have their own
+  filter, so you can turn them off without touching world quests
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
   delve tier, and a clickable button for any spell the stage hands you
-- **Bonus objectives**, on their own movable HUD, including the bonus loot mechanics
-  inside a delve and a lives and deaths readout for the run. Its background and its border
-  are yours to recolor, or to switch off entirely and leave the text floating. Off by
-  default
+- **The bonus objectives HUD**, a separate movable readout rather than a tracker section,
+  covering the bonus loot mechanics inside a delve and a lives and deaths readout for the run.
+  Its background and its border are yours to recolor, or to switch off entirely and leave the
+  text floating. Off by default
 - **Achievements**, **professions** with reagent counts, and **endeavors**, covering both the
   Traveler's Log monthly activities and the neighborhood tasks you have tracked, which the
   default tracker draws together under that same header

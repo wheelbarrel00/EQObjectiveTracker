@@ -8,6 +8,9 @@ local L        = ns.L
 local LINE = Entry.LINE
 
 local SUBHEADER_H       = 26
+-- The sub-header's own inset. The anchors below set the left one and headerTextWidth takes it
+-- off both sides, so the two have to agree or the title wraps at the wrong width.
+local HEADER_PAD        = 8
 local CAT_GAP           = 1
 local BANNER_GAP        = 6
 local CRITERIA_LINE_GAP = 4
@@ -21,6 +24,18 @@ local BAR_TEXT_GAP      = 6
 local BAR_W_RATIO       = 0.85
 local BANNER_W          = 201
 local BANNER_H          = 83
+-- What the fixed 172 the banner strings used to carry actually was: BANNER_W less 29 of
+-- padding. The art is sized by its own atlas, and the evergreen header measures 252.5 against
+-- this 201, so every string drew off-center until _DrawBanner centered them on the art.
+local BANNER_TEXT_PAD   = BANNER_W - 172
+-- The stage line's inset from the top of the art and the gap under it. Named because the name
+-- box below is derived from the room they leave, so a change to one moves the other.
+local STAGE_TOP         = 10
+local STAGE_NAME_GAP    = 4
+-- A floor, not the answer. It is the height the name box has always had, so a name that fits
+-- on one line today lays out unchanged. Only one that used to truncate gains a second line.
+local BANNER_NAME_H     = 28
+local BANNER_BOTTOM_PAD = 6
 
 local HEADER_COLOR   = { 0.93, 0.32, 0.10 }
 local CATEGORY_COLOR = { 0.78, 0.78, 0.78 }
@@ -126,6 +141,10 @@ function Scenario:Build(container)
     subHeader.text = subHeader:CreateFontString(nil, "OVERLAY",
         ObjectiveTrackerHeaderFont and "ObjectiveTrackerHeaderFont" or "GameFontNormalLarge")
     if not subHeader.text:GetFont() then subHeader.text:SetFontObject("GameFontNormalLarge") end
+    -- Explicit because ApplyHeaderFont gives this a width now. An unwidthed FontString is its
+    -- own text, so justification was inert on it. A widthed one honors it and is not LEFT by
+    -- default, which is why subHeader.cat has always set it.
+    subHeader.text:SetJustifyH("LEFT")
     subHeader.text:SetTextColor(HEADER_COLOR[1], HEADER_COLOR[2], HEADER_COLOR[3])
 
     local banner = CreateFrame("Frame", nil, container)
@@ -147,18 +166,41 @@ function Scenario:Build(container)
     banner.Stage:SetTextColor(1, 0.914, 0.682)
 
     banner.Name = banner:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    banner.Name:SetSize(172, 28)
+    -- A build-time seed only. _DrawBanner sizes both axes from the art before any draw.
+    banner.Name:SetSize(BANNER_W - BANNER_TEXT_PAD, BANNER_NAME_H)
     banner.Name:SetJustifyH("CENTER")
     banner.Name:SetJustifyV("TOP")
     banner.Name:SetSpacing(2)
     banner.Name:SetTextColor(1, 0.831, 0.380)
-    banner.Name:SetPoint("TOP", banner.Stage, "BOTTOM", 0, -4)
+    banner.Name:SetPoint("TOP", banner.Stage, "BOTTOM", 0, -STAGE_NAME_GAP)
 
     banner.Stage._baseFont = { banner.Stage:GetFont() }
     banner.Name._baseFont  = { banner.Name:GetFont() }
 
     self.subHeader = subHeader
     self.banner    = banner
+end
+
+-- A FontString anchored on one side alone has no width, so it never wraps and it measures as a
+-- single line however long it is. That is why a long scenario name ran off the tracker's edge,
+-- and it is the trap _DrawCriteria records against GetStringHeight.
+local function headerTextWidth(self)
+    -- Substituted when there is nothing to measure, never clamped: a real container narrower
+    -- than the banner keeps its own width, and a 1px wrap would measure a title one character
+    -- per line. The sub-header cannot stand in - it is anchored to the container at x offset 0.
+    local w = ((self.frame and self.frame:GetWidth()) or 0) - HEADER_PAD * 2
+    if w < 1 then return BANNER_W end
+    return w
+end
+
+local function headerHeight(self)
+    local subHeader = self.subHeader
+    local textH = subHeader.text:GetStringHeight() or 0
+    if subHeader.cat:IsShown() then
+        return (subHeader.cat:GetStringHeight() or 0) + CAT_GAP + textH + 6
+    end
+    -- Floored at the height it has always been, so a one-line title lays out exactly as before
+    return math.max(SUBHEADER_H, textH + 6)
 end
 
 function Scenario:ApplyHeaderLabels(category, name)
@@ -179,37 +221,32 @@ function Scenario:ApplyHeaderLabels(category, name)
         subHeader.cat:Show()
         subHeader.cat:ClearAllPoints()
         subHeader.text:ClearAllPoints()
-        subHeader.cat:SetPoint("TOPLEFT", subHeader, "TOPLEFT", 8, -1)
+        subHeader.cat:SetPoint("TOPLEFT", subHeader, "TOPLEFT", HEADER_PAD, -1)
         subHeader.text:SetPoint("TOPLEFT", subHeader.cat, "BOTTOMLEFT", 0, -CAT_GAP)
-        local h = subHeader.cat:GetStringHeight() + CAT_GAP
-                  + subHeader.text:GetStringHeight() + 6
-        self.subHeaderH = h
-        subHeader:SetHeight(h)
     else
         subHeader.cat:Hide()
         subHeader.text:ClearAllPoints()
-        subHeader.text:SetPoint("LEFT", subHeader, "LEFT", 8, 0)
-        self.subHeaderH = SUBHEADER_H
-        subHeader:SetHeight(SUBHEADER_H)
+        subHeader.text:SetPoint("LEFT", subHeader, "LEFT", HEADER_PAD, 0)
     end
 end
 
--- ApplyHeaderLabels memoizes on the scenario identity, so the font has to be re-applied
--- separately or an appearance change would not land until the stage did.
+-- ApplyHeaderLabels memoizes on the scenario identity, so the font, the wrap width and the
+-- height all belong here instead. Sizing there would never re-run on a tracker resize.
 function Scenario:ApplyHeaderFont()
     local subHeader = self.subHeader
     if not subHeader then return end
     local Media = ns:GetModule("Media")
     Media:ApplyFont(subHeader.text, 4)
+    if subHeader.cat:IsShown() then Media:ApplyFont(subHeader.cat, -1) end
 
-    local h = SUBHEADER_H
-    if subHeader.cat:IsShown() then
-        Media:ApplyFont(subHeader.cat, -1)
-        h = subHeader.cat:GetStringHeight() + CAT_GAP
-            + subHeader.text:GetStringHeight() + 6
-    end
+    -- Width before height, for the reason headerTextWidth records
+    local w = headerTextWidth(self)
+    subHeader.text:SetWidth(w)
+    subHeader.cat:SetWidth(w)
+
     -- Render reads subHeaderH for the first criteria row and the container height, so keep it
     -- in step after a re-font
+    local h = headerHeight(self)
     if h ~= self.subHeaderH then
         self.subHeaderH = h
         subHeader:SetHeight(h)
@@ -254,7 +291,18 @@ function Scenario:_DrawBanner(info, cfg)
     local normalAtlas, finalAtlas, resolvedKit = pickAtlases(info.textureKit)
     local offsets = TEXTURE_KIT_OFFSETS[resolvedKit] or DEFAULT_OFFSETS
 
-    banner:SetSize(BANNER_W, BANNER_H)
+    -- Resolved before the frame is sized, because the frame tracks the art's own width and
+    -- the atlas is what carries it.
+    Util.SafeSetAtlas(banner.NormalBG, normalAtlas, true)
+    local artW   = banner.NormalBG:GetWidth() or 0
+    local hasArt = artW > 1
+
+    -- Alignment anchors the FRAME while the player sees the ART, so a frame narrower than its
+    -- own art draws RIGHT past the tracker's edge and CENTER right of center. Measured against
+    -- a frame of 201: the Midnight kit's art is 249, evergreen's 252.5. nx is added because the
+    -- art is pinned at the frame's left PLUS nx, so the sum is what puts their right edges on
+    -- the same line. The only kit with a non-zero nx has a NEGATIVE one.
+    banner:SetSize(hasArt and (artW + offsets.nx) or BANNER_W, BANNER_H)
 
     local align = (cfg and cfg.scenarioTextAlign) or "CENTER"
     banner:ClearAllPoints()
@@ -266,7 +314,6 @@ function Scenario:_DrawBanner(info, cfg)
         banner:SetPoint("TOP",      subHeader, "BOTTOM",      0, -BANNER_GAP)
     end
 
-    Util.SafeSetAtlas(banner.NormalBG, normalAtlas, true)
     banner.NormalBG:ClearAllPoints()
     banner.NormalBG:SetPoint("TOPLEFT", banner, "TOPLEFT", offsets.nx, offsets.ny)
     banner.NormalBG:Show()
@@ -293,8 +340,26 @@ function Scenario:_DrawBanner(info, cfg)
     -- No UIWidgetContainer here on purpose. Registering one against Blizzard's shared widget
     -- set was reported killing the next tooltip to close with widgets on it. UI/WidgetBlock.lua
     -- reads those widgets and draws our own frames from them instead.
+
+    -- An atlas that resolves without a size falls back to the frame throughout, the stage
+    -- anchor below included, or the text would center on a zero-width texture's left edge.
+    local textW  = math.max(1, (hasArt and artW or BANNER_W) - BANNER_TEXT_PAD)
+    banner.Stage:SetWidth(textW)
+    banner.Name:SetWidth(textW)
+
+    -- A FontString with an explicit height truncates rather than wraps, and this one was a
+    -- fixed 28, which holds a single line. Derived from the room left under the stage line
+    -- instead, bounded by BANNER_H as well as the art because the criteria below are laid out
+    -- from the frame, and floored at BANNER_NAME_H so a name that fits today is unchanged.
+    -- Stage's height is the explicit 18 it is built with, not a measured one.
+    local artH = banner.NormalBG:GetHeight() or 0
+    local room = (math.min(hasArt and artH or BANNER_H, BANNER_H)
+                  - (STAGE_TOP + (banner.Stage:GetHeight() or 0) + STAGE_NAME_GAP)
+                  - BANNER_BOTTOM_PAD)
+    banner.Name:SetHeight(math.max(BANNER_NAME_H, room))
+
     banner.Stage:ClearAllPoints()
-    banner.Stage:SetPoint("TOP", banner, "TOP", 0, -10)
+    banner.Stage:SetPoint("TOP", hasArt and banner.NormalBG or banner, "TOP", 0, -STAGE_TOP)
     if info.isFinalStage then
         banner.Stage:SetText(L["Final Stage"])
     elseif info.numStages > 1 then
