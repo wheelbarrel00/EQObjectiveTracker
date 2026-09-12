@@ -5,6 +5,7 @@ local Registry   = ns:GetModule("Registry")
 local QuestItems = ns:GetModule("QuestItems")
 local Focus      = ns:GetModule("Focus")
 local TrackedSet = ns:GetModule("TrackedSet")
+local QuestCache = ns:GetModule("QuestCache")
 
 local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
 
@@ -115,6 +116,47 @@ local function getTagID(id)
     return tagID
 end
 
+-- Blizzard's own QuestTimerFrame reads exactly this pair, and that is why it is the source
+-- rather than GetQuestLogTimeLeft: the frame UI/Blizzard.lua hides and the countdown drawn in
+-- its place then answer from one place, so a client where that frame would have drawn a timer
+-- is a client where this answers. It also leaves the quest log SELECTION alone, where
+-- GetQuestLogTimeLeft reads whatever entry is selected and would need it moved and put back.
+--
+-- Walked with select rather than a packed table: a nil anywhere in that return leaves a hole
+-- where # is undefined. tonumber rather than a type test on both values: the documented
+-- return is a STRING of seconds, and refusing one silently costs a timer already hidden.
+local timerSecs = {}
+local function gatherTimers(ok, ...)
+    if not ok then return end
+    for slot = 1, select("#", ...) do
+        local raw = select(slot, ...)
+        local secs = tonumber(raw)
+        if secs and secs > 0 then
+            local gotIndex, index = pcall(GetQuestIndexForTimer, slot)
+            local at = gotIndex and tonumber(index)
+            if at and at > 0 then
+                timerSecs[at] = secs
+            end
+        end
+    end
+end
+
+-- Reused rather than returned fresh: this runs on the rebuild path, which is the one place
+-- this file already refuses to allocate per quest.
+local function readTimers()
+    wipe(timerSecs)
+    if ns.Has.QuestTimers then gatherTimers(pcall(GetQuestTimers)) end
+    return timerSecs
+end
+
+-- Assigned on every pass rather than only when a timer exists, because entries are POOLED: a
+-- quest whose timer has ended would otherwise inherit the deadline of whatever quest held the
+-- table before it and count down against nothing.
+local function fillTimer(e, timers, index)
+    local secs = index and timers[index] or nil
+    e.expiresAt = (secs and secs > 0) and (time() + secs) or nil
+end
+
 -- isComplete arrives nil while in progress, 1 when complete and -1 when failed.
 local function questState(isComplete)
     if isComplete == -1 then return STATE.FAILED end
@@ -167,6 +209,8 @@ local function fillLines(e, id, index)
 
     local objs = ns.Has.QuestObjectives and C_QuestLog.GetQuestObjectives(id) or nil
     local n    = objs and #objs or 0
+
+    QuestCache:Note(id, objs, e.state == STATE.COMPLETE)
 
     if n > 0 then
         for i = 1, n do
@@ -237,7 +281,9 @@ local function fullRebuild()
     local firstSeen = stamps()
     local currentHeader
     local watchedDuringWalk = 0
+    local timers = readTimers()
     store:Begin()
+    QuestCache:Begin()
 
     -- Bounded by a ceiling and stopped at the first nil title, NOT by GetNumQuestLogEntries.
     -- That count returns only the VISIBLE rows, so it drops to the header count when the
@@ -274,6 +320,7 @@ local function fullRebuild()
                 e.icon.classification = nil
                 e.hasItem   = QuestItems:Has(id)
                 fillTags(e, id, t[T_FREQ])
+                fillTimer(e, timers, i)
                 e.groupID = "quests"
                 fillLines(e, id, i)
             end
@@ -281,13 +328,15 @@ local function fullRebuild()
     end
 
     store:Finish()
+    local cacheReady = QuestCache:Finish()
 
-    -- Pruned only against a log that actually returned something. A cold login can present
-    -- an empty one, and pruning against that would drop every persisted stamp. That test is
-    -- one-sided though: a walk that returned SOME quests still says nothing about the ones
-    -- that have not streamed in, and they look identical to quests that are gone. So absence
-    -- has to repeat, exactly as the tracked-set prune above already requires.
-    if next(store:Out()) ~= nil then
+    -- Pruned only against a log that returned something AND that the game had finished
+    -- streaming. Emptiness alone is one-sided: a walk that returned SOME quests says nothing
+    -- about the ones that have not arrived, and those look exactly like quests that are gone,
+    -- so absence still has to repeat the way the tracked-set prune below requires. What
+    -- readiness adds is that a login walk spends no strike at all, and that the NEW tag
+    -- baseline is taken from a log that is all there rather than merely not empty.
+    if cacheReady and next(store:Out()) ~= nil then
         for id in pairs(firstSeen) do
             if store:Get(id) then
                 seenMisses[id] = nil
@@ -319,12 +368,13 @@ local function fullRebuild()
     -- from Tracker:Render, which returns early while the tracker is hidden, so a quest accepted
     -- behind a visibility rule reached the set before any rebuild did. Prune no-ops while the
     -- set is absent, so nothing here has to know which state it is in.
-    if next(store:Out()) ~= nil then
+    if cacheReady and next(store:Out()) ~= nil then
         TrackedSet:Prune(stillInLog)
     end
 end
 
 local function refreshDynamic()
+    local timers = readTimers()
     for id, e in store:Each() do
         local i = logIndex(id)
         e.isTracked = isWatched(id)
@@ -333,6 +383,10 @@ local function refreshDynamic()
             local t = { GetQuestLogTitle(i) }
             e.state = questState(t[T_COMPLETE])
         end
+        -- Re-read on the cheap path too. expiresAt is an absolute time and so cannot drift,
+        -- but a timer STARTING is a quest log change rather than a new quest, and this is the
+        -- path that change takes.
+        fillTimer(e, timers, i)
         fillLines(e, id, i)
     end
     lastDynAt = time()

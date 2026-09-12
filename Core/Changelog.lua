@@ -9,6 +9,20 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.23.0", date = "2026-09-11",
+        sections = {
+            { head = "New Features", items = {
+                "Timed quests count down on the tracker in Classic Era and Burning Crusade. An escort or a bombing run shows the time left on its row, in the same place a world quest shows its expiry on retail, and the last minute counts down in seconds rather than dropping off.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The game's own floating quest timer box no longer sits beside the tracker. It is a separate frame from the quest tracker, so hiding the tracker never hid it, and it left you with a Blizzard timer next to an EQOT row that said nothing about the timer. It is hidden now, and only where the tracker draws the countdown itself, so nobody loses a timer without getting one back. If you would rather keep the game's own box, /eqot disable Blizzard and a reload turns this addon's suppression off. That switch covers the game's whole tracker rather than just the timer box, so its quest watch frame comes back with it.",
+                "Quests you have had for a while no longer turn up marked as new after a slow login. The tracker decided what you already had from the first quest log it managed to read, and the game hands that log back a piece at a time when you first log in, so anything that had not arrived yet was recorded as brand new. It carried the New tag for an hour, and it sat at the top of the Recent order until you turned it in, because that first reading is saved per character. It now waits for the game to say the log is all there before taking that reading.",
+                "The tracker no longer trusts the quest log for the moment after a loading screen, while the game is still rebuilding it. A reading taken in that window could show a completed quest as unfinished and an objective as further from done than it is, which is enough to play the objectives sound again for a quest you had finished long before you zoned.",
+                "Quests that are simply slow to arrive are no longer mistaken for quests you have dropped. The tracker keeps a little state per quest and clears out anything that leaves your log, and a quest log still streaming in looks exactly like a log with quests missing from it, so a slow login could spend that patience on quests that were only late.",
+            } },
+        },
+    },
+    {
         version = "1.22.0", date = "2026-09-08",
         sections = {
             { head = "New Features", items = {

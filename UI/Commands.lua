@@ -61,6 +61,9 @@ handlers.status = function()
     -- Early, because a refused event registration explains a whole subsystem being silent
     -- and every counter below it would otherwise read as a clean zero.
     debugLine("Events")
+    -- Before the rebuild below, which walks, which confirms - printed after it the live verdict
+    -- would always read ready. The counters survive that cure. The verdict does not.
+    debugLine("QuestCache")
 
     -- Rebuild first so the counters describe the current state, not the last repaint.
     -- Render skips entirely while the tracker is hidden, so the feed is built directly too
@@ -122,6 +125,7 @@ handlers.status = function()
     debugLine("AutoQuestPopups")
     debugLine("WatchPersist")
     debugLine("Blizzard")
+    debugLine("Blizzard", nil, "QuestTimerLine")
     debugLine("AutoTrack")
     debugLine("QuestSound")
     debugLine("QuestProgress")

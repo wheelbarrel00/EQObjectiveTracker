@@ -110,16 +110,21 @@ end
 
 -- A fresh module table per case, because Suppress records _hookedFrame and _unmounted on it and
 -- a case must not inherit either from the case before it.
-local function load(tracker, name)
+local function load(tracker, name, opts)
+    opts = opts or {}
     _G.ObjectiveTrackerFrame = nil
     _G.QuestWatchFrame = nil
+    _G.QuestTimerFrame = opts.timerFrame or nil
     _G[name or "ObjectiveTrackerFrame"] = tracker
     deferred = {}
 
     local events = {}
     local ns = {
         modules = {},
-        Has = {},
+        -- Empty by default, which is what keeps every case above blind to the quest timer
+        -- frame: findQuestTimer refuses without BOTH the timer source and the absence of the
+        -- retail quest log.
+        Has = opts.has or {},
         RegisterModule = function(self, n, tbl) self.modules[n] = tbl or {} return self.modules[n] end,
         GetModule = function(self, n) return self.modules[n] end,
     }
@@ -339,6 +344,18 @@ do
     local fresh = load(fakeTracker())
     ok(fresh:DebugLine():find("reshown 0, last never", 1, true) ~= nil,
        "a session that has seen none says never rather than a time")
+
+    -- The hook field was only ever read at "installed", so it could be pinned there. That is the
+    -- single most misread line in this addon's whole status dump: the author runs
+    -- /eqot disable Blizzard permanently to keep both trackers on screen, so every status they
+    -- paste reads "hook missing" - and a field that can only ever say "installed" would turn
+    -- that deliberate setup into a silent lie on the one line used to diagnose the
+    -- double-tracker bug.
+    ok(fresh:DebugLine():find("hook missing", 1, true) ~= nil,
+       "a module whose Suppress never ran says its hook is MISSING: " .. fresh:DebugLine())
+    suppress(fresh, "a suppress on the previously untouched module")
+    ok(fresh:DebugLine():find("hook installed", 1, true) ~= nil,
+       "and says installed once it has: " .. fresh:DebugLine())
 end
 
 print("== OnEnable is what wires the repeat suppression")
@@ -470,6 +487,264 @@ do
     suppress(B, "a second frame's suppress on the same module")
     ok(second._hooks.OnShow ~= nil, "a different frame gets its own hook")
     ok(second._hooks.OnShow ~= firstHook, "a fresh one, not the first frame's")
+end
+
+-- ================================================================ Blizzard's OWN quest timer
+
+-- QuestTimerFrame is a THIRD Blizzard frame and a sibling of neither tracker, so findTracker
+-- cannot reach it: it draws its own floating countdown for any timed quest, and until v1.23.0 it
+-- sat beside an EQOT row that said nothing about the timer.
+--
+-- Hiding it is not cosmetic. It is the ONLY timer a Classic player has, so the two capability
+-- tests in findQuestTimer are what stop this being a straight regression, and the retail case
+-- below is the one that would have reached every retail user rather than a few Era ones.
+
+local CLASSIC = { QuestTimers = true }              -- can read the timers, no retail quest log
+local RETAIL  = { QuestTimers = true, QuestLog = true }
+-- The one combination that can tell the two refusals APART. With both flags true the order of
+-- the two overrides in QuestTimerLine cannot matter, so RETAIL alone proves nothing about which
+-- one wins - and the retail answer has to win, because on retail the frame is deliberately left
+-- alone whether or not the timer API happens to be there. Reporting it as "GetQuestTimers
+-- absent" would send a reader probing an API that was never the reason.
+local RETAIL_NO_TIMERS = { QuestLog = true }
+
+local function timerFrame()
+    local f = { _shown = true, _alpha = 1, _hooks = {}, hideCalls = 0, unregistered = 0 }
+    f.Hide = function(self) self.hideCalls = self.hideCalls + 1 self._shown = false end
+    f.Show = function(self) self._shown = true end
+    f.IsShown = function(self) return self._shown end
+    f.SetAlpha = function(self, a) self._alpha = a end
+    f.GetAlpha = function(self) return self._alpha end
+    f.HookScript = function(self, script, fn) self._hooks[script] = fn end
+    f.UnregisterAllEvents = function(self) self.unregistered = self.unregistered + 1 end
+    return f
+end
+
+-- Asserted before it is called, never called bare. A mutant that drops the hook leaves this nil,
+-- and calling nil ABORTS the file before its summary line - which every battery here reads as a
+-- mutant that SURVIVED, so the crash would report as a coverage hole instead of as the catch it
+-- is. Two mutants did exactly that on this battery's first run.
+local function fireShow(f, why)
+    ok(f._hooks.OnShow ~= nil, (why or "the frame") .. " has an OnShow hook to fire")
+    if f._hooks.OnShow then f._hooks.OnShow(f) end
+end
+
+print("== Blizzard's own quest timer frame is hidden on Classic")
+do
+    local qt = timerFrame()
+    local B = load(fakeTracker{ modules = false, removeModule = false }, "QuestWatchFrame",
+                   { has = CLASSIC, timerFrame = qt })
+    suppress(B, "a Classic suppress with a quest timer frame")
+
+    ok(qt._shown == false, "the quest timer frame is hidden")
+    ok(qt._alpha == 0, "and blanked, so a re-show draws nothing before the deferred re-hide")
+    ok(qt._hooks.OnShow ~= nil, "and hooked, or it comes back the first time Blizzard shows it")
+
+    -- Deliberate, and the same rule the tracker's own sub-modules get: this stops the frame
+    -- DRAWING and nothing more. A frame whose events have been torn off could never recover.
+    ok(qt.unregistered == 0, "its own events are left registered, unlike the tracker frame's")
+end
+
+print("== and left completely alone on retail, where nothing would replace it")
+do
+    -- The case that matters most. Data/Providers/Quests.lua does not fill expiresAt, so hiding
+    -- this frame on retail would take a timer away and put nothing back - and it would reach
+    -- every retail player rather than the Era ones the feature is for.
+    local qt = timerFrame()
+    local B = load(fakeTracker(), "ObjectiveTrackerFrame", { has = RETAIL, timerFrame = qt })
+    suppress(B, "a retail suppress with a quest timer frame present")
+
+    ok(qt._shown == true, "the frame is still shown on retail")
+    ok(qt.hideCalls == 0, "Hide is never reached")
+    ok(qt._hooks.OnShow == nil, "and no hook is installed on it")
+    ok(B:QuestTimerLine():find("not applicable") ~= nil,
+       "and the status line says so rather than reporting a failure")
+
+    -- The hook field on THIS line, at its other value. A refusal must never claim a hook it
+    -- never installed, or a retail paste reads as though the frame were being driven.
+    ok(B:QuestTimerLine():find("hook") == nil,
+       "a refusal reports no hook state at all rather than claiming one: " .. B:QuestTimerLine())
+end
+
+print("== a retail client with no timer API still reports the retail reason, not the timer one")
+do
+    -- Precedence, which the RETAIL fixture above cannot test: with BOTH flags true the order of
+    -- the two overrides is unobservable. Only the retail quest log with no timer source can say
+    -- which wins, and it has to be the retail one - the frame is left alone here because this is
+    -- retail, not because an API is missing, and naming the wrong half sends the next reader to
+    -- probe GetQuestTimers on a client where that was never the question.
+    local qt = timerFrame()
+    local B = load(fakeTracker(), "ObjectiveTrackerFrame",
+                   { has = RETAIL_NO_TIMERS, timerFrame = qt })
+    suppress(B, "a retail suppress on a client with no timer API")
+
+    ok(qt._shown == true, "the frame is still left alone")
+    ok(qt.hideCalls == 0, "and never hidden")
+
+    local line = B:QuestTimerLine()
+    ok(line:find("not applicable") ~= nil, "the retail reason wins: " .. line)
+    ok(line:find("GetQuestTimers absent") == nil,
+       "and the timer-source reason is not what gets reported: " .. line)
+end
+
+print("== and left alone on a client that cannot answer for the timers")
+do
+    -- Same bargain from the other side: with no GetQuestTimers there is no countdown on the
+    -- row either, so hiding the frame would leave the player with no timer at all.
+    local qt = timerFrame()
+    local B = load(fakeTracker{ modules = false, removeModule = false }, "QuestWatchFrame",
+                   { has = {}, timerFrame = qt })
+    suppress(B, "a suppress with no timer source")
+
+    ok(qt._shown == true, "the frame is left shown")
+    ok(qt.hideCalls == 0, "and never hidden")
+    ok(B:QuestTimerLine():find("GetQuestTimers absent") ~= nil,
+       "and the status line names which half refused")
+end
+
+print("== a frame that is not shaped like one is refused rather than called into")
+do
+    -- findQuestTimer used to validate Hide and nothing else, while this file goes on to call
+    -- HookScript and IsShown on the same frame. That matters more than it looks: hideQuestTimer
+    -- is the FIRST statement of Suppress, which is the first statement of OnEnable, so a raise
+    -- here costs the tracker suppression AND the three event subscriptions behind it - the
+    -- double-tracker bug, for the session, with no recovery path.
+    local half = { _shown = true }
+    half.Hide = function(self) self._shown = false end
+
+    local B = load(fakeTracker{ modules = false, removeModule = false }, "QuestWatchFrame",
+                   { has = CLASSIC, timerFrame = half })
+    suppress(B, "a suppress with a half-shaped quest timer frame")
+
+    ok(half._shown == true, "the frame is left alone rather than driven")
+
+    local okLine, line = pcall(B.QuestTimerLine, B)
+    ok(okLine, "the status line does not raise on a half-shaped frame" ..
+       (okLine and "" or (" - " .. tostring(line))))
+    line = okLine and line or ""
+    ok(line:find("frame shape not recognized") ~= nil,
+       "and names the frame as the half that refused, not the timer source")
+
+    -- The refusal must not read as an absence: the source IS present here, and a reader sent to
+    -- probe GetQuestTimers would find it answering perfectly.
+    ok(line:find("no frame") == nil, "and does not report it as absent")
+end
+
+print("== a client with no such frame is a no-op, not a raise")
+do
+    local B = load(fakeTracker{ modules = false, removeModule = false }, "QuestWatchFrame",
+                   { has = CLASSIC })
+    suppress(B, "a suppress with no quest timer frame at all")
+    ok(B:QuestTimerLine():find("no frame") ~= nil, "and the status line says the frame is absent")
+end
+
+print("== the quest timer is suppressed even when no tracker frame is found")
+do
+    -- Ordering, and it is load-bearing: Suppress returns early when findTracker answers nothing,
+    -- so a quest timer hidden AFTER that test would never be reached on a client where the
+    -- tracker global is missing or renamed.
+    local qt = timerFrame()
+    local B = load(nil, "QuestWatchFrame", { has = CLASSIC, timerFrame = qt })
+    suppress(B, "a suppress with no tracker frame")
+    ok(qt._shown == false, "the quest timer frame is still hidden")
+end
+
+print("== the quest timer re-hide is deferred a frame and coalesced")
+do
+    local qt = timerFrame()
+    local B = load(fakeTracker{ modules = false, removeModule = false }, "QuestWatchFrame",
+                   { has = CLASSIC, timerFrame = qt })
+    suppress(B, "a Classic suppress")
+    local hideAfterSuppress = qt.hideCalls
+
+    -- Read before any show as well as after. At one value the literal satisfies the assertion,
+    -- which is what lets a counter be pinned - the tracker's own line reads its at two values
+    -- for exactly this reason.
+    ok(B:QuestTimerLine():find("reshown 0", 1, true) ~= nil,
+       "nothing has re-shown the frame yet: " .. B:QuestTimerLine())
+
+    qt:Show()
+    fireShow(qt, "the quest timer frame")
+    ok(qt._shown == true, "hiding is NOT synchronous - the frame is still shown inside the hook")
+    ok(qt.hideCalls == hideAfterSuppress, "and Hide has not been reached yet")
+
+    fireShow(qt, "the quest timer frame")
+    fireShow(qt, "the quest timer frame")
+    -- Counted as DEFERRALS rather than as hides. Three queued callbacks all land on a frame the
+    -- first one already hid, so the IsShown guard one line down masks them and the hide count
+    -- reads 1 either way - which let the coalescing flag be deleted with this file green.
+    ok(#deferred == 1, "three shows inside one frame queue exactly ONE re-hide")
+    flush()
+    ok(qt._shown == false, "the deferred re-hide lands")
+    ok(qt.hideCalls == hideAfterSuppress + 1, "and Hide is reached once")
+    ok(B:QuestTimerLine():find("reshown 3") ~= nil, "the status line counts every show")
+
+    -- A show that something else has already taken back must not be hidden again, or the addon
+    -- writes to a frame nobody asked it to touch.
+    qt:Show()
+    fireShow(qt, "the quest timer frame")
+    qt:Hide()
+    local before = qt.hideCalls
+    flush()
+    ok(qt.hideCalls == before, "a frame hidden again before the deferral lands is left alone")
+
+    -- A third reading, so the count is seen to keep MOVING rather than to have reached a
+    -- literal. A show the addon declines to act on is still a show, and still counts.
+    ok(B:QuestTimerLine():find("reshown 4", 1, true) ~= nil,
+       "and the show it declined to act on is counted all the same: " .. B:QuestTimerLine())
+end
+
+print("== the quest timer hook is keyed on the frame too")
+do
+    local first = timerFrame()
+    local B = load(fakeTracker{ modules = false, removeModule = false }, "QuestWatchFrame",
+                   { has = CLASSIC, timerFrame = first })
+    suppress(B, "the first quest timer suppress")
+    local firstHook = first._hooks.OnShow
+
+    suppress(B, "a second suppress on the same frame")
+    ok(first._hooks.OnShow == firstHook, "the same frame is not hooked twice")
+
+    local second = timerFrame()
+    _G.QuestTimerFrame = second
+    suppress(B, "a suppress after the frame was replaced")
+    ok(second._hooks.OnShow ~= nil, "a replaced frame gets its own hook")
+    ok(second._hooks.OnShow ~= firstHook, "a fresh one, not the first frame's")
+end
+
+print("== QuestTimerLine reports both failure states and never raises")
+do
+    local qt = timerFrame()
+    local B = load(fakeTracker{ modules = false, removeModule = false }, "QuestWatchFrame",
+                   { has = CLASSIC, timerFrame = qt })
+
+    -- Before Suppress the frame RESOLVES and the hook does not exist, which is the state a
+    -- Classic client running /eqot disable Blizzard is in. Pinned to "installed" this line would
+    -- claim the frame was being driven when nothing had touched it.
+    ok(B:QuestTimerLine():find("hook missing", 1, true) ~= nil,
+       "a resolved frame with no hook yet says missing: " .. B:QuestTimerLine())
+
+    suppress(B, "a Classic suppress")
+    ok(B:QuestTimerLine():find("hook installed", 1, true) ~= nil,
+       "and says installed once Suppress has run: " .. B:QuestTimerLine())
+
+    local okCall, line = pcall(B.QuestTimerLine, B)
+    ok(okCall and type(line) == "string", "it answers a string")
+    ok(okCall and line:find("hidden") ~= nil, "and reads hidden while the suppression holds")
+
+    -- The distinction the tracker's own line already makes, for the same reason: a frame that is
+    -- shown with a re-hide queued is the deferral working, not the suppression failing, and
+    -- crying wolf on it is what makes a status line stop being read.
+    qt:Show()
+    fireShow(qt, "the quest timer frame")
+    line = B:QuestTimerLine()
+    ok(line:find("hide pending") ~= nil, "a show with a re-hide queued reads as pending")
+    flush()
+
+    qt:Show()
+    line = B:QuestTimerLine()
+    ok(line:find("suppression lost") ~= nil,
+       "and a show with nothing queued reads as the suppression being lost")
 end
 
 print(("test_blizzard: %d passed, %d failed"):format(pass, fail))

@@ -30,6 +30,7 @@ local QUEST_API = {
     "GetQuestLogIndexByID", "GetQuestLink", "GetQuestLogSpecialItemInfo",
     "IsQuestWatched", "AddQuestWatch", "RemoveQuestWatch",
     "GetNumQuestWatches", "GetQuestIndexForWatch", "IsQuestComplete",
+    "GetQuestTimers", "GetQuestIndexForTimer", "GetQuestLogTimeLeft",
     "GetQuestLogPushable", "QuestUtils_GetQuestName", "QuestUtils_IsQuestWorldQuest",
     "C_SuperTrack.SetSuperTrackedQuestID", "C_SuperTrack.GetSuperTrackedQuestID",
     "GetAchievementInfo", "GetAchievementNumCriteria", "GetAchievementCriteriaInfo",
@@ -142,6 +143,12 @@ function Probe:DumpQuestLog()
     callDump("GetQuestLogSelection()", "GetQuestLogSelection")
     callDump("GetNumQuestLeaderBoards(1)", "GetNumQuestLeaderBoards", 1)
     callDump("GetQuestLogLeaderBoard(1,1)", "GetQuestLogLeaderBoard", 1, 1)
+    -- GetQuestTimers answers per RUNNING timer, so with no timed quest in the log it prints an
+    -- EMPTY tuple that reads exactly like a healthy result. Not every escort is timed and the
+    -- clock starts when one begins, so leave a detector running rather than hunting content.
+    callDump("GetQuestTimers()", "GetQuestTimers")
+    callDump("GetQuestIndexForTimer(1)", "GetQuestIndexForTimer", 1)
+    callDump("GetQuestLogTimeLeft()", "GetQuestLogTimeLeft")
 
     ns:Print("abandon and tag api:")
     local abandon = {}

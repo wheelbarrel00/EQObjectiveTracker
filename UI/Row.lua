@@ -760,8 +760,14 @@ function Row:Render(row, entry, width, cfg)
 
     local timeText, timeMins
     if entry.expiresAt then
-        timeMins = math.floor((entry.expiresAt - time()) / 60)
-        if timeMins > 0 then timeText = Util.TimeShort(timeMins) end
+        local secs = entry.expiresAt - time()
+        timeMins = math.floor(secs / 60)
+        if secs > 0 then
+            timeText = Util.TimeShortSecs(secs)
+            -- TimeColor's zero branch is the color for no time LEFT, so a live countdown
+            -- under a minute would otherwise draw as an expired one.
+            if timeMins < 1 then timeMins = 1 end
+        end
     end
 
     local Card = ns:GetModule("Card")

@@ -96,8 +96,12 @@ MUTANTS = [
         (ROW, "    if self._hookedFrame ~= tracker then\n        self._hookedFrame = tracker",
               "    if true then\n        self._hookedFrame = tracker")]),
 
+    # Anchored on its unique predecessor rather than on the C_Timer line alone. The quest timer
+    # frame's own re-hide is deferred the same way and at the same indent, so the bare line
+    # matched twice from v1.23.0 and reported SKIPPED.
     ("the re-hide is synchronous again, from inside Blizzard's own Show", [
-        (ROW, "            C_Timer.After(0, function()",
+        (ROW, "            self._hidePending = true\n            C_Timer.After(0, function()",
+              "            self._hidePending = true\n"
               "            (function(_, fn) fn() end)(0, function()")]),
 
     ("the deferred re-hide is not coalesced, so a burst of shows queues one callback each", [
@@ -169,6 +173,13 @@ MUTANTS = [
               """    local f = ObjectiveTrackerFrame
     if type(f) == "table" then""")]),
 
+    # Anchored on the CODE only. The comment above this guard used to be part of the anchor,
+    # and correcting one word of it rotted the mutant - a note is not what this is testing.
+    ("the quest timer guard checks only Hide, so a half-shaped frame is driven anyway", [
+        (ROW, '''    if type(f.Hide) == "function" and type(f.HookScript) == "function"
+       and type(f.IsShown) == "function" then return f end''',
+              '''    if type(f.Hide) == "function" then return f end''')]),
+
     ("Suppress runs with no tracker frame, which is what ADDON_LOADED exists for", [
         (ROW, "    local tracker = findTracker()\n    if not tracker then return end",
               "    local tracker = findTracker()")]),
@@ -221,6 +232,120 @@ MUTANTS = [
               ' | alpha %.2f | reshown %d, last %s"):format(',
               '    return ("blizzard tracker: %s %s, %d modules, hook %s'
               ' | alpha %.2f | reshown %d, last %s"):format(')]),
+
+    # ------------------------------------------------ Blizzard's own quest timer frame
+    # This frame is the ONLY timer a Classic player has, so both halves of its capability gate
+    # are the difference between replacing it and simply taking it away.
+    ("the retail guard goes, so a retail player loses a timer and gets nothing back", [
+        (ROW, "    if not (ns.Has.QuestTimers and not ns.Has.QuestLog) then return nil end",
+              "    if not ns.Has.QuestTimers then return nil end")]),
+
+    ("the timer-source guard goes, so a client that cannot draw a countdown loses the frame", [
+        (ROW, "    if not (ns.Has.QuestTimers and not ns.Has.QuestLog) then return nil end",
+              "    if ns.Has.QuestLog then return nil end")]),
+
+    ("the whole capability gate goes, so every client loses the frame", [
+        (ROW, "    if not (ns.Has.QuestTimers and not ns.Has.QuestLog) then return nil end\n",
+              "")]),
+
+    ("the gate is INVERTED, so it hides the frame only where nothing can replace it", [
+        (ROW, "    if not (ns.Has.QuestTimers and not ns.Has.QuestLog) then return nil end",
+              "    if ns.Has.QuestTimers and not ns.Has.QuestLog then return nil end")]),
+
+    ("the frame is left at full alpha, so it draws for a frame on every re-show", [
+        (ROW, "    if qt.SetAlpha then qt:SetAlpha(0) end\n    qt:Hide()",
+              "    qt:Hide()")]),
+
+    ("the OnShow hook goes, so the frame comes back the first time Blizzard shows it", [
+        (ROW, "    if self._hookedTimer ~= qt then\n        self._hookedTimer = qt",
+              "    if false then\n        self._hookedTimer = qt")]),
+
+    ("the hook is keyed on a flag, so a replaced frame is never hooked", [
+        (ROW, "    if self._hookedTimer ~= qt then\n        self._hookedTimer = qt",
+              "    if not self._hookedTimer then\n        self._hookedTimer = qt")]),
+
+    ("the re-hide is synchronous again, inside Blizzard's own OnShow", [
+        (ROW, """            if self._timerHidePending then return end
+            self._timerHidePending = true""",
+              """            if self._timerHidePending then return end
+            self._timerHidePending = true
+            if qt.SetAlpha then qt:SetAlpha(0) end
+            qt:Hide()""")]),
+
+    ("the coalescing flag goes, so every show queues its own hide", [
+        (ROW, "            if self._timerHidePending then return end\n", "")]),
+
+    ("the deferred hide writes to a frame something else already took back", [
+        (ROW, """                self._timerHidePending = nil
+                if not qt:IsShown() then return end""",
+              "                self._timerHidePending = nil")]),
+
+    ("the quest timer is suppressed only after a tracker frame is found", [
+        (ROW, """function Blizzard:Suppress()
+    hideQuestTimer(self)
+
+    local tracker = findTracker()
+    if not tracker then return end""",
+              """function Blizzard:Suppress()
+    local tracker = findTracker()
+    if not tracker then return end
+    hideQuestTimer(self)""")]),
+
+    # Anchored on its unique predecessor: the deferred re-hide sets the alpha the same way at a
+    # deeper indent, and a leading-space anchor is a SUBSTRING of that line rather than a
+    # different one.
+    ("its events are torn off too, which is the loop this file forbids", [
+        (ROW, "    if not qt then return end\n\n    if qt.SetAlpha then qt:SetAlpha(0) end",
+              "    if not qt then return end\n\n"
+              "    if qt.UnregisterAllEvents then qt:UnregisterAllEvents() end\n"
+              "    if qt.SetAlpha then qt:SetAlpha(0) end")]),
+
+    ("the status line stops separating a pending re-hide from a lost suppression", [
+        (ROW, """        f:IsShown() and (self._timerHidePending and "SHOWN - hide pending"
+                                                or "SHOWN - suppression lost") or "hidden",""",
+              '        f:IsShown() and "SHOWN - suppression lost" or "hidden",')]),
+
+    ("the status line stops naming WHICH capability refused", [
+        (ROW, '        if not ns.Has.QuestTimers then why = "refused, GetQuestTimers absent" end\n',
+              "")]),
+
+    ("the status line stops telling retail apart from a refusal", [
+        (ROW, '        if ns.Has.QuestLog then why = "not applicable, retail quest log" end\n',
+              "")]),
+
+    ("the show counter never moves, so a re-show storm reads as a quiet client", [
+        (ROW, "            self._timerShows = (self._timerShows or 0) + 1\n", "")]),
+
+    ("the show counter is pinned, so the line reads the same however often the frame comes back", [
+        (ROW, "        self._timerShows or 0)", "        0)")]),
+
+    # -------------------------------------------------- the hook field, on BOTH status lines
+    # This file names "hook installed" as the precondition to check before believing any reading
+    # taken off a client, and until 2026-09-09 neither line's hook field was read at its OTHER
+    # value - so both could be pinned to "installed" with every harness green. The author runs
+    # /eqot disable Blizzard permanently, so "hook missing" is what their own pastes say, and a
+    # field that can only ever claim a hook turns that setup into a silent lie.
+    ("the tracker line always claims its hook is installed", [
+        (ROW, '        n, self._unmounted or 0, self._hookedFrame and "installed" or "missing",',
+              '        n, self._unmounted or 0, "installed",')]),
+
+    ("the quest timer line always claims its hook is installed", [
+        (ROW, '        self._hookedTimer and "installed" or "missing",', '        "installed",')]),
+
+    ("a refusal reports a hook it never installed", [
+        (ROW, '        return ("blizzard quest timer: %s"):format(why)',
+              '        return ("blizzard quest timer: %s, hook installed"):format(why)')]),
+
+    # The two overrides are ORDERED, and the retail one has to win. On retail the frame is left
+    # alone because it is retail, not because an API is missing - blaming a missing
+    # GetQuestTimers sends the next reader probing a client where that was never the question.
+    # Only a retail client WITHOUT the timer API can observe this, which is the fixture the
+    # harness had to gain: with both flags true the order is unobservable.
+    ("the two refusal reasons are swapped, so retail is blamed on a missing timer API", [
+        (ROW, """        if not ns.Has.QuestTimers then why = "refused, GetQuestTimers absent" end
+        if ns.Has.QuestLog then why = "not applicable, retail quest log" end""",
+              """        if ns.Has.QuestLog then why = "not applicable, retail quest log" end
+        if not ns.Has.QuestTimers then why = "refused, GetQuestTimers absent" end""")]),
 ]
 
 SUMMARY = re.compile(r"^test_blizzard: (\d+) passed, (\d+) failed$")

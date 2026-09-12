@@ -66,10 +66,58 @@ local function findTracker()
     return nil, nil
 end
 
+-- A THIRD Blizzard frame, a sibling of neither tracker, so findTracker cannot reach it. BOTH
+-- capability tests are load-bearing: Has.QuestTimers says the provider can read the same source
+-- this frame reads, and the absence of Has.QuestLog says the Classic provider - the only one
+-- that fills expiresAt from that source - is the one loaded. Relax either and a player loses
+-- a timer and gets nothing back.
+local function findQuestTimer()
+    if not (ns.Has.QuestTimers and not ns.Has.QuestLog) then return nil end
+    local f = QuestTimerFrame
+    if type(f) ~= "table" then return nil end
+    -- Every method this file calls unguarded, not just Hide. hideQuestTimer runs FIRST in
+    -- Suppress, so a raise here costs the tracker suppression and its events too.
+    if type(f.Hide) == "function" and type(f.HookScript) == "function"
+       and type(f.IsShown) == "function" then return f end
+    return nil
+end
+
+-- Events deliberately left registered: this stops the frame DRAWING and nothing more, and is
+-- not the UnregisterAllEvents loop this file must never grow back. A mutant guards it.
+local function hideQuestTimer(self)
+    local qt = findQuestTimer()
+    if not qt then return end
+
+    if qt.SetAlpha then qt:SetAlpha(0) end
+    qt:Hide()
+
+    if self._hookedTimer ~= qt then
+        self._hookedTimer = qt
+        -- Captured rather than taken as the hook's own argument: it keeps this block
+        -- textually distinct from the tracker's, which mutate_blizzard.py's anchors
+        -- depend on.
+        qt:HookScript("OnShow", function()
+            self._timerShows = (self._timerShows or 0) + 1
+            if self._timerHidePending then return end
+            self._timerHidePending = true
+            -- Deferred by a frame for the same reason the tracker's re-hide is: hiding straight
+            -- out of Blizzard's own OnShow was followed by a blocked protected call once.
+            C_Timer.After(0, function()
+                self._timerHidePending = nil
+                if not qt:IsShown() then return end
+                if qt.SetAlpha then qt:SetAlpha(0) end
+                qt:Hide()
+            end)
+        end)
+    end
+end
+
 -- Deliberately NOT latched behind a "done" flag. Another addon touching the tracker can
 -- re-register its modules or re-show it, and a one-shot suppress could never recover -
 -- that is exactly how a second tracker reappears mid-session.
 function Blizzard:Suppress()
+    hideQuestTimer(self)
+
     local tracker = findTracker()
     if not tracker then return end
 
@@ -119,6 +167,25 @@ function Blizzard:Suppress()
             end)
         end)
     end
+end
+
+-- Its own sentence rather than a field on the tracker line, because the reading that matters
+-- is the one where the two frames disagree. The two CAPABILITY refusals mean the countdown
+-- is not drawn either, which is the bargain. The two FRAME refusals leave Blizzard's own box
+-- on screen, so nothing is taken away and the row counting down beside it costs nothing.
+function Blizzard:QuestTimerLine()
+    local f = findQuestTimer()
+    if not f then
+        local why = QuestTimerFrame and "refused, frame shape not recognized" or "no frame"
+        if not ns.Has.QuestTimers then why = "refused, GetQuestTimers absent" end
+        if ns.Has.QuestLog then why = "not applicable, retail quest log" end
+        return ("blizzard quest timer: %s"):format(why)
+    end
+    return ("blizzard quest timer: %s, hook %s | reshown %d"):format(
+        f:IsShown() and (self._timerHidePending and "SHOWN - hide pending"
+                                                or "SHOWN - suppression lost") or "hidden",
+        self._hookedTimer and "installed" or "missing",
+        self._timerShows or 0)
 end
 
 -- Names the frame it resolved. This line is the standing regression check for the

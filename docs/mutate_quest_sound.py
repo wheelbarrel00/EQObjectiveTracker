@@ -133,8 +133,16 @@ MUTANTS = [
         ("    if not armed then\n        armed = true\n        return\n    end", "    armed = true")]),
 
     ("the prune of quests that left the log is dropped", [
-        ("        if scratch[id] == nil then lastComplete[id] = nil end",
+        ("        if scratch[id] == nil and not (holding and lastComplete[id]) then\n"
+         "            lastComplete[id] = nil\n        end",
          "        if false then lastComplete[id] = nil end")]),
+
+    # The prune must not erase a recorded completion while the gate is closed - that record
+    # is what the hold in visit reads. Without it the quest returns reading incomplete and
+    # the correct value arriving next scan is the same false to true the chime fires on.
+    ("a quest absent for one scan loses its completion while the gate is closed", [
+        ("        if scratch[id] == nil and not (holding and lastComplete[id]) then",
+         "        if scratch[id] == nil then")]),
 
     ("switching the option off no longer re-primes", [
         ("        armed = false\n        return", "        return")]),
@@ -259,6 +267,27 @@ MUTANTS = [
     ("a Classic slot 6 of 0 counts as complete", [
         ("visit(id, title, (isComplete and isComplete ~= 0 and isComplete ~= -1) and true or false,\n                  isComplete == -1)",
          "visit(id, title, (isComplete and isComplete ~= -1) and true or false,\n                  isComplete == -1)")]),
+
+    # ------------------------------------------ a complete quest across a loading screen
+    # Blizzard hands a complete quest back as incomplete for a second or two after a loading
+    # screen. Written in, it reads as the quest un-finishing, and the correct value on the pass
+    # after it then reads as a fresh completion - an ordinary zone change chiming for a quest
+    # finished ten minutes ago. docs/test_quest_cache.lua greps for this line; these two mutants
+    # are what say it actually does anything.
+    ("the hold on a complete quest across a loading screen is dropped",
+     [("    if not now and lastComplete[id] and not QuestCache:IsReady() then",
+       "    if false and not now and lastComplete[id] and not QuestCache:IsReady() then")]),
+
+    # The other direction, and the one that would be reported as "the chime stopped working":
+    # holding unconditionally means a quest can never be seen to un-finish at all, so a quest
+    # abandoned and retaken is complete forever and never chimes again.
+    ("the hold ignores the window and applies always",
+     [("    if not now and lastComplete[id] and not QuestCache:IsReady() then",
+       "    if not now and lastComplete[id] then")]),
+
+    ("the hold fires on a quest that was never complete",
+     [("    if not now and lastComplete[id] and not QuestCache:IsReady() then",
+       "    if not now and lastComplete[id] ~= nil and not QuestCache:IsReady() then")]),
 ]
 
 

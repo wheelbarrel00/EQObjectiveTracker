@@ -2,6 +2,8 @@ local _, ns = ...
 
 local QuestSound = ns:RegisterModule("QuestSound", {})
 
+local QuestCache = ns:GetModule("QuestCache")
+
 -- Midnight can hand back "secret values" that error when indexed by tainted addon code,
 -- even though they still report type "string"
 local _issecret = _G.issecretvalue
@@ -33,7 +35,7 @@ local armed        = false
 -- path recorded nothing at all, so "it only sounds once I hand the quest in" had no line to
 -- read. Nothing here is formatted on the scan path: the strings are built in DebugLine.
 local stats = {
-    scans = 0, walked = 0, done = 0, derived = 0, failed = 0,
+    scans = 0, walked = 0, done = 0, derived = 0, failed = 0, held = 0,
     scanSaw = 0, scanPlayed = 0, turnIns = 0,
     surface = "no scan yet",
 }
@@ -121,6 +123,14 @@ local function visit(id, title, flag, failed)
         now = objectivesDone(id)
         if now then stats.derived = stats.derived + 1 end
     end
+    -- Guards a complete quest reading incomplete across a loading screen: writing that in makes
+    -- the SAME quest read as a fresh completion next scan. Held rather than skipped, so a real
+    -- completion inside the window is still seen on the pass after it.
+    if not now and lastComplete[id] and not QuestCache:IsReady() then
+        now = true
+        stats.held = stats.held + 1
+    end
+
     scratch[id] = now
     if now then stats.done = stats.done + 1 end
 
@@ -194,8 +204,15 @@ local function detectTransitions()
 
     if not walkQuestLog() then return end
 
+    -- A quest missing from ONE scan must keep a recorded completion while the gate is
+    -- closed, because that record is what the hold in visit reads. Pruned, the quest
+    -- returns reading incomplete and the correct value arriving next scan is the same
+    -- false to true the chime fires on. A recorded false still prunes.
+    local holding = not QuestCache:IsReady()
     for id in pairs(lastComplete) do
-        if scratch[id] == nil then lastComplete[id] = nil end
+        if scratch[id] == nil and not (holding and lastComplete[id]) then
+            lastComplete[id] = nil
+        end
     end
     for id, v in pairs(scratch) do lastComplete[id] = v end
 
@@ -342,8 +359,8 @@ function QuestSound:DebugLine()
         ("%d scans, %d quests walked, %d read done (%d of them from the objectives), %d read failed, last scan %s")
             :format(stats.scans, stats.walked, stats.done, stats.derived, stats.failed,
                     ago(stats.scanAt)),
-        ("scan saw %d, played %d | turn ins seen %d"):format(
-            stats.scanSaw, stats.scanPlayed, stats.turnIns),
+        ("scan saw %d, played %d | turn ins seen %d | %d held over a loading screen"):format(
+            stats.scanSaw, stats.scanPlayed, stats.turnIns, stats.held),
         ("done by objectives but not by Blizzard's flag right now: %d%s"):format(
             mismatch, firstMismatch and (" -> " .. firstMismatch) or ""),
         ("recent: %s"):format(

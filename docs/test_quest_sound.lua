@@ -166,6 +166,11 @@ local function build(classic, opts)
         questTurnInSound        = "EQ: Raid Warning",
     }
     mods.DB    = { Tracker = function() return cfg end }
+    -- Data/QuestSound.lua takes this at file scope, so it has to exist before the chunk loads.
+    -- Ready by default because every case in this file bar one section is an ordinary scan with
+    -- no loading screen anywhere near it, which is the state they were all written in.
+    local cacheReady = true
+    mods.QuestCache = { IsReady = function() return cacheReady end }
     -- Core/Media.lua's Play returns at its first line on nil and on the "NONE" token, which is
     -- what the sound picker STORES when a player chooses None - the first entry in all three
     -- dropdowns. A stub that recorded either as a played sound could not express the everyday
@@ -208,6 +213,7 @@ local function build(classic, opts)
     local B = { QS = QS, qlog = qlog, played = played, cfg = cfg, handlers = handlers,
                 taskQuests = taskQuests, debounces = debounces, events = mods.Events }
     function B.logUpdate() handlers.QUEST_LOG_UPDATE() end
+    function B.setCacheReady(v) cacheReady = v end
     function B.accept(a, b) handlers.QUEST_ACCEPTED(nil, a, b) end
     function B.turnIn(id)
         if handlers.QUEST_TURNED_IN then handlers.QUEST_TURNED_IN(nil, id) end
@@ -734,6 +740,146 @@ ok(script(false) == script(true),
    .. script(false) .. " vs classic " .. script(true))
 ok(script(true) == "EQ: Work Complete",
    "and the sound lands on the last objective, not at the quest giver: " .. script(true))
+
+-- ------------------------------------------------- a complete quest across a loading screen
+
+-- Blizzard hands a complete quest back as INCOMPLETE for a second or two while it rebuilds its
+-- cache after a loading screen. Written into lastComplete that reads as the quest un-finishing,
+-- and the correct value arriving on the pass after it then reads as a fresh completion - so an
+-- ordinary zone change chimes for a quest the player finished ten minutes ago.
+--
+-- The hold is on the READ rather than on the scan, so nothing is skipped and nothing is lost:
+-- a real completion inside the window is still seen, just measured against the state the quest
+-- actually had.
+for _, classic in ipairs({ false, true }) do
+    local label = classic and "classic" or "retail"
+
+    do
+        local b = build(classic)
+        b.qlog[1] = { id = 1, title = "A Baying of Gnolls", complete = true,
+                      objs = { { finished = true } } }
+        b.logUpdate()
+        ok(#b.played == 0, label .. ": a quest first seen already complete is silent")
+
+        b.setCacheReady(false)
+        b.qlog[1].complete = false
+        b.qlog[1].objs[1].finished = false
+        b.logUpdate()
+        b.setCacheReady(true)
+        b.qlog[1].complete = true
+        b.qlog[1].objs[1].finished = true
+        b.logUpdate()
+        ok(#b.played == 0,
+           label .. ": a complete quest reading incomplete across a loading screen does not chime"
+           .. " when it reads complete again (played " .. table.concat(b.played, ",") .. ")")
+    end
+
+    do
+        -- The control, and without it the case above passes just as well against a build that
+        -- never chimes at all. Same sequence, no loading screen: the un-finish is taken as real
+        -- and the re-finish is a real completion, so it SHOULD sound.
+        local b = build(classic)
+        b.qlog[1] = { id = 1, title = "A Baying of Gnolls", complete = true,
+                      objs = { { finished = true } } }
+        b.logUpdate()
+        b.qlog[1].complete = false
+        b.qlog[1].objs[1].finished = false
+        b.logUpdate()
+        b.qlog[1].complete = true
+        b.qlog[1].objs[1].finished = true
+        b.logUpdate()
+        ok(#b.played == 1,
+           label .. ": and the same sequence with no loading screen still chimes")
+    end
+
+    do
+        -- The hold reads lastComplete for TRUTH, never for presence. A quest already recorded
+        -- as incomplete is present in that table too, so holding on presence promotes an
+        -- unfinished quest to complete inside the window - and since the chime gate then sees
+        -- exactly the false-to-true it fires on, that quest chimes without finishing anything.
+        local b = build(classic)
+        b.qlog[1] = { id = 1, title = "A Baying of Gnolls", complete = false,
+                      objs = { { finished = false } } }
+        b.logUpdate()
+        b.setCacheReady(false)
+        b.logUpdate()
+        ok(#b.played == 0,
+           label .. ": a quest that was never complete is not held, and does not chime unfinished"
+           .. " (played " .. table.concat(b.played, ",") .. ")")
+    end
+
+    do
+        -- A quest missing from ONE scan is what a half-arrived log looks like, and the prune
+        -- must not take its recorded completion while the gate is closed - that record is the
+        -- hold's only input. Pruned, the quest returns reading incomplete and the correct value
+        -- arriving next scan is the same false to true the chime fires on.
+        --
+        -- The vanishing quest is SECOND on purpose: the Classic walk breaks at the first nil
+        -- title, so dropping the first would end the walk and the prune would never run.
+        local b = build(classic)
+        b.qlog[1] = { id = 9, title = "Decoy", complete = false,
+                      objs = { { finished = false } } }
+        b.qlog[2] = { id = 1, title = "A Baying of Gnolls", complete = true,
+                      objs = { { finished = true } } }
+        b.logUpdate()
+        ok(#b.played == 0, label .. ": a quest first seen already complete is silent")
+
+        b.setCacheReady(false)
+        local gone = b.qlog[2]
+        b.qlog[2] = nil
+        b.logUpdate()
+        b.qlog[2] = gone
+        b.qlog[2].complete = false
+        b.qlog[2].objs[1].finished = false
+        b.logUpdate()
+        b.setCacheReady(true)
+        b.qlog[2].complete = true
+        b.qlog[2].objs[1].finished = true
+        b.logUpdate()
+        ok(#b.played == 0,
+           label .. ": a quest absent for one scan keeps its completion while the gate is closed"
+           .. " (played " .. table.concat(b.played, ",") .. ")")
+    end
+
+    do
+        -- The control for the case above: the same disappearance with the gate OPEN is an
+        -- ordinary prune, so the quest really is new when it comes back complete, and it sounds.
+        local b = build(classic)
+        b.qlog[1] = { id = 9, title = "Decoy", complete = false,
+                      objs = { { finished = false } } }
+        b.qlog[2] = { id = 1, title = "A Baying of Gnolls", complete = true,
+                      objs = { { finished = true } } }
+        b.logUpdate()
+        local gone = b.qlog[2]
+        b.qlog[2] = nil
+        b.logUpdate()
+        b.qlog[2] = gone
+        b.qlog[2].complete = false
+        b.qlog[2].objs[1].finished = false
+        b.logUpdate()
+        b.qlog[2].complete = true
+        b.qlog[2].objs[1].finished = true
+        b.logUpdate()
+        ok(#b.played == 1,
+           label .. ": and the same disappearance with the gate open still chimes")
+    end
+
+    do
+        -- The hold only ever stops a true falling to false. A quest that was genuinely
+        -- unfinished and finishes inside the window is a real completion and still sounds,
+        -- which is what keeps this a correction rather than a mute button.
+        local b = build(classic)
+        b.qlog[1] = { id = 1, title = "A Baying of Gnolls", complete = false,
+                      objs = { { finished = false } } }
+        b.logUpdate()
+        b.setCacheReady(false)
+        b.qlog[1].complete = true
+        b.qlog[1].objs[1].finished = true
+        b.logUpdate()
+        ok(#b.played == 1,
+           label .. ": a real completion inside the window still chimes")
+    end
+end
 
 print(string.format("test_quest_sound: %d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

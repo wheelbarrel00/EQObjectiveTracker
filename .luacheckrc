@@ -85,6 +85,9 @@ read_globals = {
     "GetNumQuestLogEntries", "GetQuestLogTitle", "GetQuestLogIndexByID",
     "SelectQuestLogEntry", "GetNumQuestLeaderBoards", "GetQuestLogLeaderBoard",
     "IsQuestWatched", "AddQuestWatch", "RemoveQuestWatch", "GetQuestTagInfo",
+    -- The pair Blizzard's own QuestTimerFrame reads. Asking these rather than selecting each
+    -- entry and calling GetQuestLogTimeLeft means the quest log SELECTION is never mutated.
+    "GetQuestTimers", "GetQuestIndexForTimer",
 
     -- A percentage objective's real fill, and it is a bare global on retail with no C_QuestLog
     -- twin - C_QuestLog.GetQuestProgressBarPercent does not exist.
@@ -98,8 +101,9 @@ read_globals = {
 
     -- Read on every flavor, not only Classic. BackdropTemplateMixin guards 13 CreateFrame
     -- template arguments across UI/ and Options/, and QuestWatchFrame is Blizzard's tracker
-    -- on Vanilla and TBC where ObjectiveTrackerFrame is retail's.
-    "BackdropTemplateMixin", "QuestWatchFrame",
+    -- on Vanilla and TBC where ObjectiveTrackerFrame is retail's. QuestTimerFrame is a THIRD
+    -- Blizzard frame, a sibling of neither tracker, drawing a floating countdown of its own.
+    "BackdropTemplateMixin", "QuestWatchFrame", "QuestTimerFrame",
 
     "GetNumAutoQuestPopUps", "GetAutoQuestPopUp", "RemoveAutoQuestPopUp",
     "ShowQuestComplete", "ShowQuestOffer",

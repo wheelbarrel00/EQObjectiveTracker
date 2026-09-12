@@ -38,6 +38,10 @@ you accept it. So "Auto-track accepted quests" works, "Show only tracked quests"
 than five, and shift-clicking a row in the game's own quest log tracks and untracks exactly as
 it always did, with its checkmarks showing this tracker's list.
 
+Timed quests count down on the row. An escort or a bombing run shows the time left where a
+retail world quest shows its expiry, counting in seconds through the last minute, and
+the game's own floating timer box is hidden so you are not left with two timers.
+
 You can also focus a quest, which these clients have no super-tracking for. Click a row's
 icon to focus it and click the icon again to clear it, or use Focus in the right-click menu.
 The focused quest's title is tinted. If Everything Quests and TomTom are both installed,
@@ -50,7 +54,6 @@ focusing a quest also points a TomTom arrow at it.
 - World quests and bonus objectives, scenarios, achievements, endeavors and tracked recipes
   have no section. Most need APIs these clients do not have.
 - **No Find Group button.** These clients have no group finder for quests.
-- **Timed quests show no countdown**, and Blizzard's own timer box is left on screen.
 - The zone progress bar stays empty. Its zone routing data covers Midnight only.
 - Distance sorting does nothing, because the distance API is retail-only.
 - Some options still appear that cannot do anything on Classic, for the same reasons.

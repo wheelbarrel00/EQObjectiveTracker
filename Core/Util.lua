@@ -58,6 +58,15 @@ function Util.TimeShort(mins)
     return ("%dd"):format(math.floor(mins / 1440))
 end
 
+-- A world quest expires in hours, so whole minutes were always enough for it. A Classic quest
+-- timer runs out in single figures, and flooring THAT to minutes draws nothing at all through
+-- the last 59 seconds - which is the stretch a countdown exists for.
+function Util.TimeShortSecs(secs)
+    if not secs or secs <= 0 then return "" end
+    if secs < 60 then return ("%ds"):format(secs) end
+    return Util.TimeShort(math.floor(secs / 60))
+end
+
 function Util.TimeColor(mins)
     if not mins or mins <= 0 then return 1.00, 0.10, 0.10 end
     if mins < 30   then return 1.00, 0.25, 0.25 end

@@ -57,6 +57,9 @@ Has.TaskQuestActive     = method(C_TaskQuest, "IsActive")
 -- A percentage objective's real fill is in neither numFulfilled nor numRequired. The first is a
 -- BARE GLOBAL and has no C_QuestLog twin, so it is probed with global() rather than method().
 Has.QuestProgressBar    = global("GetQuestProgressBarPercent")
+-- Bare globals with no C_ twin, so global() rather than method(). The pair Blizzard's own
+-- QuestTimerFrame reads - the provider carries why that pair rather than another.
+Has.QuestTimers         = global("GetQuestTimers") and global("GetQuestIndexForTimer")
 Has.TaskQuestProgressBar = method(C_TaskQuest, "GetQuestProgressBarInfo")
 Has.WorldQuestWatchAPI  = method(C_QuestLog, "RemoveWorldQuestWatch")
 Has.WorldQuestWatchAdd  = method(C_QuestLog, "AddWorldQuestWatch")

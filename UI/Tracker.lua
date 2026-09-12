@@ -790,6 +790,16 @@ function Tracker:DragRows()
     return _dragRows
 end
 
+-- The soonest deadline on screen, not merely whether one exists, because the tick rate is
+-- chosen from it below. Reset by Render before either loop that feeds it.
+local soonestExpiry
+local function noteExpiry(entry)
+    local at = entry.expiresAt
+    if not at then return false end
+    if not soonestExpiry or at < soonestExpiry then soonestExpiry = at end
+    return true
+end
+
 -- World quests live outside the main scroll area in a region capped to a fraction of the
 -- tracker, so a long world quest list can never push the quest sections off screen.
 function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
@@ -843,7 +853,7 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
     local y, hasTimed = 0, false
     for i = 1, group.visibleCount do
         local entry = group.entries[i]
-        if entry.expiresAt then hasTimed = true end
+        if noteExpiry(entry) then hasTimed = true end
         local row = RowPool:Acquire(econtent, entry.providerID, entry.id, _buildRow)
         row:SetWidth(width)
         row:ClearAllPoints()
@@ -1049,6 +1059,7 @@ function Tracker:Render()
 
     local y        = 0
     local hasTimed = false
+    soonestExpiry  = nil
     local sectionTops = {}
     local tops = f._sectionTop
     if not tops then tops = {}; f._sectionTop = tops end
@@ -1079,7 +1090,7 @@ function Tracker:Render()
                     end
                     for i = 1, group.visibleCount do
                         local entry = group.entries[i]
-                        if entry.expiresAt then hasTimed = true end
+                        if noteExpiry(entry) then hasTimed = true end
                         local row = RowPool:Acquire(content, entry.providerID, entry.id, _buildRow)
                         row:SetWidth(width)
                         row:ClearAllPoints()
@@ -1151,7 +1162,7 @@ function Tracker:Render()
     -- After Sweep, so a retired row's button retires with it, and after the sizing above so
     -- the anchor arithmetic reads settled positions.
     ItemButtons:Commit()
-    self:_EnsureTimerTicker(hasTimed)
+    self:_EnsureTimerTicker(hasTimed, soonestExpiry)
 
     -- Last, so the layout is settled before a rule is allowed to paint over it. Apply is only
     -- re-entered when the count crosses zero, so this is a no-op on almost every render.
@@ -1161,15 +1172,38 @@ end
 
 -- Row's change gate keys on the formatted time string, so a plain Render only repaints
 -- the rows whose countdown actually rolled over. No Invalidate needed here.
-function Tracker:_EnsureTimerTicker(wanted)
-    if wanted and not self._timerTicker then
-        self._timerTicker = C_Timer.NewTicker(30, function()
+--
+-- Thirty seconds is right for a world quest measured in hours and wrong for the last minute of
+-- a Classic quest timer, where the row counts in seconds and would sit half a minute stale. The
+-- faster rate is entered only inside that final stretch and left again the moment the row is
+-- gone, so the render rate v1.17.0 exists to cut is untouched everywhere else.
+local TICK_SLOW, TICK_FAST, FAST_WINDOW = 30, 5, 90
+
+function Tracker:_EnsureTimerTicker(wanted, soonest)
+    local want = 0
+    if wanted then
+        local left = soonest and (soonest - time()) or nil
+        -- Only where a sub-minute countdown can actually draw, which is the Classic provider.
+        -- Retail stamps expiresAt from whole minutes and re-stamps it every render, so the
+        -- label reads the same at either rate and the faster one buys nothing there.
+        local fast = left and left <= FAST_WINDOW and not ns.Has.QuestLog
+        want = fast and TICK_FAST or TICK_SLOW
+    end
+
+    -- Compared against the rate the live ticker was CREATED with, not against the request, or
+    -- crossing into the window would cancel and rebuild the ticker on every render from then on.
+    if self._timerRate == want then return end
+
+    if self._timerTicker then
+        self._timerTicker:Cancel()
+        self._timerTicker = nil
+    end
+    self._timerRate = want
+    if want > 0 then
+        self._timerTicker = C_Timer.NewTicker(want, function()
             local f = self.frame
             if f and f:IsShown() then self:Render() end
         end)
-    elseif not wanted and self._timerTicker then
-        self._timerTicker:Cancel()
-        self._timerTicker = nil
     end
 end
 

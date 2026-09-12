@@ -4,6 +4,7 @@ local Entry      = ns:GetModule("Entry")
 local Registry   = ns:GetModule("Registry")
 local QuestItems = ns:GetModule("QuestItems")
 local QuestGroups = ns:GetModule("QuestGroups")
+local QuestCache  = ns:GetModule("QuestCache")
 
 local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
 
@@ -131,6 +132,8 @@ local function fillLines(e, id)
     Entry.BeginLines(e)
     local objs = ns.Has.QuestObjectives and C_QuestLog.GetQuestObjectives(id) or nil
     local n    = objs and #objs or 0
+
+    QuestCache:Note(id, objs, e.state == STATE.COMPLETE)
 
     if n == 0 then
         local fb = getFallbackText(id)
@@ -291,6 +294,7 @@ local function fullRebuild()
     local focused = superTrackedID()
     local currentHeader
     store:Begin()
+    QuestCache:Begin()
 
     walkEntries, walkQuests = C_QuestLog.GetNumQuestLogEntries() or 0, 0
 
@@ -331,13 +335,15 @@ local function fullRebuild()
     end
 
     store:Finish()
+    local cacheReady = QuestCache:Finish()
 
-    -- Pruned only against a log that actually returned something. A cold login can present
-    -- an empty one, and pruning against that would drop every persisted stamp. That test is
-    -- one-sided though: a walk that returned SOME quests still says nothing about the ones
-    -- that have not streamed in, and they look identical to quests that are gone. So absence
-    -- has to repeat, the same way TrackedSet's prune already handles the same hazard.
-    if next(store:Out()) ~= nil then
+    -- Pruned only against a log that returned something AND that the game had finished
+    -- streaming. Emptiness alone is one-sided: a walk that returned SOME quests says nothing
+    -- about the ones that have not arrived, and those look exactly like quests that are gone,
+    -- so absence still has to repeat, which is what SEEN_STRIKES below is for. What readiness
+    -- adds is that a login walk spends no strike at all, and that the NEW tag baseline is
+    -- taken from a log that is all there rather than merely not empty.
+    if cacheReady and next(store:Out()) ~= nil then
         for id in pairs(firstSeen) do
             if store:Get(id) then
                 seenMisses[id] = nil
