@@ -154,20 +154,21 @@ bar, and the delve or scenario panel.
 Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
 shown in its own typeface in the picker), sizes, spacing, colors, the progress bars, a card
 layout that can wrap the delve and scenario panel as well as your quests, section order and
-visibility, filters by quest type, and eight sort modes including by distance and by hand. The current-zone filter
-shows only quests with an objective on the map you are standing on. If that map lists none of
-its own, such as a building interior, a covenant sanctum or a dungeon, it asks the zone around
-it instead, so you still get that zone's quests rather than an empty tracker.
+visibility, filters by quest type, and eight sort modes including by distance and by hand.
+The current-zone filter shows only quests with an objective on the map you are standing on.
+If that map lists none of its own, such as a building interior, a covenant sanctum or a
+dungeon, it asks the zone around it instead, so you still get that zone's quests rather
+than an empty tracker.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.
 
 ## Translations
 
-Every file in `Locales/` is generated, including the `enUS.lua` phrase list. The translations live in
-[EverythingLocales](https://github.com/wheelbarrel00/EverythingLocales), shared across all of
-this author's addons so that a phrase more than one of them uses is only ever translated once,
-and so that a phrase moving between addons keeps its translation.
+Every file in `Locales/` is generated, including the `enUS.lua` phrase list. The translations
+live in [EverythingLocales](https://github.com/wheelbarrel00/EverythingLocales), shared
+across all of this author's addons so that a phrase more than one of them uses is only ever
+translated once, and so that a phrase moving between addons keeps its translation.
 
 **To add or correct a translation, edit `store/<language>.lua` there and open a pull request
 against that repository.** A change made in this repo is overwritten the next time the files

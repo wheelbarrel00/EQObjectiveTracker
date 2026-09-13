@@ -577,6 +577,14 @@ end
 local classColorButton, activeColorApply, activeReopen, activeCancel
 local pickerHookInstalled = false
 
+-- Which way the opacity control reads is a property of the CLIENT, so it is settled once per
+-- session rather than per swatch. nil means no open has produced an unambiguous reading yet,
+-- and latching false there would be a wrong answer rather than an absent one.
+local pickerAlphaInverted = nil
+
+-- An alpha the two conventions disagree about, for when the one being opened does not.
+local PROBE_ALPHA = 0.25
+
 -- Installed independently of the class button, which ElvUI suppresses. These three outlive a
 -- picker that has closed unless something clears them, and a stale cancel would revert an
 -- already committed color the next time the options window hides over an open picker.
@@ -591,7 +599,9 @@ end
 
 local function ensureClassColorButton()
     if classColorButton ~= nil then return classColorButton or nil end
-    if elvUILoaded() or not ColorPickerFrame then
+    -- The box is asked as well as ElvUI: ColorPPBoxA is ColorPickerPlus's name and ElvUI is
+    -- one fork of it, so testing for ElvUI alone puts a second Class button on the picker.
+    if elvUILoaded() or _G.ColorPPBoxA or not ColorPickerFrame then
         classColorButton = false
         return nil
     end
@@ -601,7 +611,13 @@ local function ensureClassColorButton()
         local r, g, bl = Util.GetPlayerClassColor()
         if not r then return end
         -- SetColorRGB does not reliably move the 10.2.5+ picker, so re-open it seeded instead.
-        local a = (ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha()) or 1
+        -- The reopen takes an addon-space alpha. With no box calibrate latches false, so the
+        -- conversion below is a no-op while the gate above holds and insurance if it widens.
+        local raw = ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha()
+        local a = 1
+        if type(raw) == "number" then
+            a = pickerAlphaInverted and (1 - raw) or raw
+        end
         activeReopen(r, g, bl, a)
         if activeColorApply then activeColorApply() end
     end)
@@ -612,8 +628,9 @@ local function ensureClassColorButton()
     return b
 end
 
--- SetupColorPickerAndShow is the current retail entry point. The field-assignment form
--- is the only one Classic has. Feature-detect, never version-detect.
+-- SetupColorPickerAndShow is what both shipped flavors answer - Blizzard's Classic picker
+-- carries its own copy of the mixin. The field-assignment form below is the older
+-- fallback. Feature-detect, never version-detect.
 function Options:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
     local cp = ColorPickerFrame
     if not cp then return end
@@ -621,14 +638,32 @@ function Options:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
     -- color the picker was opened on rather than the seeded class color.
     local origR, origG, origB, origA = r, g, b, a
 
+    -- ElvUI's alpha box and the slider under it disagree about which end is opaque on 1.15.9:
+    -- a slider at 0.85 shows 15, and its Class button writes 0 meaning opaque, which this addon
+    -- stored as transparent. Whether Blizzard or ElvUI has it backwards is UNMEASURED.
+
+    -- The alpha the picker addon's box is SHOWING, as a fraction. nil covers a box that is
+    -- absent, unreadable, or reporting a percentage outside 0 to 100.
+    local function shownAlpha()
+        local box = _G.ColorPPBoxA
+        local pct = box and box.GetText and tonumber(box:GetText())
+        if pct and pct >= 0 and pct <= 100 then return pct / 100 end
+        return nil
+    end
+
+    local function rawAlpha()
+        if cp.GetColorAlpha then return cp:GetColorAlpha() end
+        if OpacitySliderFrame then return OpacitySliderFrame:GetValue() end
+        return nil
+    end
+
     local function apply()
         local nr, ng, nb = cp:GetColorRGB()
         local na = 1
         if hasAlpha then
-            if cp.GetColorAlpha then
-                na = cp:GetColorAlpha()
-            elseif OpacitySliderFrame then
-                na = OpacitySliderFrame:GetValue()
+            local raw = rawAlpha()
+            if type(raw) == "number" then
+                na = pickerAlphaInverted and (1 - raw) or raw
             end
         end
         onChange(nr, ng, nb, na)
@@ -640,22 +675,72 @@ function Options:ShowColorPicker(r, g, b, a, hasAlpha, onChange, onCancel)
         if onCancel then onCancel() else onChange(origR, origG, origB, origA) end
     end
 
+    -- The control's own value for an addon-space alpha. Once the convention is known the seed
+    -- goes in right way round, which is what spares every later open a corrective write.
+    local function controlValue(v)
+        if pickerAlphaInverted then return 1 - v end
+        return v
+    end
+
+    -- Seeding is not a user gesture and must not commit. ElvUI defers an opacityFunc on any
+    -- write that crosses a percent boundary, which stores a color the user never picked.
+    local function setControl(v)
+        local fn = cp.opacityFunc
+        cp.opacityFunc = nil
+        OpacitySliderFrame:SetValue(v)
+        cp.opacityFunc = fn
+    end
+
+    -- Settles pickerAlphaInverted on the first open that can answer. No box at all is taken as
+    -- the game's own picker. A reading at an alpha near 0.5 cannot tell the two conventions
+    -- apart, so it probes where they differ rather than guessing.
+    local function calibrate(na)
+        if pickerAlphaInverted ~= nil or not (hasAlpha and OpacitySliderFrame) then return end
+        if not _G.ColorPPBoxA then pickerAlphaInverted = false return end
+        local shown = shownAlpha()
+        if not shown then return end
+        local inverted = math.abs(shown - (1 - na)) < 0.01
+        local straight = math.abs(shown - na) < 0.01
+        if inverted ~= straight then
+            pickerAlphaInverted = inverted
+            return
+        end
+        setControl(PROBE_ALPHA)
+        local probed = shownAlpha()
+        if not probed then return end
+        inverted = math.abs(probed - (1 - PROBE_ALPHA)) < 0.01
+        straight = math.abs(probed - PROBE_ALPHA) < 0.01
+        -- A probe fitting both conventions or neither is no answer, so the flag stays unset.
+        if inverted ~= straight then pickerAlphaInverted = inverted end
+    end
+
     local function openWith(nr, ng, nb, na)
+        -- Re-seeding a picker that is still open skips OnShow, which is where BOTH flavors load
+        -- the opacity control - so it commits the PREVIOUS swatch's alpha, can leave an alpha
+        -- picker with no opacity control at all, and leaves the calibration below reading stale.
+        if cp:IsShown() then cp:Hide() end
         if cp.SetupColorPickerAndShow then
             cp:SetupColorPickerAndShow({
                 r = nr, g = ng, b = nb,
-                opacity = na, hasOpacity = hasAlpha and true or false,
+                opacity = controlValue(na), hasOpacity = hasAlpha and true or false,
                 swatchFunc = apply, opacityFunc = apply, cancelFunc = cancel,
             })
         else
             cp.func, cp.opacityFunc, cp.cancelFunc = apply, apply, cancel
             cp.hasOpacity = hasAlpha and true or false
-            cp.opacity = na
+            cp.opacity = controlValue(na)
             cp:SetColorRGB(nr, ng, nb)
             cp:Hide()
             cp:Show()
         end
-        -- Set after the open: the legacy branch's Hide fires the OnHide hook that clears these.
+        calibrate(na)
+        -- The first open of a session seeds before it can know which way the control reads, and
+        -- calibrating may have moved it to probe. This is what puts it where the answer says.
+        if hasAlpha and OpacitySliderFrame and OpacitySliderFrame:GetValue() ~= controlValue(na) then
+            setControl(controlValue(na))
+        end
+        -- Set after the open: the re-seed Hide above and the legacy branch both fire the OnHide
+        -- hook that clears these.
         activeColorApply, activeReopen, activeCancel = apply, openWith, cancel
         ensurePickerHook()
         local classBtn = ensureClassColorButton()
