@@ -9,6 +9,14 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.24.0", date = "2026-09-12",
+        sections = {
+            { head = "New Features", items = {
+                "The event title above the scenario banner can be sized and colored. That is the line naming the scenario itself, and it had no controls of its own while the banner text below it had several. Both settings live in the Scenario group on the Appearance tab, named Event Title Text Size and Event Title Color, and both start at exactly what the tracker already drew, so nothing on your screen moves until you change one. The color is set separately from Section Header Color even though it matches it by default, because the scenario panel is not one of the tracker's sections. Asked for by Entmoot.",
+            } },
+        },
+    },
+    {
         version = "1.23.0", date = "2026-09-11",
         sections = {
             { head = "New Features", items = {

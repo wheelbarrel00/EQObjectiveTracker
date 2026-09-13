@@ -522,6 +522,9 @@ local function windows(QC)  return figure(QC, "(%d+) window%(s%)") end
 local function confirms(QC) return figure(QC, "(%d+) confirmed") end
 local function skip(QC)     return figure(QC, "skip (%d+)") end
 local function updates(QC)  return figure(QC, "(%d+) log updates") end
+local function walks(QC)    return figure(QC, "(%d+) walk%(s%)") end
+local function judged(QC)   return figure(QC, "last judged (%d+)") end
+local function atUpdate(QC) return figure(QC, "last judged %d+ at update (%d+)") end
 
 do
     local QC, d = fresh()
@@ -585,6 +588,144 @@ do
     d.zone()
     eq(updates(QC), 5, "a zone change does not reset the count")
     eq(skip(QC), LOGIN_SKIP, "nor re-arm the skip")
+end
+
+-- ------------------------------------------- the walk count, and the pair that goes beside it
+
+-- This trio exists because a retail dump read `9 log updates` with `0 confirmed` and nothing on
+-- the line could say whether a rebuild had run after the log arrived. It has to count FULL
+-- REBUILDS rather than renders, and the pair has to describe the LAST walk rather than any
+-- earlier one, or it answers a different question from the one it is printed for.
+do
+    local QC, d = fresh()
+    eq(walks(QC), 0, "a module nothing has walked reports no walks")
+    eq(judged(QC), 0, "and has judged nothing")
+    eq(atUpdate(QC), 0, "at no update")
+
+    d.enable()
+    d.login()
+    -- Finish answers IsReady, never "this walk was clean", so a walk inside an unconfirmed
+    -- window correctly answers false. It is still a walk and must still be counted.
+    eq(walk(QC, healthy()), false, "an early walk is refused the confirm")
+    eq(walks(QC), 1, "but is still counted as a walk")
+    -- Read at more than one value, or a literal 1 satisfies the assertion.
+    eq(walk(QC, healthy()), false, "a second walk is refused too")
+    eq(walks(QC), 2, "and the count accumulates rather than latching")
+    eq(walk(QC, healthy()), false, "and a third")
+    eq(walks(QC), 3, "and keeps accumulating")
+
+    -- The count must survive a loading screen. Reset there, it could never show that rebuilds
+    -- stopped arriving, which is the whole reason it is printed.
+    d.zone()
+    eq(walks(QC), 3, "a zone change does not reset the walk count")
+end
+
+do
+    -- The pair has to survive a loading screen too, and for a sharper reason than the count:
+    -- reset on a window that has not been walked yet, it reads `last judged 0`, which is
+    -- exactly the "a walk ran and read nothing" shape this trio exists to tell apart. Left
+    -- alone it keeps describing the last walk that really happened, whenever that was.
+    local QC, d = fresh()
+    d.enable()
+    d.login()
+    d.logUpdate(LOGIN_SKIP + 1)
+    eq(walk(QC, { healthy(1)[1], healthy(2)[1] }), true, "a walk confirms in the first window")
+    eq(judged(QC), 2, "and records two judged")
+    eq(atUpdate(QC), LOGIN_SKIP + 1, "at the update it landed on")
+
+    d.zone()
+    eq(judged(QC), 2, "a zone change leaves the last walk's judged count standing")
+    eq(atUpdate(QC), LOGIN_SKIP + 1, "and the update it landed at, rather than reading as an empty walk")
+end
+
+do
+    -- The judged figure is the one that separates "no rebuild ran" from "one ran and read
+    -- nothing" - the two shapes a bare walk count cannot tell apart.
+    local QC, d = fresh()
+    d.enable()
+    d.login()
+
+    eq(walk(QC, {}), false, "an empty walk cannot confirm")
+    eq(walks(QC), 1, "but is still counted as a walk")
+    eq(judged(QC), 0, "and judged nothing, which is why it could not confirm")
+    eq(confirms(QC), 0, "and nothing confirmed")
+
+    eq(walk(QC, { healthy(1)[1], healthy(2)[1] }), false, "a walk over two quests runs")
+    eq(judged(QC), 2, "and reports both as judged")
+    eq(walk(QC, { healthy(1)[1], healthy(2)[1], healthy(3)[1] }), false, "a walk over three runs")
+    eq(judged(QC), 3, "and reports three, so the figure tracks the last walk rather than a total")
+
+    -- It describes the LAST walk, so a shorter walk after a longer one must fall rather than
+    -- hold the high-water mark.
+    eq(walk(QC, healthy()), false, "a one-quest walk follows")
+    eq(judged(QC), 1, "and the figure falls to one rather than keeping the previous walk's three")
+end
+
+do
+    -- `at update N` is the half that proves a walk landed AFTER the skip was paid. Without it a
+    -- walk count read against `log updates` still cannot tell a burst of early rebuilds from
+    -- rebuilds that kept coming, and those are the two shapes under diagnosis.
+    local QC, d = fresh()
+    d.enable()
+    d.login()
+
+    eq(walk(QC, healthy()), false, "a walk before any log update cannot confirm")
+    eq(atUpdate(QC), 0, "and records that it landed at update 0, at or below the skip")
+    eq(confirms(QC), 0, "which is why it did not confirm")
+
+    d.logUpdate(LOGIN_SKIP + 1)
+    eq(walk(QC, healthy()), true, "a walk after the skip is paid confirms")
+    eq(atUpdate(QC), LOGIN_SKIP + 1, "and records the update it landed at")
+    eq(confirms(QC), 1, "and is counted")
+
+    d.logUpdate(3)
+    eq(walk(QC, healthy()), true, "a later walk runs")
+    eq(atUpdate(QC), LOGIN_SKIP + 4, "and the figure moves with the count rather than latching")
+end
+
+do
+    -- The aborted walk, and the only state that separates the two halves of the field.
+    -- stats.walks counts rebuilds STARTED, in Begin. The pair records rebuilds FINISHED, in
+    -- Finish. That is deliberate - a rebuild that raised still ran, and the line exists to say
+    -- whether one ran - and fullRebuild is unprotected while Data/Feed.lua calls GetEntries
+    -- bare, so the state is reachable. Without this case the increment can be moved into
+    -- Finish, and lastJudged deleted in favour of the live walkJudged, both with the file green.
+    local QC, d = fresh()
+    d.enable()
+    d.login()
+    d.logUpdate(LOGIN_SKIP + 1)
+    eq(walk(QC, healthy()), true, "a complete walk confirms")
+    eq(walks(QC), 1, "one walk is counted")
+    eq(judged(QC), 1, "and it judged one quest")
+
+    ok(pcall(function()
+        QC:Begin()
+        QC:Note(2, { obj("Kill 5 boars", 5) }, false)
+        QC:Note(3, { obj("Kill 5 boars", 5) }, false)
+    end), "a walk that opens and never closes raises nothing on the way in")
+
+    eq(walks(QC), 2, "the aborted rebuild is still counted, because it did run")
+    eq(judged(QC), 1, "while the pair keeps describing the last walk that FINISHED")
+    eq(atUpdate(QC), LOGIN_SKIP + 1, "including the update that one landed at")
+end
+
+do
+    -- The reading this instrument was written to explain, reproduced: quests judged, nothing
+    -- refused, and no confirmation - because every walk ran before the skip was paid and none
+    -- came back afterwards. The pair names that outright where the old line could not.
+    local QC, d = fresh()
+    d.enable()
+    d.login()
+    eq(walk(QC, { healthy(1)[1], healthy(2)[1] }), false, "a walk lands early and cannot confirm")
+    d.logUpdate(8)
+
+    eq(updates(QC), 8, "eight log updates then arrive")
+    eq(walks(QC), 1, "but only one walk ever ran")
+    eq(judged(QC), 2, "it judged quests, so it was not an empty walk")
+    eq(atUpdate(QC), 0, "and it landed at update 0, before the skip was paid")
+    eq(confirms(QC), 0, "which is exactly why nothing confirmed")
+    eq(figure(QC, "refused (%d+) streaming"), 0, "with nothing refused as unstreamed")
+    eq(figure(QC, "(%d+) regressed"), 0, "and nothing refused as regressed")
 end
 
 -- --------------------------------------------------------------- a zone change is not a login
@@ -868,8 +1009,22 @@ for _, rel in ipairs({ "Data/Providers/Quests.lua", "Data/Providers/QuestsClassi
     ok(src:find("store:Begin()\n    QuestCache:Begin()", 1, true) ~= nil,
        ("the cache walk opens beside the store's, ahead of the log walk [%s]"):format(rel))
     local fin = src:find("local cacheReady = QuestCache:Finish()", 1, true)
-    ok(fin and src:find("store:Finish()", 1, true) < fin,
+    -- Both sides guarded. A missing store:Finish() makes the find nil, and nil < number
+    -- aborts the file before its summary line, which every battery reads as a survivor.
+    local sfin = src:find("store:Finish()", 1, true)
+    ok(fin and sfin and sfin < fin,
        ("and closes after it [%s]"):format(rel))
+
+    -- COUNTED, because the walk figure on the status line means FULL REBUILDS only while this
+    -- is the sole caller in the file. A second Begin on the cheap path would still satisfy
+    -- every presence grep above while quietly turning that number into a render count - and it
+    -- is read against `log updates` to decide whether rebuilds kept coming, so a render count
+    -- there does not read as wrong, it reads as the opposite answer.
+    -- Whole-line comments are stripped first. QuestCache's own note invites a matching one in
+    -- the provider, and counting that would fail a build nothing is wrong with.
+    local code   = src:gsub("\n[ \t]*%-%-[^\n]*", "\n")
+    local begins = select(2, code:gsub("QuestCache:Begin%(%)", ""))
+    eq(begins, 1, ("the provider opens exactly one cache walk [%s]"):format(rel))
 end
 
 do

@@ -5,6 +5,18 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.0] - 2026-09-12
+
+### New Features
+
+- The event title above the scenario banner can be sized and colored. That is the line naming
+  the scenario itself, and it had no controls of its own while the banner text below it had
+  several. Both settings live in the Scenario group on the Appearance tab, named Event Title
+  Text Size and Event Title Color, and both start at exactly what the tracker already drew, so
+  nothing on your screen moves until you change one. The color is set separately from Section
+  Header Color even though it matches it by default, because the scenario panel is not one of
+  the tracker's sections. Asked for by Entmoot.
+
 ## [1.23.0] - 2026-09-11
 
 ### New Features

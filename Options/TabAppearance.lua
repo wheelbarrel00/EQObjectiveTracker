@@ -241,13 +241,26 @@ Options:RegisterTab({
             L["Sizes the scenario / delve objective (criteria) lines shown under the banner, separately from the Banner Text Size above. Raise it if the criteria text looks small next to your quest and World Quest text."])
         scCritSizeSlider:SetPoint("TOPLEFT", scSizeSlider, "BOTTOMLEFT", 0, -16)
 
+        -- Out of syncDependents: they dim on nothing, and it is near the Lua 5.1 upvalue ceiling.
+        local scTitleSizeSlider = self:CreateSlider(content, L["Event Title Text Size"], -4, 12, 0.5,
+            function() return DB().scenarioTitleSizeDelta or 4 end,
+            function(v) relayout("scenarioTitleSizeDelta", v) end,
+            L["Grows or shrinks the event title above the scenario / delve banner, the line naming the scenario itself. This value is added to the Font Size above, so 4 is the default and keeps the title sizing like a section heading. A long title wraps rather than trailing off, so large values make the panel taller."])
+        scTitleSizeSlider:SetPoint("TOPLEFT", scCritSizeSlider, "BOTTOMLEFT", 0, -16)
+
+        local scTitlePicker = self:CreateColorPicker(content, L["Event Title Color"],
+            function() return DB().scenarioTitleColor end,
+            function(v) relayout("scenarioTitleColor", v) end,
+            L["Color of the event title above the scenario / delve banner. It matches the Section Header Color by default but is set separately, because the scenario panel is not one of the tracker's sections."])
+        scTitlePicker:SetPoint("TOPLEFT", scTitleSizeSlider, "BOTTOMLEFT", 0, -16)
+
         -- Built here but anchored at the very bottom of this builder, because it re-homes
         -- the Tracker group under a section written further down. Screen order is not file
         -- order in EQ either, and the mirror is of the screen.
         local trackerHeader = self:CreateHeading(content, L["Tracker"])
 
         local skinsHeader = self:CreateHeading(content, L["Scroll Bar"])
-        skinsHeader:SetPoint("TOPLEFT", scCritSizeSlider, "BOTTOMLEFT", 0, self.GAP.aboveHead)
+        skinsHeader:SetPoint("TOPLEFT", scTitlePicker, "BOTTOMLEFT", 0, self.GAP.aboveHead)
 
         -- Heads its own group rather than sitting on the Tracker tab, where it switched off
         -- six controls the player could not see from there.

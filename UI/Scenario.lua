@@ -37,8 +37,11 @@ local STAGE_NAME_GAP    = 4
 local BANNER_NAME_H     = 28
 local BANNER_BOTTOM_PAD = 6
 
+-- Kept as the fallback: Build colors the string before any config read has happened.
 local HEADER_COLOR   = { 0.93, 0.32, 0.10 }
 local CATEGORY_COLOR = { 0.78, 0.78, 0.78 }
+-- The title's old hardcoded delta, still its fallback. +4 matches the section header delta.
+local TITLE_DELTA    = 4
 
 local TEXTURE_KIT_OFFSETS = {
     ["evergreen-scenario"]    = { nx = 0,  ny = 0, fx = -4, fy = 2 },
@@ -203,6 +206,17 @@ local function headerHeight(self)
     return math.max(SUBHEADER_H, textH + 6)
 end
 
+-- Per channel, the shape UI/Sections.lua uses on headerColor: a missing one falls back alone.
+local function titleColor(cfg)
+    local c = (cfg and cfg.scenarioTitleColor) or {}
+    return c.r or HEADER_COLOR[1], c.g or HEADER_COLOR[2], c.b or HEADER_COLOR[3]
+end
+
+-- `or` is safe here: 0 is truthy in Lua, so a delta of 0 survives rather than falling back.
+local function titleDelta(cfg)
+    return (cfg and cfg.scenarioTitleSizeDelta) or TITLE_DELTA
+end
+
 function Scenario:ApplyHeaderLabels(category, name)
     local subHeader = self.subHeader
     if self._sCat == category and self._sName == name then return end
@@ -212,8 +226,8 @@ function Scenario:ApplyHeaderLabels(category, name)
     local Media   = ns:GetModule("Media")
 
     subHeader.text:SetText(name or category)
-    -- +4 matches the section header delta, so this sizes like the headers around it
-    Media:ApplyFont(subHeader.text, 4)
+    -- The constant, not the setting: this memoizes, and ApplyHeaderFont applies the real one.
+    Media:ApplyFont(subHeader.text, TITLE_DELTA)
 
     if twoTier then
         Media:ApplyFont(subHeader.cat, -1)
@@ -232,11 +246,13 @@ end
 
 -- ApplyHeaderLabels memoizes on the scenario identity, so the font, the wrap width and the
 -- height all belong here instead. Sizing there would never re-run on a tracker resize.
-function Scenario:ApplyHeaderFont()
+-- cfg is passed, not fetched: a module fetch here would be this file's only hidden config read.
+function Scenario:ApplyHeaderFont(cfg)
     local subHeader = self.subHeader
     if not subHeader then return end
     local Media = ns:GetModule("Media")
-    Media:ApplyFont(subHeader.text, 4)
+    Media:ApplyFont(subHeader.text, titleDelta(cfg))
+    subHeader.text:SetTextColor(titleColor(cfg))
     if subHeader.cat:IsShown() then Media:ApplyFont(subHeader.cat, -1) end
 
     -- Width before height, for the reason headerTextWidth records
@@ -520,7 +536,7 @@ function Scenario:Render(container, cfg, info, entry, topOffset)
     self.subHeader:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, -self.topOffset)
     self.subHeader:Show()
     self:ApplyHeaderLabels(info.category, info.name)
-    self:ApplyHeaderFont()
+    self:ApplyHeaderFont(cfg)
     self.banner:Show()
 
     self:_DrawBanner(info, cfg)

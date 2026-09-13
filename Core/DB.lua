@@ -74,6 +74,9 @@ DB.defaults = {
             scenarioTextAlign          = "CENTER",
             scenarioTextSizeDelta      = 0,
             scenarioFontSize           = 13,
+            -- Seeded to the old hardcoded values. Retuning hands players a color they never picked.
+            scenarioTitleColor         = { r = 0.93, g = 0.32, b = 0.10, a = 1 },
+            scenarioTitleSizeDelta     = 4,
 
             blockSpacing         = 2,
             lineSpacing          = 0,
@@ -239,6 +242,7 @@ local APPEARANCE_KEYS = {
     "textShadow", "textShadowColor", "textShadowStrength",
     "scenarioTextShadow", "scenarioTextShadowColor", "scenarioTextShadowStrength",
     "scenarioTextAlign", "scenarioTextSizeDelta", "scenarioFontSize",
+    "scenarioTitleColor", "scenarioTitleSizeDelta",
     "titleColorOverride", "overrideCompleteGreen", "headerColor",
     "headerDividerColor", "headerSizeDelta",
     "titleColorUseClass", "headerColorUseClass",

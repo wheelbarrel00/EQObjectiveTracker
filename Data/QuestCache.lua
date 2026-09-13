@@ -41,7 +41,10 @@ local prevObjN, prevFill, prevDone = {}, {}, {}
 local walkOpen, walkDirty, walkJudged = false, false, 0
 local seen = {}
 
-local stats = { windows = 0, confirms = 0, late = 0, unstreamed = 0, regressed = 0 }
+local stats = { windows = 0, confirms = 0, late = 0, unstreamed = 0, regressed = 0, walks = 0 }
+
+-- The LAST walk's confirm-gate inputs. walkDirty is absent: the refused counters are cumulative.
+local lastJudged, lastQlu = 0, 0
 
 -- Answers ready until a PLAYER_ENTERING_WORLD arms it, so safe mode and /eqot disable QuestCache
 -- leave every consumer behaving exactly as it did before this file existed. Bisection axis and
@@ -51,8 +54,10 @@ function QuestCache:IsReady()
     return GetTime() >= settleUntil
 end
 
+-- Counts FULL REBUILDS while fullRebuild is the sole caller. A second makes it a render count.
 function QuestCache:Begin()
     walkOpen, walkDirty, walkJudged = true, false, 0
+    stats.walks = stats.walks + 1
     wipe(seen)
 end
 
@@ -110,6 +115,8 @@ end
 function QuestCache:Finish()
     if not walkOpen then return self:IsReady() end
     walkOpen = false
+
+    lastJudged, lastQlu = walkJudged, qluSeen
 
     -- Separates "fully streamed" from "fully streamed AND this session's". Without the skip a
     -- cold login could confirm against the outgoing session's quests, which read perfectly
@@ -181,12 +188,11 @@ function QuestCache:DebugLine()
     local baselines = 0
     for _ in pairs(prevObjN) do baselines = baselines + 1 end
 
-    -- `late` is the figure to read, not `confirmed`. A confirmation that lands after the window
-    -- has already expired means the gate was open on the timeout by the time the walk got
-    -- there, so it guarded nothing - and without this number that reads exactly like one that
-    -- landed in time.
-    return ("quest cache: %s (%s) | skip %d, %d log updates | %d window(s), %d confirmed, %d late | refused %d streaming, %d regressed | %d baselines"):format(
+    -- Read `late`, not `confirmed`: one landing after the window expired guarded nothing.
+    -- The walk trio spans every window, so weigh it against `skip` on a first-window dump only.
+    return ("quest cache: %s (%s) | skip %d, %d log updates | %d walk(s), last judged %d at update %d | %d window(s), %d confirmed, %d late | refused %d streaming, %d regressed | %d baselines"):format(
         ready and "ready" or "NOT READY", why,
-        skipCount, qluSeen, stats.windows, stats.confirms, stats.late,
+        skipCount, qluSeen, stats.walks, lastJudged, lastQlu,
+        stats.windows, stats.confirms, stats.late,
         stats.unstreamed, stats.regressed, baselines)
 end

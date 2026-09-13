@@ -355,9 +355,9 @@ MUTANTS = [
         (Q, "            if GetTime() >= settleUntil then stats.late = stats.late + 1 end",
             "            if GetTime() > settleUntil then stats.late = stats.late + 1 end")]),
 
-    # ---------------------------------------------------- the status line's own six figures
+    # ------------------------------------------------------ the status line's own figures
     # This line is the whole diagnostic - reading it CURES the state it reports, so the
-    # counters are all that survive the cure. Four of the six were asserted nowhere.
+    # counters are all that survive the cure.
     ("the settling branch claims a confirmation it never had", [
         (Q, '        why = ("settling, %.1fs left"):format(settleUntil - GetTime())',
             '        why = "confirmed by a clean walk"')]),
@@ -385,8 +385,8 @@ MUTANTS = [
             "            skipCount = LOGIN_SKIP")]),
 
     ("the skip is printed as a constant, so the pair that discriminates reads the same", [
-        (Q, "        skipCount, qluSeen, stats.windows, stats.confirms, stats.late,",
-            "        0, qluSeen, stats.windows, stats.confirms, stats.late,")]),
+        (Q, "        skipCount, qluSeen, stats.walks, lastJudged, lastQlu,",
+            "        0, qluSeen, stats.walks, lastJudged, lastQlu,")]),
 
     ("the log update counter latches at one, so the skip can never be paid off", [
         (Q, "        qluSeen = qluSeen + 1", "        qluSeen = 1")]),
@@ -395,6 +395,84 @@ MUTANTS = [
     # again, so nothing can confirm for another two events on every zone change.
     ("a loading screen resets the log update count, so the skip is paid on every zone change", [
         (Q, "        armed         = true", "        qluSeen       = 0\n        armed         = true")]),
+
+    # ------------------------------------------- the walk count, and the pair beside it
+    # These exist because a retail dump read `9 log updates` with `0 confirmed` and nothing on
+    # the line could say whether a rebuild had run after the log arrived. The gate is measured
+    # innocent, so the open question is the provider's, and this trio is the only thing that can
+    # tell "no rebuild ran" from "one ran and read nothing" from "one ran before the skip".
+    ("full rebuilds are not counted, so the line cannot say whether any ran", [
+        (Q, "    stats.walks = stats.walks + 1\n", "")]),
+
+    ("the walk count latches at one, so rebuilds that kept coming read as one that did not", [
+        (Q, "    stats.walks = stats.walks + 1\n",
+            "    if stats.walks < 1 then stats.walks = 1 end\n")]),
+
+    # The walk count has to survive a loading screen for the same reason the log update count
+    # does: reset there, it can never show that rebuilds stopped arriving.
+    ("a loading screen resets the walk count, so the figure only ever describes one window", [
+        (Q, "        stats.windows = stats.windows + 1",
+            "        stats.windows = stats.windows + 1\n        stats.walks = 0")]),
+
+    ("the last walk's judged and update figures are never recorded", [
+        (Q, "    lastJudged, lastQlu = walkJudged, qluSeen\n", "")]),
+
+    # The placement is the behavior. In Begin the count means rebuilds STARTED, which is what
+    # answers "did one run at all" for a fullRebuild that raised partway. Moved to Finish it
+    # means rebuilds that completed, and an aborted one disappears from the only line that
+    # could report it. A tidy-up is plausible because the pair already lives in Finish.
+    ("the walk count moves to Finish, so a rebuild that raised is never counted", [
+        (Q, "    stats.walks = stats.walks + 1\n    wipe(seen)", "    wipe(seen)"),
+        (Q, "    lastJudged, lastQlu = walkJudged, qluSeen",
+            "    stats.walks = stats.walks + 1\n    lastJudged, lastQlu = walkJudged, qluSeen")]),
+
+    # walkJudged is zeroed in Begin and never cleared in Finish, so between walks it already
+    # holds the last walk's count - which makes lastJudged look redundant. It is not: the two
+    # diverge on an aborted walk, where the live value counts quests the walk never finished.
+    ("the live walkJudged is printed instead of the recorded copy", [
+        (Q, "        skipCount, qluSeen, stats.walks, lastJudged, lastQlu,",
+            "        skipCount, qluSeen, stats.walks, walkJudged, lastQlu,")]),
+
+    # Sharper than the walk count's own reset mutant: cleared on a window that has not been
+    # walked yet, the pair reads `last judged 0`, which is the "a walk ran and read nothing"
+    # shape the trio exists to tell apart. It has to keep describing the last real walk.
+    ("a loading screen clears the last walk's pair, so an unwalked window reads as an empty walk", [
+        (Q, "        stats.windows = stats.windows + 1",
+            "        stats.windows = stats.windows + 1\n        lastJudged, lastQlu = 0, 0")]),
+
+    ("the last walk's pair is recorded the wrong way round", [
+        (Q, "    lastJudged, lastQlu = walkJudged, qluSeen",
+            "    lastJudged, lastQlu = qluSeen, walkJudged")]),
+
+    # It has to describe the LAST walk. Kept as a high-water mark, a short walk after a long one
+    # reads as the long one, which is precisely the "one ran and read nothing" case it is here
+    # to expose.
+    ("judged is kept as a session high-water mark rather than the last walk's count", [
+        (Q, "    lastJudged, lastQlu = walkJudged, qluSeen",
+            "    lastJudged = lastJudged > walkJudged and lastJudged or walkJudged\n"
+            "    lastQlu = qluSeen")]),
+
+    ("the update figure records the skip rather than the count the walk actually landed at", [
+        (Q, "    lastJudged, lastQlu = walkJudged, qluSeen",
+            "    lastJudged, lastQlu = walkJudged, skipCount")]),
+
+    ("the walk figure is printed as a constant", [
+        (Q, "        skipCount, qluSeen, stats.walks, lastJudged, lastQlu,",
+            "        skipCount, qluSeen, 0, lastJudged, lastQlu,")]),
+
+    ("judged and the update figure are printed swapped", [
+        (Q, "        skipCount, qluSeen, stats.walks, lastJudged, lastQlu,",
+            "        skipCount, qluSeen, stats.walks, lastQlu, lastJudged,")]),
+
+    # The walk figure means FULL REBUILDS only while Begin has one caller per provider. A second
+    # one on the cheap path satisfies every presence grep and quietly turns it into a render
+    # count - and since it is read against `log updates` to decide whether rebuilds kept coming,
+    # that does not read as wrong, it reads as the opposite answer.
+    ("a second cache walk opens on the retail provider's cheap path", [
+        (P, "local function refreshDynamic()", "local function refreshDynamic()\n    QuestCache:Begin()")]),
+
+    ("a second cache walk opens on the Classic provider's cheap path", [
+        (C, "local function refreshDynamic()", "local function refreshDynamic()\n    QuestCache:Begin()")]),
 ]
 
 SUMMARY = re.compile(r"^test_quest_cache: (\d+) passed, (\d+) failed$")

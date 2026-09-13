@@ -33,9 +33,10 @@ A CRASHED verdict is still reported apart from "caught" on purpose. A mutant tha
 exits nonzero too, and counting that as caught is a false pass in the one tool whose job is to
 find false passes.
 
-WRITES TO THE TREE. It edits UI/Scenario.lua in place and restores it after every mutant through
-a finally, then verifies the restore and re-checks the baseline before reporting. If you
-hard-kill it, recover from your editor's undo history.
+WRITES TO THE TREE. It edits UI/Scenario.lua in place, and for the event title mutants also
+Core/DB.lua and Options/TabAppearance.lua, restoring each after every mutant through a finally,
+then verifying every file it touched and re-checking the baseline before reporting. If you
+hard-kill it, recover those three files from your editor's undo history.
 
 Anchors are exact source text and they rot. A SKIPPED line means an anchor stopped matching: fix
 the anchor rather than dropping the mutant.
@@ -502,6 +503,89 @@ MUTANTS = [
     ("the texture kit fallback is inverted, so a kit that HAS header art is refused it",
      "    if not Util.AtlasExists(normal) then",
      "    if Util.AtlasExists(normal) then"),
+
+    # ------------------------------------------- the event title's own size and color
+    # Asked for by Entmoot: the banner text below the title was stylable and the title naming
+    # the scenario was not. Both settings are read in ApplyHeaderFont, which is the only header
+    # entry point that runs on every render - the labels memoize on the scenario identity, so a
+    # change made while a scenario is on screen would never reach the string from there.
+    ("the size delta ignores the setting and always uses the constant",
+     "    return (cfg and cfg.scenarioTitleSizeDelta) or TITLE_DELTA",
+     "    return TITLE_DELTA"),
+
+    # 0 is TRUTHY in Lua, so `or` is correct here - this is the mutant that proves the
+    # assertion knows the difference. A player sizing the title down to the base font keeps 0.
+    ("a delta of 0 is read as absent, so the base font size can never be reached",
+     "    return (cfg and cfg.scenarioTitleSizeDelta) or TITLE_DELTA",
+     "    local d = cfg and cfg.scenarioTitleSizeDelta\n"
+     "    if not d or d == 0 then return TITLE_DELTA end\n    return d"),
+
+    ("the color ignores the setting and always uses the constant",
+     "    return c.r or HEADER_COLOR[1], c.g or HEADER_COLOR[2], c.b or HEADER_COLOR[3]",
+     "    return HEADER_COLOR[1], HEADER_COLOR[2], HEADER_COLOR[3]"),
+
+    # Per channel, the shape UI/Sections.lua uses on headerColor. A whole-table fallback passes
+    # every fully-specified color and fails only a partial one.
+    ("the color falls back as a WHOLE table, so a partial one loses the channel it supplied",
+     "    local c = (cfg and cfg.scenarioTitleColor) or {}\n"
+     "    return c.r or HEADER_COLOR[1], c.g or HEADER_COLOR[2], c.b or HEADER_COLOR[3]",
+     "    local c = (cfg and cfg.scenarioTitleColor)\n"
+     "    if not (c and c.r and c.g and c.b) then\n"
+     "        return HEADER_COLOR[1], HEADER_COLOR[2], HEADER_COLOR[3]\n    end\n"
+     "    return c.r, c.g, c.b"),
+
+    ("the title is never recolored, so the picker does nothing at all",
+     "    subHeader.text:SetTextColor(titleColor(cfg))\n", ""),
+
+    # Scope creep rather than a bug in the obvious direction: the category is the small grey
+    # breadcrumb above the title and keeps its own color and its own -1 delta.
+    ("the category is recolored with the title's color too",
+     "    subHeader.text:SetTextColor(titleColor(cfg))",
+     "    subHeader.text:SetTextColor(titleColor(cfg))\n"
+     "    subHeader.cat:SetTextColor(titleColor(cfg))"),
+
+    ("the size is applied from the constant rather than the setting",
+     "    Media:ApplyFont(subHeader.text, titleDelta(cfg))",
+     "    Media:ApplyFont(subHeader.text, TITLE_DELTA)"),
+
+    # The seam, and the one no slice can see: Scenario:Render is in no slice at all, so dropping
+    # its argument leaves every case above passing while the title silently takes its fallback
+    # on every render. Only the source grep catches it.
+    ("Render calls ApplyHeaderFont bare, so both settings are inert in game",
+     "    self:ApplyHeaderFont(cfg)", "    self:ApplyHeaderFont()"),
+
+    ("the memoized labels read the setting instead of the constant, a second source of truth",
+     "    Media:ApplyFont(subHeader.text, TITLE_DELTA)\n\n    if twoTier then",
+     "    Media:ApplyFont(subHeader.text, titleDelta(nil))\n\n    if twoTier then"),
+
+    # ------------------------------------------- the defaults and the options wiring
+    # Both keys are seeded to what the file hardcoded before they existed, so nobody's title
+    # moves on upgrade. A changed default here is a visible change for every existing player,
+    # and no assertion inside the slice can see Core/DB.lua at all.
+    ("the size default is changed, so every existing player's title moves on upgrade",
+     "            scenarioTitleSizeDelta     = 4,",
+     "            scenarioTitleSizeDelta     = 0,", "Core/DB.lua"),
+
+    ("the color default is changed, so every existing player's title recolors on upgrade",
+     "            scenarioTitleColor         = { r = 0.93, g = 0.32, b = 0.10, a = 1 },",
+     "            scenarioTitleColor         = { r = 1, g = 1, b = 1, a = 1 },", "Core/DB.lua"),
+
+    ("neither key is cleared by the Appearance tab's Reset to Defaults",
+     '    "scenarioTitleColor", "scenarioTitleSizeDelta",\n', "", "Core/DB.lua"),
+
+    ("the size slider writes a key the renderer never reads",
+     'relayout("scenarioTitleSizeDelta", v)', 'relayout("scenarioTitleDelta", v)',
+     "Options/TabAppearance.lua"),
+
+    ("the color picker writes a key the renderer never reads",
+     'relayout("scenarioTitleColor", v)', 'relayout("scenarioTitleTint", v)',
+     "Options/TabAppearance.lua"),
+
+    # The slider's own getter has to agree with the renderer's fallback, or the control reads
+    # one default while the screen shows another and the first drag jumps.
+    ("the slider reads its value back against a different default than the renderer uses",
+     "DB().scenarioTitleSizeDelta or 4", "DB().scenarioTitleSizeDelta or 0",
+     "Options/TabAppearance.lua"),
 ]
 
 
@@ -520,12 +604,23 @@ def run():
     return "crashed", (r.stderr.strip().splitlines() or ["no output"])[0][:90]
 
 
-original = io.open(SRC, encoding="utf-8", newline="").read()
-crlf = "\r\n" in original
+# Read once per file and keyed by path, because the title mutants below reach Core/DB.lua and
+# Options/TabAppearance.lua as well - the wiring they break lives in neither Scenario.lua nor any
+# slice, so nothing else in this battery can see it.
+ORIGINALS = {}
 
 
-def fit(s):
-    return s.replace("\n", "\r\n") if crlf else s
+def sourceOf(rel):
+    if rel not in ORIGINALS:
+        ORIGINALS[rel] = io.open(rel, encoding="utf-8", newline="").read()
+    return ORIGINALS[rel]
+
+
+# Resolved PER FILE rather than once. Every file this touches is LF today, but the tree is mixed
+# and a bare-LF anchor against a CRLF file matches nothing and reports SKIPPED, which reads as a
+# rotted anchor rather than as this driver's own bug.
+def fit(rel, s):
+    return s.replace("\n", "\r\n") if "\r\n" in sourceOf(rel) else s
 
 
 verdict, last = run()
@@ -535,17 +630,23 @@ if verdict != "green":
     sys.exit(1)
 
 failures = []
-for name, old, new in MUTANTS:
-    old, new = fit(old), fit(new)
+for mutant in MUTANTS:
+    # A fourth element names a file other than SRC. Three-element entries are the majority and
+    # mean Scenario.lua, so widening this cost them nothing.
+    name, old, new = mutant[0], mutant[1], mutant[2]
+    rel = mutant[3] if len(mutant) > 3 else SRC
+    original = sourceOf(rel)
+    old, new = fit(rel, old), fit(rel, new)
     if original.count(old) != 1:
-        print("SKIPPED (anchor matched %d times): %s" % (original.count(old), name))
+        print("SKIPPED (anchor matched %d times in %s): %s"
+              % (original.count(old), rel, name))
         failures.append(("SKIPPED", name))
         continue
     try:
-        io.open(SRC, "w", encoding="utf-8", newline="").write(original.replace(old, new, 1))
+        io.open(rel, "w", encoding="utf-8", newline="").write(original.replace(old, new, 1))
         verdict, last = run()
     finally:
-        io.open(SRC, "w", encoding="utf-8", newline="").write(original)
+        io.open(rel, "w", encoding="utf-8", newline="").write(original)
     equivalent = name.startswith("EQUIVALENT:")
     if verdict == "crashed":
         print("CRASHED   %-88s %s" % (name, last))
@@ -561,9 +662,10 @@ for name, old, new in MUTANTS:
     else:
         print("caught    %-88s %s" % (name, last))
 
-if io.open(SRC, encoding="utf-8", newline="").read() != original:
-    print("\nTHE TREE WAS NOT RESTORED - %s still holds a mutant" % SRC)
-    sys.exit(1)
+for rel, text in ORIGINALS.items():
+    if io.open(rel, encoding="utf-8", newline="").read() != text:
+        print("\nTHE TREE WAS NOT RESTORED - %s still holds a mutant" % rel)
+        sys.exit(1)
 verdict, last = run()
 if verdict != "green":
     print("\nBASELINE IS NOT GREEN AFTER THE RUN - %s" % last)

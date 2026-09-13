@@ -9,8 +9,9 @@
 -- switch could have been inverted, dropped, or wired to the QUEST key with every harness and
 -- every battery in the tree green. That is the produce/consume split this project has recorded
 -- four times, and this file closes the scenario half of it.
--- (Options/TabAppearance.lua also reads the key, at its getter, its setter, and in the sweep
--- that dims the styling group. Those are out of scope here and covered by nothing.)
+-- (The sweep in Options/TabAppearance.lua that dims the styling group is out of scope and
+-- covered by nothing. The seams block at the foot of this file DOES read that file and
+-- Core/DB.lua, for the event title's two settings.)
 --
 -- The rest of what earns the file:
 --   * the two halves are INDEPENDENT - the quest key must never move a scenario criterion,
@@ -610,12 +611,32 @@ local function newHeader(container, width)
     return { frame = container, subHeader = newSubHeader(width) }
 end
 
-local function head(msg, st, category, name)
+-- cfg is optional. Production always passes a table, so nil here is the wider input rather
+-- than a shape the game produces. The realistic profile shape is the empty table below.
+local function head(msg, st, category, name, cfg)
     local a, aErr = pcall(Scenario.ApplyHeaderLabels, st, category, name)
     ok(a, msg .. ": ApplyHeaderLabels raised - " .. tostring(aErr))
-    local b, bErr = pcall(Scenario.ApplyHeaderFont, st)
+    local b, bErr = pcall(Scenario.ApplyHeaderFont, st, cfg)
     ok(b, msg .. ": ApplyHeaderFont raised - " .. tostring(bErr))
     return st.subHeader
+end
+
+-- Reads the delta the title was last fonted at, or nil if it was never fonted. Written as a
+-- search rather than an index because ApplyHeaderLabels fonts it too, so the title appears
+-- more than once per case and it is the LAST application that reached the screen.
+local function titleDeltaSeen(fs)
+    local seen
+    for i = 1, #Media._headerFonts do
+        if Media._headerFonts[i].fs == fs then seen = Media._headerFonts[i].delta end
+    end
+    return seen
+end
+
+-- Nil-safe on purpose. A build that never colors the string leaves _color nil, and indexing
+-- that aborts the whole file, which mutate_scenario_bars.py reports as CRASHED rather than as
+-- the coverage gap it is. Returning nil makes the same breakage FAIL one assertion instead.
+local function channel(fs, i)
+    return fs._color and fs._color[i]
 end
 
 local sh = head("one tier", newHeader(CONTAINER), "Scenario", "Scenario")
@@ -747,6 +768,98 @@ RESIZE._w = 200
 ok(pcall(Scenario.ApplyHeaderFont, st), "a re-font on a resized tracker raises nothing")
 ok(st.subHeader.text._width == 184,
    "and re-wraps a title whose own text has not changed, which the labels alone never would")
+
+--------------------------------------------------------------------------------------------
+-- The event title's own size and color, asked for by Entmoot: the banner text below it was
+-- stylable and the title naming the scenario was not. Both are read in ApplyHeaderFont, so
+-- both reach a scenario already on screen - the labels memoize and would not.
+--------------------------------------------------------------------------------------------
+-- The defaults first. A config carrying neither key has to land on exactly what the file
+-- hardcoded before they existed, or the feature moves every existing player's title.
+Media._headerFonts = {}
+st = newHeader(CONTAINER)
+sh = head("title with no config at all", st, "Scenario", "Scenario", nil)
+ok(titleDeltaSeen(sh.text) == 4, "an unconfigured title keeps the +4 it always had")
+ok(channel(sh.text, 1) == 0.93 and channel(sh.text, 2) == 0.32
+   and channel(sh.text, 3) == 0.10, "and the orange it always had")
+
+-- An EMPTY config is a different path from a nil one: the table exists and the keys do not.
+Media._headerFonts = {}
+st = newHeader(CONTAINER)
+sh = head("title with an empty config", st, "Scenario", "Scenario", {})
+ok(titleDeltaSeen(sh.text) == 4, "a config carrying neither key still gives the +4 default")
+ok(channel(sh.text, 1) == 0.93 and channel(sh.text, 3) == 0.10, "and the default color")
+
+Media._headerFonts = {}
+st = newHeader(CONTAINER)
+sh = head("title sized up", st, "Scenario", "Scenario", { scenarioTitleSizeDelta = 9 })
+ok(titleDeltaSeen(sh.text) == 9, "a configured delta reaches the title")
+
+-- 0 is TRUTHY in Lua, so `or` is safe here where it would not be for a boolean - and this is
+-- the assertion that proves it. A player who deliberately sizes the title down to the base
+-- font must keep 0 rather than silently getting the 4 back.
+Media._headerFonts = {}
+st = newHeader(CONTAINER)
+sh = head("title sized to the base font", st, "Scenario", "Scenario", { scenarioTitleSizeDelta = 0 })
+ok(titleDeltaSeen(sh.text) == 0, "a delta of 0 survives rather than falling back to 4")
+
+-- Negative is in range on the slider, and it is the case a fallback written as a truth test
+-- would also pass, so it is read at both signs.
+Media._headerFonts = {}
+st = newHeader(CONTAINER)
+sh = head("title sized down", st, "Scenario", "Scenario", { scenarioTitleSizeDelta = -3 })
+ok(titleDeltaSeen(sh.text) == -3, "and a negative delta reaches it too")
+
+st = newHeader(CONTAINER)
+sh = head("title recolored", st, "Scenario", "Scenario",
+          { scenarioTitleColor = { r = 0.1, g = 0.2, b = 0.3, a = 1 } })
+ok(channel(sh.text, 1) == 0.1 and channel(sh.text, 2) == 0.2 and channel(sh.text, 3) == 0.3,
+   "a configured color reaches the title")
+
+-- Per channel, the shape UI/Sections.lua uses on headerColor: a partial table has to fall back
+-- channel by channel rather than taking the whole color down with it. A whole-table fallback
+-- passes every case above and fails only this one.
+st = newHeader(CONTAINER)
+sh = head("title recolored on one channel", st, "Scenario", "Scenario",
+          { scenarioTitleColor = { g = 0.5 } })
+ok(channel(sh.text, 1) == 0.93, "a missing red channel falls back on its own")
+ok(channel(sh.text, 2) == 0.5,  "the supplied green is kept")
+ok(channel(sh.text, 3) == 0.10, "and the missing blue falls back too")
+
+-- Black has to be reachable. Every channel is 0, which is truthy, so a fallback written as a
+-- truth test on the CHANNEL would hand back the orange instead.
+st = newHeader(CONTAINER)
+sh = head("title in black", st, "Scenario", "Scenario",
+          { scenarioTitleColor = { r = 0, g = 0, b = 0, a = 1 } })
+ok(channel(sh.text, 1) == 0 and channel(sh.text, 2) == 0 and channel(sh.text, 3) == 0,
+   "an all-zero color is honored rather than read as absent")
+
+-- The live restyle path. ApplyHeaderLabels memoizes on the scenario identity, so this second
+-- call with a different config is exactly what a player changing the control mid-scenario does.
+st = newHeader(CONTAINER)
+head("before a restyle", st, "Scenario", "Scenario", nil)
+Media._headerFonts = {}
+ok(pcall(Scenario.ApplyHeaderFont, st, { scenarioTitleSizeDelta = 7,
+                                         scenarioTitleColor = { r = 1, g = 0, b = 0, a = 1 } }),
+   "a restyle on a scenario already drawn raises nothing")
+ok(titleDeltaSeen(st.subHeader.text) == 7, "and the new size reaches the title")
+ok(channel(st.subHeader.text, 1) == 1 and channel(st.subHeader.text, 2) == 0,
+   "and so does the new color, which the memoized labels never could")
+
+-- The category tier is deliberately NOT restyled by these two. It is the small grey breadcrumb
+-- above the title and keeps its own -1 delta, so a case that let it drift would be a silent
+-- scope creep rather than a feature.
+Media._headerFonts = {}
+st = newHeader(CONTAINER)
+sh = head("two tier with a styled title", st, "Delves", "Collegiate Calamity",
+          { scenarioTitleSizeDelta = 9, scenarioTitleColor = { r = 1, g = 1, b = 1, a = 1 } })
+ok(titleDeltaSeen(sh.text) == 9, "the title takes the configured delta")
+ok(titleDeltaSeen(sh.cat) == -1, "while the category keeps its own -1")
+-- NIL is the right expectation rather than the grey: Scenario:Build is not sliced into this
+-- harness, so the only thing that could have colored the category here is ApplyHeaderFont -
+-- and it must not. Colored by mistake, this reads the title's white instead.
+ok(sh.cat._color == nil,
+   "and ApplyHeaderFont leaves the category's color alone rather than leaking the title's onto it")
 
 --------------------------------------------------------------------------------------------
 -- The banner. Reported in the same message: the stage and the name sat off-center on the
@@ -1003,6 +1116,62 @@ ok((bn._points[1] or {}).p == "TOP", "with center the default")
 -- deletable with the file green.
 ok(pcall(Scenario.ApplyHeaderFont, { frame = CONTAINER }),
    "a state with no sub-header returns rather than raising")
+
+--------------------------------------------------------------------------------------------
+-- The seams. Everything above drives the slice, so it all passes with the title settings
+-- wired to nothing at all: Scenario:Render is in no slice, and neither is the options panel
+-- or the defaults table. These are the only assertions that can see a broken wire.
+--------------------------------------------------------------------------------------------
+local function otherFile(rel)
+    local f = assert(io.open(repoFile(rel), "r"), rel .. " is missing")
+    local t = f:read("*a")
+    f:close()
+    return t
+end
+
+-- Whole-line comments are stripped before every grep below, because a plain find cannot tell
+-- code from a note: writing `-- self:ApplyHeaderFont(cfg)` above a bare call satisfied all of
+-- these while the feature was inert on every client.
+local function codeHas(text, needle)
+    return (text:gsub("\n[ \t]*%-%-[^\n]*", "\n")):find(needle, 1, true) ~= nil
+end
+
+ok(not codeHas("\n    -- self:ApplyHeaderFont(cfg)\n", "self:ApplyHeaderFont(cfg)"),
+   "the code grep refuses a commented-out occurrence")
+ok(codeHas("\n    self:ApplyHeaderFont(cfg)\n", "self:ApplyHeaderFont(cfg)"),
+   "and still finds a real one")
+
+-- Anchored on the ARGUMENT, not the name. Dropping it leaves self:ApplyHeaderFont(), which
+-- still satisfies a bare-name grep while making every title setting inert - the title would
+-- silently take its fallback on every render and no case above could tell.
+ok(codeHas(src, "self:ApplyHeaderFont(cfg)"),
+   "Render hands its cfg to ApplyHeaderFont rather than calling it bare")
+-- The labels keep the CONSTANT deliberately, because they memoize. Reading the setting there
+-- would be a second source of truth that only re-runs when the scenario itself changes.
+ok(codeHas(src, "Media:ApplyFont(subHeader.text, TITLE_DELTA)"),
+   "and the memoized labels font the title from the constant, not the setting")
+
+local dbSrc = otherFile("Core/DB.lua")
+-- Seeded to what the file hardcoded before the keys existed, so nobody's title moves on
+-- upgrade. Both carry their trailing comma: without it `= 4` also matches `= 40`, which is a
+-- 36 point jump passing the assertion written to prevent it.
+ok(codeHas(dbSrc, "scenarioTitleSizeDelta     = 4,"),
+   "the title size delta defaults to the 4 the code used to hardcode")
+ok(codeHas(dbSrc, "scenarioTitleColor         = { r = 0.93, g = 0.32, b = 0.10, a = 1 },"),
+   "and the title color to the orange it used to hardcode")
+ok(codeHas(dbSrc, '"scenarioTitleColor", "scenarioTitleSizeDelta",'),
+   "and both are reset by the Appearance tab's Reset to Defaults")
+
+local optSrc = otherFile("Options/TabAppearance.lua")
+-- relayout both stores and renders, so these two also pin that a change reaches the screen
+-- rather than waiting for whatever repaints next.
+ok(codeHas(optSrc, 'relayout("scenarioTitleSizeDelta", v)'),
+   "the size slider writes the key the renderer reads")
+ok(codeHas(optSrc, 'relayout("scenarioTitleColor", v)'),
+   "and the color picker writes the one it reads")
+-- Trailing `end` for the same reason the defaults carry their comma: `or 4` matches `or 40`.
+ok(codeHas(optSrc, "DB().scenarioTitleSizeDelta or 4 end"),
+   "and the slider reads its own key back, seeded to the same default")
 
 print(("test_scenario_bars: %d passed, %d failed"):format(pass, fail))
 if fail > 0 then os.exit(1) end
