@@ -32,7 +32,7 @@ read_globals = {
     -- Blizzard's panel manager on every Escape press - see closeOnEscape in Options/Frame.lua.
     "RAID_CLASS_COLORS", "GetQuestDifficultyColor", "CreateColor",
     "STANDARD_TEXT_FONT", "OpacitySliderFrame",
-    "UnitClass", "UnitName", "GetRealmName", "GetZoneText", "PlaySound", "ReloadUI",
+    "UnitClass", "UnitName", "UnitLevel", "GetRealmName", "GetZoneText", "PlaySound", "ReloadUI",
     -- Locales/*.lua gate on the client language before touching ns.L
     "GetLocale",
     -- Picks which Classic Wowhead site a row menu link opens
@@ -85,8 +85,9 @@ read_globals = {
     "GetNumQuestLogEntries", "GetQuestLogTitle", "GetQuestLogIndexByID",
     "SelectQuestLogEntry", "GetNumQuestLeaderBoards", "GetQuestLogLeaderBoard",
     "IsQuestWatched", "AddQuestWatch", "RemoveQuestWatch", "GetQuestTagInfo",
+    "GetQuestLogSelection",
     -- The pair Blizzard's own QuestTimerFrame reads. Asking these rather than selecting each
-    -- entry and calling GetQuestLogTimeLeft means the quest log SELECTION is never mutated.
+    -- entry and calling GetQuestLogTimeLeft keeps the timer read off the quest log SELECTION.
     "GetQuestTimers", "GetQuestIndexForTimer",
 
     -- A percentage objective's real fill, and it is a bare global on retail with no C_QuestLog

@@ -6,6 +6,7 @@ local QuestItems = ns:GetModule("QuestItems")
 local Focus      = ns:GetModule("Focus")
 local TrackedSet = ns:GetModule("TrackedSet")
 local QuestCache = ns:GetModule("QuestCache")
+local QuestRewards = ns:GetModule("QuestRewards")
 
 local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
 
@@ -157,6 +158,28 @@ local function fillTimer(e, timers, index)
     e.expiresAt = (secs and secs > 0) and (time() + secs) or nil
 end
 
+-- Handed over after a pass rather than read inside it, because the read waits for the quest
+-- cache to be ready and fullRebuild only learns that once its walk has finished.
+local xpIndex, xpQuest, xpCount = {}, {}, 0
+
+-- QuestCache answers ready until PLAYER_ENTERING_WORLD arms it, and the tracker first renders at
+-- PLAYER_LOGIN, before that, so the read also waits for the event itself.
+local xpWorldEntered = false
+
+local function wantXP(id, index)
+    if index and QuestRewards:NeedsXP(id) then
+        xpCount = xpCount + 1
+        xpIndex[xpCount], xpQuest[xpCount] = index, id
+    end
+end
+
+local function collectXP(ready)
+    if ready and xpWorldEntered and xpCount > 0 then
+        QuestRewards:CollectXP(xpIndex, xpQuest, xpCount)
+    end
+    xpCount = 0
+end
+
 -- isComplete arrives nil while in progress, 1 when complete and -1 when failed.
 local function questState(isComplete)
     if isComplete == -1 then return STATE.FAILED end
@@ -282,6 +305,7 @@ local function fullRebuild()
     local currentHeader
     local watchedDuringWalk = 0
     local timers = readTimers()
+    xpCount = 0
     store:Begin()
     QuestCache:Begin()
 
@@ -323,12 +347,14 @@ local function fullRebuild()
                 fillTimer(e, timers, i)
                 e.groupID = "quests"
                 fillLines(e, id, i)
+                wantXP(id, i)
             end
         end
     end
 
     store:Finish()
     local cacheReady = QuestCache:Finish()
+    collectXP(cacheReady)
 
     -- Pruned only against a log that returned something AND that the game had finished
     -- streaming. Emptiness alone is one-sided: a walk that returned SOME quests says nothing
@@ -375,6 +401,7 @@ end
 
 local function refreshDynamic()
     local timers = readTimers()
+    xpCount = 0
     for id, e in store:Each() do
         local i = logIndex(id)
         e.isTracked = isWatched(id)
@@ -388,7 +415,9 @@ local function refreshDynamic()
         -- path that change takes.
         fillTimer(e, timers, i)
         fillLines(e, id, i)
+        wantXP(id, i)
     end
+    collectXP(QuestCache:IsReady())
     lastDynAt = time()
     dirtyObjectives = false
 end
@@ -575,6 +604,13 @@ function Quests:Enable(notify)
         if not primed then dirtyAll = true else dirtyObjectives = true end
         notifyDirty()
     end
+    local function enterWorld()
+        xpWorldEntered = true
+        markAll()
+    end
+    local function playerLevelChanged(_, unit)
+        if unit == "player" then markDynamic() end
+    end
 
     -- The tracked set answers to no game event, so the repaint comes from the set itself. This
     -- covers every route into it at once: the row menu, auto-track on accept, and the quest log
@@ -598,11 +634,15 @@ function Quests:Enable(notify)
     Events:On("QUEST_ACCEPTED",          markAll)
     Events:On("QUEST_REMOVED",           markRemoved)
     Events:On("QUEST_TURNED_IN",         markRemoved)
-    Events:On("PLAYER_ENTERING_WORLD",   markAll)
+    Events:On("PLAYER_ENTERING_WORLD",   enterWorld)
     Events:On("QUEST_LOG_UPDATE",        markDynamic)
     Events:On("UNIT_QUEST_LOG_CHANGED",  markDynamic)
     Events:On("QUEST_WATCH_UPDATE",      markDynamic)
     Events:On("ZONE_CHANGED_NEW_AREA",   markAll)
+    -- Reward XP is stored per player level, so a ding needs a pass. UNIT_LEVEL as well, in case
+    -- UnitLevel has not moved yet when the PLAYER_LEVEL_UP pass runs.
+    Events:On("PLAYER_LEVEL_UP",         markDynamic)
+    Events:On("UNIT_LEVEL",              playerLevelChanged)
 
     -- Blizzard fires nothing when a quest item arrives by any route other than looting, so
     -- withdrawing 5 of 8 from the bank leaves the row reading 3/8 until an unrelated quest event

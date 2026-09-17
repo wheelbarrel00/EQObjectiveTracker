@@ -5,6 +5,18 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.24.2] - 2026-09-16
+
+### Bug Fixes
+
+- A quest's tooltip on Classic shows the XP that quest actually awards. On Classic Era the game
+  only reports XP for whichever quest is selected in your quest log, so every quest showed that
+  one quest's figure, and the number jumped whenever something changed the selection. Each
+  quest's XP is now read once with the selection moved onto it and then put back, so your quest
+  log stays where you left it, and it is read again when you level up, since a quest pays less
+  once you outlevel it. Right after logging in or a reload, the XP line can take a little while to
+  appear.
+
 ## [1.24.1] - 2026-09-13
 
 ### Bug Fixes

@@ -150,6 +150,88 @@ function QR:FactionName(questID)
     return nil
 end
 
+-- Measured on Era 1.15.9: GetQuestLogRewardXP ignores its argument and answers for the SELECTED
+-- entry, so XP is read with the selection moved and put back, never from a hover. The questID is
+-- still passed because TBC is unmeasured. Split on the flavor flag, since retail has it too.
+local xpBySelection = not ns.Has.QuestLog
+
+-- A quest pays less once the player outlevels it, so every stored figure belongs to one level.
+local xpCache, xpLevel = {}, nil
+
+-- A refused read stores nothing, so without a wait it would move the selection again on every
+-- pass. The wait is chosen, not measured.
+local XP_RETRY_S = 30
+local xpRefusedAt = {}
+local xpStats = { sweeps = 0, reads = 0, refused = 0, unrestored = 0 }
+
+local function waiting(questID, clock)
+    local at = xpRefusedAt[questID]
+    return at ~= nil and clock - at < XP_RETRY_S
+end
+
+function QR:NeedsXP(questID)
+    if not xpBySelection then return false end
+    if xpLevel ~= UnitLevel("player") then return true end
+    return xpCache[questID] == nil and not waiting(questID, GetTime())
+end
+
+-- Read to n, never #, because the caller reuses both arrays.
+function QR:CollectXP(indices, ids, n)
+    if not (xpBySelection and n > 0) then return end
+    if type(GetQuestLogRewardXP) ~= "function" or type(SelectQuestLogEntry) ~= "function" then
+        return
+    end
+    local okBefore, before = pcall(GetQuestLogSelection)
+    if not (okBefore and type(before) == "number") then return end
+
+    local level = UnitLevel("player")
+    if xpLevel ~= level then
+        wipe(xpCache)
+        wipe(xpRefusedAt)
+        xpLevel = level
+    end
+
+    xpStats.sweeps = xpStats.sweeps + 1
+    local clock = GetTime()
+    local moved = false
+    for k = 1, n do
+        local index, id = indices[k], ids[k]
+        if xpCache[id] == nil and not waiting(id, clock) then
+            moved = true
+            pcall(SelectQuestLogEntry, index)
+            -- Confirmed rather than assumed, because a figure read while the selection sat
+            -- elsewhere belongs to another quest.
+            local okSel, sel = pcall(GetQuestLogSelection)
+            local okXP, xp
+            if okSel and sel == index then okXP, xp = pcall(GetQuestLogRewardXP, id) end
+            if okXP and type(xp) == "number" then
+                xpCache[id] = xp
+                xpRefusedAt[id] = nil
+                xpStats.reads = xpStats.reads + 1
+            else
+                xpRefusedAt[id] = clock
+                xpStats.refused = xpStats.refused + 1
+            end
+        end
+    end
+
+    if moved then
+        pcall(SelectQuestLogEntry, before)
+        local okAfter, after = pcall(GetQuestLogSelection)
+        if not (okAfter and after == before) then xpStats.unrestored = xpStats.unrestored + 1 end
+    end
+end
+
+function QR:DebugLine()
+    if not xpBySelection then return nil end
+    local figures, refusals = 0, 0
+    for _ in pairs(xpCache) do figures = figures + 1 end
+    for _ in pairs(xpRefusedAt) do refusals = refusals + 1 end
+    return ("reward xp: read by selection | %d figures held at level %s, player %s, %d refusals held | %d sweep(s), %d read, %d refused, %d not restored"):format(
+        figures, tostring(xpLevel), tostring(UnitLevel("player")), refusals,
+        xpStats.sweeps, xpStats.reads, xpStats.refused, xpStats.unrestored)
+end
+
 -- Structured rather than pre-formatted: the color and the indent are the renderer's, which
 -- is what keeps every escape sequence out of this layer. Valid until the next call.
 function QR:Lines(questID)
@@ -177,7 +259,12 @@ function QR:Lines(questID)
         push("money").amount = money
     end
 
-    local xp = GetQuestLogRewardXP and GetQuestLogRewardXP(questID) or 0
+    local xp
+    if xpBySelection then
+        if xpLevel == UnitLevel("player") then xp = xpCache[questID] end
+    else
+        xp = GetQuestLogRewardXP and GetQuestLogRewardXP(questID) or 0
+    end
     if xp and xp > 0 then
         push("xp").amount = xp
     end
