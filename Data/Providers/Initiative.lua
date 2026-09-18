@@ -37,6 +37,13 @@ local function readInfo()
     return fn()
 end
 
+local function isLive(C)
+    local enabled = type(C.IsInitiativeEnabled) ~= "function" or C.IsInitiativeEnabled()
+    local access  = type(C.PlayerHasInitiativeAccess) ~= "function"
+                    or C.PlayerHasInitiativeAccess()
+    return (enabled and access) and true or false
+end
+
 local function fillLines(e, task)
     Entry.BeginLines(e)
     local reqs = task.requirementsList
@@ -62,11 +69,7 @@ function Initiative:IsAvailable()
 end
 
 function Initiative:GetEntries()
-    local C = C_NeighborhoodInitiative
-    local enabled = type(C.IsInitiativeEnabled) ~= "function" or C.IsInitiativeEnabled()
-    local access  = type(C.PlayerHasInitiativeAccess) ~= "function"
-                    or C.PlayerHasInitiativeAccess()
-    local live = (enabled and access) and true or false
+    local live = isLive(C_NeighborhoodInitiative)
 
     -- GetEntries runs inside Tracker:Render, which repaints several times a second, and
     -- GetNeighborhoodInitiativeInfo builds the WHOLE initiative graph fresh on every call -
@@ -74,7 +77,7 @@ function Initiative:GetEntries()
     -- requirement under it, none of it cached. It is read on a dirty flag now, the way
     -- Data/Providers/Quests.lua does it.
     --
-    -- The two gates above are NOT cached with it. Both are cheap boolean reads and both can
+    -- The two gates isLive reads are NOT cached with it. Both are cheap boolean reads and both can
     -- change mid-session, which is the reason the content gate lives here rather than in
     -- IsAvailable, so caching them would reintroduce the bug that placement exists to avoid.
     if not dirty and live == lastLive then return store:Out() end
@@ -136,7 +139,9 @@ function Initiative:Enable(notifyDirty)
     -- must not make a call that answers later.
     Events:On("PLAYER_ENTERING_WORLD", function()
         local C = C_NeighborhoodInitiative
-        if type(C) == "table" and type(C.RequestNeighborhoodInitiativeInfo) == "function" then
+        -- Measured 2026-09-17: WoW Forever reads both gates false, and this request alone
+        -- disconnected the player there. Retail read both true right after login.
+        if type(C) == "table" and type(C.RequestNeighborhoodInitiativeInfo) == "function" and isLive(C) then
             C.RequestNeighborhoodInitiativeInfo()
         end
         invalidate()
@@ -159,11 +164,18 @@ function Initiative:DebugLine()
         return tostring(res)
     end
 
-    -- pcall'd for the same reason ask() is. This is the one call in the function that was not,
-    -- and a raise here printed "DebugLine raised" in place of the diagnosis on the provider the
-    -- line exists to diagnose.
-    local okRead, data = pcall(readInfo)
-    if not okRead then data = nil end
+    -- Gated like the render path, so the status line never reads a graph GetEntries would refuse.
+    local okLive, live = pcall(isLive, C)
+    local data, loaded = nil, "not read"
+    if okLive and live then
+        -- pcall'd for the same reason ask() is. This is the one call in the function that was
+        -- not, and a raise here printed "DebugLine raised" in place of the diagnosis on the
+        -- provider the line exists to diagnose.
+        local okRead
+        okRead, data = pcall(readInfo)
+        if not okRead then data = nil end
+        loaded = okRead and tostring(type(data) == "table" and data.isLoaded) or "raised"
+    end
     local tasks = (type(data) == "table") and data.tasks or nil
     local done, prog, trk, withID, names = 0, 0, 0, 0, {}
     for i = 1, (type(tasks) == "table" and #tasks or 0) do
@@ -186,8 +198,7 @@ function Initiative:DebugLine()
     -- nothing: the walk above is DebugLine's own.
     return ("initiative: enabled=%s access=%s loaded=%s | %s tasks, %d tracked (%d with an id), %d inProgress, %d completed%s"
             .. "\n      %d graph reads this session, %s")
-        :format(ask("IsInitiativeEnabled"), ask("PlayerHasInitiativeAccess"),
-                okRead and tostring(type(data) == "table" and data.isLoaded) or "raised",
+        :format(ask("IsInitiativeEnabled"), ask("PlayerHasInitiativeAccess"), loaded,
                 (type(tasks) == "table") and tostring(#tasks) or "no",
                 trk, withID, prog, done,
                 (#names > 0) and (" -> " .. table.concat(names, ", ")) or "",

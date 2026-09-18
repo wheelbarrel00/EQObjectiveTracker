@@ -27,6 +27,8 @@
 --      or the section stays dead for the rest of the session.
 --   4. The fetch is asynchronous, so it is issued from the event path only. GetEntries runs
 --      inside Tracker:Render and must not make a call that answers later.
+--   5. The fetch and the status line's graph read wait on the render's two gates. WoW Forever
+--      reads both false, and on 2026-09-17 the fetch alone disconnected the player there.
 
 local function repoFile(rel)
     local f = io.open(rel, "r")
@@ -367,6 +369,46 @@ ok(dirty >= 1, "and a repaint is asked for after it")
 ok(handlers.NEIGHBORHOOD_INITIATIVE_UPDATED ~= nil, "the update event is subscribed at all")
 if handlers.NEIGHBORHOOD_INITIATIVE_UPDATED then handlers.NEIGHBORHOOD_INITIATIVE_UPDATED() end
 ok(dirty >= 2, "the update event asks for a repaint too")
+
+-- Retail read both gates true right after login, and WoW Forever read both false.
+p = build({ info = INFO, enabled = false })
+handlers.PLAYER_ENTERING_WORLD()
+ok(requested == 0, "no fetch while the initiative is disabled")
+ok(dirty >= 1, "but the repaint is still asked for")
+
+p = build({ info = INFO, access = false })
+handlers.PLAYER_ENTERING_WORLD()
+ok(requested == 0, "nor while this character has no access")
+
+-- Counted through a stub rather than the graph-reads tally, which only GetEntries moves.
+local statusReads = 0
+local function countingRead()
+    statusReads = statusReads + 1
+    return INFO
+end
+
+p = build({ info = INFO, enabled = false })
+C_NeighborhoodInitiative.GetNeighborhoodInitiativeInfo = countingRead
+statusReads = 0
+text = dbg(p)
+ok(statusReads == 0, "the status line reads no graph while the initiative is disabled, read " .. statusReads)
+ok(text and text:find("loaded=not read", 1, true) ~= nil,
+   "and says so rather than reporting a load it never asked about: " .. tostring(text))
+
+p = build({ info = INFO, access = false })
+C_NeighborhoodInitiative.GetNeighborhoodInitiativeInfo = countingRead
+statusReads = 0
+dbg(p)
+ok(statusReads == 0, "nor while this character has no access, read " .. statusReads)
+
+p = build({ info = INFO })
+C_NeighborhoodInitiative.GetNeighborhoodInitiativeInfo = countingRead
+statusReads = 0
+text = dbg(p)
+ok(statusReads == 1, "with both gates open it reads the graph once, read " .. statusReads)
+ok(text and text:find("loaded=true", 1, true) ~= nil,
+   "and reports what it found: " .. tostring(text))
+p = build({ info = INFO })
 
 -- ------------------------------------------------------------------ the graph cache
 

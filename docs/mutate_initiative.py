@@ -98,8 +98,34 @@ MUTANTS = [
 
     # ---------------------------------------------------------- the gates
     ("the enabled and access gates are dropped from GetEntries",
-     "    local live = (enabled and access) and true or false",
+     "    local live = isLive(C_NeighborhoodInitiative)",
      "    local live = true"),
+
+    ("the gate helper drops the access check",
+     "    return (enabled and access) and true or false",
+     "    return enabled and true or false"),
+
+    ("the gate helper drops the enabled check",
+     "    return (enabled and access) and true or false",
+     "    return access and true or false"),
+
+    # WoW Forever reads both gates false, and on 2026-09-17 this request alone disconnected the
+    # player there.
+    ("the fetch ignores the gates, which disconnected the player on WoW Forever",
+     ' == "function" and isLive(C) then',
+     ' == "function" then'),
+
+    ("the status line reads the graph whatever the gates say",
+     "    if okLive and live then\n",
+     "    if true then\n"),
+
+    ("the gate check in the status line loses its pcall, so a raising gate takes the line down",
+     "    local okLive, live = pcall(isLive, C)",
+     "    local okLive, live = true, isLive(C)"),
+
+    ("a status line that skipped the read reports a load result anyway",
+     '    local data, loaded = nil, "not read"',
+     '    local data, loaded = nil, "false"'),
 
     # The gates are deliberately NOT cached with the graph: both are cheap boolean reads and
     # both change mid-session, which is the whole reason they sit here rather than in
@@ -137,7 +163,7 @@ MUTANTS = [
     # ---------------------------------------------------------- the async fetch
     ("the fetch is issued from the render path",
      "        local data  = readInfo()",
-     "        C.RequestNeighborhoodInitiativeInfo()\n        local data  = readInfo()"),
+     "        C_NeighborhoodInitiative.RequestNeighborhoodInitiativeInfo()\n        local data  = readInfo()"),
 
     ("the update event is not subscribed, so the section never refreshes",
      '    Events:On("NEIGHBORHOOD_INITIATIVE_UPDATED", invalidate)',
