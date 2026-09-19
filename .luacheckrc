@@ -35,8 +35,8 @@ read_globals = {
     "UnitClass", "UnitName", "UnitLevel", "GetRealmName", "GetZoneText", "PlaySound", "ReloadUI",
     -- Locales/*.lua gate on the client language before touching ns.L
     "GetLocale",
-    -- Picks which Classic Wowhead site a row menu link opens
-    "GetExpansionLevel",
+    -- Picks which Wowhead site a row menu link opens
+    "GetExpansionLevel", "GetBuildInfo",
     -- Blizzard's Classic quest log, whose tracked checkmarks UI/QuestLogChecks.lua repaints.
     -- UI/Row.lua reads ChatEdit_GetActiveWindow too, to tell a link click from an ordinary one.
     "QuestLog_Update", "IsShiftKeyDown", "ChatEdit_GetActiveWindow", "NONE",

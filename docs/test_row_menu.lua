@@ -471,13 +471,49 @@ end
 print("== Classic is excluded by the gate rather than by a flavor test")
 do
     -- QuestsClassic never CALLS QuestGroups, so entry.canGroup is never set and the gate
-    -- excludes it with no branch and no TOC line. Data/QuestGroups.lua IS listed in all four
-    -- TOCs and loads inert there. Asserted against the source rather than left to memory.
+    -- excludes it with no branch and no TOC line. Data/QuestGroups.lua IS listed in every TOC
+    -- and loads inert on Classic. Asserted against the source rather than left to memory.
     local classic = readFile("Data/Providers/QuestsClassic.lua")
     ok(not classic:find("findgroup", 1, true),
        "Data/Providers/QuestsClassic.lua names no findgroup item")
     ok(not classic:find("canGroup", 1, true),
        "and sets no canGroup, so the gate can never open there")
+end
+
+print("== Search on Wowhead opens the site for the game the client runs")
+do
+    local wowheadSrc = sliceRM("local WOWHEAD_GAME = ", "-- Dispatched against the entry ID")
+    -- Each build stubs the client fresh. The trailing strings after the interface number are
+    -- what a real GetBuildInfo returns, and they are what turns an unparenthesized select into
+    -- tonumber(16001, "Release x64"), which raises.
+    local function urlFor(questLog, toc, level, locale)
+        local url
+        local chunk = assert(loadstring(wowheadSrc .. "\nreturn wowhead", "rowmenu-wowhead-slice"))
+        setfenv(chunk, setmetatable({
+            ns = { Has = { QuestLog = questLog }, ShowURL = function(_, u) url = u end },
+            GetBuildInfo = function() return "x", "1", "date", toc, "Release x64", "Release" end,
+            GetExpansionLevel = function() return level end,
+            GetLocale = function() return locale or "enUS" end,
+        }, { __index = _G }))
+        local okCall, err = pcall(chunk(), 783)
+        ok(okCall, "wowhead() does not raise: " .. tostring(err))
+        return tostring(url)
+    end
+
+    local W = "https://www.wowhead.com/"
+    ok(urlFor(true, 120100, 11) == W .. "quest=783",
+       "retail opens the retail site: " .. urlFor(true, 120100, 11))
+    ok(urlFor(true, 16001, 0) == W .. "forever/quest=783",
+       "WoW Forever opens the Forever site: " .. urlFor(true, 16001, 0))
+    ok(urlFor(true, 16001, 0, "deDE") == W .. "forever/de/quest=783",
+       "in the client's language, which Wowhead serves under the Forever path: "
+       .. urlFor(true, 16001, 0, "deDE"))
+    ok(urlFor(true, 17000, 0) == W .. "quest=783" and urlFor(true, 15999, 0) == W .. "quest=783",
+       "and only the 16xxx range counts as Forever")
+    ok(urlFor(false, 11509, 0) == W .. "classic/quest=783",
+       "Classic Era still opens the Classic site: " .. urlFor(false, 11509, 0))
+    ok(urlFor(false, 20506, 1) == W .. "tbc/quest=783",
+       "and TBC the TBC site: " .. urlFor(false, 20506, 1))
 end
 
 print(("test_row_menu: %d passed, %d failed"):format(pass, fail))

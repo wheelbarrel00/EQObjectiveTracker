@@ -1,4 +1,4 @@
-## Interface: 20506
+## Interface: 16001
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
@@ -7,6 +7,9 @@
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
 ## Category: Quests & Leveling
+
+# Forever build 69913 loads _Mainline.toc over this file, so today it only tags the
+# CurseForge upload for Forever. docs\check_toc.py holds it to _Mainline line for line.
 
 # Libraries (vendored, never .pkgmeta externals - a fresh checkout must load as-is)
 Libs\LibStub\LibStub.lua
@@ -40,8 +43,6 @@ Core\Changelog.lua
 Data\Entry.lua
 Data\Registry.lua
 Data\QuestCache.lua
-Data\Focus.lua
-Data\TrackedSet.lua
 Data\Filter.lua
 Data\Sort.lua
 Data\ManualOrder.lua
@@ -62,16 +63,18 @@ Data\QuestGroups.lua
 Data\QuestProgress.lua
 Data\QuestLink.lua
 
-# Providers. THE ONLY FLAVOR-VARYING SECTION OF THIS FILE. World quests are Legion and
-# later, endeavors are the retail Traveler's Log, and tracked recipes need the retail
-# profession API. The quest log here is index driven and lives on flat globals rather
-# than C_QuestLog, so it gets its own provider - measured on 1.15.9 and 2.5.6.
-Data\Providers\QuestsClassic.lua
+# Providers.
+Data\Providers\Quests.lua
+Data\Providers\WorldQuests.lua
+Data\Providers\Scenarios.lua
+Data\Providers\Achievements.lua
+Data\Providers\Endeavors.lua
+Data\Providers\Initiative.lua
+Data\Providers\Professions.lua
 
 # Display layer. Operates on frames, never on a quest API.
 UI\Blizzard.lua
 UI\QuestieCoexist.lua
-UI\QuestLogChecks.lua
 UI\RowPool.lua
 UI\Card.lua
 UI\DragDrop.lua

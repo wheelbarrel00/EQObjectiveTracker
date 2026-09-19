@@ -5,6 +5,34 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.0] - 2026-09-18
+
+### New Features
+
+- WoW Forever is now supported, as a work in progress, so expect bugs, and please report anything
+  that looks wrong. The tracker follows your quests there. The retail-only sections, such as world
+  quests and scenarios, have stayed empty there so far.
+- On WoW Forever, Search on Wowhead in a quest's right-click menu opens Wowhead's Forever pages.
+
+### Improvements
+
+- Your tracked neighborhood tasks under Endeavors are now also requested when you enter a new
+  zone, as the default tracker does, so they can appear without waiting for a loading screen.
+
+### Bug Fixes
+
+- On WoW Forever, logging in or passing a loading screen with the tracker enabled no longer
+  disconnects you, and neither does `/eqot status`. Each was asking for neighborhood initiative
+  data, the tasks retail shows under Endeavors, which Forever reports as unavailable. The tracker
+  now asks only when the initiative is available to your character, the same check it already
+  made before showing those tasks.
+
+### Known Issues
+
+- Right now the Forever beta forgets every addon's settings when the game restarts. That is a bug
+  in the beta client itself, reported to Blizzard, and until it is fixed the tracker starts from
+  its default settings on each launch.
+
 ## [1.24.2] - 2026-09-16
 
 ### Bug Fixes

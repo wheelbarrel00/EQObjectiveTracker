@@ -58,6 +58,11 @@ local function wowhead(entryID)
     if not ns.Has.QuestLog then
         local level = type(GetExpansionLevel) == "function" and GetExpansionLevel() or 0
         game = WOWHEAD_GAME[level] or "classic/"
+    else
+        -- WoW Forever runs the retail quest log, so only its interface range, the packager's
+        -- 16xxx, tells it apart from retail.
+        local toc = tonumber((select(4, GetBuildInfo())))
+        if toc and toc >= 16000 and toc < 17000 then game = "forever/" end
     end
     local lang = WOWHEAD_LANG[GetLocale()] or ""
     ns:ShowURL("https://www.wowhead.com/" .. game .. lang .. "quest=" .. tostring(entryID))

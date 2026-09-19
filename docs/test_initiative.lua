@@ -27,8 +27,9 @@
 --      or the section stays dead for the rest of the session.
 --   4. The fetch is asynchronous, so it is issued from the event path only. GetEntries runs
 --      inside Tracker:Render and must not make a call that answers later.
---   5. The fetch and the status line's graph read wait on the render's two gates. WoW Forever
---      reads both false, and on 2026-09-17 the fetch alone disconnected the player there.
+--   5. The fetch and the status line's graph read wait on the render's two gates, and a gate the
+--      client lacks reads closed. WoW Forever reads both false, and on 2026-09-17 the fetch
+--      disconnected the player there, and so did /eqot status with the fetch blocked.
 
 local function repoFile(rel)
     local f = io.open(rel, "r")
@@ -72,6 +73,16 @@ local requested, dirty, handlers, mods = 0, 0, {}, {}
 -- The ns each build creates, so a case can make one of its shared helpers raise.
 local lastNs
 
+-- Never reset between builds and asserted zero at the end, so an ungated request or graph read
+-- fails the run from any path a closed-gate case drives.
+local closedRequests, closedReads = 0, 0
+local function gatesOpen()
+    local C = _G.C_NeighborhoodInitiative
+    local okE, e = pcall(C.IsInitiativeEnabled)
+    local okA, a = pcall(C.PlayerHasInitiativeAccess)
+    return (okE and e and okA and a) and true or false
+end
+
 local function build(opts)
     opts = opts or {}
     requested, dirty, handlers, mods = 0, 0, {}, {}
@@ -80,14 +91,21 @@ local function build(opts)
         _G.C_NeighborhoodInitiative = nil
     else
         _G.C_NeighborhoodInitiative = {
-            GetNeighborhoodInitiativeInfo = function() return opts.info end,
+            GetNeighborhoodInitiativeInfo = function()
+                if not gatesOpen() then closedReads = closedReads + 1 end
+                return opts.info
+            end,
             IsInitiativeEnabled = function() return opts.enabled ~= false end,
             PlayerHasInitiativeAccess = function() return opts.access ~= false end,
-            RequestNeighborhoodInitiativeInfo = function() requested = requested + 1 end,
+            RequestNeighborhoodInitiativeInfo = function()
+                requested = requested + 1
+                if not gatesOpen() then closedRequests = closedRequests + 1 end
+            end,
             -- Measured at 0 while three tasks were tracked and drawn. Nothing may read it, and
             -- this raises rather than returning empty so anything that does is caught here.
             GetTrackedInitiativeTasks = function() error("GetTrackedInitiativeTasks was read") end,
         }
+        if opts.missing then _G.C_NeighborhoodInitiative[opts.missing] = nil end
     end
 
     local ns = { Has = {} }
@@ -369,8 +387,14 @@ ok(dirty >= 1, "and a repaint is asked for after it")
 ok(handlers.NEIGHBORHOOD_INITIATIVE_UPDATED ~= nil, "the update event is subscribed at all")
 if handlers.NEIGHBORHOOD_INITIATIVE_UPDATED then handlers.NEIGHBORHOOD_INITIATIVE_UPDATED() end
 ok(dirty >= 2, "the update event asks for a repaint too")
+ok(requested == 1, "and asks for no second fetch")
 
--- Retail read both gates true right after login, and WoW Forever read both false.
+-- Nothing renders first, so a gate that leaned on the render's cached answer would not fetch.
+p = build({ info = INFO })
+handlers.PLAYER_ENTERING_WORLD()
+ok(requested == 1, "a first loading screen fetches before anything has rendered")
+
+-- One gate closed at a time, so each half of isLive's AND is proven on its own.
 p = build({ info = INFO, enabled = false })
 handlers.PLAYER_ENTERING_WORLD()
 ok(requested == 0, "no fetch while the initiative is disabled")
@@ -379,6 +403,43 @@ ok(dirty >= 1, "but the repaint is still asked for")
 p = build({ info = INFO, access = false })
 handlers.PLAYER_ENTERING_WORLD()
 ok(requested == 0, "nor while this character has no access")
+
+for _, name in ipairs({ "IsInitiativeEnabled", "PlayerHasInitiativeAccess" }) do
+    p = build({ info = INFO, missing = name })
+    -- A missing gate that raises is a Lua error on every loading screen, not a closed gate.
+    ok(pcall(handlers.PLAYER_ENTERING_WORLD), "a client that lacks " .. name .. " raises nothing")
+    ok(requested == 0, "and is sent no request, sent " .. requested)
+    local okRender, shown = pcall(p.GetEntries, p)
+    ok(okRender and #shown == 0, "and the render reads that missing gate as closed too")
+end
+
+-- Guarded so a mutant that drops the subscription fails the next assertion instead of aborting.
+local function zoneChange()
+    if handlers.ZONE_CHANGED_NEW_AREA then handlers.ZONE_CHANGED_NEW_AREA() end
+end
+
+p = build({ info = INFO })
+ok(handlers.ZONE_CHANGED_NEW_AREA ~= nil, "a zone change is subscribed, as Blizzard's tracker does")
+zoneChange()
+ok(requested == 1, "and it fetches while both gates are open, sent " .. requested)
+text = dbg(p)
+ok(text and text:find("1 requests sent, 0 skipped", 1, true) ~= nil,
+   "and the status line counts the request: " .. tostring(text))
+
+p = build({ info = INFO, enabled = false })
+zoneChange()
+handlers.PLAYER_ENTERING_WORLD()
+ok(requested == 0, "but not while a gate is closed, sent " .. requested)
+text = dbg(p)
+ok(text and text:find("0 requests sent, 2 skipped", 1, true) ~= nil,
+   "and the status line counts both skips: " .. tostring(text))
+
+-- The request went out on every loading screen, so a render between two must not bypass the gate.
+p = build({ info = INFO, enabled = false })
+p:GetEntries()
+handlers.PLAYER_ENTERING_WORLD()
+handlers.PLAYER_ENTERING_WORLD()
+ok(requested == 0, "nor on later loading screens after a render, got " .. requested)
 
 -- Counted through a stub rather than the graph-reads tally, which only GetEntries moves.
 local statusReads = 0
@@ -394,12 +455,17 @@ text = dbg(p)
 ok(statusReads == 0, "the status line reads no graph while the initiative is disabled, read " .. statusReads)
 ok(text and text:find("loaded=not read", 1, true) ~= nil,
    "and says so rather than reporting a load it never asked about: " .. tostring(text))
+-- Each gate in its own field, or a Forever report cannot say which one is closed.
+ok(text and text:find("enabled=false access=true", 1, true) ~= nil,
+   "and names the closed gate: " .. tostring(text))
 
 p = build({ info = INFO, access = false })
 C_NeighborhoodInitiative.GetNeighborhoodInitiativeInfo = countingRead
 statusReads = 0
-dbg(p)
+text = dbg(p)
 ok(statusReads == 0, "nor while this character has no access, read " .. statusReads)
+ok(text and text:find("enabled=true access=false", 1, true) ~= nil,
+   "and names that gate instead: " .. tostring(text))
 
 p = build({ info = INFO })
 C_NeighborhoodInitiative.GetNeighborhoodInitiativeInfo = countingRead
@@ -408,6 +474,20 @@ text = dbg(p)
 ok(statusReads == 1, "with both gates open it reads the graph once, read " .. statusReads)
 ok(text and text:find("loaded=true", 1, true) ~= nil,
    "and reports what it found: " .. tostring(text))
+ok(requested == 0, "and the status line sends no request of its own, sent " .. requested)
+
+text = dbg(build({ info = { isLoaded = false } }))
+ok(text and text:find("loaded=false", 1, true) ~= nil,
+   "a graph that has not streamed in reads loaded=false: " .. tostring(text))
+
+p = build({ info = INFO })
+C_NeighborhoodInitiative.GetNeighborhoodInitiativeInfo = countingRead
+C_NeighborhoodInitiative.IsInitiativeEnabled = function() error("boom") end
+statusReads = 0
+text = dbg(p)
+ok(statusReads == 0, "a gate that raises keeps the graph read closed, read " .. statusReads)
+ok(text and text:find("loaded=not read", 1, true) ~= nil,
+   "and the line says it did not read: " .. tostring(text))
 p = build({ info = INFO })
 
 -- ------------------------------------------------------------------ the graph cache
@@ -437,6 +517,10 @@ end
 p:GetEntries()
 ok(graphReads(p) == 2,
    "and the update event is what lets the next one through, got " .. graphReads(p))
+
+handlers.PLAYER_ENTERING_WORLD()
+p:GetEntries()
+ok(graphReads(p) == 3, "and so is a loading screen, got " .. graphReads(p))
 
 -- A repaint that skips the read must still hand back the SAME entries, or the cache trades one
 -- bug for a worse one.
@@ -506,6 +590,22 @@ INFO.tasks[2].tracked = false
 ok(#rebuild() == 2, "untracking one drops it on the next build")
 INFO.tasks[2].tracked = true
 ok(#rebuild() == 3, "and tracking it again brings it back")
+
+-- Every handler the provider subscribed, fired with each gate closed and with each missing.
+for _, opts in ipairs({ { enabled = false }, { access = false },
+                        { missing = "IsInitiativeEnabled" }, { missing = "PlayerHasInitiativeAccess" } }) do
+    opts.info = INFO
+    local closed = build(opts)
+    for _, fn in pairs(handlers) do pcall(fn) end
+    pcall(closed.GetEntries, closed)
+    pcall(closed.DebugLine, closed)
+    ok(requested == 0, "every subscribed handler stays quiet with a gate closed, sent " .. requested)
+end
+
+ok(closedRequests == 0,
+   "no case, on any path, sent the request while a gate read closed, sent " .. closedRequests)
+ok(closedReads == 0,
+   "nor read the graph while a gate read closed, read " .. closedReads)
 
 print(string.format("test_initiative: %d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

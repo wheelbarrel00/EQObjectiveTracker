@@ -160,8 +160,8 @@ function Scenario:Build(container)
 
     -- Chosen rather than corrected, the same way subHeader.text above is: CreateFontString
     -- RAISES on an absent font object, Build runs from Render on every flavor, and a raise here
-    -- aborts the whole tracker. Game18Font resolves on all four shipping TOCs, so the guard is
-    -- for the next one.
+    -- aborts the whole tracker. Game18Font resolves on every shipping TOC, so the guard is for
+    -- the next one.
     banner.Stage = banner:CreateFontString(nil, "ARTWORK",
         _G.Game18Font and "Game18Font" or "GameFontNormal")
     banner.Stage:SetSize(172, 18)

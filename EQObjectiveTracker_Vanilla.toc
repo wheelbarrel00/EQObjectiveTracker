@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 1.24.2
+## Version: 1.25.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -98,7 +98,6 @@ Options\TabTracker.lua
 Options\TabAppearance.lua
 Options\TabAbout.lua
 
-# Temporary cross-flavor measurement command. Remove with its dispatcher branch
-# in UI\Commands.lua, or keep it deliberately, before the first Classic release.
+# Cross-flavor measurement command. Remove it with its dispatcher branch in UI\Commands.lua.
 UI\FlavorProbe.lua
 UI\Commands.lua

@@ -102,18 +102,99 @@ MUTANTS = [
      "    local live = true"),
 
     ("the gate helper drops the access check",
-     "    return (enabled and access) and true or false",
-     "    return enabled and true or false"),
+     "    return (C.IsInitiativeEnabled() and C.PlayerHasInitiativeAccess()) and true or false",
+     "    return C.IsInitiativeEnabled() and true or false"),
 
     ("the gate helper drops the enabled check",
-     "    return (enabled and access) and true or false",
-     "    return access and true or false"),
+     "    return (C.IsInitiativeEnabled() and C.PlayerHasInitiativeAccess()) and true or false",
+     "    return C.PlayerHasInitiativeAccess() and true or false"),
 
-    # WoW Forever reads both gates false, and on 2026-09-17 this request alone disconnected the
-    # player there.
+    ("a gate the client lacks reads open, so a Forever-like client is sent the request",
+     '       or type(C.PlayerHasInitiativeAccess) ~= "function" then\n        return false',
+     '       or type(C.PlayerHasInitiativeAccess) ~= "function" then\n        return true'),
+
+    ("the missing-gate check is dropped, so a client that lacks a gate raises instead",
+     '    if type(C.IsInitiativeEnabled) ~= "function"\n'
+     '       or type(C.PlayerHasInitiativeAccess) ~= "function" then\n'
+     "        return false\n"
+     "    end\n",
+     ""),
+
+    ("only the enabled gate is checked for presence",
+     '    if type(C.IsInitiativeEnabled) ~= "function"\n'
+     '       or type(C.PlayerHasInitiativeAccess) ~= "function" then',
+     '    if type(C.IsInitiativeEnabled) ~= "function" then'),
+
+    ("the zone change is not subscribed, so a login that found the gates closed waits for a "
+     "loading screen",
+     '    Events:On("ZONE_CHANGED_NEW_AREA", request)',
+     "    -- removed"),
+
+    ("the zone change sends the request without the gates",
+     '    Events:On("ZONE_CHANGED_NEW_AREA", request)',
+     '    Events:On("ZONE_CHANGED_NEW_AREA", function()\n'
+     "        C_NeighborhoodInitiative.RequestNeighborhoodInitiativeInfo()\n"
+     "    end)"),
+
+    # Lens 2 of the 2026-09-18 scan put these three past the harness while it watched only the
+    # request, and the graph read alone disconnected /eqot status on Forever.
+    ("the render reads the graph before the gate",
+     "    if live then\n        local data  = readInfo()",
+     "    local pre = readInfo()\n    if live then\n        local data  = pre"),
+
+    ("a loading screen reads the graph whatever the gates say",
+     "        request()\n        invalidate()",
+     "        request()\n        readInfo()\n        invalidate()"),
+
+    ("a loading screen repaints without setting the dirty flag",
+     "        request()\n        invalidate()",
+     "        request()\n        notifyDirty()"),
+
+    # WoW Forever reads both gates false, and on 2026-09-17 this request disconnected the
+    # player there, and /eqot status did too through the graph read.
     ("the fetch ignores the gates, which disconnected the player on WoW Forever",
      ' == "function" and isLive(C) then',
      ' == "function" then'),
+
+    ("the gate is skipped on a loading screen after a render",
+     ' == "function" and isLive(C) then',
+     ' == "function" and (isLive(C) or not dirty) then'),
+
+    ("the gate reads the render's cached answer, so a first loading screen never fetches",
+     ' == "function" and isLive(C) then',
+     ' == "function" and lastLive then'),
+
+    ("the render sends the request while a gate is closed",
+     "    local out = store:Finish()",
+     "    if not live then C_NeighborhoodInitiative.RequestNeighborhoodInitiativeInfo() end\n"
+     "    local out = store:Finish()"),
+
+    ("the update event sends a second request",
+     '    Events:On("NEIGHBORHOOD_INITIATIVE_UPDATED", invalidate)',
+     '    Events:On("NEIGHBORHOOD_INITIATIVE_UPDATED", function()\n'
+     "        C_NeighborhoodInitiative.RequestNeighborhoodInitiativeInfo()\n"
+     "        invalidate()\n"
+     "    end)"),
+
+    ("the status line sends the request",
+     "    local okLive, live = pcall(isLive, C)",
+     "    C.RequestNeighborhoodInitiativeInfo()\n    local okLive, live = pcall(isLive, C)"),
+
+    ("a gate that raises opens the status line's read",
+     "    if okLive and live then\n",
+     "    if not okLive or live then\n"),
+
+    ("a gate that raises is read as open",
+     "    local okLive, live = pcall(isLive, C)",
+     "    local okLive, live = pcall(isLive, C)\n    if not okLive then okLive, live = true, true end"),
+
+    ("the status line reports a constant load state",
+     "        loaded = okRead and tostring(type(data) == \"table\" and data.isLoaded) or \"raised\"",
+     "        loaded = okRead and \"true\" or \"raised\""),
+
+    ("the status line reports whether the graph is a table rather than whether it loaded",
+     "        loaded = okRead and tostring(type(data) == \"table\" and data.isLoaded) or \"raised\"",
+     "        loaded = okRead and tostring(type(data) == \"table\") or \"raised\""),
 
     ("the status line reads the graph whatever the gates say",
      "    if okLive and live then\n",
@@ -183,6 +264,18 @@ MUTANTS = [
     ("DebugLine stops counting the ids GetEntries needs, hiding a renamed id field",
      "                if t.ID then withID = withID + 1 end",
      "                if t.ID then withID = withID + 0 end"),
+
+    ("the status line reports the enabled gate in the access field",
+     '        :format(ask("IsInitiativeEnabled"), ask("PlayerHasInitiativeAccess"), loaded,',
+     '        :format(ask("IsInitiativeEnabled"), ask("IsInitiativeEnabled"), loaded,'),
+
+    ("the status line stops counting sent requests",
+     "            sent = sent + 1",
+     "            sent = sent + 0"),
+
+    ("the status line stops counting skipped requests",
+     "            skipped = skipped + 1",
+     "            skipped = skipped + 0"),
 
     ("DebugLine tallies inProgress where it means tracked",
      "            if t.tracked then\n                trk = trk + 1",

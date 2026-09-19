@@ -21,14 +21,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import check_toc  # noqa: E402
 
-MAINLINE = check_toc.REFERENCE_TOC
-FALLBACK = check_toc.FALLBACK_TOC
+# Named here rather than read from check_toc, so a misspelled constant there cannot pass by
+# building its own fixture.
+MAINLINE = "EQObjectiveTracker_Mainline.toc"
+FALLBACK = "EQObjectiveTracker.toc"
+CAMELOT = "EQObjectiveTracker_Camelot.toc"
 VANILLA = "EQObjectiveTracker_Vanilla.toc"
 
+# interface_line replaces the whole first line, so a case can spell it the ways only the
+# packager rejects. SavedVariables is here so a mirror can be shown LOSING a header, not only
+# gaining one.
 HEADER = (
-    "## Interface: {interface}\n"
+    "{interface_line}\n"
     "## Title: EQ Objective Tracker\n"
     "## Version: {version}\n"
+    "## SavedVariables: {saved}\n"
     "## X-Curse-Project-ID: {project}\n"
 )
 
@@ -53,6 +60,7 @@ RETAIL_HEAD = {"interface": "120100, 120007, 120005", "version": "1.4.2", "proje
 GOOD = {
     MAINLINE: dict(RETAIL_HEAD, files=list(RETAIL_FILES)),
     FALLBACK: dict(RETAIL_HEAD, files=list(RETAIL_FILES)),
+    CAMELOT: dict(RETAIL_HEAD, interface="16001", files=list(RETAIL_FILES)),
     VANILLA: {
         "interface": "11509",
         "version": "1.4.2",
@@ -73,10 +81,15 @@ def run(tocs, luas):
             p.write_text("-- test\n", encoding="utf-8")
         for name, spec in tocs.items():
             body = HEADER.format(
-                interface=spec["interface"],
+                interface_line=spec.get("interface_line", "## Interface: " + spec["interface"]),
                 version=spec["version"],
+                saved=spec.get("saved", "EQObjectiveTrackerDB"),
                 project=spec["project"],
             )
+            for key in spec.get("omit", ()):
+                body = "".join(
+                    ln for ln in body.splitlines(True) if not ln.startswith("## " + key + ":"))
+            body += spec.get("extra", "")
             body += "\n"
             body += "".join(f.replace("/", "\\") + "\n" for f in spec["files"])
             (root / name).write_text(body, encoding="utf-8")
@@ -150,7 +163,7 @@ case(
     LUAS + ["UI/Orphan.lua"],
 )
 
-# The retail pair must stay in step in both directions. This is the drift the gate was
+# The fallback TOC must stay in step with the reference. This is the drift the gate was
 # rewritten for: the two files were byte-identical, so nothing had ever caught a one-sided
 # edit, and Task 7 is the moment they stop being identical.
 case(
@@ -167,9 +180,127 @@ case(
     list(LUAS),
 )
 
+# The WoW Forever TOC mirrors the reference too. Its failing file cases drop a retail provider
+# and add a Classic one on purpose: check 3 exempts both, so only the mirror rule can see them.
+case(
+    "a missing Forever TOC fails",
+    1,
+    {name: spec for name, spec in copy.deepcopy(GOOD).items() if name != CAMELOT},
+    list(LUAS),
+)
+
+case(
+    "a Forever TOC missing a retail provider fails",
+    1,
+    _with(**{CAMELOT: {"files": [f for f in RETAIL_FILES if f != "Data/Providers/WorldQuests.lua"]}}),
+    list(LUAS),
+)
+
+case(
+    "a Forever TOC listing a file the reference does not fails",
+    1,
+    _with(**{CAMELOT: {"files": RETAIL_FILES + ["Data/Providers/QuestsClassic.lua"]}}),
+    list(LUAS),
+)
+
+case(
+    "a Forever TOC listing the reference's files in another order fails",
+    1,
+    _with(**{CAMELOT: {"files": list(reversed(RETAIL_FILES))}}),
+    list(LUAS),
+)
+
+case(
+    "a Forever TOC listing a file twice fails",
+    1,
+    _with(**{CAMELOT: {"files": RETAIL_FILES + ["Core/Init.lua"]}}),
+    list(LUAS),
+)
+
+case(
+    "a Forever TOC with a header the reference lacks fails",
+    1,
+    _with(**{CAMELOT: {"extra": "## X-Extra: something\n"}}),
+    list(LUAS),
+)
+
+# The direction that matters: a Forever TOC that lost SavedVariables would never save a thing.
+case(
+    "a Forever TOC missing a header the reference has fails",
+    1,
+    _with(**{CAMELOT: {"omit": ("SavedVariables",)}}),
+    list(LUAS),
+)
+
+case(
+    "a Forever TOC whose header value differs fails",
+    1,
+    _with(**{CAMELOT: {"saved": "SomeOtherDB"}}),
+    list(LUAS),
+)
+
+# --- check 6: the packager's own interface rule ----------------------------------------
+
+case(
+    "a Forever TOC declaring a retail interface fails",
+    1,
+    _with(**{CAMELOT: {"interface": "120100"}}),
+    list(LUAS),
+)
+
+case(
+    "a flavor TOC mixing two game types fails",
+    1,
+    _with(**{VANILLA: {"interface": "11509, 16001"}}),
+    list(LUAS),
+)
+
+case(
+    "a suffixed TOC with no interface fails",
+    1,
+    _with(**{VANILLA: {"interface": ""}}),
+    list(LUAS),
+)
+
+case(
+    "a retail TOC declaring a Forever interface fails",
+    1,
+    _with(**{MAINLINE: {"interface": "120100, 16001"}}),
+    list(LUAS),
+)
+
+# The packager applies its rule to suffixed TOCs only.
+case(
+    "the fallback TOC may mix game types",
+    0,
+    _with(**{FALLBACK: {"interface": "120100, 16001"}}),
+    list(LUAS),
+)
+
+# Each of these passed a looser read of the line and makes the packager exit 1.
+for spelling, line in (
+    ("with no space after the ##", "##Interface: 16001"),
+    ("with a space before the colon", "## Interface : 16001"),
+    ("with two numbers and no comma", "## Interface: 16001 16002"),
+    ("with a retail line first and a Forever line second", "## Interface: 120100\n## Interface: 16001"),
+):
+    case(
+        f"a Forever TOC whose Interface line is written {spelling} fails",
+        1,
+        _with(**{CAMELOT: {"interface_line": line}}),
+        list(LUAS),
+    )
+
+case(
+    "spaces and tabs inside the Interface line are ignored, as the packager ignores them",
+    0,
+    _with(**{CAMELOT: {"interface_line": "## Interface:\t 16001 "}}),
+    list(LUAS),
+)
+
 # --- check 3: the flavor blindness this gate shipped with ------------------------------
-# All three exited 0 before FLAVOR_ONLY existed. Check 2 only asks whether SOME TOC lists a
-# file and check 4 only compares the two retail files, so nothing looked at a flavor TOC.
+# All three exited 0 before FLAVOR_ONLY existed. Check 2 only asked whether SOME TOC lists a
+# file and check 4 only compared the two retail files, so nothing looked at a flavor TOC.
 
 case(
     "a locale missing from a flavor TOC fails",
@@ -201,6 +332,7 @@ case(
         **{
             MAINLINE: {"files": RETAIL_FILES + ["Data/Providers/QuestsClassic.lua"]},
             FALLBACK: {"files": RETAIL_FILES + ["Data/Providers/QuestsClassic.lua"]},
+            CAMELOT: {"files": RETAIL_FILES + ["Data/Providers/QuestsClassic.lua"]},
         }
     ),
     list(LUAS),

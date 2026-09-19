@@ -26,9 +26,10 @@ local store = Entry.NewStore({
     isTracked = true,
 })
 
--- Counts the times the initiative graph was actually fetched, which is the only thing that can
--- tell a working cache from a rebuild: the entries are identical either way.
+-- Counts GetEntries' graph reads, the only thing that tells a working cache from a rebuild: the
+-- entries are identical either way.
 local dirty, lastLive, reads = true, nil, 0
+local sent, skipped = 0, 0
 
 local function readInfo()
     if type(C_NeighborhoodInitiative) ~= "table" then return nil end
@@ -37,11 +38,13 @@ local function readInfo()
     return fn()
 end
 
+-- A gate the client lacks reads closed, because an ungated request disconnected WoW Forever.
 local function isLive(C)
-    local enabled = type(C.IsInitiativeEnabled) ~= "function" or C.IsInitiativeEnabled()
-    local access  = type(C.PlayerHasInitiativeAccess) ~= "function"
-                    or C.PlayerHasInitiativeAccess()
-    return (enabled and access) and true or false
+    if type(C.IsInitiativeEnabled) ~= "function"
+       or type(C.PlayerHasInitiativeAccess) ~= "function" then
+        return false
+    end
+    return (C.IsInitiativeEnabled() and C.PlayerHasInitiativeAccess()) and true or false
 end
 
 local function fillLines(e, task)
@@ -77,8 +80,8 @@ function Initiative:GetEntries()
     -- requirement under it, none of it cached. It is read on a dirty flag now, the way
     -- Data/Providers/Quests.lua does it.
     --
-    -- The two gates isLive reads are NOT cached with it. Both are cheap boolean reads and both can
-    -- change mid-session, which is the reason the content gate lives here rather than in
+    -- The two gates isLive reads are NOT cached with it. Both are cheap boolean reads and both
+    -- can change mid-session, which is the reason the content gate lives here rather than in
     -- IsAvailable, so caching them would reintroduce the bug that placement exists to avoid.
     if not dirty and live == lastLive then return store:Out() end
 
@@ -137,15 +140,22 @@ function Initiative:Enable(notifyDirty)
     -- The info arrives asynchronously and RequestNeighborhoodInitiativeInfo is what asks for it,
     -- so the fetch is issued from the event path only. GetEntries runs inside Tracker:Render and
     -- must not make a call that answers later.
-    Events:On("PLAYER_ENTERING_WORLD", function()
+    -- WoW Forever reads both gates false and this request disconnected it. Retail read both true
+    -- right after login (2026-09-17). Blizzard's tracker also asks on a zone change.
+    local function request()
         local C = C_NeighborhoodInitiative
-        -- Measured 2026-09-17: WoW Forever reads both gates false, and this request alone
-        -- disconnected the player there. Retail read both true right after login.
         if type(C) == "table" and type(C.RequestNeighborhoodInitiativeInfo) == "function" and isLive(C) then
             C.RequestNeighborhoodInitiativeInfo()
+            sent = sent + 1
+        else
+            skipped = skipped + 1
         end
+    end
+    Events:On("PLAYER_ENTERING_WORLD", function()
+        request()
         invalidate()
     end)
+    Events:On("ZONE_CHANGED_NEW_AREA", request)
 end
 
 -- `initiative 0 -> shown 0` cannot say whether the player is outside a neighborhood, whether the
@@ -164,13 +174,11 @@ function Initiative:DebugLine()
         return tostring(res)
     end
 
-    -- Gated like the render path, so the status line never reads a graph GetEntries would refuse.
+    -- Ungated, this read disconnected /eqot status on WoW Forever. A raising gate shows in ask(),
+    -- a raising read as loaded=raised.
     local okLive, live = pcall(isLive, C)
     local data, loaded = nil, "not read"
     if okLive and live then
-        -- pcall'd for the same reason ask() is. This is the one call in the function that was
-        -- not, and a raise here printed "DebugLine raised" in place of the diagnosis on the
-        -- provider the line exists to diagnose.
         local okRead
         okRead, data = pcall(readInfo)
         if not okRead then data = nil end
@@ -194,15 +202,14 @@ function Initiative:DebugLine()
         end
     end
 
-    -- `graph reads` counts fetches made by GetEntries only, so reading this line moves it by
-    -- nothing: the walk above is DebugLine's own.
+    -- Only GetEntries moves `graph reads`: the read and walk above are DebugLine's own.
     return ("initiative: enabled=%s access=%s loaded=%s | %s tasks, %d tracked (%d with an id), %d inProgress, %d completed%s"
-            .. "\n      %d graph reads this session, %s")
+            .. "\n      %d graph reads this session, %s | %d requests sent, %d skipped")
         :format(ask("IsInitiativeEnabled"), ask("PlayerHasInitiativeAccess"), loaded,
                 (type(tasks) == "table") and tostring(#tasks) or "no",
                 trk, withID, prog, done,
                 (#names > 0) and (" -> " .. table.concat(names, ", ")) or "",
-                reads, dirty and "a rebuild is pending" or "cached")
+                reads, dirty and "a rebuild is pending" or "cached", sent, skipped)
 end
 
 Registry:Register(Initiative)

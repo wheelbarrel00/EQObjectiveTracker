@@ -21,6 +21,12 @@ supported.** That support is newer than the retail support and has had several r
 fixes, so the gaps listed below are real ones rather than a disclaimer. Please report anything
 you find rather than assuming it is known.
 
+**WoW Forever support is a work in progress, so expect bugs.** The tracker follows your quests
+there. The retail-only sections, such as world quests and scenarios, have stayed empty there so
+far. Right now the Forever beta forgets every addon's settings when the game restarts. That is a
+bug in the beta client itself, reported to Blizzard, and until it is fixed the tracker starts from
+its default settings on each launch.
+
 On retail it tracks quests and campaign quests, world quests and bonus objectives, scenarios
 and delves, achievements, professions, and endeavors, covering both the Traveler's Log monthly
 activities and the neighborhood tasks you have tracked.
@@ -181,7 +187,7 @@ A phrase that has not been translated yet falls back to English on its own, so a
 translation is never a broken one, and there is no need to finish a language.
 
 A new language needs adding to that repo's language list, and its `Locales/<code>.lua` listed
-in all four `.toc` files here.
+in every `.toc` file here.
 
 Every non-English string in this addon is somebody else's work. Thanks to **Zox** for the
 French, **Malevi4** for the Russian, **labrie75** for the Korean, **失眠啤酒** for the

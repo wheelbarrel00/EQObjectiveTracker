@@ -308,7 +308,7 @@ SETS[240] = { widget(704, "StatusBar", { orderIndex = 0, shownState = 1, barMin 
 n = select(2, W:Read(240))
 ok(n == 0, "a bar with a secret maximum is refused rather than drawn degenerate")
 
--- The availability guard. Data/Widgets.lua ships on all four flavors, and with the guard gone a
+-- The availability guard. Data/Widgets.lua ships on every flavor, and with the guard gone a
 -- Read on a client without the API indexes a nil table OUTSIDE the pcall, because arguments are
 -- evaluated first - so it raises rather than degrading. Callers gate first today, which is what
 -- keeps this a trap rather than a live bug.

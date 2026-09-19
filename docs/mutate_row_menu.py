@@ -185,6 +185,28 @@ MUTANTS = [
             '    if self._notifyDirty then self._notifyDirty() end\n',
             '        self:OnEntryGroupFinder({ id = entryID })\n'
             '    end\n')]),
+
+    # ------------------------------------------------------- the Wowhead site
+    ("the Forever branch is dropped, so Forever opens the retail site", [
+        (R, '        if toc and toc >= 16000 and toc < 17000 then game = "forever/" end\n', '')]),
+
+    ("the Forever range is open-ended, so retail opens the Forever site", [
+        (R, "        if toc and toc >= 16000 and toc < 17000 then",
+            "        if toc and toc >= 16000 then")]),
+
+    ("the Forever path goes after the language, which Wowhead does not serve", [
+        (R, '    ns:ShowURL("https://www.wowhead.com/" .. game .. lang .. "quest="',
+            '    ns:ShowURL("https://www.wowhead.com/" .. lang .. game .. "quest="')]),
+
+    # A real GetBuildInfo returns strings after the interface number, so an unparenthesized
+    # select hands tonumber a string base and raises.
+    ("the select loses its parentheses, so tonumber gets the build type as a base", [
+        (R, "        local toc = tonumber((select(4, GetBuildInfo())))",
+            "        local toc = tonumber(select(4, GetBuildInfo()))")]),
+
+    ("Classic stops reading the expansion level, so TBC opens the Era site", [
+        (R, "        game = WOWHEAD_GAME[level] or \"classic/\"",
+            "        game = \"classic/\"")]),
 ]
 
 SUMMARY = re.compile(r"^test_row_menu: (\d+) passed, (\d+) failed$")

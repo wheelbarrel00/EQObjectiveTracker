@@ -1057,11 +1057,14 @@ do
 end
 
 do
-    -- Listed in all four, and it has to be: both quest providers take it at file scope, so a
-    -- flavor that loads a provider without it fails at load rather than degrading.
+    -- Listed in each TOC below, and it has to be: both quest providers take it at file scope, so
+    -- a flavor that loads a provider without it fails at load rather than degrading. A new TOC
+    -- needs adding here by hand.
+    local tocs = { "EQObjectiveTracker.toc", "EQObjectiveTracker_Mainline.toc",
+                   "EQObjectiveTracker_Camelot.toc", "EQObjectiveTracker_TBC.toc",
+                   "EQObjectiveTracker_Vanilla.toc" }
     local listed = 0
-    for _, toc in ipairs({ "EQObjectiveTracker.toc", "EQObjectiveTracker_Mainline.toc",
-                           "EQObjectiveTracker_TBC.toc", "EQObjectiveTracker_Vanilla.toc" }) do
+    for _, toc in ipairs(tocs) do
         local src = source(toc)
         if src:find("Data\\QuestCache.lua", 1, true) then listed = listed + 1 end
         -- Load order is the contract: a provider reading ns:GetModule("QuestCache") at file
@@ -1072,7 +1075,7 @@ do
         local sound = src:find("Data\\QuestSound.lua", 1, true)
         ok(mine and sound and mine < sound, "QuestCache loads before the quest sound [" .. toc .. "]")
     end
-    eq(listed, 4, "QuestCache is listed in all four TOCs")
+    eq(listed, #tocs, "QuestCache is listed in each TOC above")
 end
 
 do
