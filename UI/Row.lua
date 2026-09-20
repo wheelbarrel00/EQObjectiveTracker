@@ -547,15 +547,19 @@ local function untrackClick(row)
     return true
 end
 
-local function onMouseUp(row, button)
+local function onMouseUp(row, button, upInside)
     local wasDragging = row._wasDragging
     row._wasDragging = nil
     if wasDragging then return end
+    -- A press released off the row is a cancel, as Blizzard treats it. Compared to false so a
+    -- client that does not pass it still clicks.
+    if upInside == false then return end
     if not row._entry or clickThrough() then return end
 
     if chatLinkClick(row) then return end
     if button == "LeftButton" and untrackClick(row) then return end
 
+    local splitIcon = button == "LeftButton" and splitClickWanted(row) and overIcon(row)
     if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
         dispatch(row, "OnEntryOpenLog")
         return
@@ -568,7 +572,9 @@ local function onMouseUp(row, button)
         if RowMenu and RowMenu:Show(row) then return end
     end
 
-    dispatch(row, "OnEntryClick", button)
+    -- The icon half is Blizzard's POI button, which never hands a quest in, so the provider is
+    -- told which half it was.
+    dispatch(row, "OnEntryClick", button, splitIcon)
 end
 
 -- Offered only where both halves are really wired: the focus gesture needs a client with no
@@ -722,6 +728,7 @@ function Row:Reset(row)
     row._sFocus, row._sWidth, row._sText = nil, nil, nil
     row._sTime, row._sGen, row._sCardBg  = nil, nil, nil
     row._sGroup, row._sIcon, row._sItem = nil, nil, nil
+    row._mStr, row._mText, row._mTries = nil, nil, nil
     hideBlocks(row, 1, 1)
     ns:GetModule("Card"):Clear(row)
 end
@@ -730,6 +737,20 @@ Row.generation = 0
 
 function Row:Invalidate()
     self.generation = self.generation + 1
+end
+
+-- How far the row's strings now read from what Render stored. Seen on WoW Forever: a wrapped
+-- description drew a line taller than its row, and the repaint gate kept the short height.
+function Row:Drift(row)
+    if not row._mStr then return 0 end
+    local h = row.title:GetStringHeight()
+    if row.subtitle:IsShown() then h = h + TITLE_TO_SUB + row.subtitle:GetStringHeight() end
+    for i = 1, row._mText or 0 do h = h + row._textBlocks[i]:GetStringHeight() end
+    return h - row._mStr
+end
+
+function Row:Rebase(row)
+    if row._mStr then row._mStr = row._mStr + self:Drift(row) end
 end
 
 function Row:Render(row, entry, width, cfg)
@@ -896,6 +917,7 @@ function Row:Render(row, entry, width, cfg)
     local blockW = math.max(1, textW)
 
     local nText, nBar, linesH, prevBar = 0, 0, 0, false
+    local textH = 0
     for i = 1, _nBlocks do
         local isBar = _bKind[i] == BLOCK_BAR
         -- The first block keeps the old gap under the title, so a row that is all text sits
@@ -932,6 +954,7 @@ function Row:Render(row, entry, width, cfg)
             block:SetText(_bText[i])
             block:Show()
             blockH = block:GetStringHeight()
+            textH = textH + blockH
         end
         block:ClearAllPoints()
         block:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
@@ -945,6 +968,7 @@ function Row:Render(row, entry, width, cfg)
     local h      = math.max(titleH + subH + linesH, iconW) + padY * 2
 
     row:SetHeight(math.max(1, h))
+    row._mStr, row._mText = titleH + subH + textH, nText
 
     row._sTitle, row._sSub, row._sState = titleText, subtitle, entry.state
     row._sFocus, row._sWidth, row._sText = entry.isFocused, width, lineText

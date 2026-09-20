@@ -169,7 +169,7 @@ end
 local src = readFile("UI/Row.lua")
 
 local FROM_ANCHOR = "local function chatLinkClick(row)"
-local TO_ANCHOR   = "local function onMouseUp(row, button)"
+local TO_ANCHOR   = "local function onMouseUp(row, button, upInside)"
 local from = src:find(FROM_ANCHOR, 1, true)
 local to   = src:find(TO_ANCHOR, 1, true)
 assert(from, "anchor not found in UI/Row.lua: " .. FROM_ANCHOR)

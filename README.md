@@ -140,7 +140,11 @@ events, which would otherwise not appear anywhere.
 | `/eqot debug` | Toggle entry validation warnings |
 
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
-Left-click a quest to super-track it on retail, or to focus it on Classic. Shift-click a quest
+Left-click a quest to super-track it on retail, or to focus it on Classic. A finished quest that
+is turned in from the tracker rather than at an NPC, such as a Prey hunt, shows a click to
+complete line, and left-clicking it should open the reward window instead. That last part could
+not be tested on a finished hunt before release, so please report anything that looks wrong.
+Shift-click a quest
 while a chat box is open to drop it into chat, or with no chat box open to untrack it. Right-click
 opens a menu to pin, track, focus, open the quest log, pop out the details, find a group, look
 the quest up on Wowhead, or abandon it - the Classic menu is shorter, since those clients have no

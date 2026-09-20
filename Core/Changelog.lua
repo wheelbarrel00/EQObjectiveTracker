@@ -9,6 +9,16 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.25.1", date = "2026-09-19",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "A finished quest that is turned in from the objective tracker rather than at an NPC, such as a Prey hunt for Astalor Bloodsworn, can now be turned in with this tracker. Left-clicking it opens the reward window, as the default tracker does, and the quest shows the default tracker's \"click to complete\" line. Until now this tracker offered only the Quest Complete box, and a quest that never showed one could not be turned in without the default tracker. This one could not be tested on a finished hunt before release, so please report anything that looks wrong.",
+                "Pressing a quest in the tracker and letting go of the mouse button somewhere else no longer counts as clicking it.",
+                "A quest whose text wraps onto several lines is no longer drawn over by the quest below it. The tracker now measures each quest again once it has been drawn, and lays itself out again when a height has changed. This was seen on WoW Forever.",
+            } },
+        },
+    },
+    {
         version = "1.25.0", date = "2026-09-18",
         sections = {
             { head = "New Features", items = {

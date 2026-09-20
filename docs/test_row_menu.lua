@@ -107,9 +107,6 @@ local function makeEnv(providerName)
     provider.OnEntryGroupFinder = function(_, entry)
         calls.groupFinder[#calls.groupFinder + 1] = entry
     end
-    provider.OnEntryOpenLog = function(_, entry)
-        calls.other[#calls.other + 1] = "openlog:" .. tostring(entry and entry.id)
-    end
     provider._notifyDirty = function() calls.notify = calls.notify + 1 end
 
     local env
@@ -155,6 +152,11 @@ local function makeEnv(providerName)
         end,
         openQuestDetailsPopup = function(id)
             calls.other[#calls.other + 1] = "popout:" .. tostring(id)
+        end,
+        -- Stands in for the file-local the menu calls instead of OnEntryOpenLog, so the menu never
+        -- hands a quest in. docs/test_quest_turnin.lua checks that.
+        openQuestLog = function(id)
+            calls.other[#calls.other + 1] = "openlog:" .. tostring(id)
         end,
         abandonQuest = function(id)
             calls.other[#calls.other + 1] = "abandon:" .. tostring(id)

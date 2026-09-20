@@ -974,6 +974,73 @@ end
 -- and the row loop only ever read these two counts.
 local EMPTY_GROUP = { visibleCount = 0, totalCount = 0, entries = {} }
 
+-- Layouts one row is given before its current reading is taken as settled, so a height that
+-- never settles cannot keep the tracker rendering. Counted per row, not per check: rows are
+-- drawn at different times, so a run shared across all of them can give up on a row that has
+-- only just started drifting.
+local DRIFT_MAX = 3
+
+-- Pixels a reading has to move before it counts as a move at all. One constant for the settle
+-- test and the layout test both: two thresholds could disagree, and a narrowed one would then
+-- spend a row's budget on jitter that never reached a layout.
+local DRIFT_MIN = 0.5
+
+-- Every row's strings are read again one frame after a pass, once they have been drawn, and a
+-- row that now reads differently gets the tracker laid out again. See Row:Drift.
+function Tracker:_ArmHeightCheck()
+    if self._heightArmed then return end
+    self._heightArmed = true
+    self._heightCheck = self._heightCheck or function()
+        self._heightArmed = nil
+        self:_CheckHeights()
+    end
+    C_Timer.After(0, self._heightCheck)
+end
+
+function Tracker:_CheckHeights()
+    local f = self.frame
+    if not f or f._eqotHidden or not f:IsShown() then return end
+    local Row, RowPool = ns:GetModule("Row"), ns:GetModule("RowPool")
+    -- worst is every drifting row, for the status line. fix is the ones still inside their
+    -- budget, which is what a layout would move.
+    local worst, fix, gaveUp = 0, 0, false
+    for _, byID in pairs(RowPool.byProvider) do
+        for _, row in pairs(byID) do
+            local d = Row:Drift(row)
+            if math.abs(d) < DRIFT_MIN then
+                row._mTries = nil
+            else
+                if math.abs(d) > math.abs(worst) then worst = d end
+                row._mTries = (row._mTries or 0) + 1
+                if row._mTries > DRIFT_MAX then
+                    -- This row's current reading becomes the stored one, or nothing re-measures
+                    -- it and no later check on it could come back settled. Its budget goes back
+                    -- with it, so a fresh disturbance is laid out rather than refused forever.
+                    Row:Rebase(row)
+                    row._mTries = nil
+                    gaveUp = true
+                elseif math.abs(d) > math.abs(fix) then
+                    fix = d
+                end
+            end
+        end
+    end
+    if math.abs(worst) >= DRIFT_MIN then self._driftLast = worst end
+    if gaveUp then self._driftGaveUp = (self._driftGaveUp or 0) + 1 end
+    if math.abs(fix) < DRIFT_MIN then return end
+    self._driftFixes = (self._driftFixes or 0) + 1
+    Row:Invalidate()
+    -- Refresh rather than Render: it is throttled and coalesces with a render already asked
+    -- for, where a direct Render adds a pass of its own. Visibility takes a quest count off
+    -- the end of every render and only its first zero is guarded.
+    self:Refresh()
+end
+
+function Tracker:HeightLine()
+    return ("row heights: laid out again %d time(s) after drawing, last off by %+.1fpx, gave up %d")
+        :format(self._driftFixes or 0, self._driftLast or 0, self._driftGaveUp or 0)
+end
+
 function Tracker:Render()
     local f = self.frame
     if not f then return end
@@ -1163,6 +1230,7 @@ function Tracker:Render()
     -- the anchor arithmetic reads settled positions.
     ItemButtons:Commit()
     self:_EnsureTimerTicker(hasTimed, soonestExpiry)
+    self:_ArmHeightCheck()
 
     -- Last, so the layout is settled before a rule is allowed to paint over it. Apply is only
     -- re-entered when the count crosses zero, so this is a no-op on almost every render.

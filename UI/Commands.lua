@@ -115,6 +115,7 @@ handlers.status = function()
     ns:Print(("rows: %d active, %d pooled"):format(active, free))
     debugLine("Row")
     debugLine("Tracker", "scroll: ", "DebugScroll")
+    debugLine("Tracker", nil, "HeightLine")
 
     debugLine("ItemButtons")
     debugLine("ScenarioSpells")

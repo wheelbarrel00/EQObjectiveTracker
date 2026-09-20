@@ -134,22 +134,22 @@ MUTANTS = [
               "    if not ChatEdit_GetActiveWindow() then return false end")]),
 
     # onMouseUp's ORDER, which the slice cannot reach and which this session's own fix moved.
+    # Two edits rather than one anchor spanning the whole stretch: a line added between the
+    # branches took this mutant quietly to SKIPPED once already.
     ("the link branch is moved BELOW split-click, so a split-click row never links", [
-        (ROW, """    if chatLinkClick(row) then return end
-    if button == "LeftButton" and untrackClick(row) then return end
-
-    if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
+        (ROW, "    if chatLinkClick(row) then return end\n", ""),
+        (ROW, """    if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
         dispatch(row, "OnEntryOpenLog")
         return
-    end""",
-              """    if button == "LeftButton" and untrackClick(row) then return end
-
-    if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
+    end
+""",
+              """    if button == "LeftButton" and splitClickWanted(row) and not overIcon(row) then
         dispatch(row, "OnEntryOpenLog")
         return
     end
 
-    if chatLinkClick(row) then return end""")]),
+    if chatLinkClick(row) then return end
+""")]),
 
     # The untrack asked FIRST is the one that matters most: with both bound to shift by default,
     # it would untrack the quest the player was trying to link.

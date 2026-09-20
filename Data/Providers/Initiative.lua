@@ -38,7 +38,8 @@ local function readInfo()
     return fn()
 end
 
--- A gate the client lacks reads closed, because an ungated request disconnected WoW Forever.
+-- A gate the client lacks reads closed, the author's call on 2026-09-18: an empty section is
+-- visible and reportable, a dropped connection is not. WoW Forever has both and reads them false.
 local function isLive(C)
     if type(C.IsInitiativeEnabled) ~= "function"
        or type(C.PlayerHasInitiativeAccess) ~= "function" then
@@ -140,8 +141,9 @@ function Initiative:Enable(notifyDirty)
     -- The info arrives asynchronously and RequestNeighborhoodInitiativeInfo is what asks for it,
     -- so the fetch is issued from the event path only. GetEntries runs inside Tracker:Render and
     -- must not make a call that answers later.
-    -- WoW Forever reads both gates false and this request disconnected it. Retail read both true
-    -- right after login (2026-09-17). Blizzard's tracker also asks on a zone change.
+    -- WoW Forever reads both gates false and this request disconnected it. A gate can also read
+    -- closed on retail at login, so the sent and skipped counts below are what say which event
+    -- fetched. Blizzard's tracker also asks on a zone change.
     local function request()
         local C = C_NeighborhoodInitiative
         if type(C) == "table" and type(C.RequestNeighborhoodInitiativeInfo) == "function" and isLive(C) then

@@ -5,6 +5,22 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.1] - 2026-09-19
+
+### Bug Fixes
+
+- A finished quest that is turned in from the objective tracker rather than at an NPC, such as a
+  Prey hunt for Astalor Bloodsworn, can now be turned in with this tracker. Left-clicking it opens
+  the reward window, as the default tracker does, and the quest shows the default tracker's
+  "click to complete" line. Until now this tracker offered only the Quest Complete box, and a
+  quest that never showed one could not be turned in without the default tracker. This one could
+  not be tested on a finished hunt before release, so please report anything that looks wrong.
+- Pressing a quest in the tracker and letting go of the mouse button somewhere else no longer
+  counts as clicking it.
+- A quest whose text wraps onto several lines is no longer drawn over by the quest below it. The
+  tracker now measures each quest again once it has been drawn, and lays itself out again when
+  a height has changed. This was seen on WoW Forever.
+
 ## [1.25.0] - 2026-09-18
 
 ### New Features

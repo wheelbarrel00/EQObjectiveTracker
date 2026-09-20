@@ -94,7 +94,7 @@ MUTANTS = [
 
     ("findgroup dispatches to the quest log instead of the group finder", [
         (Q, "        self:OnEntryGroupFinder({ id = entryID })",
-            "        self:OnEntryOpenLog({ id = entryID })")]),
+            "        openQuestLog(entryID)")]),
 
     # ------------------------------------------------- the reused table both providers answer with
     ("the menu wipe is dropped, so a groupable quest's item rides onto the next row", [

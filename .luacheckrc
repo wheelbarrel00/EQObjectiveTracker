@@ -107,7 +107,7 @@ read_globals = {
     "BackdropTemplateMixin", "QuestWatchFrame", "QuestTimerFrame",
 
     "GetNumAutoQuestPopUps", "GetAutoQuestPopUp", "RemoveAutoQuestPopUp",
-    "ShowQuestComplete", "ShowQuestOffer",
+    "ShowQuestComplete", "ShowQuestOffer", "QUEST_WATCH_CLICK_TO_COMPLETE",
     "QuestUtils_IsQuestWorldQuest", "QuestUtils_GetQuestName",
     "QuestMapFrame_OpenToQuestDetails", "ToggleQuestLog", "GetQuestLogQuestText",
     "ObjectiveTrackerFrame",

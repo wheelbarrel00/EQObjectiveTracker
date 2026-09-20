@@ -128,6 +128,12 @@ local function questState(id)
     return STATE.ACTIVE
 end
 
+local function isAutoComplete(id)
+    local index = C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(id)
+    local info  = index and C_QuestLog.GetInfo(index)
+    return (info and info.isAutoComplete) and true or false
+end
+
 local function fillLines(e, id)
     Entry.BeginLines(e)
     local objs = ns.Has.QuestObjectives and C_QuestLog.GetQuestObjectives(id) or nil
@@ -167,6 +173,12 @@ local function fillLines(e, id)
                 end
             end
         end
+    end
+
+    -- Blizzard's own string, so it arrives translated. Left unfinished, or simplify mode hides it.
+    if e.state == STATE.COMPLETE and QUEST_WATCH_CLICK_TO_COMPLETE and isAutoComplete(id) then
+        local ln = Entry.PushLine(e)
+        ln.text = QUEST_WATCH_CLICK_TO_COMPLETE
     end
 
     Entry.EndLines(e)
@@ -516,26 +528,51 @@ function Quests:ZoneProbeLines()
     return out
 end
 
-function Quests:OnEntryClick(entry, button)
+-- Blizzard's tracker hands an auto-complete quest in from a click on the quest, and the quest
+-- log has no button that can, so a finished one that raised no Complete popup relies on this.
+local function turnIn(provider, id)
+    if not (ShowQuestComplete and questState(id) == STATE.COMPLETE and isAutoComplete(id)) then
+        return false
+    end
+    -- Removed first, as Blizzard's header click does.
+    if RemoveAutoQuestPopUp then pcall(RemoveAutoQuestPopUp, id) end
+    -- pcall for the reason UI/AutoQuestPopup.lua gives for its own: that file records this
+    -- global raising on a popup already retired, and the line above retires one. A raise here
+    -- would otherwise reach the row's script and take the caller's fallback down with it.
+    if not pcall(ShowQuestComplete, id) then return false end
+    if provider._notifyDirty then provider._notifyDirty() end
+    return true
+end
+
+function Quests:OnEntryClick(entry, button, splitIcon)
     if button == "RightButton" then
         if ns.Has.QuestWatchAPI then C_QuestLog.RemoveQuestWatch(entry.id) end
         return
     end
+    -- The icon half of a split click super-tracks and nothing else, as Blizzard's POI button does
+    if not splitIcon and turnIn(self, entry.id) then return end
     if ns.Has.SuperTrack then
         C_SuperTrack.SetSuperTrackedQuestID(entry.id)
         if self._notifyDirty then self._notifyDirty() end
     end
 end
 
--- Only implemented here, which is also what gates the split-click option: Row offers it
--- solely to a provider that answers this, matching EQ having it on quest blocks alone.
-function Quests:OnEntryOpenLog(entry)
+-- The menu calls this directly. Its Open item never hands a quest in, and neither does Blizzard's.
+local function openQuestLog(id)
     if C_AddOns and C_AddOns.LoadAddOn then C_AddOns.LoadAddOn("Blizzard_QuestLog") end
     if QuestMapFrame_OpenToQuestDetails then
-        QuestMapFrame_OpenToQuestDetails(entry.id)
+        QuestMapFrame_OpenToQuestDetails(id)
     elseif ToggleQuestLog then
         ToggleQuestLog()
     end
+end
+
+-- Only the quest providers answer this, and that is what gates the split-click option, matching
+-- EQ having it on quest blocks alone. The title half of a split click is Blizzard's header click,
+-- so it hands a quest in the same way.
+function Quests:OnEntryOpenLog(entry)
+    if turnIn(self, entry.id) then return end
+    openQuestLog(entry.id)
 end
 
 local function isFocused(id)
@@ -655,7 +692,7 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
     elseif itemID == "unfocus" then
         if ns.Has.SuperTrack then C_SuperTrack.SetSuperTrackedQuestID(0) end
     elseif itemID == "openlog" then
-        self:OnEntryOpenLog({ id = entryID })
+        openQuestLog(entryID)
     elseif itemID == "popout" then
         openQuestDetailsPopup(entryID)
     elseif itemID == "findgroup" then
