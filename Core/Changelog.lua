@@ -9,6 +9,19 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "1.26.0", date = "2026-09-27",
+        sections = {
+            { head = "New Features", items = {
+                "Always show campaign quests, a new retail option on the Tracker tab, keeps your campaign quests from every zone on the tracker, even while Show only quests in current zone is on. It sits just under that filter and is off by default. Unchecking Campaign quests still hides them, and so does Show only tracked quests for a campaign quest you have untracked. Requested by Lokir.",
+                "Tracker Opacity, a new slider on the Appearance tab, fades the whole tracker so the game shows through it. Moving the mouse onto your quests or headers brings it back to full, and the quest you are following stays fully solid while the rest is faded. Each of those has its own switch under the slider. The slider starts at 100, so nothing changes until you move it. During combat the followed quest's item button fades along with the rest. Requested by Flamed_1984.",
+            } },
+            { head = "Improvements", items = {
+                "Every language is fully translated again. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese now cover the whole addon, including both new options, the quest accepted and turned in sounds, the progress bar settings, and the reworded Reset all settings tooltip.",
+                "/eqot status now shows when the tracker last asked the game to play one of its sounds and what the game answered, and, for the quests that are complete right now, how many the tracker has on record as complete, as unfinished, or not at all. Both are there to help find out why the Quest Sound can play minutes late on WoW Forever.",
+            } },
+        },
+    },
+    {
         version = "1.25.1", date = "2026-09-19",
         sections = {
             { head = "Bug Fixes", items = {

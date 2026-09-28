@@ -179,20 +179,47 @@ function Media:GetSoundLabel(value)
     return (value:gsub("^EQ: ", ""))
 end
 
+-- A sound the client plays late and a call made late sound the same to the player, so the latest
+-- call keeps its time and the client's own willPlay answer.
+local lastPlay
+
 -- Everything that makes a noise goes through here rather than reaching for a file, or a kit
 -- sound falls through to the fallback at the bottom of GetSoundFile and the player hears the
 -- wrong one. A kit name this client cannot resolve is SILENT rather than substituted, which is
 -- the honest failure: the picker does not offer it either, so a substitute could not be
--- recognised or changed.
+-- recognized or changed.
 function Media:Play(name)
     if not name or name == "NONE" then return end
+    local at = GetTime()
     if isKitName(name) then
         local kit = kitID(name)
-        if kit and PlaySound then pcall(PlaySound, kit, "Master") end
+        if not (kit and PlaySound) then
+            lastPlay = { name = name, at = at, outcome = "no kit on this client" }
+            return
+        end
+        local ok, willPlay = pcall(PlaySound, kit, "Master")
+        lastPlay = { name = name, at = at, kit = kit,
+                     outcome = ok and ("willPlay " .. tostring(willPlay)) or "raised" }
         return
     end
     local file = self:GetSoundFile(name)
-    if file and PlaySoundFile then pcall(PlaySoundFile, file, "Master") end
+    if not (file and PlaySoundFile) then
+        lastPlay = { name = name, at = at, outcome = "no file" }
+        return
+    end
+    local ok, willPlay = pcall(PlaySoundFile, file, "Master")
+    lastPlay = { name = name, at = at, file = file,
+                 outcome = ok and ("willPlay " .. tostring(willPlay)) or "raised" }
+end
+
+-- Every Play shares one record, so an accept, a turn in or the options preview replaces the
+-- objectives chime's. The name on the line says which sound it was.
+function Media:LastPlayLine()
+    if not lastPlay then return "none this session" end
+    local what = lastPlay.file or lastPlay.kit
+    return ("%s%s %.0fs ago, %s"):format(
+        lastPlay.name, what and (" (" .. tostring(what) .. ")") or "",
+        GetTime() - lastPlay.at, lastPlay.outcome)
 end
 
 function Media:GetSoundFile(name)

@@ -313,10 +313,25 @@ function QuestSound:DebugLine()
     -- the scan already pays one GetQuestObjectives per unfinished quest. This is the derived
     -- case on screen: quests the objectives call finished while Blizzard's own flag does not.
     local mismatch, firstMismatch = 0, nil
+    -- Only a recorded false lets visit chime, and no other line here shows which record a
+    -- complete quest carries. A nil means visit records its next complete reading in silence.
+    local recDone, recPending, recNone, firstNone = 0, 0, 0, nil
     local function note(id, title, flag, failed)
-        if not flag and not failed and objectivesDone(id) then
+        local derived = false
+        if not flag and not failed then derived = objectivesDone(id) end
+        if derived then
             mismatch = mismatch + 1
             firstMismatch = firstMismatch or ('"%s" (%s)'):format(safeText(title), tostring(id))
+        end
+        if not (flag or derived) then return end
+        local rec = lastComplete[id]
+        if rec == true then
+            recDone = recDone + 1
+        elseif rec == false then
+            recPending = recPending + 1
+        else
+            recNone = recNone + 1
+            firstNone = firstNone or ('"%s" (%s)'):format(safeText(title), tostring(id))
         end
     end
     if ns.Has.QuestLog then
@@ -359,10 +374,14 @@ function QuestSound:DebugLine()
         ("%d scans, %d quests walked, %d read done (%d of them from the objectives), %d read failed, last scan %s")
             :format(stats.scans, stats.walked, stats.done, stats.derived, stats.failed,
                     ago(stats.scanAt)),
-        ("scan saw %d, played %d | turn ins seen %d | %d held over a loading screen"):format(
-            stats.scanSaw, stats.scanPlayed, stats.turnIns, stats.held),
+        ("scan saw %d, played %d (last %s) | turn ins seen %d | %d held over a loading screen")
+            :format(stats.scanSaw, stats.scanPlayed, ago(stats.scanPlayedAt), stats.turnIns,
+                    stats.held),
         ("done by objectives but not by Blizzard's flag right now: %d%s"):format(
             mismatch, firstMismatch and (" -> " .. firstMismatch) or ""),
+        ("complete right now: %d recorded complete, %d recorded unfinished, %d unrecorded%s")
+            :format(recDone, recPending, recNone, firstNone and (" -> " .. firstNone) or ""),
+        ("last sound: %s"):format(ns:GetModule("Media"):LastPlayLine()),
         ("recent: %s"):format(
             (#log > 0) and table.concat(events, " | ") or "nothing this session"),
         ("last accept payload (%s) -> id %s, %s"):format(

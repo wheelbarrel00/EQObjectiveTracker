@@ -71,6 +71,138 @@ local function shouldHide(f)
     return false
 end
 
+-- The hide below owns alpha 0 and the opacity option owns every alpha a SHOWN tracker has, so
+-- the two can never disagree about the frame.
+local FADE_TIME  = 0.2
+local HOLD_TIME  = 1
+local HOVER_POLL = 0.05
+-- A faded tracker still takes clicks, so no stored value may make it invisible.
+local MIN_ALPHA  = 0.1
+
+local fade = { current = 1, over = false, leftAt = nil, poll = 0 }
+local focusRow, focusQuestID
+local exemptRow, exemptButton
+local driver
+
+local function appearance()
+    return ns:GetModule("DB"):Tracker()
+end
+
+local function fadeLevel()
+    local t = appearance()
+    local a = t and tonumber(t.trackerAlpha)
+    if not a or a >= 1 then return 1 end
+    return math.max(MIN_ALPHA, a)
+end
+
+local function hoverOn()
+    local t = appearance()
+    return not (t and t.trackerAlphaHover == false)
+end
+
+local function focusOn()
+    local t = appearance()
+    return not (t and t.trackerAlphaFocus == false)
+end
+
+local function over(r)
+    return r ~= nil and r:IsVisible() and r:IsMouseOver() and true or false
+end
+
+local function overBar(sf)
+    return sf ~= nil and over(sf.ScrollBar or sf.scrollBar)
+end
+
+-- Only what is drawn counts, so the empty part of the frame below the last quest does not bring
+-- the tracker up. The quest list is the scroll viewport clipped to the content laid out in it.
+local function mouseOverDrawn(f)
+    if over(f.drag) or over(f.scenarioContainer) or over(f.eventsRegion) then return true end
+    if over(f.scroll) and over(f.content) then return true end
+    if overBar(f.scroll) or overBar(f.eventsScroll) then return true end
+    -- A locked grip sits at alpha 0 but still reads as visible.
+    if not over(f.grip) then return false end
+    local Tracker = ns:GetModule("Tracker")
+    return not (Tracker and Tracker:IsLocked())
+end
+
+local function fadeTarget()
+    local level = fadeLevel()
+    if level >= 1 then return 1 end
+    if hoverOn() and (fade.over or (fade.leftAt and GetTime() - fade.leftAt < HOLD_TIME)) then
+        return 1
+    end
+    return level
+end
+
+-- Takes the level at once rather than animating from wherever the last fade left off. Every
+-- Apply that leaves the tracker shown lands here, so combat or a map toggle also ends a mouseover
+-- hold early.
+local function settle(f)
+    fade.over = fadeLevel() < 1 and hoverOn() and mouseOverDrawn(f)
+    fade.leftAt = nil
+    fade.current = fadeTarget()
+    return fade.current
+end
+
+local function stepFade(_, elapsed)
+    local Tracker = ns:GetModule("Tracker")
+    local f = Tracker and Tracker.frame
+    if not f then return end
+    fade.poll = fade.poll - elapsed
+    if fade.poll <= 0 then
+        fade.poll = HOVER_POLL
+        local now = mouseOverDrawn(f)
+        if fade.over and not now then fade.leftAt = GetTime() end
+        fade.over = now
+    end
+    local cur, target = fade.current, fadeTarget()
+    if cur == target then return end
+    local step = elapsed / FADE_TIME
+    if cur < target then cur = math.min(target, cur + step) else cur = math.max(target, cur - step) end
+    fade.current = cur
+    f:SetAlpha(cur)
+end
+
+-- Runs only while a shown tracker is faded with mouseover on, so the default costs nothing.
+local function syncDriver(visible)
+    if visible and fadeLevel() < 1 and hoverOn() then
+        if not driver then
+            driver = CreateFrame("Frame")
+            driver:SetScript("OnUpdate", stepFade)
+        end
+        driver:Show()
+    elseif driver then
+        driver:Hide()
+    end
+end
+
+local function canExempt(r)
+    return r ~= nil and r.SetIgnoreParentAlpha ~= nil
+end
+
+-- The focused quest's row ignores the tracker's alpha, so it stays solid while the rest fades.
+-- Its item button is secure and nobody has measured this call on one in combat, so it is exempt
+-- out of combat only. PLAYER_REGEN_DISABLED runs Apply before the lockdown to drop it, and no
+-- call reaches the button while the lockdown is up.
+local function syncExempt(visible)
+    local row = (visible and fadeLevel() < 1 and focusOn()) and focusRow or nil
+    local button
+    if row and not inCombat() then
+        local IB = ns:GetModule("ItemButtons")
+        button = IB and IB.buttons and IB.buttons[focusQuestID]
+    end
+    if exemptRow ~= row then
+        if canExempt(exemptRow) then exemptRow:SetIgnoreParentAlpha(false) end
+        if canExempt(row) then row:SetIgnoreParentAlpha(true) end
+        exemptRow = row
+    end
+    if exemptButton ~= button and not InCombatLockdown() then
+        if canExempt(exemptButton) then exemptButton:SetIgnoreParentAlpha(false) end
+        if canExempt(button) then button:SetIgnoreParentAlpha(true) end
+        exemptButton = button
+    end
+end
+
 -- A real Hide until a secure quest-item button has been built, and alpha from then on for the
 -- rest of the session - HasSecureButtons latches, so this is not scoped to combat. Unlike EQ
 -- the invisible frame is also made click-through: Tracker:IsClickThrough gates every mouse
@@ -80,7 +212,7 @@ local function setVisible(f, visible)
     local IB = ns:GetModule("ItemButtons")
     -- The alpha-only path fires no OnHide, so the frame's own hook cannot catch this one
     if not visible then ns.Util.Tooltip():Hide() end
-    f:SetAlpha(visible and 1 or 0)
+    f:SetAlpha(visible and settle(f) or 0)
     f._eqotHidden = (not visible) or nil
     -- Hiding for real once a secure button has been built strands the frame: Show is
     -- protected in combat too, so a toggle mid-fight set alpha on a frame that was never
@@ -96,6 +228,8 @@ local function setVisible(f, visible)
     if Tracker and Tracker.SetScrollInputSuspended then
         Tracker:SetScrollInputSuspended(not visible)
     end
+    syncDriver(visible)
+    syncExempt(visible)
 end
 
 function Visibility:Apply()
@@ -168,6 +302,41 @@ function Visibility:SetQuestRows(n)
     self:Apply()
 end
 
+-- The options call this rather than Apply, which would rerun every hide rule on each tick of a
+-- slider drag.
+function Visibility:ApplyFade()
+    if not self._started then return end
+    local Tracker = ns:GetModule("Tracker")
+    local f = Tracker and Tracker.frame
+    if not f then return end
+    local visible = not f._eqotHidden
+    if visible then f:SetAlpha(settle(f)) end
+    syncDriver(visible)
+    syncExempt(visible)
+end
+
+-- Called by Tracker:Render after ItemButtons:Commit, so the button looked up here is the one this
+-- pass settled rather than one Commit is about to pool.
+function Visibility:SetFocus(row, questID)
+    if not self._started then return end
+    focusRow, focusQuestID = row, questID
+    local Tracker = ns:GetModule("Tracker")
+    local f = Tracker and Tracker.frame
+    syncExempt(f ~= nil and not f._eqotHidden)
+end
+
+function Visibility:FadeLine()
+    local Tracker = ns:GetModule("Tracker")
+    local f = Tracker and Tracker.frame
+    return ("fade: opacity %.2f, mouseover %s, focused quest %s | now %.2f, over %s, driver %s | exempt quest %s, item button %s | ignore parent alpha %s")
+        :format(fadeLevel(), hoverOn() and "on" or "off", focusOn() and "on" or "off",
+                fade.current, tostring(fade.over),
+                (driver and driver:IsShown()) and "running" or "idle",
+                exemptRow and tostring(focusQuestID) or "none",
+                exemptButton and "yes" or "no",
+                canExempt(f) and "supported" or "unsupported")
+end
+
 function Visibility:IsRuleHiding()
     local Tracker = ns:GetModule("Tracker")
     local f = Tracker and Tracker.frame
@@ -206,6 +375,10 @@ function Visibility:DebugLine()
 end
 
 function Visibility:OnEnable()
+    -- ApplyFade and SetFocus ask this rather than IsModuleDisabled, so /eqot enable and disable wait
+    -- for the reload they ask for. Enabled live, the item button would be exempted with no combat
+    -- listener to drop it before the lockdown.
+    self._started = true
     local Events = ns:GetModule("Events")
     local function apply() self:Apply() end
 

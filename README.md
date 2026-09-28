@@ -16,16 +16,15 @@ lands in both places at once.
 
 ## Status
 
-**Retail is released and stable. Classic Era (1.15.9) and TBC Anniversary (2.5.6) are
-supported.** That support is newer than the retail support and has had several rounds of
-fixes, so the gaps listed below are real ones rather than a disclaimer. Please report anything
-you find rather than assuming it is known.
+**Retail, Classic Era (1.15.9) and TBC Anniversary (2.5.6) are all supported.** The Classic
+gaps listed below are real ones rather than a disclaimer. Please report anything you find
+rather than assuming it is known.
 
 **WoW Forever support is a work in progress, so expect bugs.** The tracker follows your quests
 there. The retail-only sections, such as world quests and scenarios, have stayed empty there so
 far. Right now the Forever beta forgets every addon's settings when the game restarts. That is a
 bug in the beta client itself, reported to Blizzard, and until it is fixed the tracker starts from
-its default settings on each launch.
+its default settings on each launch. Your settings do still survive a reload and a logout.
 
 On retail it tracks quests and campaign quests, world quests and bonus objectives, scenarios
 and delves, achievements, professions, and endeavors, covering both the Traveler's Log monthly
@@ -152,8 +151,9 @@ group finder and popping out and abandoning need frames they do not have. A pinn
 on the tracker whatever your filters say. In manual sort mode you can also drag quests into
 whatever order you like.
 
-A setting that only applies while another one is on is dimmed while that one is off, so it is
-clear which settings are actually in effect.
+Most settings that only apply while another one is on are dimmed while that one is off, so it
+is clear which settings are actually in effect. Always show campaign quests is the exception: it
+stays lit, and only acts while Show only quests in current zone is on.
 
 The tracker can hide itself while you are in combat, inside an instance, on a Mythic+ run,
 while the world map is open, or while you have no quests showing. Each is its own toggle, and
@@ -162,13 +162,15 @@ keeps the tracker on screen by itself, including world quests, achievements, the
 bar, and the delve or scenario panel.
 
 Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
-shown in its own typeface in the picker), sizes, spacing, colors, the progress bars, a card
+shown in its own typeface in the picker), sizes, spacing, colors, opacity (back to full under
+the mouse, with the quest you are following kept solid), the progress bars, a card
 layout that can wrap the delve and scenario panel as well as your quests, section order and
 visibility, filters by quest type, and eight sort modes including by distance and by hand.
 The current-zone filter shows only quests with an objective on the map you are standing on.
 If that map lists none of its own, such as a building interior, a covenant sanctum or a
 dungeon, it asks the zone around it instead, so you still get that zone's quests rather
-than an empty tracker.
+than an empty tracker. On retail, an option keeps your campaign quests on screen from every
+zone while that filter is on.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.

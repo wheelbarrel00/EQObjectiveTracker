@@ -36,6 +36,10 @@ DB.defaults = {
             maxHeight     = 600,
             scale         = 1.0,
 
+            trackerAlpha      = 1.0,
+            trackerAlphaHover = true,
+            trackerAlphaFocus = true,
+
             questSoundEnabled    = true,
             questCompleteSound   = "EQ: Work Complete",
             -- Its own pair rather than sharing the two above, so accept and complete can be set
@@ -157,6 +161,7 @@ DB.defaults = {
                 showWorld       = true,
                 showBonus       = true,
                 onlyCurrentZone = false,
+                campaignAnyZone = false,
             },
 
             -- positionInScreenUnits is deliberately NOT defaulted here, and must never be.
@@ -249,6 +254,7 @@ local APPEARANCE_KEYS = {
     "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
     "headerBarSoftEdges", "headerBarSoftEdgeStrength",
     "blockSpacing", "lineSpacing", "headerSpacing", "scale",
+    "trackerAlpha", "trackerAlphaHover", "trackerAlphaFocus",
     "blockLayout", "cardColor", "cardBorderColor", "cardBorderSize", "cardPadding",
     "cardTintByType", "cardTintCampaign", "cardTintLegendary", "cardTintDungeon", "cardTintRaid",
     "scenarioCard",

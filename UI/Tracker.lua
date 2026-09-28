@@ -800,6 +800,13 @@ local function noteExpiry(entry)
     return true
 end
 
+-- The row the focused entry was drawn into, which the opacity option keeps solid. Reset by
+-- Render beside soonestExpiry, since both row loops feed it.
+local focusRow, focusQuestID
+local function noteFocus(entry, row)
+    if entry.isFocused and not focusRow then focusRow, focusQuestID = row, entry.id end
+end
+
 -- World quests live outside the main scroll area in a region capped to a fraction of the
 -- tracker, so a long world quest list can never push the quest sections off screen.
 function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
@@ -859,6 +866,7 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", econtent, "TOPLEFT", 0, -y)
         y = y + Row:Render(row, entry, width, cfg) + gap
+        noteFocus(entry, row)
     end
     econtent:SetHeight(math.max(1, y))
 
@@ -1127,6 +1135,7 @@ function Tracker:Render()
     local y        = 0
     local hasTimed = false
     soonestExpiry  = nil
+    focusRow, focusQuestID = nil, nil
     local sectionTops = {}
     local tops = f._sectionTop
     if not tops then tops = {}; f._sectionTop = tops end
@@ -1164,6 +1173,7 @@ function Tracker:Render()
                         row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
                         if entry.hasItem then ItemButtons:Want(entry.id, row) end
                         y = y + Row:Render(row, entry, width, cfg) + gap
+                        noteFocus(entry, row)
                         -- After Render, which is what stamps row._entry - DragDrop reads it
                         -- back off the row to scope a drag to its own section.
                         if entry.providerID == dragProvider then
@@ -1235,7 +1245,10 @@ function Tracker:Render()
     -- Last, so the layout is settled before a rule is allowed to paint over it. Apply is only
     -- re-entered when the count crosses zero, so this is a no-op on almost every render.
     local Visibility = ns:GetModule("Visibility")
-    if Visibility then Visibility:SetQuestRows(questRows) end
+    if Visibility then
+        Visibility:SetFocus(focusRow, focusQuestID)
+        Visibility:SetQuestRows(questRows)
+    end
 end
 
 -- Row's change gate keys on the formatted time string, so a plain Render only repaints

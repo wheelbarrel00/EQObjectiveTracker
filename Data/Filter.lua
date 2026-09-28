@@ -20,10 +20,14 @@ Filter.CATEGORIES = {
 -- isTracked and an active zone filter look identical from that number. One integer bump per
 -- rejected entry, so it stays on in release.
 Filter.rejects = { popup = 0, watched = 0, category = 0, zone = 0 }
+-- The rows the zone rule would have hidden and the campaign exemption kept, so a "why is
+-- this quest showing" report is answered from the same line as the rejects.
+Filter.campaignKept = 0
 
 function Filter:BeginPass()
     local r = self.rejects
     r.popup, r.watched, r.category, r.zone = 0, 0, 0, 0
+    self.campaignKept = 0
 end
 
 -- Keyed by provider then entry id so two providers can never collide on a bare numeric id.
@@ -82,11 +86,12 @@ function Filter:FiltersLine()
         cats[i] = ("%s=%s"):format(key, tostring((f and f[key]) ~= false))
     end
 
-    return ("filters: onlyWatched=%s onlyCurrentZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, popup %d")
+    return ("filters: onlyWatched=%s onlyCurrentZone=%s campaignAnyZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, popup %d | campaign kept from other zones %d")
         :format(tostring(cfg and cfg.showOnlyWatched and true or false),
                 tostring(f and f.onlyCurrentZone and true or false),
+                tostring(f and f.campaignAnyZone and true or false),
                 f and table.concat(cats, " ") or "no filters table",
-                r.watched, r.category, r.zone, r.popup)
+                r.watched, r.category, r.zone, r.popup, self.campaignKept)
 end
 
 function Filter:PassesCategory(entry, f)
@@ -137,8 +142,13 @@ function Filter:Visible(entry, cfg, provider)
         -- nil from IsCurrentZone means the provider cannot tell, so fail open
         if f and f.onlyCurrentZone and provider.IsCurrentZone
            and provider:IsCurrentZone(entry) == false then
-            rejects.zone = rejects.zone + 1
-            return false
+            -- Asked after the zone test, so campaignKept counts only rows it really kept.
+            if f.campaignAnyZone and entry.tags and entry.tags.campaign then
+                self.campaignKept = self.campaignKept + 1
+            else
+                rejects.zone = rejects.zone + 1
+                return false
+            end
         end
     end
 

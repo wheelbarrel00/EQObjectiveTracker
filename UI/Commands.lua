@@ -134,6 +134,7 @@ handlers.status = function()
     debugLine("QuestieCoexist")
     debugLine("QuestLogChecks")
     debugLine("Visibility")
+    debugLine("Visibility", nil, "FadeLine")
 
     local ZP = ns:GetModule("ZoneProgress")
     if ZP and ZP.DebugLines then

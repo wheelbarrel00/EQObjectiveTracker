@@ -533,11 +533,49 @@ Options:RegisterTab({
             L["Scales the whole tracker. Takes effect immediately out of combat."])
         scaleSlider:SetPoint("TOPLEFT", dividerPicker, "BOTTOMLEFT", 0, -32)
 
+        local syncFade
+        -- Stored as a fraction and shown as a whole number, so no key carries a bare percent sign.
+        local fadeSlider = self:CreateSlider(content, L["Tracker Opacity"], 10, 100, 5,
+            function() return math.floor((DB().trackerAlpha or 1) * 100 + 0.5) end,
+            function(v)
+                DB().trackerAlpha = v / 100
+                ns:GetModule("Visibility"):ApplyFade()
+                syncFade()
+            end,
+            L["How solid the tracker is. At 100 it is fully solid, and lower values let the game show through it."])
+        fadeSlider:SetPoint("TOPLEFT", scaleSlider, "BOTTOMLEFT", 0, -16)
+
+        local fadeHover = self:CreateCheckbox(content, L["Full opacity on mouseover"],
+            function() return DB().trackerAlphaHover ~= false end,
+            function(v)
+                DB().trackerAlphaHover = v
+                ns:GetModule("Visibility"):ApplyFade()
+            end,
+            L["Brings the tracker back to full while the mouse is over its quests or headers. Only used while Tracker Opacity is below 100."])
+        fadeHover:SetPoint("TOPLEFT", fadeSlider, "BOTTOMLEFT", 0, -14)
+
+        local fadeFocus = self:CreateCheckbox(content, L["Keep the focused quest at full opacity"],
+            function() return DB().trackerAlphaFocus ~= false end,
+            function(v)
+                DB().trackerAlphaFocus = v
+                ns:GetModule("Visibility"):ApplyFade()
+            end,
+            L["The quest you are following stays fully solid while the rest of the tracker is faded. Only used while Tracker Opacity is below 100."])
+        fadeFocus:SetPoint("TOPLEFT", fadeHover, "BOTTOMLEFT", 0, -2)
+
+        -- Swept on its own rather than through syncDependents, which sits near Lua's upvalue limit.
+        syncFade = function()
+            local faded = (DB().trackerAlpha or 1) < 1
+            self:SetDependent(fadeHover, faded)
+            self:SetDependent(fadeFocus, faded)
+        end
+        syncFade()
+
         local spacingSlider = self:CreateSlider(content, L["Block Spacing"], 0, 12, 0.5,
             function() return DB().blockSpacing or 2 end,
             function(v) relayout("blockSpacing", v) end,
             L["Vertical gap between each entry and between sections."])
-        spacingSlider:SetPoint("TOPLEFT", scaleSlider, "BOTTOMLEFT", 0, -16)
+        spacingSlider:SetPoint("TOPLEFT", fadeFocus, "BOTTOMLEFT", 0, -14)
 
         local lineSpacingSlider = self:CreateSlider(content, L["Line Spacing"], 0, 12, 1,
             function() return DB().lineSpacing or 0 end,

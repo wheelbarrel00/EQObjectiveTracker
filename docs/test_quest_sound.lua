@@ -177,9 +177,17 @@ local function build(classic, opts)
     -- silence those two produce: it reported a correctly silent build as a working one, and
     -- would have reported a mutant routing a sound to None as caught when the player hears
     -- nothing. Measured before this was fixed, the None case failed against correct production.
-    mods.Media = { Play = function(_, name)
+    mods.Media = { Play = function(self, name)
         if not name or name == "NONE" then return end
         played[#played + 1] = name
+        self.last = name
+    end,
+    -- Core/Media.lua's own LastPlayLine, which the status block prints. A stub missing it took
+    -- the WHOLE report down rather than that one field, so every assertion reading any other
+    -- line failed with it and a missing stub read exactly like a broken scan.
+    LastPlayLine = function(self)
+        if not self.last then return "none this session" end
+        return self.last .. " (558132) 0s ago, willPlay true"
     end }
     mods.Events = {
         On = function(_, e, fn) handlers[e] = fn end,
@@ -829,6 +837,9 @@ for _, classic in ipairs({ false, true }) do
         b.qlog[2] = nil
         b.logUpdate()
         b.qlog[2] = gone
+        local held = b.line("complete right now")
+        ok(has(held, " 1 recorded complete,") and has(held, " 0 unrecorded"),
+           label .. ": a completion held over a missed scan still reads as recorded: " .. held)
         b.qlog[2].complete = false
         b.qlog[2].objs[1].finished = false
         b.logUpdate()
@@ -880,6 +891,213 @@ for _, classic in ipairs({ false, true }) do
            label .. ": a real completion inside the window still chimes")
     end
 end
+
+-- ------------------------------------------------------- the recorded state of a complete quest
+
+-- Only a recorded false lets visit chime, and no other status line shows which record a complete
+-- quest carries. A complete quest with no record was not in the last scan, so it is counted and
+-- named.
+for _, flavor in ipairs({ "retail", "classic" }) do
+    local classic = flavor == "classic"
+    local label   = "census/" .. flavor
+
+    local b = build(classic)
+    local q = b.qlog
+    q[1] = { id = 1, title = "Old Quest", complete = true,  objs = { { finished = true } } }
+    q[2] = { id = 2, title = "Rats",      complete = false, objs = { { finished = false } } }
+
+    ok(has(b.line("last sound"), "none this session"),
+       label .. ": nothing has played before the first scan: " .. b.line("last sound"))
+
+    b.logUpdate()
+    local l = b.line("complete right now")
+    ok(has(l, " 1 recorded complete,"), label .. ": a quest primed complete is recorded: " .. l)
+    ok(has(l, " 0 unrecorded"), label .. ": and the scan has seen it: " .. l)
+    ok(has(l, "complete right now: 1 recorded complete, 0 recorded unfinished, 0 unrecorded"),
+       label .. ": an unfinished quest is not complete right now: " .. l)
+    ok(has(b.line("scan saw"), "played 0 (last never)"),
+       label .. ": a scan that never played says never: " .. b.line("scan saw"))
+
+    -- Finished since the last scan, so the record still reads unfinished. That is the state the
+    -- next scan chimes on, and it must not be mistaken for a quest with no record.
+    q[2].complete = true
+    q[2].objs[1].finished = true
+    l = b.line("complete right now")
+    ok(has(l, " 1 recorded unfinished,"), label .. ": one is due to chime: " .. l)
+    ok(has(l, " 0 unrecorded"), label .. ": and it is not read as unrecorded: " .. l)
+
+    q[3] = { id = 3, title = "Ragefire Chasm", complete = true, objs = { { finished = true } } }
+    l = b.line("complete right now")
+    ok(has(l, " 1 unrecorded"), label .. ": a complete quest with no record is counted: " .. l)
+    ok(has(l, '"Ragefire Chasm" (3)'), label .. ": and named: " .. l)
+
+    b.logUpdate()
+    ok(#b.played == 1, label .. ": one chime for the one real finish, played " .. #b.played)
+    l = b.line("complete right now")
+    ok(has(l, " 3 recorded complete,") and has(l, " 0 recorded unfinished,")
+       and has(l, " 0 unrecorded"), label .. ": and all three are recorded afterwards: " .. l)
+
+    ok(has(b.line("last sound"), "EQ: Work Complete"),
+       label .. ": the sound the client was asked for is named: " .. b.line("last sound"))
+    ok(has(b.line("scan saw"), "played 1 (last 0s)"),
+       label .. ": and the time it was asked is on the scan line: " .. b.line("scan saw"))
+    -- A later scan that plays nothing moves "last scan" and must not move "last" played.
+    NOW = NOW + 10
+    b.logUpdate()
+    ok(has(b.line("scan saw"), "played 1 (last 10s)") and has(b.line("last scan"), "last scan 0s"),
+       label .. ": the play time is its own, not the last scan's: " .. b.line("scan saw"))
+
+    -- Complete by its objectives alone with the flag still silent. visit counts that as done, so
+    -- the census must too, and every quest above carries the flag.
+    q[4] = { id = 4, title = "Derived", complete = false, objs = { { finished = true } } }
+    l = b.line("complete right now")
+    ok(has(l, " 1 unrecorded") and has(l, '"Derived" (4)'),
+       label .. ": a quest done by its objectives alone is counted too: " .. l)
+
+    -- Neither an unfinished quest nor a FAILED one is complete right now, whatever its
+    -- objectives say. Failed is the one state where the flag and the objectives disagree.
+    q[5] = { id = 5, title = "Still Going", complete = false, objs = { { finished = false } } }
+    q[6] = { id = 6, title = "Failed Escort", complete = false, failed = true,
+             objs = { { finished = true } } }
+    b.logUpdate()
+    l = b.line("complete right now")
+    ok(has(l, "complete right now: 4 recorded complete, 0 recorded unfinished, 0 unrecorded")
+       and not has(l, "->"),
+       label .. ": an unfinished and a failed quest are not counted: " .. l)
+    ok(has(b.line("not by Blizzard's flag"), 'right now: 1 -> "Derived" (4)'),
+       label .. ": nor does the failed one read as done by its objectives: "
+       .. b.line("not by Blizzard's flag"))
+
+    -- Two unrecorded at once, so "first" is tested, then a secret title as the first.
+    q[7] = { id = 7, title = "First New", complete = true, objs = { { finished = true } } }
+    q[8] = { id = 8, title = "Second New", complete = true, objs = { { finished = true } } }
+    l = b.line("complete right now")
+    ok(has(l, ' 2 unrecorded -> "First New" (7)'), label .. ": the FIRST is named: " .. l)
+    b.logUpdate()
+    q[9] = { id = 9, title = SECRET, complete = true, objs = { { finished = true } } }
+    l = b.line("complete right now")
+    ok(has(l, ' 1 unrecorded -> "<secret>" (9)'),
+       label .. ": a secret title is neutralized in the census too: " .. l)
+end
+
+-- Two quests due to chime at once, so the unfinished tally is seen past one, and a Classic slot 6
+-- of 0, which only the census walk's own `~= 0` half refuses.
+for _, flavor in ipairs({ "retail", "classic" }) do
+    local b = build(flavor == "classic")
+    local q = b.qlog
+    q[1] = { id = 1, title = "One",  complete = false, objs = { { finished = false } } }
+    q[2] = { id = 2, title = "Two",  complete = false, objs = { { finished = false } } }
+    q[3] = { id = 3, title = "Zero", zeroComplete = true, objs = { { finished = false } } }
+    b.logUpdate()
+    q[1].complete, q[1].objs[1].finished = true, true
+    q[2].complete, q[2].objs[1].finished = true, true
+    local l = b.line("complete right now")
+    ok(has(l, "complete right now: 0 recorded complete, 2 recorded unfinished, 0 unrecorded"),
+       "census/" .. flavor .. ": two due to chime read as two, and a slot 6 of 0 is not complete: " .. l)
+end
+
+-- ------------------------------------------------------------ Core/Media.lua's own play record
+
+-- Every case above reads a STUBBED Media, so nothing above reaches the real Play or the record
+-- it keeps. This section loads the shipped file. It calls Play and LastPlayLine directly, so it
+-- runs under one pcall and a raise fails the run instead of aborting it.
+local okMedia, errMedia = pcall(function()
+    local calls = {}
+    local fileAnswer, raise = true, false
+    _G.PlaySoundFile = function(file, channel)
+        calls[#calls + 1] = { "file", file, channel }
+        if raise then error("boom") end
+        return fileAnswer, 7
+    end
+    local kitAnswer, kitRaise = true, false
+    _G.PlaySound = function(kit, channel)
+        calls[#calls + 1] = { "kit", kit, channel }
+        if kitRaise then error("boom") end
+        return kitAnswer, 8
+    end
+    _G.SOUNDKIT = { IG_QUEST_LIST_COMPLETE = 878 }
+
+    local mods, ns = {}, {}
+    function ns:RegisterModule(n, t) mods[n] = t return t end
+    function ns:GetModule(n) return mods[n] end
+    assert(loadfile(repoFile("Core/Media.lua")))("EQObjectiveTracker", ns)
+    local M = mods.Media
+
+    ok(M:LastPlayLine() == "none this session",
+       "media: nothing played reads as none: " .. M:LastPlayLine())
+
+    M:Play("EQ: Work Complete")
+    ok(#calls == 1 and calls[1][1] == "file" and calls[1][2] == 558132 and calls[1][3] == "Master",
+       "media: a voice line goes to PlaySoundFile by file id")
+    ok(M:LastPlayLine() == "EQ: Work Complete (558132) 0s ago, willPlay true",
+       "media: and the record names the file, the age and the answer: " .. M:LastPlayLine())
+
+    fileAnswer = false
+    M:Play("EQ: Work Complete")
+    ok(has(M:LastPlayLine(), ", willPlay false"),
+       "media: a refusal from the client is recorded: " .. M:LastPlayLine())
+
+    raise = true
+    ok(pcall(M.Play, M, "EQ: Work Complete"), "media: a raising PlaySoundFile does not escape Play")
+    ok(has(M:LastPlayLine(), ", raised"), "media: a raise is recorded rather than lost: " .. M:LastPlayLine())
+    raise = false
+
+    wipe(calls)
+    M:Play("EQ: Quest Ding")
+    ok(#calls == 1 and calls[1][1] == "kit" and calls[1][2] == 878 and calls[1][3] == "Master",
+       "media: a chime goes to PlaySound by kit id")
+    ok(M:LastPlayLine() == "EQ: Quest Ding (878) 0s ago, willPlay true",
+       "media: and is recorded the same way: " .. M:LastPlayLine())
+
+    kitAnswer = false
+    M:Play("EQ: Quest Ding")
+    ok(M:LastPlayLine() == "EQ: Quest Ding (878) 0s ago, willPlay false",
+       "media: a chime the client refuses is recorded as refused: " .. M:LastPlayLine())
+    kitRaise = true
+    ok(pcall(M.Play, M, "EQ: Quest Ding"), "media: a raising PlaySound does not escape Play")
+    ok(M:LastPlayLine() == "EQ: Quest Ding (878) 0s ago, raised",
+       "media: and is recorded as raised: " .. M:LastPlayLine())
+    kitAnswer, kitRaise = true, false
+
+    -- The kit resolves but the client has no PlaySound, the other half of the same guard.
+    wipe(calls)
+    local savedPlaySound = _G.PlaySound
+    _G.PlaySound = nil
+    M:Play("EQ: Quest Ding")
+    ok(#calls == 0 and M:LastPlayLine() == "EQ: Quest Ding 0s ago, no kit on this client",
+       "media: a client with no PlaySound records why rather than a raise: " .. M:LastPlayLine())
+    _G.PlaySound = savedPlaySound
+
+    -- A kit this client lacks once fell through to the first voice line
+    wipe(calls)
+    _G.SOUNDKIT = {}
+    M:Play("EQ: Quest Ding")
+    ok(#calls == 0, "media: a kit this client lacks plays nothing, made " .. #calls .. " call(s)")
+    ok(M:LastPlayLine() == "EQ: Quest Ding 0s ago, no kit on this client",
+       "media: and the record says why: " .. M:LastPlayLine())
+
+    M:Play("NONE")
+    ok(#calls == 0 and has(M:LastPlayLine(), "no kit on this client"),
+       "media: None is silence and leaves the record alone: " .. M:LastPlayLine())
+
+    _G.GetTime = function() return NOW + 42 end
+    ok(has(M:LastPlayLine(), " 42s ago,"), "media: the age counts from the call: " .. M:LastPlayLine())
+    _G.GetTime = function() return NOW + 30 end
+    M:Play("EQ: Work Complete")
+    _G.GetTime = function() return NOW + 42 end
+    ok(has(M:LastPlayLine(), " 12s ago,"),
+       "media: the age counts from the LATEST call, not the first: " .. M:LastPlayLine())
+    _G.GetTime = function() return NOW end
+
+    wipe(calls)
+    _G.PlaySoundFile = nil
+    M:Play("EQ: Work Complete")
+    ok(#calls == 0 and M:LastPlayLine() == "EQ: Work Complete 0s ago, no file",
+       "media: a client with no PlaySoundFile records the refusal: " .. M:LastPlayLine())
+
+    _G.PlaySoundFile, _G.PlaySound, _G.SOUNDKIT = nil, nil, nil
+end)
+ok(okMedia, "media: the Core/Media.lua cases ran to the end without raising: " .. tostring(errMedia))
 
 print(string.format("test_quest_sound: %d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

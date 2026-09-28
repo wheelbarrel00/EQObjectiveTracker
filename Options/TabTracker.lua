@@ -217,6 +217,18 @@ Options:RegisterTab({
             L["Only show entries with an objective on your current map. Entries whose provider cannot tell are always shown."])
         zoneOnly:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -2)
 
+        -- Gated like the category run above. Classic has no campaigns, so it could never act.
+        local campaignZone
+        local filtersEnd = zoneOnly
+        if Registry:HasTag("campaign") then
+            campaignZone = self:CreateCheckbox(content, L["Always show campaign quests"],
+                function() return DB().filters.campaignAnyZone end,
+                function(v) DB().filters.campaignAnyZone = v; render() end,
+                L["Campaign quests from every zone stay on the tracker, even while Show only quests in current zone is on."])
+            campaignZone:SetPoint("TOPLEFT", zoneOnly, "BOTTOMLEFT", 0, -2)
+            filtersEnd = campaignZone
+        end
+
         -- Deliberately does NOT touch showOnlyWatched. That box sits under a different
         -- heading and is the most impactful setting on the tab, so silently turning it back
         -- on here hid quests with nothing connecting the two.
@@ -227,17 +239,22 @@ Options:RegisterTab({
                 -- reset here without anyone remembering to come back for it.
                 for i = 1, #Filter.CATEGORIES do f[Filter.CATEGORIES[i].key] = true end
                 f.onlyCurrentZone = false
+                f.campaignAnyZone = false
                 -- Re-checked in place rather than by reloading the tab: these boxes only
                 -- read their getter on build and on a tab view.
                 zoneOnly:SetChecked(false)
+                if campaignZone then campaignZone:SetChecked(false) end
                 for _, e in ipairs(filterBoxes) do
                     e.cb:SetChecked(f[e.key] ~= false)
                 end
                 render()
             end,
-            L["Turns every category filter back on and clears the current-zone filter. Nothing else on this tab is changed."])
+            -- Without the campaign box the tooltip must not name it.
+            campaignZone
+                and L["Turns every category filter back on, clears the current-zone filter and turns off Always show campaign quests. Nothing else on this tab is changed."]
+                or L["Turns every category filter back on and clears the current-zone filter. Nothing else on this tab is changed."])
         resetFilters:SetSize(180, 24)
-        resetFilters:SetPoint("TOPLEFT", zoneOnly, "BOTTOMLEFT", 0, -10)
+        resetFilters:SetPoint("TOPLEFT", filtersEnd, "BOTTOMLEFT", 0, -10)
 
         local visHeader = self:CreateHeading(content, L["Tracker Visibility"])
         visHeader:SetPoint("TOPLEFT", resetFilters, "BOTTOMLEFT", 0, self.GAP.aboveHead)
