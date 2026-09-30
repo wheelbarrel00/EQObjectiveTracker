@@ -297,6 +297,32 @@ MUTANTS = [
 
     ("the ToggleQuestLog fallback is dropped", [
         (Q, "    elseif ToggleQuestLog then\n        ToggleQuestLog()\n", "")]),
+
+    # ------------------------------------------ a click on the followed quest resends it (Forever)
+    # Focus:Set passes over an unchanged quest, so without the resend an arrow TomTom removed on
+    # arrival never comes back.
+    ("a click on the followed quest no longer resends it", [
+        (Q, "            if Focus then Focus:Resend() end\n", "")]),
+
+    ("every click resends, so a new quest is announced before its own event", [
+        (Q, "        if again then\n", "        if true then\n")]),
+
+    ("the followed quest is read after the set, so every click looks like a repeat", [
+        (Q, "        local again = superTrackedID() == entry.id\n"
+            "        C_SuperTrack.SetSuperTrackedQuestID(entry.id)\n",
+            "        C_SuperTrack.SetSuperTrackedQuestID(entry.id)\n"
+            "        local again = superTrackedID() == entry.id\n")]),
+
+    ("the followed quest is compared with the entry table, so it never matches", [
+        (Q, "        local again = superTrackedID() == entry.id\n",
+            "        local again = superTrackedID() == entry\n")]),
+
+    ("a missing Focus module raises inside the click", [
+        (Q, "            if Focus then Focus:Resend() end\n", "            Focus:Resend()\n")]),
+
+    ("superTrackedID asks for a getter the client may not have", [
+        (Q, "    if not (ns.Has.SuperTrack and C_SuperTrack.GetSuperTrackedQuestID) then return nil end\n",
+            "    if not ns.Has.SuperTrack then return nil end\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_quest_turnin: (\d+) passed, (\d+) failed$")

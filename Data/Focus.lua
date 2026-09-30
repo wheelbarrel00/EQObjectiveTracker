@@ -1,15 +1,17 @@
 local _, ns = ...
 
--- Which row the player is working on, for a client with no super-track. Retail marks a focused
--- row with the -SuperTracked atlas and drives C_SuperTrack instead, so only the Classic TOCs
--- list this file and nothing on retail reads it.
+-- Which row the player is working on. Classic has no super-track, so a click sets it here. WoW
+-- Forever runs the retail file list, so there it follows super-track instead, giving Everything
+-- Quests the same announcement it turns into a TomTom arrow on Classic. Retail loads this and
+-- never sets it.
 --
--- Session state on purpose. Nothing is persisted, so a login never republishes a focus the
--- player did not just ask for, and no listener has to guard against one.
+-- Session state on purpose. A Classic login starts with no focus, and on Forever super-track is
+-- read at the first loading screen.
 local Focus = ns:RegisterModule("Focus", {})
 
 local focusedProvider, focusedID
 local dirtyHandlers = {}
+local following = false
 
 function Focus:OnDirty(fn)
     dirtyHandlers[#dirtyHandlers + 1] = fn
@@ -43,4 +45,40 @@ end
 function Focus:Toggle(providerID, entryID)
     if self:Is(providerID, entryID) then return self:Set(nil, nil) end
     return self:Set(providerID, entryID)
+end
+
+function Focus:FollowsSuperTrack()
+    return following
+end
+
+-- For a click on the quest already followed, which Set would pass over as unchanged, so an arrow
+-- TomTom removed on arrival could never come back.
+function Focus:Resend()
+    if not (following and focusedID) then return end
+    local API = ns:GetModule("API")
+    if API then API:NotifyFocus(focusedProvider, focusedID) end
+end
+
+-- The packager's Forever range. Forever has retail's API and project id, so only this tells them apart.
+local function isForever()
+    local toc = tonumber((select(4, GetBuildInfo())))
+    return toc ~= nil and toc >= 16000 and toc < 17000
+end
+
+local function followSuperTrack()
+    local id = C_SuperTrack.GetSuperTrackedQuestID()
+    if not (id and id > 0) then id = nil end
+    Focus:Set("quests", id)
+end
+
+-- Defined only where it does something, so /eqot modules never offers a switch that changes nothing.
+if ns.Has.SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and isForever() then
+    function Focus:OnEnable()
+        local Events = ns:GetModule("Events")
+        Events:On("SUPER_TRACKING_CHANGED", followSuperTrack)
+        -- Not read at enable: Everything Quests registers its listener after this runs, and Set is
+        -- silent on an unchanged focus, so an early read would keep the login's quest from it.
+        Events:On("PLAYER_ENTERING_WORLD", followSuperTrack)
+        following = true
+    end
 end

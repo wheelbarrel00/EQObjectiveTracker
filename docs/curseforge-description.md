@@ -12,9 +12,7 @@
 
 Retail, Classic Era and TBC Anniversary are all supported. **WoW Forever support is newer and still a work in progress, so expect bugs.** Please report anything you find rather than assuming it is already known.
 
-The tracker follows your quests on Forever. The retail-only sections, such as world quests and scenarios, have stayed empty there so far, and Search on Wowhead opens Wowhead's Forever site.
-
-**Known issue: the Forever beta forgets every addon's settings when the game restarts.** That is a bug in the beta client itself, reported to Blizzard, and until it is fixed the tracker starts from its default settings on each launch. Your settings still survive a reload and a logout.
+The tracker shows your quests on Forever, and with Everything Quests and TomTom installed the quest you are following gets a TomTom arrow, as on Classic. The retail-only sections, such as world quests and scenarios, have stayed empty there so far, and Search on Wowhead opens Wowhead's Forever site.
 
 ***
 
@@ -25,7 +23,7 @@ The tracker follows your quests on Forever. The retail-only sections, such as wo
 *   Tracks quests, campaign quests, world quests, bonus objectives, scenarios, delves, achievements, professions and endeavors on Retail, and quests on Classic and Forever
 *   Right click any quest for a menu: pin, track, focus, open the quest log, pop out the details, find a group, look it up on Wowhead, or abandon it
 *   Shift click a quest to untrack it, or to drop it into chat while a chat box is open
-*   Focus a quest on Classic to mark it and, with Everything Quests and TomTom, point an arrow at it
+*   Focus a quest on Classic, or follow one on Forever, and with Everything Quests and TomTom an arrow points at it
 *   Pin a quest to keep it on screen no matter how your filters are set
 *   Hover a quest to see its objectives and full rewards, with item level compared against what you have equipped
 *   Eight sort orders, including by distance and a manual order you drag into place
@@ -47,7 +45,7 @@ The tracker follows your quests on Forever. The retail-only sections, such as wo
 
 **They are already joined up.** As of Everything Quests 1.38.0 there is only one tracker between the two addons, and it is this one. Everything Quests lists it as a dependency, so installing Everything Quests brings this along on its own and both stay updated. There is nothing to set up, and nothing to install twice.
 
-**On Classic they work together too.** Everything Quests adds the other half of the picture there, map pins and the TomTom arrow among them, and it is what turns a focused quest into an arrow. Its Classic support is still growing, so check its own page for what it covers today.
+**On Classic and Forever they work together too.** Everything Quests adds the other half of the picture there, map pins and the TomTom arrow among them, and it is what turns the quest you focus or follow into an arrow. Its Classic support is still growing, so check its own page for what it covers today.
 
 If you came from Everything Quests, your tracker settings are read across the first time this loads, so it starts out looking the way yours already did. That includes your per-character state, on every character: pinned quests, which sections you had collapsed, and your saved world quest watches. Nothing is changed on the Everything Quests side.
 
@@ -57,7 +55,7 @@ One copy of the tracker code now means a fix lands in both places at once.
 
 ## What it does
 
-**Quests and campaign** sit in their own sections, with objectives, progress counts and completion state. Left click a quest to super-track it on Retail, or to focus it on Classic. Shift click it to untrack it, or with a chat box open to drop it into chat. Right click opens a menu to pin, track or untrack, focus, open it in the map and quest log, pop out its details, find a group, search Wowhead, or abandon it. The Classic menu is shorter, since those clients have no group finder and popping out and abandoning need frames they do not have. Any quest the game will form a group for gets a Find Group button on its row as well. A pinned quest carries a star and stays on the tracker whatever your filters say.
+**Quests and campaign** sit in their own sections, with objectives, progress counts and completion state. Left click a quest to super-track it on Retail and Forever, or to focus it on Classic. Shift click it to untrack it, or with a chat box open to drop it into chat. Right click opens a menu to pin, track or untrack, focus, open it in the map and quest log, pop out its details, find a group, search Wowhead, or abandon it. The Classic menu is shorter, since those clients have no group finder and popping out and abandoning need frames they do not have. Any quest the game will form a group for gets a Find Group button on its row as well. A pinned quest carries a star and stays on the tracker whatever your filters say.
 
 **Quests you hand in from the tracker.** A finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt, shows a "click to complete" line, and left clicking it should open the reward window. That could not be tested on a finished hunt before release, so please report anything that looks wrong.
 

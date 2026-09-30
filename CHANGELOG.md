@@ -5,6 +5,21 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.0] - 2026-09-29
+
+### New Features
+
+- On WoW Forever, the quest you follow now gets a TomTom arrow when Everything Quests and TomTom
+  are both installed, as a focused quest already does on Classic Era and TBC Anniversary. It works
+  for any quest Everything Quests knows the location of. Following a different quest, from the
+  tracker or the map, moves the arrow, clicking the quest you already follow brings it back after
+  TomTom clears it on arrival, and stopping following clears it.
+
+### Notes
+
+- WoW Forever no longer forgets every addon's settings when the game restarts. Blizzard fixed the
+  beta client bug listed under Known Issues in 1.25.0 on build 1.60.1.70009.
+
 ## [1.26.0] - 2026-09-27
 
 ### New Features

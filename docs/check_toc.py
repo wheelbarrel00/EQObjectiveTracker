@@ -59,12 +59,11 @@ CAMELOT_TOC = "EQObjectiveTracker_Camelot.toc"
 MIRRORS = (FALLBACK_TOC, CAMELOT_TOC)
 SHARED_HEADERS = ("Version", "X-Curse-Project-ID")
 
-# The only files a TOC may legitimately omit: providers a flavor cannot run, and the three
+# The only files a TOC may legitimately omit: providers a flavor cannot run, and the
 # non-provider modules that are Classic-only. Everything else - all of Core, all of UI, every
 # locale - must be in every TOC. An exemption is a deliberate edit, which is the point: the
 # cost of adding a line here is what stops a shared file going missing by accident.
 FLAVOR_ONLY = frozenset({
-    "Data/Focus.lua",
     "Data/TrackedSet.lua",
     "UI/QuestLogChecks.lua",
     "Data/Providers/Achievements.lua",

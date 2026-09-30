@@ -20,11 +20,10 @@ lands in both places at once.
 gaps listed below are real ones rather than a disclaimer. Please report anything you find
 rather than assuming it is known.
 
-**WoW Forever support is a work in progress, so expect bugs.** The tracker follows your quests
-there. The retail-only sections, such as world quests and scenarios, have stayed empty there so
-far. Right now the Forever beta forgets every addon's settings when the game restarts. That is a
-bug in the beta client itself, reported to Blizzard, and until it is fixed the tracker starts from
-its default settings on each launch. Your settings do still survive a reload and a logout.
+**WoW Forever support is a work in progress, so expect bugs.** The tracker shows your quests
+there, and with Everything Quests and TomTom installed the quest you are following gets a TomTom
+arrow, as on Classic. The retail-only sections, such as world quests and scenarios, have stayed empty
+there so far.
 
 On retail it tracks quests and campaign quests, world quests and bonus objectives, scenarios
 and delves, achievements, professions, and endeavors, covering both the Traveler's Log monthly
@@ -139,9 +138,9 @@ events, which would otherwise not appear anywhere.
 | `/eqot debug` | Toggle entry validation warnings |
 
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
-Left-click a quest to super-track it on retail, or to focus it on Classic. A finished quest that
-is turned in from the tracker rather than at an NPC, such as a Prey hunt, shows a click to
-complete line, and left-clicking it should open the reward window instead. That last part could
+Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. A
+finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt,
+shows a click to complete line, and left-clicking it should open the reward window instead. That last part could
 not be tested on a finished hunt before release, so please report anything that looks wrong.
 Shift-click a quest
 while a chat box is open to drop it into chat, or with no chat box open to untrack it. Right-click
@@ -226,8 +225,9 @@ API:AddFocusListener{ id = "mine",
 
 Callbacks receive the provider ID and the entry ID, never the entry table, because entries are
 rebuilt on every quest event. `onFocus` is called with a nil quest ID when the focus is
-cleared, and only fires on clients with no super-tracking of their own, which today means
-Classic Era and TBC. `/eqot status` reports what is registered. Everything Quests uses this
+cleared. It fires on Classic Era and TBC, where the tracker owns the focus, and on WoW Forever,
+where it follows the quest you super-track and fires again when you click the quest you already
+follow. On retail it never fires. `/eqot status` reports what is registered. Everything Quests uses this
 for two header icons, its Chain Guide and its own options, for its "Get Directions" menu entry,
 and for its TomTom arrow.
 

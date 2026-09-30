@@ -552,7 +552,12 @@ function Quests:OnEntryClick(entry, button, splitIcon)
     -- The icon half of a split click super-tracks and nothing else, as Blizzard's POI button does
     if not splitIcon and turnIn(self, entry.id) then return end
     if ns.Has.SuperTrack then
+        local again = superTrackedID() == entry.id
         C_SuperTrack.SetSuperTrackedQuestID(entry.id)
+        if again then
+            local Focus = ns:GetModule("Focus")
+            if Focus then Focus:Resend() end
+        end
         if self._notifyDirty then self._notifyDirty() end
     end
 end

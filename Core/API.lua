@@ -99,9 +99,9 @@ function API:MenuItemsFor(providerID, entryID, out)
     return out
 end
 
--- Announced when the tracker's focused row changes, for a client with no super-track: EQOT
--- owns the focus, a listener owns whatever it points at. Only Data/Focus.lua fires this and
--- only the Classic TOCs list that file, so a retail listener is registered and never called.
+-- Announced when the tracker's focused row changes: EQOT owns the focus, a listener owns
+-- whatever it points at. Only Data/Focus.lua fires this, and only on Classic and WoW Forever,
+-- so a retail listener is registered and never called.
 -- Registering here on every flavor is deliberate - a call that exists on one flavor and is nil
 -- on another is the trap, not the courtesy.
 function API:AddFocusListener(spec)
@@ -120,8 +120,8 @@ function API:RemoveFocusListener(id)
 end
 
 -- entryID is nil when focus was CLEARED, and providerID still names the provider that lost it.
--- pcall'd because this runs from inside the click that set the focus, so a foreign addon
--- erroring here would otherwise take the row handler down with it.
+-- pcall'd because this runs inside the click or event that set the focus, so a foreign addon
+-- erroring here would otherwise take that handler down with it.
 --
 -- Walked backwards because a one-shot listener unregistering itself from its own callback is an
 -- ordinary thing to write, and table.remove would shift an unvisited entry into a slot the
@@ -142,7 +142,9 @@ end
 
 function API:DebugLine()
     local providerID, entryID = self:GetFocus()
-    return ("api: %d header icon(s), %d menu item(s), %d focus listener(s) | focus %s:%s")
+    local Focus = ns:GetModule("Focus")
+    local follows = Focus and Focus:FollowsSuperTrack()
+    return ("api: %d header icon(s), %d menu item(s), %d focus listener(s) | focus %s:%s%s")
         :format(#self.headerIcons, #self.menuItems, #self.focusListeners,
-                tostring(providerID), tostring(entryID))
+                tostring(providerID), tostring(entryID), follows and ", follows super-track" or "")
 end

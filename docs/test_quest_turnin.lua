@@ -84,6 +84,7 @@ end
 
 local sliceQ = slicer("Data/Providers/Quests.lua")
 local src = sliceQ("local function questState(id)", "-- A world quest can sit in the quest log")
+         .. sliceQ("local function superTrackedID()", "local function isWatched(id)")
          .. sliceQ("-- Blizzard's tracker hands an auto-complete quest in", "local function isFocused(id)")
          .. sliceQ("function Quests:OnEntryMenuSelect(entryID, itemID)",
                    "function Quests:OnEntryGroupFinder")
@@ -108,8 +109,12 @@ local STR = "<the client's own click-to-complete string>"
 -- id -> { index, complete, failed, auto, noInfo, objs, fallback }
 local world
 local calls
+-- The quest the client says is super-tracked, and whether the Focus module is there to ask.
+local followed
+local focusLoaded = true
 
 local function note(what) calls[#calls + 1] = what end
+local focusSpy = { Resend = function() note("resend") end }
 
 -- The client's quest APIs RAISE on a nil id, so these do too. A forgiving stub lets a real
 -- guard be deleted with every assertion green.
@@ -123,7 +128,10 @@ local function removeStub(id) need(id, "RemoveAutoQuestPopUp") note("remove:" ..
 local ns = {
     Has = { QuestIsFailed = true, QuestIsComplete = true, QuestObjectives = true,
             QuestWatchAPI = true, SuperTrack = true },
-    GetModule = function(_, name) error("unexpected module: " .. tostring(name), 0) end,
+    GetModule = function(_, name)
+        if name == "Focus" then return focusLoaded and focusSpy or nil end
+        error("unexpected module: " .. tostring(name), 0)
+    end,
 }
 
 local Quests = { id = "quests", _notifyDirty = function() note("notify") end }
@@ -158,7 +166,9 @@ local env = setmetatable({
     QuestCache = { Note = function() end },
     getFallbackText = function(id) return world[id] and world[id].fallback or "" end,
     C_SuperTrack = {
-        SetSuperTrackedQuestID = function(id) note("supertrack:" .. tostring(id)) end,
+        -- Written through, as the client does, so asking after the set reads the new quest.
+        SetSuperTrackedQuestID = function(id) note("supertrack:" .. tostring(id)) followed = id end,
+        GetSuperTrackedQuestID = function() return followed or 0 end,
     },
     C_AddOns = { LoadAddOn = function(name) note("load:" .. tostring(name)) end },
     QuestMapFrame_OpenToQuestDetails = function(id) note("openlog:" .. tostring(id)) end,
@@ -176,6 +186,8 @@ local GET_INDEX = C_QuestLog.GetLogIndexForQuestID
 
 local function reset()
     world, calls = {}, {}
+    followed, focusLoaded = nil, true
+    env.C_SuperTrack.GetSuperTrackedQuestID = function() return followed or 0 end
     env.ShowQuestComplete = showStub
     env.RemoveAutoQuestPopUp = removeStub
     env.QUEST_WATCH_CLICK_TO_COMPLETE = STR
@@ -384,6 +396,52 @@ do
     ok(got == "remove:65 show:65 notify", "while the whole row still hands it in: " .. got)
     got = click(65)
     ok(got == "remove:65 show:65 notify", "and so does a click that names no half: " .. got)
+end
+
+print("== clicking the quest already followed sends it again, and only that quest")
+do
+    -- Focus:Set passes over an unchanged quest, so without the resend an arrow TomTom removed on
+    -- arrival never comes back. A different quest is left to SUPER_TRACKING_CHANGED instead, or
+    -- the listener would hear the old quest first.
+    reset()
+    quest(66, { complete = false, auto = false })
+    followed = 66
+    local got = click(66)
+    ok(got == "supertrack:66 resend notify", "the followed quest is sent again: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    followed = 67
+    got = click(66)
+    ok(got == "supertrack:66 notify", "a quest that is not followed yet is not: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    got = click(66)
+    ok(got == "supertrack:66 notify", "nor is one clicked while nothing is followed: " .. got)
+
+    reset()
+    quest(69, { complete = true, auto = true })
+    followed = 69
+    got = click(69, "LeftButton", true)
+    ok(got == "supertrack:69 resend notify", "the icon half of a split click resends too: " .. got)
+    got = click(69)
+    ok(got == "remove:69 show:69 notify", "while the whole row still hands it in and sends nothing: "
+       .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    followed = 66
+    focusLoaded = false
+    got = click(66)
+    ok(got == "supertrack:66 notify", "with no Focus module the click still super-tracks: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    followed = 66
+    env.C_SuperTrack.GetSuperTrackedQuestID = nil
+    got = click(66)
+    ok(got == "supertrack:66 notify", "and a client with no super-track getter resends nothing: " .. got)
 end
 
 print("== a right click never hands a quest in")

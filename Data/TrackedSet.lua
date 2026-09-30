@@ -6,7 +6,7 @@ local TrackedSet = ns:RegisterModule("TrackedSet", {})
 -- (measured on 1.15.9 by its own error text), there is no auto-track on accept, and another quest
 -- addon commonly replaces IsQuestWatched and empties that list outright - so a mirror of it is
 -- neither complete nor trustworthy. This owns the set instead, per character. Listed in the
--- Classic TOCs only, the same way Data/Focus.lua is.
+-- Classic TOCs only.
 
 local function readSet()
     local DB = ns:GetModule("DB")
