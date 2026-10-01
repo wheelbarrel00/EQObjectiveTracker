@@ -10,6 +10,7 @@
 
 # Libraries (vendored, never .pkgmeta externals - a fresh checkout must load as-is)
 Libs\LibStub\LibStub.lua
+Libs\EverythingUI\EverythingUI.xml
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
 Libs\LibSharedMedia-3.0\lib.xml

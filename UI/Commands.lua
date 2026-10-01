@@ -70,6 +70,9 @@ handlers.status = function()
     local Sections = ns:GetModule("Sections")
 
     ns:Print(("version %s"):format(ns.VERSION))
+    local eui, euiMinor = LibStub("EverythingUI-1.0", true)
+    ns:Print(euiMinor and ("EverythingUI-1.0 minor %d from %s"):format(euiMinor, tostring(eui.host))
+        or "EverythingUI-1.0 not loaded")
     -- The setting and the session can differ until the reload, and an empty report below reads
     -- as a broken addon unless this says why.
     -- The frame's state is the first question on a "no tracker at all" report. Blizzard hides its
