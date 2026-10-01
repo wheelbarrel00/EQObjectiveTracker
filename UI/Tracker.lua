@@ -1327,6 +1327,9 @@ function Tracker:ResetPosition()
 end
 
 function Tracker:OnEnable()
+    -- No frame at all, rather than a hidden one: every method here already answers a missing
+    -- frame, and nothing is left to hold a secure button or run a render.
+    if ns:UsesBlizzardTracker() then return end
     self:BuildFrame()
 
     local Registry = ns:GetModule("Registry")

@@ -23,6 +23,7 @@ DB.defaults = {
             -- everyone who chose the old value. The companion global.questieTrackerPrompted
             -- has no default because it is only ever written true.
             hideQuestieTracker = false,
+            useBlizzardTracker = false,
         },
         tracker = {
             anchor        = "TOPRIGHT",
@@ -362,6 +363,10 @@ function DB:OnInitialize()
 
     local Migrate = ns:GetModule("Migrate")
     if Migrate and Migrate.Run then Migrate:Run(self.db, freshInstall) end
+
+    -- Latched for the session. Suppressing Blizzard's tracker cannot be undone live, so a change
+    -- waits for the reload it asks for.
+    ns._blizzardTracker = (self.db.profile.general.useBlizzardTracker == true)
 end
 
 function DB:Profile()

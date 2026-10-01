@@ -5,6 +5,31 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - 2026-09-30
+
+### New Features
+
+- Use Blizzard's quest tracker, a new option at the top of the General tab, turns off the EQ
+  Objective Tracker window and brings back the game's own quest tracker. The parts that do not
+  need the window keep working, including quest sounds, the flight point highlight on retail and the zone
+  progress bar, which floats on its own while the window is off, and on WoW Forever the TomTom
+  arrow Everything Quests draws for the quest you follow. Settings for the window itself, such as
+  its hide rules, the bonus objectives HUD and hiding Questie's tracker, wait until you switch back.
+  The interface reloads to switch, in either direction. Everything Quests has the same checkbox in
+  the Tracker section of its General tab. Requested by diana_winter.
+- On retail and WoW Forever both trackers use the game's own list of tracked quests, so what you
+  track carries over when you switch. On Classic Era and TBC Anniversary the game's tracker starts
+  with nothing watched, and you add quests from the quest log as usual. The EQ Objective Tracker
+  window keeps its own list, which still auto-tracks quests you accept in the meantime, and
+  switching back empties the game's watch list again so its five-quest limit never gets in the way.
+
+### Bug Fixes
+
+- On Classic Era and TBC Anniversary with Questie installed, EQ Objective Tracker empties the
+  game's watch list behind every quest the game adds to it, and Questie could take that for you
+  untracking the quest, which could leave it marked as untracked in Questie's own settings. Those
+  removals are now flagged the way Questie flags its own.
+
 ## [1.27.0] - 2026-09-29
 
 ### New Features

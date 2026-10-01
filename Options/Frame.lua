@@ -454,7 +454,11 @@ local function showDropdown(anchor, opts, onPick, decorate, current, previewFont
         local isActive = (opt.value == current)
         b.sel:SetShown(isActive)
         if isActive then activeIndex = i end
-        b:SetScript("OnClick", function() p:Hide(); onPick(opt.value) end)
+        -- The pick runs before the hide, as in Dialog:_finish, because picking a profile reloads.
+        b:SetScript("OnClick", function()
+            xpcall(function() onPick(opt.value) end, geterrorhandler())
+            p:Hide()
+        end)
         b:Show()
     end
     for i = #opts + 1, #p.rows do p.rows[i]:Hide() end

@@ -84,6 +84,22 @@ addon loads, so it starts out looking the way yours already did. Your per-charac
 comes across too, on every character: pinned quests, collapsed sections and saved world
 quest watches.
 
+### Using the game's own tracker instead
+
+If you would rather keep the game's own quest tracker, tick **Use Blizzard's quest tracker** at
+the top of the General tab. Everything Quests has the same checkbox in the Tracker section of its
+own General tab. The interface reloads, the EQ Objective Tracker window is gone, and the game's
+tracker is back. The parts of this addon that do not need the window keep working, including the
+quest sounds, the flight point highlight, the zone progress bar, which floats on its own then, and
+on WoW Forever the TomTom arrow Everything Quests draws for the quest you follow. Settings for the
+window itself, such as its hide rules, the bonus objectives HUD and hiding Questie's tracker, wait
+until you switch back. Untick it to get the window back, again after a reload.
+
+On retail and WoW Forever both trackers use the game's own list of tracked quests. On Classic Era
+and TBC Anniversary the game's tracker starts empty, so shift-click quests in the quest log to
+watch them, up to the game's limit of five. This tracker's own list is kept for when you switch
+back.
+
 ## What it tracks
 
 - **Quests and Campaign**, in separate sections, with objectives, completion, and Find

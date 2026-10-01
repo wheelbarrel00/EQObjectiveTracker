@@ -31,6 +31,9 @@ end
 -- `isTracked == false`, so an absent set fails open and the whole log shows rather than none of
 -- it - which is what makes this need no migration pass over an existing character.
 function TrackedSet:IsTracked(questID)
+    -- Blizzard's list is what is on screen then, and an Everything Quests older than this
+    -- switch still reads this set, so it hears "cannot tell" rather than a stale answer.
+    if ns:UsesBlizzardTracker() then return nil end
     local set = readSet()
     if not (set and questID) then return nil end
     return set[questID] and true or false
@@ -123,6 +126,14 @@ function TrackedSet:ToggleAtIndex(index)
     local title, _, _, isHeader, _, _, _, questID = GetQuestLogTitle(index)
     if not title or isHeader or not questID or questID == 0 then return end
     self:Toggle(questID)
+end
+
+-- Blizzard's own list fills while its tracker is in use, and the provider that empties it stands
+-- down for that session, so the marker is left here for the first session back.
+function TrackedSet:OnInitialize()
+    if not ns:UsesBlizzardTracker() then return end
+    local char = ns:GetModule("DB"):Char()
+    if char then char.clearBlizzardWatches = true end
 end
 
 local dirtyListeners = {}

@@ -233,6 +233,9 @@ local function setVisible(f, visible)
 end
 
 function Visibility:Apply()
+    -- Still reachable from the General tab's hide rules, and the map hook it installs would
+    -- serve a tracker window that does not exist.
+    if ns:IsStandingDown("Visibility") then return end
     ensureMapHook()
     local Tracker = ns:GetModule("Tracker")
     local f = Tracker and Tracker.frame

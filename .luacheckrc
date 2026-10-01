@@ -86,6 +86,8 @@ read_globals = {
     "SelectQuestLogEntry", "GetNumQuestLeaderBoards", "GetQuestLogLeaderBoard",
     "IsQuestWatched", "AddQuestWatch", "RemoveQuestWatch", "GetQuestTagInfo",
     "GetQuestLogSelection",
+    -- Blizzard's own Vanilla and TBC QuestWatch_OnLogin walks its watch list with these two.
+    "GetNumQuestWatches", "GetQuestIndexForWatch",
     -- The pair Blizzard's own QuestTimerFrame reads. Asking these rather than selecting each
     -- entry and calling GetQuestLogTimeLeft keeps the timer read off the quest log SELECTION.
     "GetQuestTimers", "GetQuestIndexForTimer",

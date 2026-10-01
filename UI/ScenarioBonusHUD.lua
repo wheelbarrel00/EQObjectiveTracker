@@ -302,7 +302,9 @@ end
 
 function HUD:Update()
     if self._test then return end
-    if not enabled() then
+    -- Blizzard's tracker shows these itself, so only the test frame is ever drawn then, and
+    -- this is the call that takes it down again.
+    if not enabled() or ns:IsStandingDown("ScenarioBonusHUD") then
         self:_ReleaseRows()
         if self.frame then self.frame:Hide() end
         return

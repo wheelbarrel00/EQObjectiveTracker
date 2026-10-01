@@ -39,6 +39,8 @@ local ns = { L = setmetatable({}, { __index = function(_, k) return k end }) }
 local mods = {}
 function ns:RegisterModule(n, t) mods[n] = t return t end
 function ns:GetModule(n) return mods[n] end
+-- Always EQOT's own window here. Blizzard's tracker is docs/test_blizzard_tracker.lua's.
+function ns:IsStandingDown() return false end
 
 wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 tremove = table.remove

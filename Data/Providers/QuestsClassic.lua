@@ -193,7 +193,8 @@ end
 -- empties the list underneath it. Reading our own table removes all three at once, and it is why
 -- no TRACKING path here calls AddQuestWatch or RemoveQuestWatch any more - which is what stops
 -- an untrack from the row menu writing into that other addon's saved variables. The hook in
--- Enable is the one remaining caller and it runs on Blizzard's own adds, not on ours.
+-- Enable runs on Blizzard's own adds, not on ours, and clearLeftoverWatches clears what a
+-- session on Blizzard's tracker left behind.
 --
 -- nil, never false, until the player has made a first explicit choice, so Filter's
 -- `isTracked == false` test fails open exactly as IsCurrentZone's nil already does.
@@ -574,6 +575,35 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
     if self._notifyDirty then self._notifyDirty() end
 end
 
+-- While Questie's tracker runs it keeps Blizzard's list empty itself, so there is nothing to
+-- clear. A profile that cannot be read counts as on.
+local function questieTrackerRuns()
+    local loaded = (ns.Has.AddOns and C_AddOns.IsAddOnLoaded("Questie")) or Questie ~= nil
+    if not loaded then return false end
+    local q = Questie
+    local profile = type(q) == "table" and type(q.db) == "table" and q.db.profile
+    return not (type(profile) == "table" and profile.trackerEnabled == false)
+end
+
+-- Left in Blizzard's list by a session on Blizzard's tracker. Five of them would make the quest
+-- log's shift-click refuse with the too-many-quests error behind this tracker. Only ever after
+-- such a session and never while Questie's tracker runs. Never before the log has loaded
+-- either, since a watch is removed by its log index. The true is Questie's own flag for a
+-- removal its RemoveQuestWatch hook must ignore, and that hook stays in after its tracker is
+-- switched off mid-session.
+local function clearLeftoverWatches()
+    local char = ns:GetModule("DB"):Char()
+    if not (char and char.clearBlizzardWatches) then return end
+    if questieTrackerRuns() then return end
+    if type(GetNumQuestWatches) ~= "function" or type(GetQuestIndexForWatch) ~= "function"
+       or type(RemoveQuestWatch) ~= "function" or not GetQuestLogTitle(1) then return end
+    for i = (GetNumQuestWatches() or 0), 1, -1 do
+        local index = GetQuestIndexForWatch(i)
+        if index then RemoveQuestWatch(index, true) end
+    end
+    char.clearBlizzardWatches = nil
+end
+
 function Quests:Enable(notify)
     local Events = ns:GetModule("Events")
 
@@ -604,6 +634,10 @@ function Quests:Enable(notify)
         if not primed then dirtyAll = true else dirtyObjectives = true end
         notifyDirty()
     end
+    local function logUpdated()
+        clearLeftoverWatches()
+        markDynamic()
+    end
     local function enterWorld()
         xpWorldEntered = true
         markAll()
@@ -617,16 +651,17 @@ function Quests:Enable(notify)
     -- click that UI/QuestLogChecks.lua owns.
     TrackedSet:OnDirty(notifyDirty)
 
-    -- The ONLY thing left on Blizzard's watch functions, and it no longer carries the gesture:
-    -- emptying its list behind every add is what keeps its five-quest cap from ever being
-    -- reached. Measured after: GetNumQuestWatches() reads 0, so its own handler can never take
-    -- the too-many-quests branch. The toggle used to hang off this hook and could not stay -
-    -- shift-clicking a row calls neither watch function on 1.15.9, so it silently never fired.
+    -- All that is left on Blizzard's watch functions besides that one-off clear, and it no
+    -- longer carries the gesture: emptying its list behind every add is what keeps its
+    -- five-quest cap from ever being reached. Measured after: GetNumQuestWatches() reads 0, so
+    -- its own handler can never take the too-many-quests branch. The toggle used to hang off this
+    -- hook and could not stay - shift-clicking a row calls neither watch function on 1.15.9, so
+    -- it silently never fired. The true keeps Questie's hook from reading this as an untrack.
     if type(AddQuestWatch) == "function" and type(RemoveQuestWatch) == "function" then
         hooksecurefunc("AddQuestWatch", function(index)
             if suppressWatchHook then return end
             suppressWatchHook = true
-            RemoveQuestWatch(index)
+            RemoveQuestWatch(index, true)
             suppressWatchHook = false
         end)
     end
@@ -635,7 +670,7 @@ function Quests:Enable(notify)
     Events:On("QUEST_REMOVED",           markRemoved)
     Events:On("QUEST_TURNED_IN",         markRemoved)
     Events:On("PLAYER_ENTERING_WORLD",   enterWorld)
-    Events:On("QUEST_LOG_UPDATE",        markDynamic)
+    Events:On("QUEST_LOG_UPDATE",        logUpdated)
     Events:On("UNIT_QUEST_LOG_CHANGED",  markDynamic)
     Events:On("QUEST_WATCH_UPDATE",      markDynamic)
     Events:On("ZONE_CHANGED_NEW_AREA",   markAll)

@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EQObjectiveTracker = ns
 ns.NAME    = addonName
-ns.VERSION = "1.27.0"
+ns.VERSION = "1.28.0"
 
 ns.modules     = {}
 ns.moduleOrder = {}
@@ -69,6 +69,27 @@ local NEVER_SKIP = {
     Media = true, Migrate = true, Commands = true, Tracker = true,
 }
 
+-- Off while Blizzard's own tracker is in use: each one would double it, fight it for its watch
+-- list, or draw only inside the tracker window. What stays is what does not clash - Focus for
+-- Everything Quests' arrow, the quest sounds and their cache, the zone bar, the flight map, the
+-- options window, and AutoTrack, which keeps Classic's own set current for the way back.
+-- Tracker is in NEVER_SKIP and stands down in its own OnEnable.
+local STAND_DOWN = {
+    Blizzard = true, QuestLogChecks = true, QuestieCoexist = true,
+    ScenarioBonus = true, ScenarioBonusHUD = true, ScenarioSpells = true,
+    Widgets = true, WidgetBlock = true, Visibility = true,
+    SuperTrackPersist = true, WatchPersist = true,
+}
+
+-- Latched by DB:OnInitialize, so it reads false until then and never changes mid-session.
+function ns:UsesBlizzardTracker()
+    return self._blizzardTracker == true
+end
+
+function ns:IsStandingDown(name)
+    return self:UsesBlizzardTracker() and STAND_DOWN[name] == true
+end
+
 -- Read straight off the saved variable rather than through DB, so it answers correctly
 -- before AceDB has initialized and from inside a module's own load-time code.
 function ns:SafeMode()
@@ -81,6 +102,9 @@ end
 -- had - which is the whole workflow the tool exists for.
 function ns:IsModuleDisabled(name)
     if NEVER_SKIP[name] then return false end
+    -- Ahead of the explicit enable, which a past bisection can leave set: a suppression
+    -- enabled over Blizzard's tracker would leave the player with no tracker at all.
+    if self:IsStandingDown(name) then return true end
     local db = _G.EQObjectiveTrackerDB
     local g  = db and db.global
     if g and g.enabledModules and g.enabledModules[name] then return false end
@@ -92,6 +116,7 @@ end
 -- iterate, but each provider can be marked unavailable so it registers no events and makes
 -- no game API calls at all.
 function ns:IsProviderDisabled(id)
+    if self:UsesBlizzardTracker() then return true end
     local db = _G.EQObjectiveTrackerDB
     local g  = db and db.global
     if g and g.enabledProviders and g.enabledProviders[id] then return false end
@@ -120,7 +145,11 @@ loader:SetScript("OnEvent", function()
     for _, name in ipairs(ns.moduleOrder) do
         local m = ns.modules[name]
         if m.OnEnable then
-            if ns:IsModuleDisabled(name) then
+            -- Not listed as skipped: that line is the bisection warning, and a player who chose
+            -- Blizzard's tracker would otherwise read it at every login.
+            if ns:IsStandingDown(name) then
+                ns.stoodDown = (ns.stoodDown or 0) + 1
+            elseif ns:IsModuleDisabled(name) then
                 ns.skipped[#ns.skipped + 1] = name
             else
                 xpcall(m.OnEnable, geterrorhandler(), m)

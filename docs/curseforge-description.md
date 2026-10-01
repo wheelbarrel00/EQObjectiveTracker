@@ -19,6 +19,7 @@ The tracker shows your quests on Forever, and with Everything Quests and TomTom 
 ## At a glance
 
 *   Replaces Blizzard's objective tracker with a frame you can move, resize and scroll
+*   Prefer Blizzard's own tracker? One checkbox brings it back, and the quest sounds and the other parts that don't need the window keep running
 *   Runs on Retail, Classic Era and TBC Anniversary, and on WoW Forever as a work in progress
 *   Tracks quests, campaign quests, world quests, bonus objectives, scenarios, delves, achievements, professions and endeavors on Retail, and quests on Classic and Forever
 *   Right click any quest for a menu: pin, track, focus, open the quest log, pop out the details, find a group, look it up on Wowhead, or abandon it
@@ -50,6 +51,14 @@ The tracker shows your quests on Forever, and with Everything Quests and TomTom 
 If you came from Everything Quests, your tracker settings are read across the first time this loads, so it starts out looking the way yours already did. That includes your per-character state, on every character: pinned quests, which sections you had collapsed, and your saved world quest watches. Nothing is changed on the Everything Quests side.
 
 One copy of the tracker code now means a fix lands in both places at once.
+
+***
+
+## Rather keep Blizzard's tracker?
+
+Tick **Use Blizzard's quest tracker** at the top of the General tab, or the same checkbox in the Tracker section of Everything Quests' General tab. The interface reloads, the tracker window is gone, and the game's own quest tracker is back. The parts that don't need the window keep working: the quest sounds, the flight point highlight, the zone progress bar, which floats on its own then, and on Forever the TomTom arrow Everything Quests draws for the quest you follow. Settings for the window itself, such as its hide rules, the bonus objectives HUD and hiding Questie's tracker, wait until you switch back. Untick it to get the window back, again after a reload.
+
+On Retail and Forever both trackers use the game's own list of tracked quests. On Classic Era and TBC Anniversary the game's tracker starts empty, so shift click quests in the quest log to watch them, up to the game's limit of five, and this tracker's own list is kept for when you switch back.
 
 ***
 
@@ -128,7 +137,7 @@ Everything the tracker is actually for works on Classic: quests with zone subtit
 *   **Retail, Classic Era, TBC Anniversary and WoW Forever.** Retail, Classic Era and TBC Anniversary are supported, and what Classic lacks is listed above. Forever is a work in progress, see the note at the top. Mists of Pandaria Classic is not supported yet.
 *   **No dependencies.** Every library it needs is bundled.
 *   **Profiles** are supported and shared across all your characters, so you can keep different setups and switch between them.
-*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 438 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
+*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 445 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
 *   **World quests sit in their own pinned area** above or below the quest list rather than in the reorderable run, so a long world quest list can never push your quests off screen.
 *   Drag the strip along the top to move the tracker, and the corner grip to resize it.
 

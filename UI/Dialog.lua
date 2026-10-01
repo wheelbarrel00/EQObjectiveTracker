@@ -32,13 +32,18 @@ function Dialog:_finish(accepted)
     local text = (f and f.editBox:IsShown()) and f.editBox:GetText() or nil
     -- Hiding the frame releases the focus on its own, but only while this stays the sole
     -- path that hides it. An edit box that kept focus would swallow Enter game-wide.
-    if f then f.editBox:ClearFocus(); f:Hide() end
+    if f then f.editBox:ClearFocus() end
 
+    -- Callback first and hide after, the order Blizzard's StaticPopup uses. Hidden first, a
+    -- ReloadUI from Yes was blocked as an addon action on retail 12.1. Run through xpcall so a
+    -- raise cannot leave the dialog on screen with no callbacks left to close it.
     if accepted then
-        if opts.onAccept then opts.onAccept(text) end
+        if opts.onAccept then xpcall(function() opts.onAccept(text) end, geterrorhandler()) end
     elseif opts.onCancel then
-        opts.onCancel()
+        xpcall(opts.onCancel, geterrorhandler())
     end
+    -- A callback that opened the next dialog keeps the frame up for it.
+    if f and not self.opts then f:Hide() end
 end
 
 function Dialog:Build()

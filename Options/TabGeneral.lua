@@ -17,6 +17,37 @@ Options:RegisterTab({
         local h = self:CreateHeading(content, L["General"])
         h:SetPoint("TOPLEFT", 8, -8)
 
+        -- Saved only on Yes, right before the reload, so the choice on screen is always the
+        -- tracker actually running. Everything Quests offers the same box through Core/API.lua.
+        local blizz
+        blizz = self:CreateCheckbox(content, L["Use Blizzard's quest tracker"],
+            function() return ns:GetModule("API"):GetBlizzardTrackerSetting() end,
+            function(v)
+                local Dialog = ns:GetModule("Dialog")
+                if not Dialog then blizz:SetChecked(not v); return end
+                Dialog:Show({
+                    title    = "EQ Objective Tracker",
+                    text     = v and L["Switch to Blizzard's quest tracker? The interface will reload."]
+                        or L["Switch back to the EQ Objective Tracker window? The interface will reload."],
+                    button1  = L["Yes"],
+                    button2  = L["Cancel"],
+                    onAccept = function()
+                        if ns:GetModule("API"):SetBlizzardTrackerSetting(v) then
+                            ReloadUI()
+                            -- Expected to fire only if the client refused the reload. The choice is saved either way.
+                            C_Timer.After(1, function()
+                                ns:Print(L["The interface did not reload. Type /reload to finish."])
+                            end)
+                        else
+                            blizz:SetChecked(not v)
+                        end
+                    end,
+                    onCancel = function() blizz:SetChecked(not v) end,
+                })
+            end,
+            L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."])
+        blizz:SetPoint("TOPLEFT", h, "BOTTOMLEFT", 0, self.GAP.tabHead)
+
         local lock = self:CreateCheckbox(content, L["Lock tracker"],
             function() return DB:General().lockTracker end,
             function(v)
@@ -24,7 +55,7 @@ Options:RegisterTab({
                 ns:GetModule("Tracker"):ApplyLockState()
             end,
             L["Disable drag-to-move and resize."])
-        lock:SetPoint("TOPLEFT", h, "BOTTOMLEFT", 0, self.GAP.tabHead)
+        lock:SetPoint("TOPLEFT", blizz, "BOTTOMLEFT", 0, -2)
 
         local function hideRule(key, label, tooltip)
             return self:CreateCheckbox(content, label,

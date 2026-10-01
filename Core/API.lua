@@ -140,6 +140,24 @@ function API:GetFocus()
     return Focus:Get()
 end
 
+-- Two answers on purpose: the mode this session runs in, fixed at login, and the saved choice,
+-- which only a reload applies. A caller reading Blizzard's watch list needs the first.
+function API:UsesBlizzardTracker()
+    return ns:UsesBlizzardTracker()
+end
+
+function API:GetBlizzardTrackerSetting()
+    local gen = ns:GetModule("DB"):General()
+    return (gen and gen.useBlizzardTracker == true) and true or false
+end
+
+function API:SetBlizzardTrackerSetting(on)
+    local gen = ns:GetModule("DB"):General()
+    if not gen then return false end
+    gen.useBlizzardTracker = on and true or false
+    return true
+end
+
 function API:DebugLine()
     local providerID, entryID = self:GetFocus()
     local Focus = ns:GetModule("Focus")

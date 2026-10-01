@@ -30,7 +30,9 @@ local function enabled()
     return (t and t.showZoneProgressBar) == true
 end
 
+-- Docked needs the tracker window, which Blizzard's tracker replaces.
 local function isFloating()
+    if ns:UsesBlizzardTracker() then return true end
     local t = cfg()
     return ((t and t.zoneProgressLocation) or "floating") == "floating"
 end

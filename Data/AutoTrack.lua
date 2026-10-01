@@ -47,6 +47,10 @@ local function onQuestAccepted(_, a, b)
         return
     end
 
+    -- Blizzard's tracker shares this list, so its own watch rules decide what it shows.
+    AutoTrack._lastAction = "left alone, Blizzard's tracker in use"
+    if ns:UsesBlizzardTracker() then return end
+
     if cfg.autoTrackAccepted == false then
         local watched = watchType(questID) ~= nil
         if watched and ns.Has.QuestWatchAPI then

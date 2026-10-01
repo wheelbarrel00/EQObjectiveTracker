@@ -48,7 +48,9 @@ local ns = { Has = { MythicPlus = true } }
 function ns:RegisterModule(n, t) mods[n] = t return t end
 function ns:GetModule(n) return mods[n] end
 function ns:IsModuleDisabled(name) return disabled[name] == true end
-ns.Util = { Tooltip = function() return { Hide = function() end } end }
+-- Always EQOT's own window here. Blizzard's tracker is docs/test_blizzard_tracker.lua's.
+function ns:IsStandingDown() return false end
+ns.Util ={ Tooltip = function() return { Hide = function() end } end }
 
 mods.DB = {
     General = function() return general end,

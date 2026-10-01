@@ -20,6 +20,9 @@ end
 -- Hide only. The other addon's own disable path is never called: it clears its saved
 -- tracked quests and reloads, which is data loss in another addon's saved variables.
 function Coexist:Apply()
+    -- Still reachable from the General tab. Hiding that tracker under Blizzard's would leave
+    -- Classic with none on screen, since it empties Blizzard's watch list.
+    if ns:IsStandingDown("QuestieCoexist") then return end
     local f = trackerFrame()
     if not f then return end
     local c = cfg()

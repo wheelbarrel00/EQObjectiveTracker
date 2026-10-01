@@ -25,6 +25,10 @@ handlers.reset = function()
 end
 
 handlers.toggle = function()
+    if ns:UsesBlizzardTracker() then
+        ns:Print(L["Blizzard's quest tracker is in use - see /eqot, General."])
+        return
+    end
     tracker():Toggle()
 end
 
@@ -34,6 +38,8 @@ handlers.debug = function()
     tracker():Render()
 end
 
+local WINDOW_ONLY = { Tracker = true, ItemButtons = true }
+
 -- One module raising must not take the rest of the report
 -- with it: this is the tool for diagnosing a broken subsystem, so it has to outlive one, and
 -- a report that stops halfway reads as "the addon is fine up to here".
@@ -41,6 +47,13 @@ local function debugLine(name, prefix, method)
     local m = ns:GetModule(name)
     method = method or "DebugLine"
     if not (m and m[method]) then return end
+    -- A module that never enabled reports itself as broken, which it is not. Said once, on its
+    -- main line, rather than once per line it has. The window's own parts never stand down
+    -- through the loader but have no window to report on either.
+    if ns:IsStandingDown(name) or (WINDOW_ONLY[name] and ns:UsesBlizzardTracker()) then
+        if method == "DebugLine" then ns:Print(("%s: off, Blizzard's tracker in use"):format(name)) end
+        return
+    end
     local ok, line = pcall(m[method], m)
     if not ok then
         ns:Print(("|cffff5555%s:%s raised|r %s"):format(name, method, tostring(line)))
@@ -57,6 +70,30 @@ handlers.status = function()
     local Sections = ns:GetModule("Sections")
 
     ns:Print(("version %s"):format(ns.VERSION))
+    -- The setting and the session can differ until the reload, and an empty report below reads
+    -- as a broken addon unless this says why.
+    -- The frame's state is the first question on a "no tracker at all" report. Blizzard hides its
+    -- own frame while it has nothing to show, so the watch count is printed beside it.
+    local gen = ns:GetModule("DB"):General()
+    local frameState = ""
+    if ns:UsesBlizzardTracker() then
+        local f = _G.ObjectiveTrackerFrame or _G.QuestWatchFrame
+        local shown = "absent"
+        if type(f) == "table" and type(f.IsShown) == "function" then
+            -- The test sits inside the pcall too, since IsShown can answer a secret on live and Forever.
+            local okShown, state = pcall(function() return f:IsShown() and "shown" or "hidden" end)
+            shown = okShown and state or "unreadable"
+        end
+        local countWatches = (C_QuestLog and C_QuestLog.GetNumQuestWatches) or _G.GetNumQuestWatches
+        local okCount, watched = false, nil
+        if type(countWatches) == "function" then okCount, watched = pcall(countWatches) end
+        frameState = (" | Blizzard's frame %s, %s quest(s) watched"):format(shown,
+            (okCount and type(watched) == "number") and tostring(watched) or "?")
+    end
+    ns:Print(("tracker in use: %s | setting %s | %d module(s) standing down%s"):format(
+        ns:UsesBlizzardTracker() and "Blizzard's" or "EQ Objective Tracker",
+        (gen and gen.useBlizzardTracker == true) and "Blizzard's" or "EQ Objective Tracker",
+        ns.stoodDown or 0, frameState))
 
     -- Early, because a refused event registration explains a whole subsystem being silent
     -- and every counter below it would otherwise read as a clean zero.
@@ -68,16 +105,21 @@ handlers.status = function()
     -- Rebuild first so the counters describe the current state, not the last repaint.
     -- Render skips entirely while the tracker is hidden, so the feed is built directly too
     -- or a rule-hidden tracker would report whatever the last paint happened to leave.
-    ns:GetModule("Tracker"):Render()
-    -- Render owns this refresh normally, but it returns early while hidden, and Filter reads
-    -- the suppression set - so refresh here too or the direct build below reports stale rows.
-    ns:GetModule("AutoQuestPopups"):Refresh()
-    Feed:Build()
+    -- Not under Blizzard's tracker: there is no feed then, and a build would start the
+    -- distance ticker for the rest of the session.
+    if not ns:UsesBlizzardTracker() then
+        ns:GetModule("Tracker"):Render()
+        -- Render owns this refresh normally, but it returns early while hidden, and Filter reads
+        -- the suppression set - so refresh here too or the direct build below reports stale rows.
+        ns:GetModule("AutoQuestPopups"):Refresh()
+        Feed:Build()
+    end
 
     ns:Print("providers (emitted -> duplicate / filtered / shown):")
     for _, p in ipairs(Registry:Active()) do
         if not p._available then
-            ns:Print(("  %-14s unavailable on this client"):format(p.id))
+            ns:Print(("  %-14s %s"):format(p.id, ns:UsesBlizzardTracker()
+                and "off, Blizzard's tracker in use" or "unavailable on this client"))
         else
             local st = Feed.stats[p.id] or {}
             ns:Print(("  %-14s %d -> dup %d, filtered %d, shown %d")
@@ -172,7 +214,8 @@ local function moduleCmd(cmd, rest)
 
     -- Reports the EFFECTIVE state, not the raw flag: under safe mode the flag reads enabled
     -- for everything, which made the whole optional half look innocent when it was not.
-    local function stateOf(disabled, overridden)
+    local function stateOf(disabled, overridden, standing)
+        if standing then return "off, Blizzard's tracker in use" end
         if disabled then return "|cffff5555disabled|r" end
         if overridden and db.global.safeMode then return "enabled |cffffd100(override)|r" end
         return "enabled"
@@ -182,11 +225,13 @@ local function moduleCmd(cmd, rest)
         ns:Print(("skippable modules (safe mode %s, /reload to apply):")
             :format(db.global.safeMode and "|cffff5555ON|r" or "off"))
         for _, name in ipairs(list) do
-            ns:Print(("  %-18s %s"):format(name, stateOf(ns:IsModuleDisabled(name), on[name])))
+            ns:Print(("  %-18s %s"):format(name, stateOf(ns:IsModuleDisabled(name), on[name],
+                ns:IsStandingDown(name))))
         end
         ns:Print("providers:")
         for _, p in ipairs(Registry:Active()) do
-            ns:Print(("  %-18s %s"):format(p.id, stateOf(ns:IsProviderDisabled(p.id), onP[p.id])))
+            ns:Print(("  %-18s %s"):format(p.id, stateOf(ns:IsProviderDisabled(p.id), onP[p.id],
+                ns:UsesBlizzardTracker())))
         end
         return
     end
@@ -210,7 +255,9 @@ local function moduleCmd(cmd, rest)
             wipe(offP)
             wipe(on)
             wipe(onP)
-            ns:Print("safe mode off, all modules and providers re-enabled. /reload to apply.")
+            ns:Print("safe mode off, all modules and providers re-enabled. /reload to apply."
+                .. (ns:UsesBlizzardTracker()
+                    and " Those that stand down for Blizzard's tracker stay off." or ""))
         end
         return
     end
@@ -222,8 +269,9 @@ local function moduleCmd(cmd, rest)
         if name:lower() == want:lower() then
             off[name] = disabling or nil
             on[name]  = (not disabling) or nil
-            ns:Print(("%s is now %s. /reload to apply."):format(name,
-                stateOf(disabling, on[name])))
+            ns:Print(("%s is now %s. /reload to apply.%s"):format(name,
+                stateOf(disabling, on[name]),
+                ns:IsStandingDown(name) and " It stays off while Blizzard's tracker is in use." or ""))
             return
         end
     end
@@ -232,8 +280,9 @@ local function moduleCmd(cmd, rest)
         if p.id:lower() == want:lower() then
             offP[p.id] = disabling or nil
             onP[p.id]  = (not disabling) or nil
-            ns:Print(("provider %s is now %s. /reload to apply."):format(p.id,
-                stateOf(disabling, onP[p.id])))
+            ns:Print(("provider %s is now %s. /reload to apply.%s"):format(p.id,
+                stateOf(disabling, onP[p.id]),
+                ns:UsesBlizzardTracker() and " It stays off while Blizzard's tracker is in use." or ""))
             return
         end
     end

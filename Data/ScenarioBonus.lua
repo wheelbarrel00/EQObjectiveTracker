@@ -490,7 +490,7 @@ local function setDelveEvents(on)
 end
 
 function Bonus:Reconcile()
-    setDelveEvents(self:Enabled() and playerInDelve())
+    setDelveEvents(self:Enabled() and playerInDelve() and not ns:IsStandingDown("ScenarioBonus"))
 end
 
 -- Entries are valid only until the next call, exactly as a provider's are.
