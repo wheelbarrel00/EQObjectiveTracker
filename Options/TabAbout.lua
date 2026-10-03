@@ -3,14 +3,6 @@ local _, ns = ...
 local Options = ns:GetModule("Options")
 local L       = ns.L
 
-local GOLD  = "|cffEBB706"
-local MUTED = "|cffb3b3b3"
-local WHITE = "|cffe6e6e6"
-local CLOSE = "|r"
-
-local BRAND_RED = { 0.635, 0.000, 0.039 }
-local LINK      = { 0.92, 0.72, 0.02 }
-
 local CURSEFORGE_URL = "https://www.curseforge.com/wow/addons/eq-objective-tracker"
 local GITHUB_URL     = "https://github.com/wheelbarrel00/EQObjectiveTracker"
 local BUG_URL        = "https://github.com/wheelbarrel00/EQObjectiveTracker/issues"
@@ -42,203 +34,126 @@ local THANKS = {
     { name = "Stonetwist",  line = L["Special thanks to %s for the many hours spent translating EQ Objective Tracker into German."] },
 }
 
--- A tab-local cursor, the way EQ's own About tab does it. This is the one tab that wants
--- stacking - its provider run is as long as the flavor's TOC made it, and its changelog is
--- as long as the release history - and a cursor that lives here costs less than a layout
--- engine shared by three tabs that never use it.
-local LEFT, WRAP = 8, 900
+-- An escape opening one of the theme's colors, for the part of a line drawn in another one.
+local function colorCode(ui, name)
+    local r, g, b = ui:Color(name)
+    return ("|cff%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5),
+                                       math.floor(b * 255 + 0.5))
+end
 
 Options:RegisterTab({
     id    = "about",
     title = L["About"],
     order = 90,
     build = function(self, content)
-        local y = -8
-
-        -- size is passed only by the page title. Without it the addon name renders at the
-        -- same weight as Commands and Changelog and reads as the first of five equal
-        -- sections rather than as the title. Set before measuring, or y advances by the
-        -- old height. EQ builds its title at this exact size and outline.
-        local function title(text, size)
-            local fs = self:CreateHeading(content, text)
-            if size then fs:SetFont(fs:GetFont(), size, "OUTLINE") end
-            fs:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT, y)
-            y = y - math.max(18, fs:GetStringHeight() or 18) - 10
-            return fs
-        end
-
-        -- A rule under each section heading, as EQ's About tab has. Everywhere else in the
-        -- panel a heading tops a short column. Here the sections scroll past one another,
-        -- and the changelog alone is longer than every other tab put together.
-        local function header(text)
-            local fs = title(text)
-            local rule = content:CreateTexture(nil, "ARTWORK")
-            rule:SetHeight(1)
-            rule:SetColorTexture(0.30, 0.30, 0.30, 0.8)
-            rule:SetPoint("TOPLEFT", fs, "BOTTOMLEFT", 0, -3)
-            -- WRAP, not WRAP - LEFT. A label is anchored at LEFT + indent with width
-            -- WRAP - indent, so the text column ends at LEFT + WRAP and EQ's expression
-            -- leaves a full-width paragraph overhanging its own rule.
-            rule:SetWidth(WRAP)
-            return fs
-        end
-
-        -- Width and wrap set before the text, so GetStringHeight reports the wrapped
-        -- height. The old shared CreateLabel set neither and overflowed the content frame.
-        local function label(text, indent, size, r, g, b)
-            local fs = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            fs:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT + (indent or 0), y)
-            if size then fs:SetFont(fs:GetFont(), size) end
-            fs:SetWidth(WRAP - (indent or 0))
-            fs:SetJustifyH("LEFT")
-            fs:SetWordWrap(true)
-            fs:SetTextColor(r or 0.8, g or 0.8, b or 0.8)
-            fs:SetText(text)
-            y = y - math.max(size or 12, fs:GetStringHeight() or 12) - 4
-            return fs
-        end
-
-        local function gap(px) y = y - (px or 8) end
-
-        local function makeLink(text, onClick)
-            local b = CreateFrame("Button", nil, content)
-            b:SetHeight(16)
-            b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            b.text:SetPoint("LEFT", b, "LEFT", 0, 0)
-            b.text:SetText(text)
-            b.text:SetTextColor(unpack(LINK))
-            -- `<= 0` as well as nil: 0 is truthy in Lua, so an unmeasured string would give
-            -- a 2px button that looks like a link and cannot be clicked.
-            local w = b.text:GetStringWidth()
-            if not w or w <= 0 then w = 90 end
-            b:SetWidth(w + 2)
-            b:SetScript("OnClick", onClick)
-            b:SetScript("OnEnter", function(s) s.text:SetTextColor(1, 1, 1) end)
-            b:SetScript("OnLeave", function(s) s.text:SetTextColor(unpack(LINK)) end)
-            return b
-        end
-
-        local function linkRow(links)
-            local prev
-            for i, lk in ipairs(links) do
-                local b = makeLink(lk.label, lk.onClick)
-                if i == 1 then
-                    b:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT, y)
-                else
-                    local sep = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-                    sep:SetText(MUTED .. "  |  " .. CLOSE)
-                    sep:SetPoint("LEFT", prev, "RIGHT", 2, 0)
-                    b:SetPoint("LEFT", sep, "RIGHT", 2, 0)
-                end
-                prev = b
+        local gap, listRow = self:Spacing("groupGap"), self:Spacing("listRowHeight")
+        local above
+        local function stack(card)
+            if above then
+                card:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
+                card:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -gap)
+            else
+                card:SetPoint("TOPLEFT")
+                card:SetPoint("TOPRIGHT")
             end
-            y = y - 24
+            above = card
+            return card
         end
 
-        title("EQ Objective Tracker", 22)
-        label(L["Version %s"]:format(ns.VERSION) .. " " .. L["by Wheelbarrel00"])
-        label(L["A standalone replacement for the default objective tracker. It does not require Everything Quests, and never will."],
-            0, nil, 0.6, 0.6, 0.6)
-        gap(6)
+        local intro = stack(self:CreateGroup(content, nil))
+        local blurb = self:CreateTextBlock(content)
+        blurb:AddLine(L["Version %s"]:format(ns.VERSION) .. " " .. L["by Wheelbarrel00"], "value")
+        blurb:AddLine(L["A standalone replacement for the default objective tracker. It does not require Everything Quests, and never will."])
+        intro:Add(blurb, { fitHeight = true })
 
-        linkRow({
+        local links = CreateFrame("Frame", nil, content)
+        links:SetHeight(self:Spacing("buttonHeight"))
+        local prev
+        for _, lk in ipairs({
             { label = L["Join our Discord"], onClick = function() ns:ShowDiscord() end },
             { label = L["CurseForge"],       onClick = function() ns:ShowURL(CURSEFORGE_URL) end },
             { label = L["GitHub"],           onClick = function() ns:ShowURL(GITHUB_URL) end },
             { label = L["Report a Bug"],     onClick = function() ns:ShowURL(BUG_URL) end },
-        })
-        gap(8)
-
-        header(L["Commands"])
-        local cmdRows, widest = {}, 0
-        for i = 1, #COMMANDS do
-            local slash = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            slash:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT, y)
-            slash:SetText(GOLD .. COMMANDS[i][1] .. CLOSE)
-            local w = slash:GetStringWidth() or 0
-            if w > widest then widest = w end
-            local desc = content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-            desc:SetText(WHITE .. COMMANDS[i][2] .. CLOSE)
-            cmdRows[i] = { slash, desc }
-            y = y - 16
+        }) do
+            local b = self:CreateButton(content, lk.label, nil, lk.onClick)
+            if prev then
+                b:SetPoint("LEFT", prev, "RIGHT", self:Spacing("buttonGap"), 0)
+            else
+                b:SetPoint("LEFT", links, "LEFT")
+            end
+            prev = b
         end
-        -- Second column past the widest token, the way AlignPickerColumn lines the pickers
-        -- up. EQ hardcodes 120, which silently overlaps the first command longer than that.
-        for i = 1, #cmdRows do
-            cmdRows[i][2]:SetPoint("TOPLEFT", cmdRows[i][1], "TOPLEFT", widest + 12, 0)
+        intro:Add(links, { fill = true })
+
+        local commands = stack(self:CreateGroup(content, L["Commands"]))
+        for _, cmd in ipairs(COMMANDS) do
+            local row = self:CreateTextRow(content, cmd[1], cmd[2])
+            row.label:SetTextColor(self:Color("text"))
+            commands:Add(row, { height = listRow })
         end
-        gap(10)
 
-        header(L["Content providers"])
-        label(L["Providers are gated at load time by which TOC file your game flavor used. A provider that is not listed was never loaded."],
-            0, nil, 0.6, 0.6, 0.6)
-
-        content._providerLines = {}
-        local Registry = ns:GetModule("Registry")
-        for _, p in ipairs(Registry:Active()) do
-            content._providerLines[p.id] = label(p.id)
+        local providers = stack(self:CreateGroup(content, L["Content providers"]))
+        local note = self:CreateTextBlock(content)
+        note:AddLine(L["Providers are gated at load time by which TOC file your game flavor used. A provider that is not listed was never loaded."], "hint")
+        providers:Add(note, { fitHeight = true })
+        content._providerRows = {}
+        for _, p in ipairs(ns:GetModule("Registry"):Active()) do
+            local row = self:CreateTextRow(content, p.id, "")
+            providers:Add(row, { height = listRow })
+            content._providerRows[p.id] = row
         end
-        gap(10)
 
-        header(L["Thanks"])
+        local thanks = stack(self:CreateGroup(content, L["Thanks"]))
+        local bright = colorCode(self, "text")
         for _, t in ipairs(THANKS) do
-            -- WHITE is re-opened after the name because |r resets to the font's own color
-            -- rather than popping back to the enclosing escape.
-            label(WHITE .. t.line:format(GOLD .. t.name .. CLOSE .. WHITE) .. CLOSE,
-                0, nil, 1, 1, 1)
+            local credit = self:CreateTextBlock(content)
+            -- |r falls back to the line's own color, so only the name needs an escape.
+            credit:AddLine(t.line:format(bright .. t.name .. "|r"))
+            thanks:Add(credit, { fitHeight = true })
         end
-        gap(10)
 
-        header(L["Changelog"])
+        local changelog = stack(self:CreateGroup(content, L["Changelog"]))
+        local muted = colorCode(self, "muted")
         -- A version-less entry would throw on the concatenation below, and a throw here
-        -- leaves Frame.lua's SelectTab without _built and with every tab hidden, so the
+        -- leaves the library's SelectTab without _built and with every tab hidden, so the
         -- whole window goes blank and re-throws on each click. Cheaper to skip the row.
         for _, entry in ipairs(ns.Changelog or {}) do
             if entry.version then
-                local vh = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-                vh:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT, y)
-                vh:SetFont(vh:GetFont(), 13, "OUTLINE")
-                vh:SetText(GOLD .. "v" .. entry.version .. CLOSE
-                    .. MUTED .. "    " .. (entry.date or "") .. CLOSE)
-                y = y - 18
-                if entry.summary then label(MUTED .. entry.summary .. CLOSE, 10, 11) end
+                local block = self:CreateTextBlock(content)
+                block:AddLine(entry.version .. "   " .. muted .. (entry.date or "") .. "|r", "value")
+                if entry.summary then block:AddLine(entry.summary, "hint") end
                 for _, sec in ipairs(entry.sections or {}) do
-                    local sh = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-                    sh:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT + 10, y)
-                    sh:SetFont(sh:GetFont(), 11, "OUTLINE")
-                    sh:SetTextColor(unpack(BRAND_RED))
-                    sh:SetText(sec.head or "")
-                    y = y - 16
+                    block:AddLine(sec.head or "", "groupLabel", { gap = 10 })
                     for _, item in ipairs(sec.items or {}) do
-                        label(WHITE .. "- " .. item .. CLOSE, 18, 11, 1, 1, 1)
+                        block:AddLine(item, "label", { bullet = "-" })
                     end
-                    gap(2)
                 end
-                gap(8)
+                changelog:Add(block, { fitHeight = true })
             end
         end
-
-        local older = makeLink(L["Older versions are on CurseForge"],
-            function() ns:ShowURL(CURSEFORGE_URL) end)
-        older:SetPoint("TOPLEFT", content, "TOPLEFT", LEFT, y)
-        y = y - 24
+        changelog:Add(self:CreateButton(content, L["Older versions are on CurseForge"], nil,
+            function() ns:ShowURL(CURSEFORGE_URL) end, nil, "ghost"))
     end,
 
     -- Live, because "is the provider empty or is the section not rendering" is the
     -- first question asked whenever something does not appear. Left untranslated with
     -- the rest of the diagnostic output - the counts are for bug reports, not reading.
-    refresh = function(_, content)
-        local Registry = ns:GetModule("Registry")
-        for _, p in ipairs(Registry:Active()) do
-            local fs = content._providerLines and content._providerLines[p.id]
-            if fs then
+    refresh = function(self, content)
+        local muted = colorCode(self, "muted")
+        for _, p in ipairs(ns:GetModule("Registry"):Active()) do
+            local row = content._providerRows and content._providerRows[p.id]
+            if row then
                 if not p._available then
-                    fs:SetText(("|cff888888%-14s unavailable on this client|r"):format(p.id))
+                    row.label:SetTextColor(self:Color("muted"))
+                    row.text:SetTextColor(self:Color("muted"))
+                    row.text:SetText("unavailable on this client")
                 else
                     local ok, entries = pcall(p.GetEntries, p)
                     local n = (ok and entries) and #entries or -1
-                    fs:SetText(("|cff44ff44%-14s|r %d entries   |cff888888groups: %s|r")
-                        :format(p.id, math.max(0, n), table.concat(p.groups, ", ")))
+                    row.label:SetTextColor(self:Color("text"))
+                    row.text:SetTextColor(self:Color("label"))
+                    row.text:SetText(("%d entries   %sgroups: %s|r")
+                        :format(math.max(0, n), muted, table.concat(p.groups, ", ")))
                 end
             end
         end

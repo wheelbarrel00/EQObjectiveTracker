@@ -18,8 +18,19 @@ local OPTS = {
     tooltip    = { kind = "function", required = true },
     accentText = { kind = "rgb" },
     discord    = { kind = "function" },
+    labels     = { kind = "table" },
     getLastTab = { kind = "function" },
     setLastTab = { kind = "function" },
+    getWindowScale = { kind = "function" },
+    setWindowScale = { kind = "function" },
+}
+
+local LABELS = {
+    discord         = true,
+    discordTipTitle = true,
+    discordTip      = true,
+    testSound       = true,
+    clear           = true,
 }
 
 local function isRGB(v)
@@ -61,11 +72,28 @@ function lib:NewContext(opts)
     if (opts.getLastTab == nil) ~= (opts.setLastTab == nil) then
         error("EverythingUI: opts.getLastTab and opts.setLastTab come as a pair", 2)
     end
+    if (opts.getWindowScale == nil) ~= (opts.setWindowScale == nil) then
+        error("EverythingUI: opts.getWindowScale and opts.setWindowScale come as a pair", 2)
+    end
+    local labels = {}
+    for key, v in pairs(opts.labels or {}) do
+        if not LABELS[key] then
+            error(("EverythingUI: NewContext got unknown opts.labels.%s"):format(tostring(key)), 2)
+        end
+        if type(v) ~= "string" then
+            error(("EverythingUI: opts.labels.%s must be a string"):format(key), 2)
+        end
+        labels[key] = v
+    end
+    if opts.discord and not labels.discord then
+        error("EverythingUI: opts.discord needs opts.labels.discord", 2)
+    end
 
     local kept = {}
     for key, v in pairs(opts) do kept[key] = v end
     kept.accent = copyRGB(opts.accent)
     kept.accentText = opts.accentText and copyRGB(opts.accentText) or { 1, 1, 1 }
+    kept.labels = labels
 
     return setmetatable({ opts = kept }, lib.contextMeta)
 end
@@ -88,6 +116,10 @@ function Context:Color(name)
         error(("EverythingUI: no color named %s"):format(tostring(name)), 2)
     end
     return c[1], c[2], c[3], alpha
+end
+
+function Context:Texture(name)
+    return lib.media .. "Textures\\" .. name
 end
 
 function Context:Font(name)

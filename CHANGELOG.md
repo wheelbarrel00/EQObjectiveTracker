@@ -5,6 +5,30 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-03
+
+### Improvements
+
+- The options window has a new look: a sidebar for its four tabs, settings grouped into cards on
+  every tab, and redesigned checkboxes, sliders, dropdowns and color swatches. No setting or saved
+  value changes.
+- The Appearance tab shows a live preview beside its settings: a sample tracker drawn the way your
+  tracker draws, which changes as you adjust fonts, colors, header bars, quest cards, progress bars,
+  the scroll bar, the background and border, and the docked zone bar.
+- The About tab uses the same cards, with its links as buttons and the changelog listed by version.
+- Confirmation prompts, the new profile name prompt and the copy-a-link popups match the new look.
+- The right-click menus on quests, the floating zone progress bar and the bonus objectives HUD match the
+  new look.
+
+### Bug Fixes
+
+- A confirmation left open when a fight started no longer keeps every key from reaching the game after
+  Enter was pressed on it.
+
+### Notes
+
+- Everything Quests is next in line for this overhaul, so its windows will get the same new look.
+
 ## [1.28.0] - 2026-09-30
 
 ### New Features

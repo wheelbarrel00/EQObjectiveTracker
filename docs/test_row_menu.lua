@@ -33,8 +33,9 @@
 --
 -- OUT OF SCOPE BY CONSTRUCTION, so a green run says nothing about any of it: the actual
 -- Blizzard calls behind every other menu id, QuestGroups:Find and whether the group finder
--- opens, UI/RowMenu.lua's own popup construction, and API:MenuItemsFor's interleaving of
--- foreign items. Only the menu's SHAPE and its dispatch are measured here.
+-- opens, and how the EverythingUI library draws the menu (its own tests/test_menu.lua). The
+-- providers' menus are sliced. The last section loads UI/RowMenu.lua and Core/API.lua WHOLE and
+-- checks what RowMenu:Show hands the library, foreign items included, and what a click does.
 
 local function repoFile(rel)
     local f = io.open(rel, "r")
@@ -85,7 +86,7 @@ local sliceRM = slicer("UI/RowMenu.lua")
 
 local questSrc = sliceQ("local menuOut = {}", "function Quests:OnEntryGroupFinder")
 local wqSrc    = sliceWQ("local menuOut = {}", "function WorldQuests:ProbeLines")
-local labelSrc = sliceRM("local LABELS = {", "local DANGER")
+local labelSrc = sliceRM("local LABELS = {", "local scratch = {}")
 
 -- ---------------------------------------------------------------------------- the stubs
 
@@ -516,6 +517,286 @@ do
        "Classic Era still opens the Classic site: " .. urlFor(false, 11509, 0))
     ok(urlFor(false, 20506, 1) == W .. "tbc/quest=783",
        "and TBC the TBC site: " .. urlFor(false, 20506, 1))
+end
+
+-- The library's menu is a spy here, beside the provider, the tracker, Print and ShowURL. The
+-- real one raises on any field it does not know, and a raise there is a Lua error on every
+-- right-click, so each row handed over is checked against the fields its vendored Menu.lua takes,
+-- read from that file rather than copied, so the two cannot drift apart.
+local function libItemFields()
+    local fh = assert(io.open(repoFile("Libs/EverythingUI/Menu.lua"), "r"))
+    local src = fh:read("*a")
+    fh:close()
+    local body = assert(src:match("local ITEM_FIELDS = (%b{})"), "ITEM_FIELDS not found in Menu.lua")
+    return assert(loadstring("return " .. body))()
+end
+local fieldsRead, LIB_FIELDS = pcall(libItemFields)
+ok(fieldsRead and type(LIB_FIELDS) == "table" and next(LIB_FIELDS) ~= nil,
+   "the library's item fields are read from its Menu.lua: " .. tostring(LIB_FIELDS))
+if not fieldsRead then LIB_FIELDS = {} end
+
+-- marked makes every lookup read "<key>", so a hard-coded English string can be told from one.
+local function loadShow(marked)
+    local st = { shown = {}, printed = {}, urls = {}, refreshed = 0, selected = {} }
+    local modules = {}
+    local ns = {
+        L = setmetatable({}, { __index = function(_, k) return marked and ("<" .. k .. ">") or k end }),
+        Has = { QuestLog = true },
+        SafeMode = function() return st.safe == true end,
+        -- tostring, so a nil printed is still seen rather than vanishing from the list.
+        Print = function(_, msg) st.printed[#st.printed + 1] = tostring(msg) end,
+        ShowURL = function(_, u) st.urls[#st.urls + 1] = u end,
+        RegisterModule = function(_, name, t) modules[name] = t return t end,
+        GetModule = function(_, name) return modules[name] end,
+    }
+    st.provider = {
+        GetEntryMenu = function() return st.items end,
+        OnEntryMenuSelect = function(_, entryID, itemID)
+            st.selected[#st.selected + 1] = { entryID, itemID }
+            return st.refusal
+        end,
+    }
+    modules.Registry = { Get = function(_, id) if id == "quests" then return st.provider end end }
+    modules.Tracker = { Refresh = function() st.refreshed = st.refreshed + 1 end }
+    modules.Options = { ui = { ShowMenu = function(_, items) st.shown[#st.shown + 1] = items end } }
+    local env = setmetatable({
+        GetBuildInfo = function() return "x", "1", "date", 120100, "Release x64", "Release" end,
+        GetLocale = function() return "enUS" end,
+    }, { __index = _G })
+    for _, rel in ipairs({ "Core/API.lua", "UI/RowMenu.lua" }) do
+        local chunk = assert(loadfile(repoFile(rel)))
+        setfenv(chunk, env)
+        chunk("EQObjectiveTracker", ns)
+    end
+    return modules.RowMenu, modules.API, st
+end
+
+-- The quest provider's menu, deliberately out of order, so only the sort can put it right.
+local function questItems()
+    return {
+        { id = "abandon", order = 80, danger = true },
+        { kind = "title", text = "The Fall of the Lich King", order = 0 },
+        { id = "openlog", order = 40 },
+        { id = "pin",     order = 10 },
+        { kind = "divider", order = 70 },
+        { id = "untrack", order = 20 },
+        { id = "focus",   order = 30 },
+        { id = "wowhead", order = 60 },
+        { id = "popout",  order = 50 },
+    }
+end
+
+local function questRow()
+    return { _entry = { id = 155, title = "The Fall of the Lich King" }, _providerID = "quests" }
+end
+
+local function show(RowMenu, row, why)
+    local okCall, res = pcall(RowMenu.Show, RowMenu, row)
+    ok(okCall, (why or "Show") .. " does not raise" .. (okCall and "" or (" - " .. tostring(res))))
+    if okCall then return res end
+    return "<raised>"
+end
+
+local function click(item, why)
+    local okCall, err = pcall(item and item.onClick or error)
+    ok(okCall, (why or "a click") .. " does not raise" .. (okCall and "" or (" - " .. tostring(err))))
+end
+
+-- tostring on the way in, so a row with neither text nor kind fails a case instead of aborting
+-- table.concat and the whole run with it.
+local function names(menu)
+    local out = {}
+    for i = 1, #menu do out[i] = tostring(menu[i].text or menu[i].kind) end
+    return out
+end
+
+print("== Show hands the library the quest's menu, sorted, with a divider and Cancel last")
+do
+    local RowMenu, _, st = loadShow()
+    st.items = questItems()
+    ok(show(RowMenu, questRow()) == true, "Show reports a menu, so the row's own click does not run as well")
+    ok(#st.shown == 1, "the library is asked once: " .. #st.shown)
+    local m = st.shown[1] or {}
+    local want = {
+        { kind = "title", text = "The Fall of the Lich King" },
+        { text = "Pin to tracker" }, { text = "Untrack Quest" }, { text = "Focus" },
+        { text = "Open in Map & Quest Log" }, { text = "Pop Out Quest Details" },
+        { text = "Search on Wowhead" },
+        { kind = "divider" },
+        { text = "Abandon Quest", danger = true },
+        { kind = "divider" },
+        { text = "Cancel" },
+    }
+    ok(#m == #want, "eleven rows: " .. table.concat(names(m), " | "))
+    for i, w in ipairs(want) do
+        local got = m[i] or {}
+        ok(got.kind == w.kind and got.text == w.text,
+           ("row %d is %s: got %s"):format(i, tostring(w.text or w.kind), tostring(got.text or got.kind)))
+        ok((got.danger == true) == (w.danger == true),
+           ("row %d is %sdrawn as danger"):format(i, w.danger and "" or "not "))
+    end
+    for i, got in ipairs(m) do
+        local acts = got.kind == nil and got.text ~= "Cancel"
+        ok((type(got.onClick) == "function") == acts,
+           ("row %d carries an action only if it is an item other than Cancel"):format(i))
+        for k, v in pairs(got) do
+            ok(LIB_FIELDS[k] == type(v), ("row %d field %s is one the library takes, of its type"):format(i, tostring(k)))
+        end
+        if got.kind ~= "divider" then
+            ok(type(got.text) == "string", ("row %d has the text the library requires"):format(i))
+        end
+    end
+end
+
+print("== a click dispatches the entry ID it opened for, then the tracker repaints")
+do
+    local RowMenu, _, st = loadShow()
+    st.items = questItems()
+    local row = questRow()
+    show(RowMenu, row)
+    local m = st.shown[1] or {}
+    click(m[2], "Pin")
+    local s = st.selected[1] or {}
+    ok(s[1] == 155 and s[2] == "pin", "Pin dispatches pin against 155: " .. tostring(s[1]) .. " " .. tostring(s[2]))
+    ok(type(s[1]) == "number", "the ID, never the entry table")
+    ok(st.refreshed == 1, "and the tracker is asked to repaint once: " .. st.refreshed)
+    -- The menu outlives the render that opened it: the row can be showing another quest by the
+    -- time the click lands.
+    row._entry = { id = 999, title = "Another" }
+    click(m[3], "Untrack")
+    s = st.selected[2] or {}
+    ok(s[1] == 155 and s[2] == "untrack", "a click after the row moved on still acts on 155: " .. tostring(s[1]))
+end
+
+print("== a refusal reaches the chat frame as words, and an unknown token says nothing")
+do
+    local RowMenu, _, st = loadShow()
+    st.items = questItems()
+    show(RowMenu, questRow())
+    local m = st.shown[1] or {}
+    st.refusal = "combat"
+    click(m[9], "Abandon")
+    local s = st.selected[1] or {}
+    ok(s[2] == "abandon", "Abandon dispatches abandon")
+    ok(st.printed[1] == "You cannot abandon a quest while in combat.",
+       "the combat refusal is printed in words: " .. tostring(st.printed[1]))
+    st.refusal = "nonsense"
+    click(m[9], "Abandon again")
+    ok(#st.printed == 1, "an unknown token prints nothing: " .. #st.printed)
+end
+
+print("== Search on Wowhead opens the link here and never asks the provider")
+do
+    local RowMenu, _, st = loadShow()
+    st.items = questItems()
+    show(RowMenu, questRow())
+    click((st.shown[1] or {})[7], "Wowhead")
+    ok(st.urls[1] == "https://www.wowhead.com/quest=155", "the retail link for 155: " .. tostring(st.urls[1]))
+    ok(#st.selected == 0, "and the provider is not asked")
+    ok(st.refreshed == 1, "the tracker repaints after it like any other action")
+end
+
+print("== another addon's item sits where its order puts it and runs its own action")
+do
+    local RowMenu, API, st = loadShow()
+    st.items = questItems()
+    local got
+    ok(API:AddMenuItem({ id = "eq-directions", providerID = "quests", label = "Get Directions", order = 35,
+                         onClick = function(p, e) got = { p, e } end }) == true, "EQ's item registers")
+    API:AddMenuItem({ id = "zz-other", providerID = "worldquests", label = "Not Here", order = 36,
+                      onClick = function() end })
+    API:AddMenuItem({ id = "zz-hidden", label = "Hidden", order = 37,
+                      shouldShow = function() return false end, onClick = function() end })
+    API:AddMenuItem({ id = "zz-every", label = "Everywhere", order = 65, onClick = function() end })
+    API:AddMenuItem({ id = "aaa", providerID = "quests", label = "Alpha", order = 30, onClick = function() end })
+    show(RowMenu, questRow())
+    local m = st.shown[1] or {}
+    local n = names(m)
+    ok(n[4] == "Alpha" and n[5] == "Focus",
+       "two items at one order fall back to their ids, aaa before focus: " .. table.concat(n, " | "))
+    ok(n[6] == "Get Directions" and n[7] == "Open in Map & Quest Log",
+       "Get Directions between Focus and Open in Map, at 35")
+    ok(n[9] == "Search on Wowhead" and n[10] == "Everywhere",
+       "an item for every provider shows here too, at its own order")
+    local joined = table.concat(n, " | ")
+    ok(not joined:find("Not Here", 1, true), "an item for another provider stays off this one")
+    ok(not joined:find("Hidden", 1, true), "an item whose shouldShow says no stays off")
+    click(m[6], "Get Directions")
+    ok(got and got[1] == "quests" and got[2] == 155, "its action gets the provider and the entry ID")
+    ok(#st.selected == 0, "and the provider's own dispatch is not called for it")
+end
+
+print("== an id with no label is left out, and a title with no text still draws")
+do
+    local RowMenu, _, st = loadShow()
+    st.items = { { kind = "title", order = 0 }, { id = "mystery", order = 45 }, { id = "pin", order = 10 } }
+    show(RowMenu, questRow())
+    local m = st.shown[1] or {}
+    ok(table.concat(names(m), " | ") == " | Pin to tracker | divider | Cancel",
+       "title, Pin, the divider and Cancel, nothing blank: " .. table.concat(names(m), " | "))
+    ok(m[1] and m[1].text == "", "the untitled title is an empty string, which the library takes")
+end
+
+print("== Show draws nothing, and says so, when there is nothing to draw")
+do
+    local RowMenu, _, st = loadShow()
+    st.items = questItems()
+    st.safe = true
+    ok(show(RowMenu, questRow(), "safe mode") == false and #st.shown == 0, "safe mode: no menu")
+    st.safe = false
+    ok(show(RowMenu, { _providerID = "quests" }, "no entry") == false, "a row with no entry")
+    ok(show(RowMenu, { _entry = { id = 1 } }, "no provider") == false, "a row with no provider")
+    ok(show(RowMenu, { _entry = { id = 1 }, _providerID = "achievements" }, "unknown provider") == false,
+       "a provider the registry does not know")
+    st.provider.GetEntryMenu, st.provider.OnEntryMenuSelect = nil, nil
+    ok(show(RowMenu, questRow(), "no menu") == false, "a provider with no menu")
+    st.provider.GetEntryMenu = function() return nil end
+    ok(show(RowMenu, questRow(), "nil menu") == false, "a provider whose menu is nil")
+    st.provider.GetEntryMenu = function() return {} end
+    ok(show(RowMenu, questRow(), "empty menu") == false, "an empty menu")
+    ok(#st.shown == 0, "and the library was never asked: " .. #st.shown)
+end
+
+print("== a second right-click shows only the second quest's menu")
+do
+    local good, err = pcall(function()
+        local RowMenu, _, st = loadShow()
+        st.items = questItems()
+        show(RowMenu, questRow())
+        st.items = { { kind = "title", text = "Wolves at the Door", order = 0 }, { id = "untrack", order = 20 } }
+        show(RowMenu, { _entry = { id = 156, title = "Wolves at the Door" }, _providerID = "quests" })
+        local n = table.concat(names(st.shown[2] or {}), " | ")
+        ok(n == "Wolves at the Door | Untrack Quest | divider | Cancel",
+           "nothing is carried over from the first menu: " .. n)
+        click((st.shown[2] or {})[2], "Untrack on the second menu")
+        local s = st.selected[1] or {}
+        ok(s[1] == 156 and s[2] == "untrack", "and its item acts on the second quest: " .. tostring(s[1]))
+    end)
+    ok(good, "the second right-click raised: " .. tostring(err))
+end
+
+print("== every word the menu shows comes through the locale table")
+do
+    local good, err = pcall(function()
+        local RowMenu, _, st = loadShow(true)
+        st.items = questItems()
+        show(RowMenu, questRow())
+        local m = st.shown[1] or {}
+        ok(m[1] and m[1].text == "The Fall of the Lich King", "the title is the quest's own name, not a lookup")
+        for i = 2, #m do
+            if m[i].kind == nil then
+                ok(type(m[i].text) == "string" and m[i].text:match("^<.+>$") ~= nil,
+                   ("row %d is a translated label: %s"):format(i, tostring(m[i].text)))
+            end
+        end
+        ok(m[2] and m[2].text == "<Pin to tracker>", "Pin reads its own key: " .. tostring(m[2] and m[2].text))
+        ok(m[#m] and m[#m].text == "<Cancel>", "Cancel reads its own key: " .. tostring(m[#m] and m[#m].text))
+        st.refusal = "combat"
+        click(m[9], "Abandon in combat")
+        ok(st.printed[1] == "<You cannot abandon a quest while in combat.>",
+           "the refusal is printed in the player's language: " .. tostring(st.printed[1]))
+    end)
+    ok(good, "the translated labels raised: " .. tostring(err))
 end
 
 print(("test_row_menu: %d passed, %d failed"):format(pass, fail))

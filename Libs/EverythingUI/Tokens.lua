@@ -41,6 +41,7 @@ lib.tokens = {
         label         = hex("C4C8CE"),
         navText       = hex("A3A8B0"),
         muted         = hex("8B9098"),
+        danger        = hex("FF5050"),
         hover         = { 1, 1, 1 },
     },
 
@@ -72,6 +73,7 @@ lib.tokens = {
         value      = { size = 13, weight = "Medium",   color = "text" },
         groupLabel = { size = 12, weight = "SemiBold", color = "muted" },
         hint       = { size = 12, weight = "Regular",  color = "muted" },
+        segment    = { size = 12, weight = "SemiBold", color = "navText" },
     },
 
     spacing = {
@@ -90,6 +92,7 @@ lib.tokens = {
         groupLabelGap      = 8,
         rowHeight          = 44,
         dependentRowHeight = 40,
+        listRowHeight      = 28,
         rowPadding         = 14,
         dependentIndent    = 40,
         labelColumn        = 150,
@@ -100,5 +103,18 @@ lib.tokens = {
         buttonHeight       = 32,
         segmentHeight      = 26,
         border             = 1,
+        fieldHeight        = 30,
+        controlGap         = 14,
+        checkboxGap        = 10,
+        buttonGap          = 10,
+        trackHeight        = 3,
+        thumbWidth         = 8,
+        thumbHeight        = 15,
+        chevron            = 12,
+        segmentPadding     = 14,
+        segmentGap         = 2,
+        popupRowHeight     = 22,
+        popupMaxRows       = 10,
+        menuItemHeight     = 24,
     },
 }

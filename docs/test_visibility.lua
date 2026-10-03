@@ -1095,12 +1095,22 @@ do
        and occurrences(a, "self:SetDependent(fadeFocus, faded)\n") == 1, "both are swept")
     ok(occurrences(a, "        end\n        syncFade()\n\n        local spacingSlider") == 1,
        "and dimmed once when the tab is built")
-    ok(occurrences(a, 'spacingSlider:SetPoint("TOPLEFT", fadeFocus, "BOTTOMLEFT", 0, -14)') == 1,
-       "Block Spacing hangs below the new controls rather than on top of them")
-    ok(occurrences(a, 'fadeSlider:SetPoint("TOPLEFT", scaleSlider, "BOTTOMLEFT", 0, -16)') == 1
-       and occurrences(a, 'fadeHover:SetPoint("TOPLEFT", fadeSlider, "BOTTOMLEFT", 0, -14)') == 1
-       and occurrences(a, 'fadeFocus:SetPoint("TOPLEFT", fadeHover, "BOTTOMLEFT", 0, -2)') == 1,
-       "the three new controls hang one below the other under Tracker Scale")
+    -- A card stacks its rows in the order they are added, so the order of these lines is the
+    -- order on screen. docs/test_appearance.lua drives the same order through the real tab.
+    local function addedAt(line)
+        if occurrences(a, line) ~= 1 then return nil end
+        return a:find(line, 1, true)
+    end
+    local scaleAt = addedAt("        colors:Add(scaleSlider)\n")
+    local fadeAt  = addedAt("        colors:Add(fadeSlider)\n")
+    local hoverAt = addedAt("        colors:Add(fadeHover, DEPENDENT)\n")
+    local focusAt = addedAt("        colors:Add(fadeFocus, DEPENDENT)\n")
+    local spaceAt = addedAt("        colors:Add(spacingSlider)\n")
+    ok(spaceAt and focusAt and spaceAt > focusAt,
+       "Block Spacing comes after the new controls rather than among them")
+    ok(scaleAt and fadeAt and hoverAt and focusAt and scaleAt < fadeAt and fadeAt < hoverAt
+       and hoverAt < focusAt and occurrences(a, "local DEPENDENT = { dependent = true }\n") == 1,
+       "the three new controls stack one below the other under Tracker Scale, the two boxes indented")
 end
 
 print(string.format("test_visibility: %d passed, %d failed", pass, fail))

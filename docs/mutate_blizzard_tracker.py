@@ -45,7 +45,7 @@ SB = "Data/ScenarioBonus.lua"
 QX = "UI/QuestieCoexist.lua"
 ZB = "UI/ZoneProgressBar.lua"
 DLG = "UI/Dialog.lua"
-FR = "Options/Frame.lua"
+DD ="Libs/EverythingUI/Dropdown.lua"
 
 LIST1 = "    Blizzard = true, QuestLogChecks = true, QuestieCoexist = true,\n"
 LIST3 = "    Widgets = true, WidgetBlock = true, Visibility = true,\n"
@@ -242,13 +242,16 @@ MUTANTS = [
         (G, '            function() return ns:GetModule("API"):GetBlizzardTrackerSetting() end,\n',
             "            function() return ns:UsesBlizzardTracker() end,\n")]),
 
-    ("the box sits at the wrong gap", [
-        (G, '        blizz:SetPoint("TOPLEFT", h, "BOTTOMLEFT", 0, self.GAP.tabHead)\n',
-            '        blizz:SetPoint("TOPLEFT", h, "BOTTOMLEFT", 0, -2)\n')]),
+    ("the box is never put in its card", [
+        (G, "        general:Add(blizz)\n", "")]),
 
-    ("Lock tracker stays on the heading and covers the box", [
-        (G, '        lock:SetPoint("TOPLEFT", blizz, "BOTTOMLEFT", 0, -2)\n',
-            '        lock:SetPoint("TOPLEFT", h, "BOTTOMLEFT", 0, self.GAP.tabHead)\n')]),
+    ("Lock tracker heads the card and the box falls below it", [
+        (G, "        general:Add(blizz)\n", ""),
+        (G, "        general:Add(lock)\n", "        general:Add(lock)\n        general:Add(blizz)\n")]),
+
+    ("the box goes in a second card instead of General", [
+        (G, "        general:Add(blizz)\n",
+            '        self:CreateGroup(content, L["Profiles"]):Add(blizz)\n')]),
 
     # ------------------------------------------------- found by the first scan, kept caught
     ("EQOT's own set keeps answering, so an older Everything Quests filters by a stale list", [
@@ -339,59 +342,41 @@ MUTANTS = [
         (C, "        local countWatches = (C_QuestLog and C_QuestLog.GetNumQuestWatches) or _G.GetNumQuestWatches\n",
             "        local countWatches = (C_QuestLog or _G).GetNumQuestWatches\n")]),
 
-    ("the dialog hides before the callback, which blocked ReloadUI on retail", [
-        (DLG, "    if f then f.editBox:ClearFocus() end\n",
-              "    if f then f.editBox:ClearFocus(); f:Hide() end\n")]),
+    # The dialog itself moved to the EverythingUI library on 2026-10-02 with its 1.28 rules, and its
+    # mutants with it (the library's tests/mutate.py). What stays here is the wrapper handing it on.
+    ("the dialog loses its default title", [
+        (DLG, '        title            = opts.title or "EQ Objective Tracker",\n',
+              '        title            = opts.title,\n')]),
 
-    ("a callback that opens the next dialog has it hidden", [
-        (DLG, "    if f and not self.opts then f:Hide() end\n", "    if f then f:Hide() end\n")]),
+    ("a dialog with no button named gets none", [
+        (DLG, '        button1          = opts.button1 or L["OK"],\n', '        button1          = opts.button1,\n')]),
 
-    ("a raising callback leaves the dialog on screen with nothing left to close it", [
-        (DLG, "        if opts.onAccept then xpcall(function() opts.onAccept(text) end, geterrorhandler()) end\n",
-              "        if opts.onAccept then opts.onAccept(text) end\n")]),
+    ("the dialog's text is dropped", [
+        (DLG, '        text             = opts.text or "",\n', '        text             = "",\n')]),
+
+    ("a confirm loses its second button", [
+        (DLG, '        button2          = opts.button2,\n', '')]),
+
+    ("Yes never reaches its callback, so nothing it confirms happens", [
+        (DLG, '        onAccept         = opts.onAccept,\n', '')]),
 
     ("Cancel no longer reaches its callback", [
-        (DLG, "        xpcall(opts.onCancel, geterrorhandler())\n", "")]),
+        (DLG, '        onCancel         = opts.onCancel,\n', '')]),
 
-    ("the dialog keeps the keyboard after it closes", [
-        (DLG, "    if f then f.editBox:ClearFocus() end\n", "")]),
+    ("New Profile and the copy-a-link popups lose their field", [
+        (DLG, '        hasEditBox       = opts.hasEditBox and true or nil,\n', '')]),
 
-    ("a raising Cancel leaves the dialog on screen", [
-        (DLG, "        xpcall(opts.onCancel, geterrorhandler())\n", "        opts.onCancel()\n")]),
+    ("a link to copy opens with an empty field", [
+        (DLG, '        editBoxText      = opts.editBoxText,\n', '')]),
 
-    ("what was typed never reaches onAccept, so New Profile loses the name", [
-        (DLG, "xpcall(function() opts.onAccept(text) end, geterrorhandler())",
-              "xpcall(function() opts.onAccept() end, geterrorhandler())")]),
+    ("a link to copy opens unselected", [
+        (DLG, '        highlightEditBox = opts.highlightEditBox and true or nil,\n', '')]),
 
-    ("the edit box keeps the keyboard while the callback runs", [
-        (DLG, "    if f then f.editBox:ClearFocus() end\n", ""),
-        (DLG, "    if f and not self.opts then f:Hide() end\n",
-              "    if f then f.editBox:ClearFocus() end\n    if f and not self.opts then f:Hide() end\n")]),
+    ("a field loses its letter limit", [
+        (DLG, '        maxLetters       = opts.maxLetters,\n', '')]),
 
-    ("Enter in the edit box cancels", [
-        (DLG, '    f.editBox:SetScript("OnEnterPressed", function() Dialog:_finish(true) end)\n',
-              '    f.editBox:SetScript("OnEnterPressed", function() Dialog:_finish(false) end)\n')]),
-
-    ("Escape accepts, which reloads on a reload prompt", [
-        (DLG, "            frame:SetPropagateKeyboardInput(false)\n            Dialog:_finish(false)\n",
-              "            frame:SetPropagateKeyboardInput(false)\n            Dialog:_finish(true)\n")]),
-
-    ("Escape in the edit box accepts", [
-        (DLG, '    f.editBox:SetScript("OnEscapePressed", function() Dialog:_finish(false) end)\n',
-              '    f.editBox:SetScript("OnEscapePressed", function() Dialog:_finish(true) end)\n')]),
-
-    ("Enter with no edit box accepts, which reloads on a reload prompt", [
-        (DLG, "            frame:SetPropagateKeyboardInput(false)\n        else\n",
-              "            frame:SetPropagateKeyboardInput(false)\n            Dialog:_finish(true)\n        else\n")]),
-
-    ("a dialog opened over another accepts it", [
-        (DLG, "    if self.opts then self:_finish(false) end\n", "    if self.opts then self:_finish(true) end\n")]),
-
-    ("a dialog opened over another drops it silently", [
-        (DLG, "    if self.opts then self:_finish(false) end\n", "")]),
-
-    ("a dropdown pick runs after its list hides, which blocks a profile switch's reload", [
-        (FR, "            xpcall(function() onPick(opt.value) end, geterrorhandler())\n            p:Hide()\n",
+    ("the library's list picks after it hides, which blocks the profile switch's reload", [
+        (DD, "            xpcall(function() onPick(opt.value) end, geterrorhandler())\n            p:Hide()\n",
              "            p:Hide()\n            xpcall(function() onPick(opt.value) end, geterrorhandler())\n")]),
 
     ("Yes leaves no hint when the reload is refused", [

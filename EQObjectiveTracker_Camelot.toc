@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 1.28.0
+## Version: 2.0.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -95,6 +95,7 @@ UI\RewardTooltip.lua
 UI\ScenarioBonusHUD.lua
 UI\Visibility.lua
 UI\Dialog.lua
+UI\TrackerPreview.lua
 
 # Options. Frame.lua defines RegisterTab and must load before any Tab file.
 Options\Frame.lua

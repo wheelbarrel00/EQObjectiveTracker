@@ -33,6 +33,8 @@ HARNESS = "docs/test_row_menu.lua"
 Q = "Data/Providers/Quests.lua"
 W = "Data/Providers/WorldQuests.lua"
 R = "UI/RowMenu.lua"
+A = "Core/API.lua"
+M = "Libs/EverythingUI/Menu.lua"
 
 Q_GATE = '    if entry.canGroup then menuOut[#menuOut + 1] = { id = "findgroup", order = 55 } end'
 W_GATE = '    if entry.canGroup then menuOut[#menuOut + 1] = { id = "findgroup", order = 25 } end'
@@ -207,6 +209,140 @@ MUTANTS = [
     ("Classic stops reading the expansion level, so TBC opens the Era site", [
         (R, "        game = WOWHEAD_GAME[level] or \"classic/\"",
             "        game = \"classic/\"")]),
+
+    # ------------------------------------------- what RowMenu:Show hands the library's menu
+    ("the title is not handed to the library", [
+        (R, '            menu[#menu + 1] = { kind = "title", text = it.text or "" }\n', "")]),
+
+    # The library refuses a title with no text, which would be a Lua error on the right-click.
+    ("an untitled title is handed over as nil", [
+        (R, 'text = it.text or "" }', 'text = it.text }')]),
+
+    ("the provider's divider is dropped", [
+        (R, '        elseif it.kind == "divider" then\n'
+            '            menu[#menu + 1] = { kind = "divider" }\n',
+            '        elseif it.kind == "divider" then\n')]),
+
+    ("danger is dropped, so Abandon draws like any other item", [
+        (R, "danger = it.danger and true or nil,", "danger = nil,")]),
+
+    ("every item is drawn as danger", [
+        (R, "danger = it.danger and true or nil,", "danger = true,")]),
+
+    ("the trailing divider is dropped", [
+        (R, '    menu[#menu + 1] = { kind = "divider" }\n    menu[#menu + 1] = { text = L["Cancel"] }',
+            '    menu[#menu + 1] = { text = L["Cancel"] }')]),
+
+    ("Cancel is dropped", [
+        (R, '    menu[#menu + 1] = { text = L["Cancel"] }\n', "")]),
+
+    ("another addon's label is ignored, so its item never draws", [
+        (R, "            local label = it.label or LABELS[it.id]",
+            "            local label = LABELS[it.id]")]),
+
+    ("an id with no label is handed over with no text", [
+        (R, "            if label then", "            if true then")]),
+
+    ("the sort is dropped, so the menu keeps the provider's order", [
+        (R, "    table.sort(scratch, byOrder)\n", "")]),
+
+    ("a tie on order goes the other way", [
+        (R, '    if a.order == b.order then return (a.id or "") < (b.id or "") end',
+            '    if a.order == b.order then return (a.id or "") > (b.id or "") end')]),
+
+    ("other addons' items are never asked for", [
+        (R, '    ns:GetModule("API"):MenuItemsFor(providerID, entryID, scratch)\n', "")]),
+
+    ("the entry table is dispatched instead of its ID", [
+        (R, "    local entryID = entry.id\n", "    local entryID = entry\n")]),
+
+    # The menu outlives the render that opened it, so the row can hold another quest by then.
+    ("a click reads the row's entry when it lands, not the quest it opened for", [
+        (R, "onClick = function() run(providerID, entryID, it) end }",
+            "onClick = function() run(providerID, row._entry.id, it) end }")]),
+
+    ("a click runs the first item, not its own", [
+        (R, "onClick = function() run(providerID, entryID, it) end }",
+            "onClick = function() run(providerID, entryID, list[1]) end }")]),
+
+    ("the tracker is not repainted after an action", [
+        (R, "    if Tracker then Tracker:Refresh() end\n", "")]),
+
+    ("a refusal is never printed", [
+        (R, "            if refused and REFUSALS[refused] then ns:Print(REFUSALS[refused]) end\n", "")]),
+
+    ("an unknown refusal token prints nil", [
+        (R, "if refused and REFUSALS[refused] then ns:Print(REFUSALS[refused]) end",
+            "if refused then ns:Print(REFUSALS[refused]) end")]),
+
+    ("Search on Wowhead is dispatched to the provider instead of opened here", [
+        (R, '    elseif item.id == "wowhead" then\n        wowhead(entryID)\n', "")]),
+
+    ("another addon's item is dispatched to the provider", [
+        (R, "    if item.external then\n        item.external.onClick(providerID, entryID)\n    elseif",
+            "    if false then\n    elseif")]),
+
+    ("another addon's item gets no entry ID", [
+        (R, "        item.external.onClick(providerID, entryID)",
+            "        item.external.onClick(providerID)")]),
+
+    ("safe mode leaves the menu live", [
+        (R, "    if ns:SafeMode() then return false end\n", "")]),
+
+    # Row.lua falls through to the provider's own click on false, so both would run.
+    ("Show reports no menu after showing one", [
+        (R, '    ns:GetModule("Options").ui:ShowMenu(menu)\n    return true',
+            '    ns:GetModule("Options").ui:ShowMenu(menu)\n    return false')]),
+
+    ("the library is never asked", [
+        (R, '    ns:GetModule("Options").ui:ShowMenu(menu)\n', "")]),
+
+    ("an empty menu is still shown", [
+        (R, "    if #list == 0 then return false end\n", "")]),
+
+    ("a provider with no menu is asked for one anyway", [
+        (R, "    if not (provider and provider.GetEntryMenu) then return false end",
+            "    if not provider then return false end")]),
+
+    ("a nil menu is read anyway", [
+        (R, "    if not items then return false end\n", "")]),
+
+    ("a row with no entry is read anyway", [
+        (R, "    if not (entry and providerID) then return false end\n", "")]),
+
+    # ------------------------------------------- API:MenuItemsFor, the foreign items it adds
+    ("an item for another provider shows on this one", [
+        (A, "        if not it.providerID or it.providerID == providerID then",
+            "        if true then")]),
+
+    ("an item for every provider shows on none", [
+        (A, "        if not it.providerID or it.providerID == providerID then",
+            "        if it.providerID == providerID then")]),
+
+    ("shouldShow is ignored", [
+        (A, "                show = ok and res and true or false", "                show = true")]),
+
+    ("a foreign item loses its order", [
+        (A, "                    order = it.order, external = it,",
+            "                    order = 999, external = it,")]),
+
+    # ------------------------------------------- what one right-click leaves for the next
+    ("the item list is never cleared, so every right-click carries the last menu's items", [
+        (R, "    for i = #scratch, 1, -1 do scratch[i] = nil end\n", "")]),
+
+    # ------------------------------------------- words a literal would leave in English
+    ("Cancel is hard-coded in English", [
+        (R, '    menu[#menu + 1] = { text = L["Cancel"] }', '    menu[#menu + 1] = { text = "Cancel" }')]),
+
+    ("Pin to tracker is hard-coded in English", [
+        (R, '    pin        = L["Pin to tracker"],', '    pin        = "Pin to tracker",')]),
+
+    ("the combat refusal is hard-coded in English", [
+        (R, '    combat      = L["You cannot abandon a quest while in combat."],',
+            '    combat      = "You cannot abandon a quest while in combat.",')]),
+    # The fields the harness checks are read from the vendored library, so a change there is seen.
+    ("the library stops taking danger, which Abandon carries", [
+        (M, 'local ITEM_FIELDS = { kind = "string", text = "string", danger = "boolean", onClick = "function" }', 'local ITEM_FIELDS = { kind = "string", text = "string", onClick = "function" }')]),
 ]
 
 SUMMARY = re.compile(r"^test_row_menu: (\d+) passed, (\d+) failed$")

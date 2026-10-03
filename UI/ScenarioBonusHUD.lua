@@ -139,23 +139,23 @@ function HUD:_SavePosition()
 end
 
 function HUD:_ContextMenu()
-    if not (MenuUtil and MenuUtil.CreateContextMenu and self.frame) then return end
-    MenuUtil.CreateContextMenu(self.frame, function(_, root)
-        root:CreateTitle(L["Bonus Objectives"])
-        local st = hudState() or {}
-        root:CreateButton(st.locked and L["Unlock (allow moving)"] or L["Lock position"], function()
+    if not self.frame then return end
+    local st = hudState() or {}
+    ns:GetModule("Options").ui:ShowMenu({
+        { kind = "title", text = L["Bonus Objectives"] },
+        { text = st.locked and L["Unlock (allow moving)"] or L["Lock position"], onClick = function()
             local s = hudState()
             if s then s.locked = not s.locked end
             HUD:ApplySettings()
-        end)
-        root:CreateButton(L["Reset position"], function()
+        end },
+        { text = L["Reset position"], onClick = function()
             local s = hudState()
             if s then s.point, s.relPoint, s.x, s.y = "CENTER", "CENTER", 0, DEFAULT_Y end
             HUD:ApplySettings()
-        end)
-        root:CreateDivider()
-        root:CreateButton(L["Cancel"], function() end)
-    end)
+        end },
+        { kind = "divider" },
+        { text = L["Cancel"] },
+    })
 end
 
 -- Parented to UIParent so it stays outside the tracker's secure item-button chain and needs

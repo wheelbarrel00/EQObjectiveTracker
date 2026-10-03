@@ -1,5 +1,9 @@
--- Unit tests for Options:ShowColorPicker, run against the SHIPPED source.
--- Run from the repo root with the game's own Lua version:
+-- Unit tests for the color picker's ShowColorPicker, run against the SHIPPED source: the copy of
+-- EverythingUI vendored at Libs/EverythingUI/ColorPicker.lua, which is the one this addon loads.
+-- The picker moved there in phase 1 step 4, and the library's own tests/test_color_picker.lua and
+-- its battery carry the same cases against the whole library. This file keeps them pointed at the
+-- vendored copy, and keeps the half nothing in the library can reach: UI/Sections.lua drawing
+-- the stored alpha. Run from the repo root with the game's own Lua version:
 --
 --     "C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe" docs/test_color_picker.lua
 --
@@ -41,8 +45,9 @@
 --
 -- OUT OF SCOPE BY CONSTRUCTION: the slice is ShowColorPicker alone. CreateColorPicker builds
 -- frames, so its swatch, its paint() and its prev-snapshot are reached by no assertion here.
--- The two file-locals are stubbed too, so the OnHide hook that clears activeColorApply,
--- activeReopen and activeCancel - which the re-seed Hide now fires - is uncovered as well.
+-- The session state and the hook are stubbed too, so the OnHide hook that clears the open
+-- picker's callbacks - which the re-seed Hide now fires - is uncovered as well. The library's
+-- own tests drive all three.
 
 local function repoFile(rel)
     local f = io.open(rel, "r")
@@ -180,61 +185,61 @@ local function newClassicPicker(startAlpha)
     return cp
 end
 
--- --------------------------------------------------------- Options/Frame.lua slice
---
--- Frame.lua cannot be loaded whole - it takes the addon namespace off varargs and registers a
--- module at file scope - so ShowColorPicker is sliced by TEXT ANCHOR rather than line number,
--- which drifts. If an anchor below stops matching, fix the anchor here rather than deleting
--- the test.
+-- The library file cannot be loaded alone - it opens on LibStub and the host check, and reads
+-- the kit and the context methods the other library files make - so ShowColorPicker is sliced
+-- by TEXT ANCHOR rather than line number, which drifts. If an anchor below stops matching, fix
+-- the anchor here rather than deleting the test.
 
-local src = readFile("Options/Frame.lua")
+local PICKER_FILE = "Libs/EverythingUI/ColorPicker.lua"
+local src = readFile(PICKER_FILE)
 
 -- The slice starts at the class button rather than at ShowColorPicker: the button seeds a
 -- reopen from the control's own value, so it has to be read in the same space the picker
--- writes, and it shares activeReopen with the picker as a file-local.
-local FROM_ANCHOR = "local function ensureClassColorButton()"
-local TO_ANCHOR   = "function Options:CreateColorPicker(content, label, getter, setter, tooltip, hasAlpha, onClear)"
+-- writes, and it shares the open picker's reopen with it through the session state.
+local FROM_ANCHOR = "local function ensureClassColorButton(ctx)"
+local TO_ANCHOR   = "function Context:CreateColorPicker(content, label, getter, setter, tooltip, hasAlpha, onClear)"
 local from = src:find(FROM_ANCHOR, 1, true)
 local to   = src:find(TO_ANCHOR, 1, true)
-assert(from, "anchor not found in Options/Frame.lua: " .. FROM_ANCHOR)
-assert(to,   "anchor not found in Options/Frame.lua: " .. TO_ANCHOR)
-assert(to > from, "anchors are out of order in Options/Frame.lua")
+assert(from, "anchor not found in " .. PICKER_FILE .. ": " .. FROM_ANCHOR)
+assert(to,   "anchor not found in " .. PICKER_FILE .. ": " .. TO_ANCHOR)
+assert(to > from, "anchors are out of order in " .. PICKER_FILE)
 
-local slice = "local Options = {}\n" .. src:sub(from, to - 1) .. "\nreturn Options\n"
+local slice = "local Context = {}\n" .. src:sub(from, to - 1) .. "\nreturn Context\n"
 
 -- Read out of the shipped source rather than written here: a probe value restated in the test
 -- would keep agreeing with itself after the shipped one moved.
 local PROBE_ALPHA = tonumber(src:match("local PROBE_ALPHA%s*=%s*([%d%.]+)"))
-assert(PROBE_ALPHA, "PROBE_ALPHA did not match in Options/Frame.lua")
+assert(PROBE_ALPHA, "PROBE_ALPHA did not match in " .. PICKER_FILE)
 ok(PROBE_ALPHA ~= 0.5, "a probe at 0.5 could not tell the two conventions apart")
 
 -- The class button the slice builds, captured so a case can press it.
 local classBtn
+
+-- The context the picker is opened through. Only its button maker and its window are read.
+local ui = {}
+function ui.CreateButton(_, _, _, _, onClick)
+    classBtn = { _shown = false, Click = onClick }
+    function classBtn:SetPoint() end
+    function classBtn:Show() self._shown = true end
+    function classBtn:Hide() self._shown = false end
+    return classBtn
+end
 
 local env = setmetatable({
     -- These are file-locals above the slice in production, so they resolve as globals here.
     ensurePickerHook = function() end,
     PROBE_ALPHA      = PROBE_ALPHA,
     elvUILoaded      = function() return false end,
-    ns               = { GetModule = function()
-        return { GetPlayerClassColor = function() return 0.67, 0.83, 0.45 end }
-    end },
-    flatButton = function(_, _, onClick)
-        classBtn = { _shown = false, Click = onClick }
-        function classBtn:SetSize() end
-        function classBtn:SetPoint() end
-        function classBtn:Show() self._shown = true end
-        function classBtn:Hide() self._shown = false end
-        return classBtn
-    end,
+    classColor       = function() return 0.67, 0.83, 0.45 end,
+    kit              = { Fill = function() end },
 }, { __index = _G })
 
-local Options = (function()
-    local chunk = assert(loadstring(slice, "@Options/Frame.lua slice"))
+local Context = (function()
+    local chunk = assert(loadstring(slice, "@" .. PICKER_FILE .. " slice"))
     setfenv(chunk, env)
     return chunk()
 end)()
-assert(type(Options.ShowColorPicker) == "function", "the slice defined no ShowColorPicker")
+assert(type(Context.ShowColorPicker) == "function", "the slice defined no ShowColorPicker")
 
 -- Swaps the frames without touching session state, for a case that models one client opening
 -- two pickers rather than two clients.
@@ -250,11 +255,10 @@ end
 -- The slice reads these as globals off its environment.
 local function install(cp, box)
     installFrames(cp, box)
-    -- Cleared per case because production settles these once per SESSION, and every case here
-    -- is a fresh client. Leaving them set lets one case answer for the next one's picker.
-    env.pickerAlphaInverted = nil
-    env.classColorButton    = nil
-    classBtn                = nil
+    -- A fresh session state per case because production settles it once per SESSION, and
+    -- every case here is a fresh client. Keeping it lets one case answer for the next one's.
+    env.state = {}
+    classBtn  = nil
 end
 
 -- ElvUI's Color Picker Plus, read off Game/Classic/Blizzard/ColorPicker.lua rather than
@@ -313,7 +317,7 @@ local function swatch(stored, hasAlpha)
     function s:Open()
         local c = self.value or {}
         local prev = self.value and { r = c.r, g = c.g, b = c.b, a = c.a } or nil
-        guard(Options.ShowColorPicker, Options, c.r or 1, c.g or 1, c.b or 1, c.a or 1, hasAlpha,
+        guard(Context.ShowColorPicker, ui, c.r or 1, c.g or 1, c.b or 1, c.a or 1, hasAlpha,
             function(nr, ng, nb, na) self.value = { r = nr, g = ng, b = nb, a = na } end,
             function() self.value = prev end)
     end
@@ -501,7 +505,7 @@ do
     install(cp, box)
     local bar = swatch({ r = 0.8, g = 0.6, b = 0.2, a = 0.5 }, true)
     bar:Open()
-    ok(env.pickerAlphaInverted == true, "the probe settles the convention at the ambiguous alpha")
+    ok(env.state.alphaInverted == true, "the probe settles the convention at the ambiguous alpha")
     ok(near(picker.slider:GetValue(), 0.5), "and the control still ends up where the color asked")
     drive(picker, "DragOpacity", 0.75)
     ok(near(A(bar), 0.25), "so a later drag stores the alpha ElvUI is showing, not its complement")
@@ -514,7 +518,7 @@ do
     install(cp, box)
     local first = swatch({ r = 0.1, g = 0.2, b = 0.3, a = 0.85 }, true)
     first:Open()
-    ok(env.pickerAlphaInverted == true, "the first open that can answer settles it")
+    ok(env.state.alphaInverted == true, "the first open that can answer settles it")
 
     local before = cp.slider._writes
     local second = swatch({ r = 0.4, g = 0.5, b = 0.6, a = 0.25 }, true)
@@ -532,14 +536,14 @@ do
     local cp = newClassicPicker(0)
     install(cp, { GetText = function() return "" end })
     swatch({ r = 0.8, g = 0.6, b = 0.2, a = 0.85 }, true):Open()
-    ok(env.pickerAlphaInverted == nil, "an unreadable box settles nothing")
+    ok(env.state.alphaInverted == nil, "an unreadable box settles nothing")
 
     -- Same session, so the frames are swapped without clearing what it has learned.
     local good = newClassicPicker(0)
     installFrames(good, attachColorPP(good, true))
     local bar = swatch({ r = 0.8, g = 0.6, b = 0.2, a = 0.85 }, true)
     bar:Open()
-    ok(env.pickerAlphaInverted == true, "and a later readable one still settles it")
+    ok(env.state.alphaInverted == true, "and a later readable one still settles it")
     drive(picker, "DragOpacity", 0.75)
     ok(near(A(bar), 0.25), "with the alpha read the right way round from then on")
 end
@@ -639,14 +643,14 @@ do
     install(cp, box)
 
     local commits, stored = 0, nil
-    guard(Options.ShowColorPicker, Options, 1, 1, 1, 1, true,
+    guard(Context.ShowColorPicker, ui, 1, 1, 1, 1, true,
         function(nr, ng, nb, na)
             commits = commits + 1
             stored = { r = nr, g = ng, b = nb, a = na }
         end,
         function() stored = nil end)
 
-    ok(env.pickerAlphaInverted == true, "the first open still settles the convention")
+    ok(env.state.alphaInverted == true, "the first open still settles the convention")
     ok(commits == 0, "and merely opening it commits nothing")
     ok(stored == nil, "so an unset clearable color is still unset")
     ok(near(picker.slider:GetValue(), 0), "while the control ends up showing a fully opaque alpha")
@@ -664,7 +668,7 @@ do
 
     local stuck = swatch({ r = 0.1, g = 0.2, b = 0.3, a = 0.5 }, true)
     stuck:Open()
-    ok(env.pickerAlphaInverted == nil, "a box that answers neither convention settles nothing")
+    ok(env.state.alphaInverted == nil, "a box that answers neither convention settles nothing")
 end
 
 -- ------------------------------------------------------------------------------- seams
@@ -695,10 +699,15 @@ do
     local fr = codeOf(src)
     ok(fr:find("cp:SetupColorPickerAndShow", 1, true) ~= nil,
        "ShowColorPicker still prefers the modern entry point")
-    -- The initializer sits above the slice, so no case here can reach it. Latching false at
-    -- load is a wrong answer rather than an absent one, which is the whole of the tri-state.
-    ok(fr:find("local pickerAlphaInverted = nil", 1, true) ~= nil,
-       "the session flag is still initialized unset")
+    -- The session state sits above the slice, so no case here can reach it. It starts empty
+    -- and is kept by every later copy, and the only LITERAL false written is the no-box latch
+    -- inside calibrate (a reading can still settle it false through `= inverted`). Latching
+    -- false at load is a wrong answer rather than an absent one, which is the whole of the
+    -- tri-state.
+    ok(fr:find("local state = lib.shared.colorPicker or {}", 1, true) ~= nil,
+       "the session state is still kept across copies and starts empty")
+    local _, falses = fr:gsub("alphaInverted = false", "")
+    ok(falses == 1, "and the session flag is latched false in one place only: " .. falses)
     -- Seeding is not a user gesture. A bare SetValue here commits a color nobody picked.
     ok(fr:find("setControl(controlValue(na))", 1, true) ~= nil,
        "the corrective write still goes through the commit-suppressing helper")

@@ -29,8 +29,6 @@ local LABELS = {
     abandon    = L["Abandon Quest"],
 }
 
-local DANGER = "|cffff5050%s|r"
-
 local scratch = {}
 
 local function byOrder(a, b)
@@ -88,10 +86,9 @@ end
 
 function RowMenu:Show(row)
     -- No OnEnable, so ns:IsModuleDisabled never covers this. Honored directly, as DragDrop and
-    -- ItemButtons do, or /eqot disable all leaves the menu live - and MenuUtil, StaticPopup and
-    -- the quest log popout are the newest taint vectors a bisection would be trying to rule out.
+    -- ItemButtons do, or /eqot disable all leaves the menu live - and StaticPopup and the quest
+    -- log popout behind it are the newest taint vectors a bisection would be trying to rule out.
     if ns:SafeMode() then return false end
-    if not (MenuUtil and MenuUtil.CreateContextMenu) then return false end
 
     local entry, providerID = row._entry, row._providerID
     if not (entry and providerID) then return false end
@@ -115,23 +112,24 @@ function RowMenu:Show(row)
     for i = 1, #scratch do list[i] = scratch[i] end
     if #list == 0 then return false end
 
-    MenuUtil.CreateContextMenu(row, function(_, root)
-        for i = 1, #list do
-            local it = list[i]
-            if it.kind == "title" then
-                root:CreateTitle(it.text or "")
-            elseif it.kind == "divider" then
-                root:CreateDivider()
-            else
-                local label = it.label or LABELS[it.id]
-                if label then
-                    root:CreateButton(it.danger and DANGER:format(label) or label,
-                        function() run(providerID, entryID, it) end)
-                end
+    -- Drawn by the EverythingUI library's menu, an addon frame, in place of Blizzard's MenuUtil.
+    local menu = {}
+    for i = 1, #list do
+        local it = list[i]
+        if it.kind == "title" then
+            menu[#menu + 1] = { kind = "title", text = it.text or "" }
+        elseif it.kind == "divider" then
+            menu[#menu + 1] = { kind = "divider" }
+        else
+            local label = it.label or LABELS[it.id]
+            if label then
+                menu[#menu + 1] = { text = label, danger = it.danger and true or nil,
+                                    onClick = function() run(providerID, entryID, it) end }
             end
         end
-        root:CreateDivider()
-        root:CreateButton(L["Cancel"], function() end)
-    end)
+    end
+    menu[#menu + 1] = { kind = "divider" }
+    menu[#menu + 1] = { text = L["Cancel"] }
+    ns:GetModule("Options").ui:ShowMenu(menu)
     return true
 end

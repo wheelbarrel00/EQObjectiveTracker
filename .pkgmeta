@@ -4,7 +4,8 @@ package-as: EQObjectiveTracker
 # Externals are fetched at build time, which would leave a fresh git checkout with
 # TOC lines pointing at files that are not on disk - and the AddOns directory
 # junction would fail to load in-game. Vendoring is what makes the zero-build-step
-# workflow real. Update the six Ace3 files by hand when needed.
+# workflow real. Update the six Ace3 files by hand when needed. Libs/EverythingUI is the
+# exception: it is copied in from the EverythingUI repo by its sync.py, never edited here.
 
 # Declared by hand because both of the packager's auto-credit routes are absent here -
 # there are no externals to mark, and the vendored files carry no

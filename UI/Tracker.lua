@@ -590,51 +590,71 @@ local function applyScrollBarSkin(sf, cfg)
     setArrowHidden(down, cfg.hideScrollArrows == true)
 end
 
-function Tracker:ApplyFrameSkin(cfg)
-    local f = self.frame
-    if not (f and f.bgFrame and cfg) then return end
-
+-- The background and border, on any frame built like the tracker's: a backdrop frame and a
+-- background texture. The Appearance preview draws its own tracker with this.
+function Tracker:SkinBackdrop(bgFrame, background, cfg)
     if cfg.showBackground then
         local c = cfg.backgroundColor or {}
-        f.background:SetColorTexture(c.r or 0, c.g or 0, c.b or 0, c.a or 0.6)
-        f.background:Show()
+        background:SetColorTexture(c.r or 0, c.g or 0, c.b or 0, c.a or 0.6)
+        background:Show()
     else
-        f.background:Hide()
+        background:Hide()
     end
 
     -- SetBackdrop rebuilds the edge textures, so only call it when the size changes
     local size = math.max(1, cfg.borderSize or 1)
-    if f._borderSize ~= size then
-        f._borderSize = size
-        f.bgFrame:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = size })
-        f.bgFrame:SetBackdropColor(0, 0, 0, 0)
+    if bgFrame._borderSize ~= size then
+        bgFrame._borderSize = size
+        bgFrame:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = size })
+        bgFrame:SetBackdropColor(0, 0, 0, 0)
     end
 
     if cfg.showBorder then
         local c = cfg.borderColor or {}
-        f.bgFrame:SetBackdropBorderColor(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
+        bgFrame:SetBackdropBorderColor(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
     else
-        f.bgFrame:SetBackdropBorderColor(0, 0, 0, 0)
+        bgFrame:SetBackdropBorderColor(0, 0, 0, 0)
     end
+end
+
+-- A scroll frame's bar and the track texture behind it, the preview's as well as the tracker's.
+function Tracker:SkinScroll(sf, barBG, cfg)
+    local hideBar = cfg.hideScrollBar == true
+    if barBG then
+        if cfg.scrollBarBg ~= false and not hideBar then
+            local s = cfg.scrollBarBgColor or {}
+            barBG:SetColorTexture(s.r or 0.60, s.g or 0.60, s.b or 0.65, s.a or 0.25)
+            barBG:Show()
+        else
+            barBG:Hide()
+        end
+    end
+    setScrollBarHidden(sf, hideBar)
+    applyScrollBarSkin(sf, cfg)
+end
+
+-- What the scroll bar takes off the content's width, and the content's insets from the frame's
+-- left, top and bottom, so the preview lays its rows out where the tracker would.
+function Tracker:ScrollGutter(cfg)
+    return scrollGutter(cfg)
+end
+
+function Tracker:Insets()
+    return CONTENT_PAD, DRAG_HANDLE_H, GRIP_SIZE + 2
+end
+
+function Tracker:ApplyFrameSkin(cfg)
+    local f = self.frame
+    if not (f and f.bgFrame and cfg) then return end
+
+    self:SkinBackdrop(f.bgFrame, f.background, cfg)
 
     -- The scroll frame is sized explicitly per render, so the gutter feeds the anchoring
     -- pass rather than a BOTTOMRIGHT point that would fight SetSize.
     self:ApplyContentInset()
 
-    local hideBar = cfg.hideScrollBar == true
-    if f.scrollBarBG then
-        if cfg.scrollBarBg ~= false and not hideBar then
-            local s = cfg.scrollBarBgColor or {}
-            f.scrollBarBG:SetColorTexture(s.r or 0.60, s.g or 0.60, s.b or 0.65, s.a or 0.25)
-            f.scrollBarBG:Show()
-        else
-            f.scrollBarBG:Hide()
-        end
-    end
-
-    setScrollBarHidden(f.scroll, hideBar)
-    setScrollBarHidden(f.eventsScroll, hideBar)
-    applyScrollBarSkin(f.scroll, cfg)
+    self:SkinScroll(f.scroll, f.scrollBarBG, cfg)
+    setScrollBarHidden(f.eventsScroll, cfg.hideScrollBar == true)
     applyScrollBarSkin(f.eventsScroll, cfg)
 end
 

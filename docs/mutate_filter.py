@@ -145,19 +145,20 @@ MUTANTS = [
     # The author's call on 2026-09-27: grayed out while the zone filter was off, it read as an
     # option that only worked in one situation.
     ("the box is grayed out again while the zone filter is off", [
-        (O, "            filtersEnd = campaignZone\n",
-            "            filtersEnd = campaignZone\n"
+        (O, "            filters:Add(campaignZone)\n",
+            "            filters:Add(campaignZone)\n"
             "            self:SetDependent(campaignZone, DB().filters.onlyCurrentZone)\n")]),
 
     ("the box is built on Classic too, where nothing can tag a campaign quest", [
         (O, '        if Registry:HasTag("campaign") then', "        if true then")]),
 
-    ("Reset filters hangs from the zone filter again and draws over the new box", [
-        (O, 'resetFilters:SetPoint("TOPLEFT", filtersEnd, "BOTTOMLEFT", 0, -10)',
-            'resetFilters:SetPoint("TOPLEFT", zoneOnly, "BOTTOMLEFT", 0, -10)')]),
+    ("Reset filters sits between the zone filter and the new box", [
+        (O, "            filters:Add(campaignZone)\n", ""),
+        (O, "        filters:Add(resetFilters)\n",
+            "        filters:Add(resetFilters)\n        if campaignZone then filters:Add(campaignZone) end\n")]),
 
-    ("the box never becomes the end of the run", [
-        (O, "            filtersEnd = campaignZone\n", "")]),
+    ("the box is never put in its card", [
+        (O, "            filters:Add(campaignZone)\n", "")]),
 
     # A reworded key orphans every translation of it and opens a store round trip.
     ("the label is reworded, orphaning its translations", [
@@ -196,9 +197,9 @@ MUTANTS = [
         (O, "                if campaignZone then campaignZone:SetChecked(false) end\n",
             "")]),
 
-    ("filtersEnd starts at the campaign box, which is nil on Classic", [
-        (O, "        local filtersEnd = zoneOnly\n",
-            "        local filtersEnd = campaignZone\n")]),
+    ("the reset row waits on the campaign box, which Classic never builds", [
+        (O, "        filters:Add(resetFilters)\n",
+            "        if campaignZone then filters:Add(resetFilters) end\n")]),
 
     # ------------------------------------------ hand-broken in the second 2026-09-27 scan
     ("the zone rule asks a provider that has no IsCurrentZone, raising on every world quest", [
@@ -217,13 +218,13 @@ MUTANTS = [
         (F, "Filter.campaignKept = 0\n", "Filter.campaignKept = nil\n")]),
 
     ("the campaign box is grayed out again, spelled as a dot call", [
-        (O, "            filtersEnd = campaignZone\n",
-            "            filtersEnd = campaignZone\n"
+        (O, "            filters:Add(campaignZone)\n",
+            "            filters:Add(campaignZone)\n"
             "            self.SetDependent(self, campaignZone, DB().filters.onlyCurrentZone)\n")]),
 
     ("the campaign box is disabled outright", [
-        (O, "            filtersEnd = campaignZone\n",
-            "            filtersEnd = campaignZone\n            campaignZone:Disable()\n")]),
+        (O, "            filters:Add(campaignZone)\n",
+            "            filters:Add(campaignZone)\n            campaignZone:Disable()\n")]),
 
     ("the box is built into a shadowing local, so Reset and the tooltip never see it", [
         (O, '            campaignZone = self:CreateCheckbox(content, L["Always show campaign quests"],',

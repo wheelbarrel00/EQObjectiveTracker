@@ -153,6 +153,10 @@ events, which would otherwise not appear anywhere.
 | `/eqot enable <name>` | Switch a part back on, or `all` |
 | `/eqot debug` | Toggle entry validation warnings |
 
+The options window, opened with `/eqot` or the cog on the tracker's header, has a sidebar with
+four tabs, General, Tracker, Appearance and About, each laid out in cards. The Appearance tab
+draws a sample tracker beside its settings that changes as you adjust them.
+
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
 Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. A
 finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt,

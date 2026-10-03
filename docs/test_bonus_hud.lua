@@ -19,8 +19,8 @@
 --      color, a picked color beats the lock fade, and only the third branch fades. Getting the
 --      order wrong leaves a user who has picked a color watching its alpha change when they
 --      lock the HUD, which reads as the color not sticking.
---   2. A COLOR TABLE MAY CARRY NO ALPHA. Options/Frame.lua always sends one, so `c.a or 1`
---      is insurance against a hand-edited or imported table rather than against anything this
+--   2. A COLOR TABLE MAY CARRY NO ALPHA. The library's color picker always sends one, so
+--      `c.a or 1` is insurance against a hand-edited or imported table rather than against anything this
 --      addon writes. It keeps the call explicit instead of leaning on the client's own default
 --      for a missing alpha.
 --   3. THE BORDER FALLS BACK TO A CONSTANT, NOT TO NOTHING. AceDB merges the borderColor

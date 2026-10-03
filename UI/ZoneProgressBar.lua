@@ -94,23 +94,23 @@ function ZoneBar:_SavePosition()
 end
 
 function ZoneBar:_ContextMenu()
-    if not (MenuUtil and MenuUtil.CreateContextMenu and self.frame) then return end
-    MenuUtil.CreateContextMenu(self.frame, function(_, root)
-        root:CreateTitle(L["Zone Progress Bar"])
-        local st = barState() or {}
-        root:CreateButton(st.locked and L["Unlock (allow moving)"] or L["Lock position"], function()
+    if not self.frame then return end
+    local st = barState() or {}
+    ns:GetModule("Options").ui:ShowMenu({
+        { kind = "title", text = L["Zone Progress Bar"] },
+        { text = st.locked and L["Unlock (allow moving)"] or L["Lock position"], onClick = function()
             local s = barState()
             if s then s.locked = not s.locked end
             ZoneBar:ApplySettings()
-        end)
-        root:CreateButton(L["Reset position"], function()
+        end },
+        { text = L["Reset position"], onClick = function()
             local s = barState()
             if s then s.point, s.relPoint, s.x, s.y = "CENTER", "CENTER", 0, 220 end
             ZoneBar:ApplySettings()
-        end)
-        root:CreateDivider()
-        root:CreateButton(L["Cancel"], function() end)
-    end)
+        end },
+        { kind = "divider" },
+        { text = L["Cancel"] },
+    })
 end
 
 function ZoneBar:_Acquire()
@@ -178,14 +178,24 @@ function ZoneBar:DockedState()
     return done, total, zoneName or ""
 end
 
+-- Whether the tracker draws the bar as one of its sections, whatever the zone holds right now.
+function ZoneBar:IsDocked()
+    return (enabled() and not isFloating()) and true or false
+end
+
 function ZoneBar:_AcquireDocked(parent)
     local bar = self.docked
     if bar then
         if bar:GetParent() ~= parent then bar:SetParent(parent) end
         return bar
     end
+    self.docked = self:BuildDockedBar(parent)
+    return self.docked
+end
 
-    bar = CreateFrame("StatusBar", nil, parent)
+-- Also the Appearance preview's, which draws a docked bar of its own rather than borrowing this one.
+function ZoneBar:BuildDockedBar(parent)
+    local bar = CreateFrame("StatusBar", nil, parent)
     bar:SetHeight(BAR_H)
     bar:SetMinMaxValues(0, 100)
     applyBarFill(bar)
@@ -203,7 +213,6 @@ function ZoneBar:_AcquireDocked(parent)
     bar.label = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     bar.label:SetPoint("CENTER")
 
-    self.docked = bar
     return bar
 end
 
@@ -214,7 +223,10 @@ end
 -- The zone name and the count live on the section header, so the bar itself carries only
 -- its percentage, exactly as EQ draws it.
 function ZoneBar:RenderDocked(content, y, done, total)
-    local bar = self:_AcquireDocked(content)
+    return self:DrawDocked(self:_AcquireDocked(content), content, y, done, total)
+end
+
+function ZoneBar:DrawDocked(bar, content, y, done, total)
     bar:ClearAllPoints()
     bar:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, -(y + ROW_PAD_TOP))
     bar:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -(y + ROW_PAD_TOP))

@@ -336,9 +336,16 @@ MUTANTS = [
         (A, "        end\n        syncFade()\n\n        local spacingSlider",
             "        end\n\n        local spacingSlider")]),
 
-    ("Block Spacing is drawn on top of the new controls", [
-        (A, 'spacingSlider:SetPoint("TOPLEFT", fadeFocus, "BOTTOMLEFT", 0, -14)',
-            'spacingSlider:SetPoint("TOPLEFT", scaleSlider, "BOTTOMLEFT", 0, -16)')]),
+    ("Block Spacing is added among the new controls", [
+        (A, "        colors:Add(spacingSlider)\n", ""),
+        (A, "        colors:Add(fadeHover, DEPENDENT)\n",
+            "        colors:Add(spacingSlider)\n        colors:Add(fadeHover, DEPENDENT)\n")]),
+
+    ("the mouseover box is not indented under the slider", [
+        (A, "        colors:Add(fadeHover, DEPENDENT)\n", "        colors:Add(fadeHover)\n")]),
+
+    ("the boxes are indented by a table that indents nothing", [
+        (A, "local DEPENDENT = { dependent = true }\n", "local DEPENDENT = {}\n")]),
 
     # ------------------------------------------------------------ the older hide interlock
     # The three cases the harness header names, plus the first-count guard and the pass owed on
@@ -528,13 +535,15 @@ MUTANTS = [
             "    debugLine(\"Visibility\", nil, \"FadeLine\")\n"
             "    end\n")]),
 
-    ("the opacity slider is anchored where the scale slider already sits", [
-        (A, "fadeSlider:SetPoint(\"TOPLEFT\", scaleSlider, \"BOTTOMLEFT\", 0, -16)",
-            "fadeSlider:SetPoint(\"TOPLEFT\", dividerPicker, \"BOTTOMLEFT\", 0, -32)")]),
+    ("the opacity slider is added above Tracker Scale", [
+        (A, "        colors:Add(scaleSlider)\n", ""),
+        (A, "        colors:Add(fadeSlider)\n",
+            "        colors:Add(fadeSlider)\n        colors:Add(scaleSlider)\n")]),
 
-    ("the focused-quest box is drawn on top of the mouseover box", [
-        (A, "fadeFocus:SetPoint(\"TOPLEFT\", fadeHover, \"BOTTOMLEFT\", 0, -2)",
-            "fadeFocus:SetPoint(\"TOPLEFT\", fadeSlider, \"BOTTOMLEFT\", 0, -14)")]),
+    ("the focused-quest box is added above the mouseover box", [
+        (A, "        colors:Add(fadeHover, DEPENDENT)\n", ""),
+        (A, "        colors:Add(fadeFocus, DEPENDENT)\n",
+            "        colors:Add(fadeFocus, DEPENDENT)\n        colors:Add(fadeHover, DEPENDENT)\n")]),
 
     ("the slider re-dims the boxes but through a stale copy (syncFade before store)", [
         (A, "                DB().trackerAlpha = v / 100\n"

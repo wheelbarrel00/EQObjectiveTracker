@@ -11,8 +11,6 @@ globals = {
     "SLASH_EQOT2",
     "SlashCmdList",
     "BINDING_HEADER_EQOBJECTIVETRACKER",
-    -- Classic's color picker is driven by assigning callbacks onto the frame itself
-    "ColorPickerFrame",
     -- Blizzard's own quest log sets .questID on this before showing it, and the pop-out
     -- reads it back, so the field has to be written rather than passed.
     "QuestLogPopupDetailFrame",
@@ -29,9 +27,9 @@ read_globals = {
     "GameFontNormalSmall", "GameFontHighlightSmall", "ObjectiveTrackerHeaderFont",
     "InCombatLockdown", "IsModifiedClick", "GetCursorPosition", "GetTime", "hooksecurefunc",
     -- UISpecialFrames is deliberately NOT here. Putting a frame name in that list taints
-    -- Blizzard's panel manager on every Escape press - see closeOnEscape in Options/Frame.lua.
+    -- Blizzard's panel manager on every Escape press - see CloseOnEscape in Libs/EverythingUI/Kit.lua.
     "RAID_CLASS_COLORS", "GetQuestDifficultyColor", "CreateColor",
-    "STANDARD_TEXT_FONT", "OpacitySliderFrame",
+    "STANDARD_TEXT_FONT",
     "UnitClass", "UnitName", "UnitLevel", "GetRealmName", "GetZoneText", "PlaySound", "ReloadUI",
     -- Locales/*.lua gate on the client language before touching ns.L
     "GetLocale",
@@ -63,7 +61,7 @@ read_globals = {
     "IsInInstance", "C_ChallengeMode", "WorldMapFrame",
     "C_TradeSkillUI", "C_CurrencyInfo", "C_Item", "C_FactionInfo", "ProfessionsUtil", "QuestUtil",
     "C_LFGList", "LFGListUtil_FindQuestGroup", "C_TaxiMap", "FlightMapFrame",
-    "PlaySoundFile", "ERR_QUEST_COMPLETE_S", "C_QuestLine", "MenuUtil",
+    "PlaySoundFile", "ERR_QUEST_COMPLETE_S", "C_QuestLine",
 
     -- Blizzard format strings, used so reagent lines stay localized
     "PROFESSIONS_TRACKER_REAGENT_FORMAT", "PROFESSIONS_TRACKER_REAGENT_COUNT_FORMAT",

@@ -683,10 +683,19 @@ local function generalTab(useBlizzard, opts)
     else
         t.ns.modules.Dialog = nil
     end
-    local spec, boxes = nil, {}
-    local O = { GAP = { tabHead = -16, head = -10, aboveHead = -20 } }
+    local spec, boxes, cards = nil, {}, {}
+    local O = {}
     function O:RegisterTab(s) spec = s end
     function O:CreateHeading() return newFrame() end
+    -- A card records the order its rows were added in, which is the order they stack in.
+    function O:CreateGroup(_, label)
+        local card = newFrame()
+        card.title, card.rows, card.label = label, {}, newFrame()
+        card.Add = function(c, control) c.rows[#c.rows + 1] = control return newFrame() end
+        cards[#cards + 1] = card
+        return card
+    end
+    function O:Spacing() return 10 end
     function O:CreateCheckbox(_, label, getter, setter, tooltip)
         local f = newFrame()
         f.getter, f.setter, f.tooltip = getter, setter, tooltip
@@ -702,7 +711,7 @@ local function generalTab(useBlizzard, opts)
     t.load("Options/TabGeneral.lua")
     spec.build(O, newFrame())
     return { t = t, box = boxes[LABEL], lock = boxes["Lock tracker"], shown = shown, timers = timers,
-             reloads = function() return reloads end }
+             cards = cards, reloads = function() return reloads end }
 end
 
 local HINT = "The interface did not reload. Type /reload to finish."
@@ -769,123 +778,58 @@ case("the General tab's box asks first and saves only on Yes", function()
     ok((g.shown[1] or {}).title == "EQ Objective Tracker", "the dialog is titled for this addon")
 end)
 
--- The REAL UI/Dialog.lua on permissive stubs: a method a stub does not model is a no-op.
-local function stubFrame()
-    local f = { shown = false, scripts = {} }
-    function f:Show() self.shown = true end
-    function f:Hide() self.shown = false end
-    function f:IsShown() return self.shown end
-    function f:SetScript(name, fn) self.scripts[name] = fn end
-    function f:ClearFocus() self.cleared = true end
-    function f:GetText() return self.text end
-    function f:SetText(s) self.text = s end
-    function f:GetStringWidth() return 40 end
-    function f:GetStringHeight() return 14 end
-    function f:GetFont() return "font", 12 end
-    function f:CreateTexture() return stubFrame() end
-    function f:CreateFontString() return stubFrame() end
-    function f:GetFontString() return stubFrame() end
-    return setmetatable(f, { __index = function() return function() end end })
-end
-
+-- The REAL UI/Dialog.lua over a stub library context. The dialog itself, with the 1.28 rules this
+-- file used to pin on it (the callback before the hide, Enter never accepting, Escape cancelling, a
+-- dialog over another cancelling it), moved to the EverythingUI library on 2026-10-02 and is driven
+-- there by tests/test_dialog.lua and its battery. What stays here is the hand-off.
 local function realDialog()
-    local handled = {}
+    local shown = {}
     local ns = { L = setmetatable({}, { __index = function(_, k) return k end }) }
-    function ns:RegisterModule(_, m) self.dialog = m; return m end
-    function ns:GetModule() return { RunWhenOutOfCombat = function() end } end
-    local env = setmetatable({
-        CreateFrame = function() return stubFrame() end, UIParent = stubFrame(), BackdropTemplateMixin = {},
-        InCombatLockdown = function() return false end,
-        geterrorhandler = function() return function(e) handled[#handled + 1] = tostring(e) end end,
-    }, { __index = _G })
+    local modules = { Options = { ui = { ShowDialog = function(_, o) shown[#shown + 1] = o end } } }
+    function ns:RegisterModule(name, m) modules[name] = m return m end
+    function ns:GetModule(name) return modules[name] end
     local chunk = assert(loadfile(repoFile("UI/Dialog.lua")))
-    setfenv(chunk, env)
+    setfenv(chunk, setmetatable({}, { __index = _G }))
     chunk("EQObjectiveTracker", ns)
-    return ns.dialog, handled
+    return modules.Dialog, shown
 end
 
-case("the dialog runs a button's callback before it hides", function()
-    -- A ReloadUI from Yes was blocked on retail 12.1 while the dialog hid first.
-    local D = realDialog()
-    local during
-    D:Show({ button1 = "Yes", button2 = "Cancel", onAccept = function() during = D.frame:IsShown() end })
-    D.frame.editBox.cleared = nil
-    D.frame.accept.scripts.OnClick()
-    ok(during == true, "Yes runs its callback with the dialog still up: " .. tostring(during))
-    ok(D.frame:IsShown() == false, "then hides it")
-    ok(D.frame.editBox.cleared == true, "and the edit box lets go of the keyboard")
+case("Dialog:Show hands the library's dialog every field it knows", function()
+    local D, shown = realDialog()
+    local accept, cancel = function() end, function() end
+    D:Show({ title = "New Profile", text = "Profile name:", button1 = "Create", button2 = "Cancel",
+             onAccept = accept, onCancel = cancel, hasEditBox = true, maxLetters = 32,
+             editBoxText = "Raid", highlightEditBox = true, timeout = 0 })
+    local o = shown[1] or {}
+    ok(#shown == 1, "one dialog asked for")
+    ok(o.title == "New Profile" and o.text == "Profile name:" and o.button1 == "Create" and o.button2 == "Cancel",
+       "the title, text and both buttons")
+    ok(o.onAccept == accept and o.onCancel == cancel, "both callbacks, the same functions")
+    ok(o.hasEditBox == true and o.maxLetters == 32 and o.editBoxText == "Raid" and o.highlightEditBox == true,
+       "the field, its limit, its text and its selection")
+    ok(o.timeout == nil, "and nothing the library does not know, which would make it raise")
 
-    local C = realDialog()
-    local cancelled
-    C:Show({ button1 = "Yes", button2 = "Cancel", onCancel = function() cancelled = C.frame:IsShown() end })
-    C.frame.cancel.scripts.OnClick()
-    ok(cancelled == true and C.frame:IsShown() == false, "Cancel the same: " .. tostring(cancelled))
-
-    local N = realDialog()
-    local second = { button1 = "OK" }
-    N:Show({ button1 = "Yes", onAccept = function() N:Show(second) end })
-    N.frame.accept.scripts.OnClick()
-    ok(N.frame:IsShown() == true and N.opts == second, "a callback that opens the next dialog keeps it on screen")
-
-    local R, handled = realDialog()
-    R:Show({ button1 = "Yes", onAccept = function() error("boom", 0) end })
-    local okRun = pcall(R.frame.accept.scripts.OnClick)
-    ok(okRun and R.frame:IsShown() == false, "a raising callback still closes the dialog")
-    ok(handled[1] == "boom", "and reaches the error handler: " .. tostring(handled[1]))
-
-    local RC, handledC = realDialog()
-    RC:Show({ button1 = "Yes", button2 = "Cancel", onCancel = function() error("boom", 0) end })
-    okRun = pcall(RC.frame.cancel.scripts.OnClick)
-    ok(okRun and RC.frame:IsShown() == false and handledC[1] == "boom", "and a raising Cancel the same")
-
-    -- New Profile's path: what was typed reaches onAccept from the button and from Enter, with the
-    -- keyboard already let go, so a re-prompt from the callback opens with the cursor in its box.
-    for _, route in ipairs({ "button", "enter" }) do
-        local T = realDialog()
-        local got, focusFreed
-        T:Show({ button1 = "OK", button2 = "Cancel", hasEditBox = true,
-                 onAccept = function(text) got = text; focusFreed = T.frame.editBox.cleared end })
-        T.frame.editBox:SetText("Raid")
-        T.frame.editBox.cleared = nil
-        if route == "button" then T.frame.accept.scripts.OnClick() else T.frame.editBox.scripts.OnEnterPressed() end
-        ok(got == "Raid", route .. ": what was typed reaches onAccept: " .. tostring(got))
-        ok(focusFreed == true, route .. ": the edit box let go before the callback ran")
-    end
-
-    -- Escape cancels from the frame and the edit box. Enter with no edit box is swallowed, never an
-    -- accept, since most of these confirms reload.
-    for _, route in ipairs({ "frame", "editbox", "enter" }) do
-        local E = realDialog()
-        local got = "nothing"
-        E:Show({ button1 = "Yes", button2 = "Cancel", hasEditBox = (route == "editbox"),
-                 onAccept = function() got = "accepted" end, onCancel = function() got = "cancelled" end })
-        if route == "frame" then
-            E.frame.scripts.OnKeyDown(E.frame, "ESCAPE")
-        elseif route == "editbox" then
-            E.frame.editBox.scripts.OnEscapePressed()
-        else
-            E.frame.scripts.OnKeyDown(E.frame, "ENTER")
-        end
-        local want = (route == "enter") and "nothing" or "cancelled"
-        ok(got == want, route .. ": " .. got)
-    end
-
-    local I = realDialog()
-    local first = "nothing"
-    local nextOne = { button1 = "OK" }
-    I:Show({ button1 = "Yes", button2 = "Cancel",
-             onAccept = function() first = "accepted" end, onCancel = function() first = "cancelled" end })
-    I:Show(nextOne)
-    ok(first == "cancelled" and I.frame:IsShown() == true and I.opts == nextOne,
-       "a dialog opened over another cancels it: " .. first)
+    D:Show({ text = "Done." })
+    o = shown[2] or {}
+    ok(o.title == "EQ Objective Tracker" and o.button1 == "OK" and o.text == "Done.", "this addon's title and OK by default")
+    ok(o.button2 == nil and o.hasEditBox == nil and o.highlightEditBox == nil and o.onAccept == nil,
+       "a one-button notice asks for nothing more")
+    D:Show({ hasEditBox = 1, highlightEditBox = "yes" })
+    o = shown[3] or {}
+    ok(o.hasEditBox == true and o.highlightEditBox == true and o.text == "", "a truthy flag is handed on as true, a missing text as empty")
 end)
 
 case("the box heads the General column", function()
     local g = generalTab(false)
-    local p = g.box.points[1] or {}
-    ok(p[1] == "TOPLEFT" and p[3] == "BOTTOMLEFT" and p[5] == -16, "under the heading at the tab gap")
-    local l = g.lock.points[1] or {}
-    ok(l[2] == g.box and l[5] == -2, "and Lock tracker hangs off it")
+    local first = g.cards[1] or { rows = {} }
+    ok(first.title == "General", "the first card is General: " .. tostring(first.title))
+    ok(first.rows[1] == g.box, "the box is its first row")
+    ok(first.rows[2] == g.lock, "and Lock tracker the second")
+    local count = 0
+    for _, card in ipairs(g.cards) do
+        for _, row in ipairs(card.rows) do if row == g.box then count = count + 1 end end
+    end
+    ok(count == 1, "added once, to one card: " .. count)
 end)
 
 -- ------------------------------------------------------------------------------ the rest
@@ -1074,11 +1018,12 @@ case("seams", function()
     ok(q:find("\n    local function logUpdated()\n        clearLeftoverWatches()\n        markDynamic()\n    end\n", 1, true) ~= nil,
        "which clears first and still marks the rebuild")
     -- A dropdown pick runs before its list hides, as the dialog's callback does, because picking a
-    -- profile reloads.
-    ok(code("Options/Frame.lua"):find("\n        b:SetScript(\"OnClick\", function()\n"
+    -- profile reloads. The profile dropdown uses the library's list.
+    local PICK = "\n        b:SetScript(\"OnClick\", function()\n"
         .. "            xpcall(function() onPick(opt.value) end, geterrorhandler())\n"
-        .. "            p:Hide()\n        end)\n", 1, true) ~= nil,
-       "a dropdown pick runs before the list hides")
+        .. "            p:Hide()\n        end)\n"
+    ok(code("Libs/EverythingUI/Dropdown.lua"):find(PICK, 1, true) ~= nil,
+       "a dropdown pick runs before the library's list hides")
 
     -- The add hook's own case runs a slice of it, so only this proves Enable still installs it.
     local enable = q:match("\n(function Quests:Enable%(notify%).-\nend\n)")

@@ -13,8 +13,10 @@
 -- to hold only the rows it really kept, or the status line reads as a feature firing when the
 -- zone rule never asked it anything.
 --
--- The last block is GREPS. The tag, the default and the checkbox live in three other files, and
--- a key spelled differently in any of them switches the feature off with every driven case green.
+-- The block after the driven cases is GREPS. The tag, the default and the checkbox live in three
+-- other files, and a key spelled differently in any of them switches the feature off with every
+-- driven case green. The last block loads the real Options/TabTracker.lua over a stub context and
+-- drives its Filters card: the order its rows stack in, and what Reset filters does.
 --
 -- OUT OF SCOPE BY CONSTRUCTION: whether IsCurrentZone places a quest correctly, which no harness
 -- covers (/eqot zoneprobe reads it in game), and how the checkbox looks on screen.
@@ -363,8 +365,6 @@ do
     ok(count(tab, "f.campaignAnyZone = false\n") == 1, "Reset filters clears it")
     ok(count(tab, "                if campaignZone then campaignZone:SetChecked(false) end\n") == 1,
        "and unticks the box on screen, which only reads its getter on a tab view")
-    ok(count(tab, "        local filtersEnd = zoneOnly\n") == 1,
-       "the run ends at the zone filter wherever the box is not built")
     ok(count(tab, "campaignAnyZone") == 3, "and nothing else in the tab touches it")
     ok(count(tab, 'if Registry:HasTag("campaign") then') == 1,
        "the box is only built where a provider can tag a campaign quest")
@@ -375,17 +375,11 @@ do
     -- Disable or a Hide spelled any other way adds one. luacheck catches a shadowing local.
     local refs = 0
     for _ in tab:gmatch("%f[%w_]campaignZone%f[^%w_]") do refs = refs + 1 end
-    ok(refs == 7, "the box is referenced only where these pins expect it: " .. refs)
+    ok(refs == 6, "the box is referenced only where these pins expect it: " .. refs)
     ok(count(tab, "\n            campaignZone = self:CreateCheckbox(content, L") == 1,
        "and it is built into the outer local that Reset and the tooltip read")
     ok(count(tab, "function(v) DB().filters.onlyCurrentZone = v; render() end,") == 1,
        "and the zone filter's own setter is back to its shipped form, with nothing to resync")
-    -- Reset filters hangs from the campaign box where it is built, or draws on top of it.
-    ok(count(tab, 'campaignZone:SetPoint("TOPLEFT", zoneOnly, "BOTTOMLEFT", 0, -2)') == 1,
-       "the box sits under the zone filter")
-    ok(count(tab, "            filtersEnd = campaignZone\n") == 1, "and becomes the end of the run")
-    ok(count(tab, 'resetFilters:SetPoint("TOPLEFT", filtersEnd, "BOTTOMLEFT", 0, -10)') == 1,
-       "which is what Reset filters hangs from")
     -- A reworded key orphans every translation of it. Built in pieces because the locale
     -- scanner reads docs/ too, and a whole L["..."] here would list this file as a user.
     ok(count(tab, "L" .. '["Always show campaign quests"]') == 1, "the label key is unchanged")
@@ -398,6 +392,130 @@ do
         .. "                or L" .. '["Turns every category filter back on and clears the current-zone'
         .. ' filter. Nothing else on this tab is changed."])\n') == 1,
        "Reset filters names the campaign option where its box is built, and nowhere else")
+end
+
+-- Loads the REAL Options/TabTracker.lua with a stub context that records each card's rows in the
+-- order they were added, which is the order they stack in. campaign is whether a provider can tag
+-- a campaign quest, which is what builds the box.
+local function trackerTab(campaign)
+    local modules = {}
+    local ns = {
+        L = setmetatable({}, { __index = function(_, k) return k end }),
+        Util = { Tooltip = function() return { Hide = function() end } end },
+    }
+    function ns:GetModule(name) return modules[name] end
+    local cfg = { filters = { onlyCurrentZone = true, campaignAnyZone = true, showNormal = false } }
+    local spec
+    modules.Options = { RegisterTab = function(_, s) spec = s end }
+    modules.DB = { Tracker = function() return cfg end }
+    modules.Tracker = { Render = function() end }
+    modules.Row = { Invalidate = function() end }
+    modules.Media = { Play = function() end, GetSoundList = function() return {}, {} end }
+    modules.Sections = {
+        Known = function() return { "quests" } end, Order = function() return { "quests", "campaign" } end,
+        IsHidden = function() return false end, SetHidden = function() end,
+        Title = function(_, id) return id end, Move = function() end,
+    }
+    modules.Filter = { CATEGORIES = { { key = "showNormal", label = "Normal" }, { key = "showDaily", label = "Daily" } } }
+    modules.Registry = { HasTag = function(_, tag) return tag == "campaign" and campaign end }
+
+    local function frame()
+        local f = { shown = true }
+        function f:SetPoint() end
+        function f:Show() self.shown = true end
+        function f:Hide() self.shown = false end
+        function f:SetShown(v) self.shown = v and true or false end
+        function f:IsShown() return self.shown end
+        function f:SetChecked(v) self.checked = v end
+        function f:SetText(s) self.text = s end
+        function f:SetEnabled() end
+        function f:SetScript() end
+        function f:HookScript() end
+        return f
+    end
+    local cards, dimmed, ui = {}, {}, {}
+    function ui:CreateGroup(_, label)
+        local card = frame()
+        card.title, card.rows, card.label = label, {}, frame()
+        card.Add = function(c, control) c.rows[#c.rows + 1] = control return frame() end
+        card.Layout = function() end
+        cards[#cards + 1] = card
+        return card
+    end
+    function ui:CreateCheckbox(_, label, getter, setter, tooltip)
+        local f = frame()
+        f.label, f.getter, f.setter, f.tooltip = label, getter, setter, tooltip
+        return f
+    end
+    function ui:CreateButton(_, label, _, onClick, tooltip)
+        local f = frame()
+        f.label, f.onClick, f.tooltip = label, onClick, tooltip
+        return f
+    end
+    function ui:CreateSlider(_, label) local f = frame() f.label, f.slider = label, frame() return f end
+    function ui:CreateDropdown(_, label) local f = frame() f.label, f.button = label, frame() return f end
+    function ui:CreateRadioGroup(_, label) local f = frame() f.label = label return f end
+    function ui:CreateText(_, text) local f = frame() f.text = text return f end
+    function ui:CreateIconButton() return frame() end
+    function ui:AttachTooltip() end
+    function ui:SetDependent(control, on) dimmed[#dimmed + 1] = { control = control, on = on } end
+    function ui:MeasureContent() end
+    function ui:Spacing() return 10 end
+
+    assert(loadfile(repoFile("Options/TabTracker.lua")))("EQObjectiveTracker", ns)
+    spec.build(ui, {})
+    local byTitle = {}
+    for _, c in ipairs(cards) do byTitle[c.title] = c end
+    return { cards = cards, filters = byTitle["Filters"], cfg = cfg, dimmed = dimmed }
+end
+
+local CAMPAIGN_LABEL = "Always show campaign quests"
+local RESET_LABEL = "Reset filters to defaults"
+
+print("== the Filters card, driven through the real tab")
+do
+    local good, err = pcall(function()
+        local t = trackerTab(true)
+        ok(t.filters ~= nil and t.cards[2] == t.filters, "Filters is the second card")
+        local rows = (t.filters or { rows = {} }).rows
+        local n = #rows
+        ok(rows[n] and rows[n].label == RESET_LABEL, "Reset filters is the card's last row")
+        ok(rows[n - 1] and rows[n - 1].label == CAMPAIGN_LABEL,
+           "the campaign box is the row just above it, the end of the filter run")
+        ok(rows[n - 2] and rows[n - 2].label == "Show only quests in current zone", "under the zone filter")
+        local boxes = 0
+        for _, r in ipairs(rows) do if r.label == CAMPAIGN_LABEL then boxes = boxes + 1 end end
+        ok(boxes == 1, "added once: " .. boxes)
+
+        local box, reset, zone = rows[n - 1], rows[n], rows[n - 2]
+        ok(box.getter() == true, "the box reads the switch")
+        box.setter(false)
+        ok(t.cfg.filters.campaignAnyZone == false, "and writes it")
+        t.cfg.filters.campaignAnyZone = true
+        box.checked = true
+        reset.onClick()
+        ok(t.cfg.filters.campaignAnyZone == false and box.checked == false,
+           "Reset filters clears the switch and unticks the box on screen")
+        ok(t.cfg.filters.onlyCurrentZone == false and zone.checked == false, "and the zone filter")
+        ok(t.cfg.filters.showNormal == true and rows[1].checked == true, "and turns the categories back on")
+        ok(reset.tooltip:find(CAMPAIGN_LABEL, 1, true) ~= nil, "its tooltip names the box it clears")
+        local grayed = false
+        for _, d in ipairs(t.dimmed) do if d.control == box then grayed = true end end
+        ok(not grayed, "and the box is never grayed out")
+
+        local c = trackerTab(false)
+        local crows = c.filters.rows
+        local cn = #crows
+        ok(crows[cn].label == RESET_LABEL and crows[cn - 1].label == "Show only quests in current zone",
+           "with no campaign tag the reset follows the zone filter")
+        local any = false
+        for _, r in ipairs(crows) do if r.label == CAMPAIGN_LABEL then any = true end end
+        ok(not any, "and there is no box")
+        ok(crows[cn].tooltip:find(CAMPAIGN_LABEL, 1, true) == nil, "and the tooltip does not name one")
+        local okReset, resetErr = pcall(crows[cn].onClick)
+        ok(okReset, "and the reset runs without it: " .. tostring(resetErr))
+    end)
+    ok(good, "the tab builds and the card drives: " .. tostring(err))
 end
 
 print(("test_filter: %d passed, %d failed"):format(pass, fail))

@@ -217,10 +217,16 @@ local function build(parent, groupID, title)
     return h
 end
 
+-- A header outside the pool, for the Appearance preview. The pool holds one header per section,
+-- so borrowing the tracker's own would pull it off the tracker.
+function Sections:NewHeader(parent, groupID)
+    return build(parent, groupID, self:Title(groupID))
+end
+
 function Sections:Acquire(parent, groupID)
     local h = self.frames[groupID]
     if not h then
-        h = build(parent, groupID, self:Title(groupID))
+        h = self:NewHeader(parent, groupID)
         self.frames[groupID] = h
     end
     if h:GetParent() ~= parent then h:SetParent(parent) end
