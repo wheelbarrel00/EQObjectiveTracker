@@ -5,6 +5,36 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-03
+
+### New Features
+
+- Keep section headers in view while scrolling (Tracker tab): the header of the section you are
+  scrolled into stays at the top of the quest list, and the next section's header pushes it out of
+  the way as you reach it. Clicking it still collapses the section. On by default.
+- Quest Title Color (Appearance tab) colors quest titles By difficulty, in Gold color, in your Class color,
+  in a Custom color, or in Original Style, the way Blizzard's own tracker colors them on your version
+  of the game. It replaces Use class color for titles and the Tracker tab's Quest Title Color By
+  Difficulty. The Quest Title Color Override picker moves under it as Custom Title Color, and
+  whatever those were set to carries over unchanged.
+- The objective text, the color of a count like 0/5 (none done, in progress and done), and finished
+  objectives can each be given their own color on the Appearance tab. Every one starts at the color it
+  has always been. Until a finished objective is given its own color, it follows the done color, or
+  the title color while Use title color for completed quests is on and Quest Title Color gives one
+  (Class color, Custom color or Original Style). Requested by Rhinoplasty.
+
+### Improvements
+
+- The Appearance tab is reorganized with the most used settings first: Text, Quest Colors, Tracker,
+  Section Headers and Spacing, then Quest Rows, Progress Bars, the Scroll Bar, the Scenario panel,
+  the Scenario Bonus Objectives and the Zone Progress Bar. Every setting keeps its value.
+- The switch that hides the cogwheel at the top of the tracker is now called Show the options cogwheel
+  on the tracker, so it can be found. It is on the Tracker tab, and /eqot still opens the options
+  with the cogwheel hidden. Requested by zeldakostv.
+- Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and
+  Traditional Chinese cover every new option in this release, including Quest Title Color, the
+  objective and count colors, and the sticky section headers.
+
 ## [2.0.0] - 2026-10-03
 
 ### Improvements

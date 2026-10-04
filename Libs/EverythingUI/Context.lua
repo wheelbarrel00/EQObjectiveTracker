@@ -104,6 +104,8 @@ function Context:Color(name)
     local c
     if name == "accent" or name == "accentSoft" then
         c = self.opts.accent
+    elseif name == "dangerSoft" then
+        c = tokens.colors.danger
     elseif name == "accentHi" then
         local a, mix = self.opts.accent, tokens.accentHiMix
         return a[1] + (1 - a[1]) * mix, a[2] + (1 - a[2]) * mix, a[3] + (1 - a[3]) * mix, alpha

@@ -2,19 +2,38 @@ local _, ns = ...
 
 local Util = ns:RegisterModule("Util", {})
 
+-- None done, some done, all done. Rebuilt only when a picked color moves: every objective line on
+-- the tracker passes through here on a repaint, and a hex string per line would be garbage.
+local COUNT_DEFAULT = { "|cffff5050", "|cffeeaa00", "|cff44ff44" }
+local countEsc = { COUNT_DEFAULT[1], COUNT_DEFAULT[2], COUNT_DEFAULT[3] }
+local countRGB = { {}, {}, {} }
+
+local function setCount(i, c)
+    local k = countRGB[i]
+    if not (c and c.r) then
+        countEsc[i], k.r = COUNT_DEFAULT[i], nil
+    elseif k.r ~= c.r or k.g ~= c.g or k.b ~= c.b then
+        k.r, k.g, k.b = c.r, c.g, c.b
+        countEsc[i] = "|cff" .. Util.Hex(c.r, c.g, c.b)
+    end
+end
+
 local function progressRepl(have, need)
     local h, n = tonumber(have), tonumber(need)
     if not (h and n) then return have .. "/" .. need end
     local color
-    if h == 0    then color = "|cffff5050"
-    elseif h < n then color = "|cffeeaa00"
-    else              color = "|cff44ff44"
+    if h == 0    then color = countEsc[1]
+    elseif h < n then color = countEsc[2]
+    else              color = countEsc[3]
     end
     return color .. have .. "/" .. need .. "|r"
 end
 
-function Util.ColorizeProgress(text)
+function Util.ColorizeProgress(text, cfg)
     if not text or text == "" then return text end
+    setCount(1, cfg and cfg.countColorNone)
+    setCount(2, cfg and cfg.countColorPartial)
+    setCount(3, cfg and cfg.countColorDone)
     return (text:gsub("(%d+)%s*/%s*(%d+)", progressRepl))
 end
 
@@ -87,15 +106,66 @@ function Util.GetPlayerClassColor()
     end
 end
 
--- Returns nothing when neither source is set, which is what lets callers fall through to
--- difficulty coloring. Class color deliberately beats the explicit override.
-function Util.EffectiveTitleColor(cfg)
-    if cfg and cfg.titleColorUseClass then
-        local r, g, b = Util.GetPlayerClassColor()
-        if r then return r, g, b end
-    end
+local TITLE_MODES = { difficulty = true, gold = true, class = true, custom = true, original = true }
+
+-- Absent until the player picks one or uses Custom Title Color, and read off the three switches
+-- it replaced until then, so nobody's titles change with the update that added it. Class color
+-- beat the override, as before.
+function Util.TitleColorMode(cfg)
+    local m = cfg and cfg.titleColorMode
+    if TITLE_MODES[m] then return m end
+    if cfg and cfg.titleColorUseClass then return "class" end
     local ov = cfg and cfg.titleColorOverride
-    if ov and ov.r then return ov.r, ov.g, ov.b end
+    if ov and ov.r then return "custom" end
+    if cfg and cfg.colorByDifficulty == false then return "gold" end
+    return "difficulty"
+end
+
+local function normalFontColor()
+    local c = NORMAL_FONT_COLOR
+    if c and c.r then return c.r, c.g, c.b end
+    return 1, 0.82, 0
+end
+
+-- True on the clients that have Era's and TBC's watch frame. Retail's tracker, which Forever runs
+-- too, has no such frame.
+local function watchFrameClient()
+    return QuestWatchFrame ~= nil and ObjectiveTrackerFrame == nil
+end
+
+-- The tracker Blizzard ships on this client, as read in its source. The watch frame draws 0.75,
+-- 0.61, 0 and brightens to the normal font color once every objective is done (QuestWatch_Update
+-- on Era and TBC). Retail's draws every title, finished or not, in
+-- OBJECTIVE_TRACKER_BLOCK_HEADER_COLOR, read live because the client defines it.
+function Util.OriginalTitleColor(complete)
+    if watchFrameClient() then
+        if complete then return normalFontColor() end
+        return 0.75, 0.61, 0
+    end
+    local c = OBJECTIVE_TRACKER_BLOCK_HEADER_COLOR
+    if c and c.r then return c.r, c.g, c.b end
+    return 0.75, 0.61, 0
+end
+
+-- Retail brightens a title under the mouse. The watch frame draws no hover.
+function Util.OriginalTitleHighlight()
+    if watchFrameClient() then return nil end
+    return normalFontColor()
+end
+
+-- The color a mode gives a title. Nothing for By difficulty, which differs per quest, for Gold,
+-- which keeps finished quests green as turning difficulty off always did, or for Custom color
+-- before one is picked.
+function Util.EffectiveTitleColor(cfg, complete)
+    local mode = Util.TitleColorMode(cfg)
+    if mode == "class" then
+        return Util.GetPlayerClassColor()
+    elseif mode == "custom" then
+        local ov = cfg and cfg.titleColorOverride
+        if ov and ov.r then return ov.r, ov.g, ov.b end
+    elseif mode == "original" then
+        return Util.OriginalTitleColor(complete)
+    end
 end
 
 -- Only a TRUE is memoized. GetAtlasInfo answers nil for art that has not streamed in yet, so

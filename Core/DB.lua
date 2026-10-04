@@ -139,6 +139,7 @@ DB.defaults = {
             -- is what restores what the stock tracker was already showing.
             showTrackerWidgets   = true,
             showQuestTotal       = true,
+            stickySectionHeaders = true,
             showLevelInTracker   = false,
             showQuestID          = false,
             showRecentlyAddedTag = true,
@@ -149,9 +150,19 @@ DB.defaults = {
             colorByDifficulty     = true,
             titleColorUseClass    = false,
             overrideCompleteGreen = true,
-            -- Left unset on purpose: nil is what makes titles fall through to difficulty
-            -- coloring, so AceDB must not seed a default the Clear button cannot restore.
+            -- Left unset on purpose: Util.TitleColorMode reads a set override as Custom color, and
+            -- Clear stores nil, which an AceDB default would read back over.
             titleColorOverride    = nil,
+            -- The objective text and its X/Y count. Each default is the color it always had, the
+            -- count's written in 255ths so it rounds back to the very same hex.
+            objectiveColor     = { r = 0.85, g = 0.85, b = 0.85 },
+            countColorNone     = { r = 1, g = 80 / 255, b = 80 / 255 },
+            countColorPartial  = { r = 238 / 255, g = 170 / 255, b = 0 },
+            countColorDone     = { r = 68 / 255, g = 1, b = 68 / 255 },
+            -- finishedObjectiveColor is left unset: a finished line then takes the title color when
+            -- Use title color for completed quests is on and the mode gives one, else the done color.
+            -- titleColorMode must never get a default either. Absent, Util.TitleColorMode reads it
+            -- off the three title keys, so a default would read every old profile as that default.
 
             filters = {
                 showNormal      = true,
@@ -252,6 +263,9 @@ local APPEARANCE_KEYS = {
     "titleColorOverride", "overrideCompleteGreen", "headerColor",
     "headerDividerColor", "headerSizeDelta",
     "titleColorUseClass", "headerColorUseClass",
+    -- Both, or a reset could land on Gold: the mode is read off colorByDifficulty while unset.
+    "titleColorMode", "colorByDifficulty",
+    "objectiveColor", "countColorNone", "countColorPartial", "countColorDone", "finishedObjectiveColor",
     "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
     "headerBarSoftEdges", "headerBarSoftEdgeStrength",
     "blockSpacing", "lineSpacing", "headerSpacing", "scale",

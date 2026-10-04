@@ -30,6 +30,7 @@ LUA = r"C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe"
 HARNESS = "docs/test_tracker_tab.lua"
 
 T = "Options/TabTracker.lua"
+TR = "UI/Tracker.lua"
 
 UP_CLICK = ("                r.up:SetScript(\"OnClick\", function()\n"
             "                    Sections:Move(id, -1)\n"
@@ -99,19 +100,45 @@ MUTANTS = [
         (T, "            if liveSections[id] then\n", "            if true then\n")]),
 
     # ------------------------------------------------------------------- the Options card
-    ("the difficulty box is never dimmed again on a view", [
-        (T, "        if content._syncDiff then content._syncDiff() end\n", "")]),
+    # The difficulty box became one choice of Quest Title Color on Appearance. These three put
+    # back what its removal took away, or break the box that took its place in the card.
+    ("the difficulty box comes back to this tab", [
+        (T, "        local lvl = self:CreateCheckbox(content, L[\"Show quest level prefix\"],\n",
+            "        display:Add(self:CreateCheckbox(content, L[\"Quest Title Color By Difficulty\"],\n"
+            "            rowSetting(\"colorByDifficulty\", true)))\n"
+            "        local lvl = self:CreateCheckbox(content, L[\"Show quest level prefix\"],\n")]),
 
-    ("the difficulty box ignores class colored titles", [
-        (T, "            self:SetDependent(diff, cfg.titleColorOverride == nil and not cfg.titleColorUseClass)",
-            "            self:SetDependent(diff, cfg.titleColorOverride == nil)")]),
+    ("the tab grows a per-view pass again", [
+        (T, "        -- beside the controls that style them - one feature, one place.\n    end,\n})\n",
+            "        -- beside the controls that style them - one feature, one place.\n    end,\n"
+            "    refresh = function() end,\n})\n")]),
 
-    ("the difficulty box ignores a title color", [
-        (T, "            self:SetDependent(diff, cfg.titleColorOverride == nil and not cfg.titleColorUseClass)",
-            "            self:SetDependent(diff, not cfg.titleColorUseClass)")]),
+    ("Keep section headers in view redraws before it re-anchors", [
+        (T, "                DB().stickySectionHeaders = v\n"
+            "                ns:GetModule(\"Tracker\"):ApplyWorldQuestsPosition()\n"
+            "                render()\n",
+            "                DB().stickySectionHeaders = v\n"
+            "                render()\n"
+            "                ns:GetModule(\"Tracker\"):ApplyWorldQuestsPosition()\n")]),
 
-    ("Show Options icon is stored but never applied", [
+    ("Keep section headers in view never re-anchors the list", [
+        (T, "                DB().stickySectionHeaders = v\n"
+            "                ns:GetModule(\"Tracker\"):ApplyWorldQuestsPosition()\n",
+            "                DB().stickySectionHeaders = v\n")]),
+
+    ("Keep section headers in view stores the opposite of the box", [
+        (T, "                DB().stickySectionHeaders = v\n",
+            "                DB().stickySectionHeaders = not v\n")]),
+
+    ("Keep section headers in view is indented under the count box", [
+        (T, "            L[\"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default.\"]))\n",
+            "            L[\"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default.\"]), { dependent = true })\n")]),
+
+    ("the cogwheel box is stored but never applied", [
         (T, '                ns:GetModule("Tracker"):ApplyHeaderIcons()\n', "")]),
+
+    ("the cogwheel box goes back to the label nobody could find", [
+        (T, 'L["Show the options cogwheel on the tracker"]', 'L["Show Options icon on the tracker"]')]),
 
     ("a display box that changes how a row reads never invalidates the rows", [
         (T, '               DB()[key] = v\n               ns:GetModule("Row"):Invalidate()\n               render()\n',
@@ -264,6 +291,42 @@ MUTANTS = [
 
     ("the World Quests block is built where nothing has a world quest", [
         (T, "        if hasWorldQuests then\n            local autoWQ", "        if true then\n            local autoWQ")]),
+
+    ("Keep section headers in view reads a misspelled key, so it always shows ticked", [
+        (T, "            function() return DB().stickySectionHeaders ~= false end,",
+            "            function() return DB().stickySectionHeader ~= false end,")]),
+
+    ("Keep section headers in view reads an unset setting as off, against the shipped default", [
+        (T, "            function() return DB().stickySectionHeaders ~= false end,",
+            "            function() return DB().stickySectionHeaders == true end,")]),
+
+    ("the cogwheel box reads a misspelled key, so it always shows ticked", [
+        (T, "            function() return DB().showOptionsIcon ~= false end,",
+            "            function() return DB().showOptionIcon ~= false end,")]),
+
+    ("the cogwheel is built carrying a key the box never writes", [
+        (TR, '    cog._dbKey = "showOptionsIcon"', '    cog._dbKey = "showOptionIcon"')]),
+
+    ("the cogwheel's key line is commented out", [
+        (TR, '    cog._dbKey = "showOptionsIcon"', '    -- cog._dbKey = "showOptionsIcon"')]),
+
+    ("the cogwheel is left out of the icon run", [
+        (TR, "    f.headerIcons = { cog }", "    f.headerIcons = {}")]),
+
+    ("a rebuild drops the cogwheel along with the API icons", [
+        (TR, "    for i = #f.headerIcons, 2, -1 do f.headerIcons[i] = nil end",
+             "    for i = #f.headerIcons, 1, -1 do f.headerIcons[i] = nil end")]),
+
+    ("the icons sit 3px apart the other way", [
+        (TR, '                b:SetPoint("RIGHT", prev, "LEFT", -3, 0)', '                b:SetPoint("RIGHT", prev, "LEFT", 3, 0)')]),
+
+    ("the cogwheel box redraws before it stores, so it toggles one click late", [
+        (T, "                DB().showOptionsIcon = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n                DB().showOptionsIcon = v\n")]),
+
+    ("the header pass never hides an icon whose switch is off", [
+        (TR, "        if cfg and b._dbKey and cfg[b._dbKey] == false then",
+             "        if cfg and b._dbKey and cfg[b._dbKey] == nil then")]),
 ]
 
 SUMMARY = re.compile(r"^test_tracker_tab: (\d+) passed, (\d+) failed$")

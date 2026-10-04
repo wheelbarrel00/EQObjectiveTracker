@@ -1093,21 +1093,22 @@ do
        "both boxes dim exactly while the tracker is at 100")
     ok(occurrences(a, "self:SetDependent(fadeHover, faded)\n") == 1
        and occurrences(a, "self:SetDependent(fadeFocus, faded)\n") == 1, "both are swept")
-    ok(occurrences(a, "        end\n        syncFade()\n\n        local spacingSlider") == 1,
+    ok(occurrences(a, "        end\n        syncFade()\n\n        local bgRow = tracker:Add(") == 1,
        "and dimmed once when the tab is built")
     -- A card stacks its rows in the order they are added, so the order of these lines is the
     -- order on screen. docs/test_appearance.lua drives the same order through the real tab.
+    -- Since 2026-10-03 they head the Tracker card, ahead of its background and border.
     local function addedAt(line)
         if occurrences(a, line) ~= 1 then return nil end
         return a:find(line, 1, true)
     end
-    local scaleAt = addedAt("        colors:Add(scaleSlider)\n")
-    local fadeAt  = addedAt("        colors:Add(fadeSlider)\n")
-    local hoverAt = addedAt("        colors:Add(fadeHover, DEPENDENT)\n")
-    local focusAt = addedAt("        colors:Add(fadeFocus, DEPENDENT)\n")
-    local spaceAt = addedAt("        colors:Add(spacingSlider)\n")
-    ok(spaceAt and focusAt and spaceAt > focusAt,
-       "Block Spacing comes after the new controls rather than among them")
+    local scaleAt = addedAt("        tracker:Add(scaleSlider)\n")
+    local fadeAt  = addedAt("        tracker:Add(fadeSlider)\n")
+    local hoverAt = addedAt("        tracker:Add(fadeHover, DEPENDENT)\n")
+    local focusAt = addedAt("        tracker:Add(fadeFocus, DEPENDENT)\n")
+    local bgAt    = addedAt("        local bgRow = tracker:Add(")
+    ok(bgAt and focusAt and bgAt > focusAt,
+       "the Background box comes after the new controls rather than among them")
     ok(scaleAt and fadeAt and hoverAt and focusAt and scaleAt < fadeAt and fadeAt < hoverAt
        and hoverAt < focusAt and occurrences(a, "local DEPENDENT = { dependent = true }\n") == 1,
        "the three new controls stack one below the other under Tracker Scale, the two boxes indented")

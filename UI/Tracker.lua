@@ -437,6 +437,15 @@ function Tracker:BuildFrame()
     eBg:Hide()
     f.eventsScrollBarBG = eBg
 
+    -- Holds the header of the section the list is scrolled into. It sits above the scroll frame
+    -- rather than over it, so rows leaving the top are cut off at its edge instead of showing
+    -- through a header that has no fill of its own.
+    local stickyBand = CreateFrame("Frame", nil, f)
+    stickyBand:SetHeight(1)
+    if stickyBand.SetClipsChildren then stickyBand:SetClipsChildren(true) end
+    stickyBand.heads = {}
+    f.stickyBand = stickyBand
+
     -- scroll and eventsRegion are anchored by ApplyWorldQuestsPosition per the Top/Bottom
     -- setting, so they are deliberately not hard-anchored here.
     local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
@@ -461,6 +470,7 @@ function Tracker:BuildFrame()
         sf:EnableMouseWheel(true)
         sf:SetScript("OnMouseWheel", wheelScroll)
     end
+    scroll:HookScript("OnVerticalScroll", function() Tracker:_UpdateSticky() end)
 
     -- Anchored to the bar itself when the template exposes one, so it tracks the bar's
     -- real width rather than assuming the gutter constant matches it.
@@ -698,17 +708,36 @@ function Tracker:ApplyWorldQuestsPosition()
 
     local cfg = ns:GetModule("DB"):Tracker()
     local pos = (cfg and cfg.worldQuestsPosition) or "bottom"
+    local band = f.stickyBand
+    local sticky = (band and cfg and cfg.stickySectionHeaders ~= false) and true or false
 
     scroll:ClearAllPoints()
     region:ClearAllPoints()
+    local above = scen
     if pos == "top" then
         region:SetPoint("TOPLEFT",  scen,   "BOTTOMLEFT",  0, -2)
         region:SetPoint("TOPRIGHT", scen,   "BOTTOMRIGHT", 0, -2)
-        scroll:SetPoint("TOPLEFT",  region, "BOTTOMLEFT",  0, -2)
+        above = region
+    end
+    -- Off, the list hangs where it always has and the band is left out of the chain.
+    if sticky then
+        band:ClearAllPoints()
+        band:SetPoint("TOPLEFT",  above, "BOTTOMLEFT",  0, -2)
+        band:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
+        scroll:SetPoint("TOPLEFT", band, "BOTTOMLEFT", 0, 0)
     else
-        scroll:SetPoint("TOPLEFT",  scen,   "BOTTOMLEFT",  0, -2)
+        scroll:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -2)
+    end
+    if pos ~= "top" then
         region:SetPoint("TOPLEFT",  scroll, "BOTTOMLEFT",  0, -2)
         region:SetPoint("TOPRIGHT", scroll, "BOTTOMRIGHT", 0, -2)
+    end
+
+    -- Render lays the list out for the chain that is actually anchored, never for the live
+    -- setting, which a deferred call here can leave disagreeing with the frames.
+    if (f._stickyAnchored or false) ~= sticky then
+        f._stickyAnchored = sticky
+        self:Refresh()
     end
 end
 
@@ -922,14 +951,16 @@ end
 -- after, so a fresh table per render would be pure garbage.
 local _virtualGroup = { visibleCount = 0, totalCount = 0 }
 
-function Tracker:_RenderZoneSection(content, groupID, y, gap)
+-- Answers what it added to the list and whether it drew at all, which differ once the band
+-- holds its header: a collapsed section there adds nothing and is still on screen.
+function Tracker:_RenderZoneSection(content, groupID, y, gap, inBand)
     local ZoneBar = ns:GetModule("ZoneProgressBar")
-    if not ZoneBar then return 0 end
+    if not ZoneBar then return 0, false end
 
     local done, total, zoneName = ZoneBar:DockedState()
     if not done then
         ZoneBar:HideDocked()
-        return 0
+        return 0, false
     end
 
     local Sections  = ns:GetModule("Sections")
@@ -939,13 +970,95 @@ function Tracker:_RenderZoneSection(content, groupID, y, gap)
 
     header.text:SetText(zoneName)
     header.count:SetText(done .. "/" .. total)
+    -- Hidden rather than skipped: the band copies its text and count from this header.
+    if inBand then
+        header:Hide()
+        added = 0
+    end
 
     if collapsed then
         ZoneBar:HideDocked()
     else
         added = added + ZoneBar:RenderDocked(content, y + added, done, total) + gap
     end
-    return added
+    return added, true
+end
+
+-- Which section the band shows at a scroll offset, and how far the next header has pushed it
+-- up. A section takes the band only once its own header has scrolled fully under the band's
+-- edge, so the band and the list never both show one header whole.
+local function stickyState(tops, n, offset, bandH)
+    local cur = 1
+    for i = 2, n do
+        if tops[i] + bandH <= offset then cur = i else break end
+    end
+    local push = 0
+    if cur < n and offset > tops[cur + 1] then push = offset - tops[cur + 1] end
+    return cur, push
+end
+
+local function stickyHead(band, slot, groupID)
+    local Sections = ns:GetModule("Sections")
+    local h = band.heads[slot]
+    local made = not h
+    if made then
+        h = Sections:NewHeader(band, groupID)
+        band.heads[slot] = h
+    end
+    -- The header's own click handler reads this, so a click collapses the section shown.
+    h.groupID = groupID
+    local src = Sections.frames[groupID]
+    if src then
+        h.text:SetText(src.text:GetText())
+        h.count:SetText(src.count:GetText())
+        h.collapse:SetText(src.collapse:GetText())
+    end
+    -- One made mid-scroll would otherwise wear the stock font until the next render.
+    if made then Sections:ApplyStyle(h) end
+    return h
+end
+
+local function placeHead(h, band, dy)
+    h:ClearAllPoints()
+    h:SetPoint("TOPLEFT",  band, "TOPLEFT",  0, dy)
+    h:SetPoint("TOPRIGHT", band, "TOPRIGHT", 0, dy)
+    h:Show()
+end
+
+-- Runs on every scroll step, so it only copies strings and moves two frames. Styling them is
+-- Render's job, apart from a header made here mid-scroll.
+function Tracker:_UpdateSticky()
+    local f    = self.frame
+    local band = f and f.stickyBand
+    if not band then return end
+    local heads, n = band.heads, f._stickyN or 0
+    if not f._stickyAnchored or n == 0 then
+        for i = 1, #heads do heads[i]:Hide() end
+        return
+    end
+
+    local bandH = f._stickyH or 0
+    local cur, push = stickyState(f._stickyTops, n, f.scroll:GetVerticalScroll() or 0, bandH)
+    -- Without clipping a pushed header would draw over whatever sits above the band, so it
+    -- is handed over in place instead.
+    if not band.SetClipsChildren then push = 0 end
+    self._stickyShown, self._stickyPush = f._stickyIDs[cur], push
+
+    placeHead(stickyHead(band, 1, f._stickyIDs[cur]), band, push)
+    if push > 0 then
+        placeHead(stickyHead(band, 2, f._stickyIDs[cur + 1]), band, push - bandH)
+    elseif heads[2] then
+        heads[2]:Hide()
+    end
+end
+
+function Tracker:StickyLine()
+    local f = self.frame
+    local band = f and f.stickyBand
+    if not (band and f._stickyAnchored) then return "sticky headers: off" end
+    return ("sticky headers: on, band %.0fpx, %d section(s), showing %s, pushed %.0f, clip %s")
+        :format(band:GetHeight() or 0, f._stickyN or 0, tostring(self._stickyShown),
+                self._stickyPush or 0, band.SetClipsChildren and "yes" or "no")
 end
 
 function Tracker:_RenderScenario(group, cfg)
@@ -1161,11 +1274,25 @@ function Tracker:Render()
     if not tops then tops = {}; f._sectionTop = tops end
     wipe(tops)
 
+    -- The first section's header lives in the band, so the list starts with its body.
+    local sticky = f._stickyAnchored and f.stickyBand
+    local stickyIDs, stickyTops = f._stickyIDs, f._stickyTops
+    if not stickyIDs then
+        stickyIDs, stickyTops = {}, {}
+        f._stickyIDs, f._stickyTops = stickyIDs, stickyTops
+    end
+    local stickyN = 0
+
     for _, groupID in ipairs(Sections:Order()) do
         if Sections:IsVirtual(groupID) then
             local top   = y
-            local added = self:_RenderZoneSection(content, groupID, y, gap)
-            if added > 0 then sectionTops[#sectionTops + 1] = top end
+            local added, drawn = self:_RenderZoneSection(content, groupID, y, gap,
+                                                         sticky and stickyN == 0)
+            if drawn then
+                sectionTops[#sectionTops + 1] = top
+                stickyN = stickyN + 1
+                stickyIDs[stickyN], stickyTops[stickyN] = groupID, top
+            end
             y = y + added
         else
             local group      = byGroup[groupID] or EMPTY_GROUP
@@ -1176,8 +1303,15 @@ function Tracker:Render()
                 local header    = Sections:Acquire(content, groupID)
                 sectionTops[#sectionTops + 1] = y
                 tops[groupID] = y
-                y = y + Sections:Place(header, content, y, group, collapsed,
-                                       cfg and cfg.showQuestTotal ~= false, popupCount) + gap
+                stickyN = stickyN + 1
+                stickyIDs[stickyN], stickyTops[stickyN] = groupID, y
+                local headerH = Sections:Place(header, content, y, group, collapsed,
+                                               cfg and cfg.showQuestTotal ~= false, popupCount)
+                if sticky and stickyN == 1 then
+                    header:Hide()
+                else
+                    y = y + headerH + gap
+                end
 
                 if not collapsed then
                     -- Popup boxes sit above the rows in their section, as EQ has them
@@ -1213,6 +1347,18 @@ function Tracker:Render()
     local questContentH = y
     if not locked then content:SetHeight(math.max(1, questContentH)) end
 
+    -- A header and the gap under it, which is what the list gave up for the first one. One
+    -- pixel with nothing to show, since the band stays in the chain while the option is on.
+    local bandH = 0
+    f._stickyN = sticky and stickyN or 0
+    if sticky then
+        bandH = (stickyN > 0) and (Sections:Height() + gap) or 1
+        f._stickyH = bandH
+        if math.abs((sticky:GetHeight() or 0) - bandH) > 0.5 then
+            setRegionHeight(sticky, bandH)
+        end
+    end
+
     local available = math.max(1, (f:GetHeight() or 0) - DRAG_HANDLE_H - scenarioH - 2
                                   - (GRIP_SIZE + 2))
     local fraction  = (cfg and cfg.worldQuestsPinnedMaxFraction) or WQ_PIN_FRACTION
@@ -1236,7 +1382,7 @@ function Tracker:Render()
 
     -- Only snap the clip up when the cut lands inside a header's own row. Snapping when a
     -- body merely overflows would collapse the viewport to the sections above it.
-    local scrollH = math.min(questContentH, available - (wqH or 0))
+    local scrollH = math.min(questContentH, available - (wqH or 0) - bandH)
     if scrollH < questContentH then
         local headerGap = Sections:Height() + gap
         for i = #sectionTops, 1, -1 do
@@ -1254,6 +1400,12 @@ function Tracker:Render()
         if f.scroll.UpdateScrollChildRect then f.scroll:UpdateScrollChildRect() end
         clampScroll(f.scroll)
     end
+
+    self:_UpdateSticky()
+    -- Styled here rather than per scroll step, and after the update so a header made for
+    -- this pass already carries its text when it is measured.
+    local heads = f.stickyBand and f.stickyBand.heads
+    for i = 1, (heads and #heads or 0) do Sections:ApplyStyle(heads[i]) end
 
     RowPool:Sweep(_resetRow)
     -- After Sweep, so a retired row's button retires with it, and after the sizing above so

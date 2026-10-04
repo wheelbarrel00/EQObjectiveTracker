@@ -203,10 +203,10 @@ end
 
 -- A texture on the HIGHLIGHT layer is shown and hidden by the Button itself, so hover needs
 -- no script. Without one these read as labels rather than as something clickable.
-function kit.Highlight(ctx, frame)
+function kit.Highlight(ctx, frame, color)
     local t = frame:CreateTexture(nil, "HIGHLIGHT")
     t:SetAllPoints()
-    t:SetColorTexture(ctx:Color("hover"))
+    t:SetColorTexture(ctx:Color(color or "hover"))
     return t
 end
 

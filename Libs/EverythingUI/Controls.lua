@@ -62,7 +62,7 @@ function Context:AttachTooltip(frame, title, body)
     end
 end
 
-local BUTTON_STYLES = { secondary = true, primary = true, ghost = true }
+local BUTTON_STYLES = { secondary = true, primary = true, ghost = true, danger = true }
 
 function Context:CreateButton(content, label, width, onClick, tooltip, style)
     style = style or "secondary"
@@ -71,7 +71,7 @@ function Context:CreateButton(content, label, width, onClick, tooltip, style)
     end
     local b = CreateFrame("Button", nil, content)
     b:SetHeight(lib.tokens.spacing.buttonHeight)
-    local text = kit.Text(self, b, "value", style == "primary" and "accentText" or "navText")
+    local text = kit.Text(self, b, "value", (style == "primary" and "accentText") or (style == "danger" and "danger") or "navText")
     text:SetPoint("CENTER")
     text:SetText(label)
     b.text = text
@@ -79,8 +79,10 @@ function Context:CreateButton(content, label, width, onClick, tooltip, style)
         kit.Fill(self, b, "accent")
     elseif style == "secondary" then
         kit.Edge(self, b, "navText")
+    elseif style == "danger" then
+        kit.Edge(self, b, "danger")
     end
-    kit.Highlight(self, b)
+    kit.Highlight(self, b, style == "danger" and "dangerSoft" or nil)
     -- Keeps btn:SetText() working without a Blizzard template. Without it a caller relabeling a
     -- button would fail silently.
     b.SetText = function(_, s) text:SetText(s) end
@@ -199,7 +201,10 @@ function Context:CreateIconButton(parent, icon, size, flip)
     return b
 end
 
-function Context:CreateCheckbox(content, label, getter, setter, tooltip)
+function Context:CreateCheckbox(content, label, getter, setter, tooltip, icon)
+    if icon ~= nil and type(icon) ~= "string" then
+        error("EverythingUI: CreateCheckbox's icon must be a texture path", 2)
+    end
     local sp = lib.tokens.spacing
     local ctx = self
     local cb = CreateFrame("CheckButton", nil, content)
@@ -214,6 +219,13 @@ function Context:CreateCheckbox(content, label, getter, setter, tooltip)
     cb.label = kit.Text(self, cb, "label")
     cb.label:SetPoint("LEFT", cb, "RIGHT", sp.checkboxGap, 0)
     cb.label:SetText(label)
+    if icon then
+        cb.icon = cb:CreateTexture(nil, "ARTWORK")
+        cb.icon:SetSize(ICON_SIZE, ICON_SIZE)
+        cb.icon:SetPoint("LEFT", cb, "RIGHT", sp.checkboxGap, 0)
+        cb.icon:SetTexture(icon)
+        cb.label:SetPoint("LEFT", cb.icon, "RIGHT", sp.checkboxGap, 0)
+    end
 
     -- Painted by hand rather than through a checked texture, because a checked box changes
     -- its fill and its edge as well as showing the mark.
@@ -243,6 +255,8 @@ function Context:CreateCheckbox(content, label, getter, setter, tooltip)
     end)
     cb.Refresh = function(btn) btn:SetChecked(getter() and true or false) end
     if tooltip then self:AttachTooltip(cb, label, tooltip) end
+    -- After the tooltip, which widens the click area by the label alone.
+    if icon then cb:SetHitRectInsets(0, -(labelW + ICON_SIZE + sp.checkboxGap * 2), 0, 0) end
     content._controls[#content._controls + 1] = cb
     return cb
 end
@@ -290,7 +304,10 @@ end
 
 -- Built by hand rather than from OptionsSliderTemplate, whose name and children have
 -- moved between flavors. This works everywhere and needs no template at all.
-function Context:CreateSlider(content, label, minV, maxV, step, getter, setter, tooltip)
+function Context:CreateSlider(content, label, minV, maxV, step, getter, setter, tooltip, format)
+    if format ~= nil and type(format) ~= "function" then
+        error("EverythingUI: CreateSlider's format must be a function", 2)
+    end
     local sp = lib.tokens.spacing
     local holder = labelledHolder(self, content, label)
 
@@ -302,6 +319,7 @@ function Context:CreateSlider(content, label, minV, maxV, step, getter, setter, 
     local valueFmt = chooseFormat(step)
     -- A range reaching below zero is an offset, so a positive value carries its sign.
     local function formatValue(v)
+        if format then return format(v) end
         local s = valueFmt:format(v)
         if minV < 0 and (tonumber(s) or 0) > 0 then s = "+" .. s end
         return s

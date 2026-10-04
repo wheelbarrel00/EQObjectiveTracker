@@ -27,6 +27,21 @@ local BAR_STYLES = {
     { value = 2, label = L["Header Bar 2"] },
 }
 
+local TITLE_MODES = {
+    { value = "difficulty", label = L["By difficulty"],
+      tip = L["Each quest title takes the color of how hard it is for your level, the way the quest log does. Entries with no level are gold."] },
+    -- Not L["Gold"]: the shared store translates that one as money.
+    { value = "gold",       label = L["Gold color"],
+      tip = L["Every title in the same gold."] },
+    { value = "class",      label = L["Class color"],
+      tip = L["Every title in the class color of the character you are logged in on."] },
+    -- Not L["Custom"]: its translations were written for another addon, and in Korean it reads "User".
+    { value = "custom",     label = L["Custom color"],
+      tip = L["Every title in the color you pick under this."] },
+    { value = "original",   label = L["Original Style"],
+      tip = L["Titles colored the way Blizzard's own tracker colors them on this version of the game."] },
+}
+
 local SCENARIO_ALIGN = {
     { value = "LEFT",   label = L["Left"] },
     { value = "CENTER", label = L["Center"] },
@@ -199,7 +214,9 @@ Options:RegisterTab({
             return card
         end
 
-        local look = stack(self:CreateGroup(content, L["Appearance"]))
+        -- The card order is the author's (2026-10-03): the most used settings first, the
+        -- self-contained features last.
+        local look = stack(self:CreateGroup(content, L["Text"]))
 
         look:Add(self:CreateDropdown(content, L["Font"],
             function() return mediaOptions(ns:GetModule("Media"):GetFontList()) end,
@@ -249,103 +266,132 @@ Options:RegisterTab({
             L["How far the text drop-shadow is cast behind the letters. Higher values give a larger, more pronounced shadow. Lower values keep it tight. Only applies while Text Shadow is on."])
         look:Add(w.shadowSizeSlider, DEPENDENT)
 
-        local scenario = stack(self:CreateGroup(content, L["Scenario"]))
+        local questColors = stack(self:CreateGroup(content, L["Quest Colors"]))
 
-        local scShadowRow = scenario:Add(self:CreateCheckbox(content, L["Text Shadow"],
-            function() return DB().scenarioTextShadow ~= false end,
-            function(v) bannerRestyle("scenarioTextShadow", v); syncDependents() end,
-            L["Draws a drop-shadow behind the scenario / delve banner text (the Stage and name lines). This is SEPARATE from the Text Shadow above, which affects only the quest and objective text. The banner is styled on its own."]))
-
-        w.scShadowPicker = self:CreateColorPicker(content, L["Shadow Color"],
-            function() return DB().scenarioTextShadowColor end,
-            function(v) bannerRestyle("scenarioTextShadowColor", v) end,
-            L["Color and opacity of the banner's drop shadow."], true)
-        satellite(self, scShadowRow, w.scShadowPicker)
-
-        w.scShadowSizeSlider = self:CreateSlider(content, L["Shadow Size"], 1, 6, 0.5,
-            function() return DB().scenarioTextShadowStrength or 1 end,
-            function(v) bannerRestyle("scenarioTextShadowStrength", v) end,
-            L["How far the scenario banner's drop-shadow is cast. Higher values give a larger, more pronounced shadow. Lower values keep it tight. Only applies while the Scenario Text Shadow above is on."])
-        scenario:Add(w.scShadowSizeSlider, DEPENDENT)
-
-        scenario:Add(self:CreateRadioGroup(content, L["Banner Alignment"],
-            SCENARIO_ALIGN,
-            function() return alignValue(DB().scenarioTextAlign) end,
-            function(v) relayout("scenarioTextAlign", v) end,
+        -- Five choices, so the library draws a dropdown with each choice's tip on its row. The
+        -- getter reads the mode the old switches imply until one is saved.
+        questColors:Add(self:CreateRadioGroup(content, L["Quest Title Color"],
+            TITLE_MODES,
+            function() return ns.Util.TitleColorMode(DB()) end,
+            function(v) restyle("titleColorMode", v); syncDependents() end,
             nil, nil,
-            L["Banner Alignment"],
-            L["Positions the scenario / delve banner within the tracker. Left lines it up with the quest text, Center keeps it centered (the default), and Right pushes it to the tracker's right edge."]))
+            L["Quest Title Color"],
+            L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on."]))
 
-        local scSizeSlider = self:CreateSlider(content, L["Banner Text Size"], -4, 6, 0.5,
-            function() return DB().scenarioTextSizeDelta or 0 end,
-            function(v) relayout("scenarioTextSizeDelta", v) end,
-            L["Grows or shrinks the scenario / delve banner's Stage and name text. 0 is the default size. The banner artwork is a fixed size, so large values may overflow it."])
-        scenario:Add(scSizeSlider)
+        -- Until a known mode is saved the override is one of the switches the mode is read off, so
+        -- the mode shown is saved first or the picker and its Clear would switch every title.
+        local function setTitleOverride(v)
+            local db = DB()
+            db.titleColorMode = ns.Util.TitleColorMode(db)
+            restyle("titleColorOverride", v)
+        end
 
-        local scCritSizeSlider = self:CreateSlider(content, L["Criteria Text Size"], 8, 24, 0.5,
-            function() return DB().scenarioFontSize or 13 end,
-            function(v) relayout("scenarioFontSize", v) end,
-            L["Sizes the scenario / delve objective (criteria) lines shown under the banner, separately from the Banner Text Size above. Raise it if the criteria text looks small next to your quest and World Quest text."])
-        scenario:Add(scCritSizeSlider)
+        -- onClear rather than a button of our own: the helper hides it while the color is
+        -- unset, so a live Clear no longer sits beside a swatch it cannot change.
+        w.titlePicker = self:CreateColorPicker(content, L["Custom Title Color"],
+            function() return DB().titleColorOverride end,
+            function(v)
+                local had = (DB().titleColorOverride or {}).r ~= nil
+                setTitleOverride(v)
+                -- Only when the nil state actually changes, in either direction. The wheel
+                -- fires this setter every frame of a drag, and the sweep is ~40 SetAlpha
+                -- calls. Cancel comes back through here with the previous value, so testing
+                -- only for the arriving transition left the control undimmed and inert.
+                if had ~= (v ~= nil) then syncDependents() end
+            end,
+            L["The color every title takes while Quest Title Color is set to Custom color. Until one is picked they are gold."],
+            false,
+            function()
+                setTitleOverride(nil)
+                syncDependents()
+            end)
+        questColors:Add(w.titlePicker, DEPENDENT)
 
-        -- Out of syncDependents: they dim on nothing.
-        local scTitleSizeSlider = self:CreateSlider(content, L["Event Title Text Size"], -4, 12, 0.5,
-            function() return DB().scenarioTitleSizeDelta or 4 end,
-            function(v) relayout("scenarioTitleSizeDelta", v) end,
-            L["Grows or shrinks the event title above the scenario / delve banner, the line naming the scenario itself. This value is added to the Font Size above, so 4 is the default and keeps the title sizing like a section heading. A long title wraps rather than trailing off, so large values make the panel taller."])
-        scenario:Add(scTitleSizeSlider)
+        w.recolorCheck = self:CreateCheckbox(content, L["Use title color for completed quests"],
+            function() return DB().overrideCompleteGreen ~= false end,
+            function(v) restyle("overrideCompleteGreen", v) end,
+            L["A finished quest's title takes the title color instead of green, and so do its finished objectives unless a Finished Objective Color is picked. Only Class color, Custom color and Original Style give a title color."])
+        questColors:Add(w.recolorCheck)
 
-        scenario:Add(self:CreateColorPicker(content, L["Event Title Color"],
-            function() return DB().scenarioTitleColor end,
-            function(v) relayout("scenarioTitleColor", v) end,
-            L["Color of the event title above the scenario / delve banner. It matches the Section Header Color by default but is set separately, because the scenario panel is not one of the tracker's sections."]))
+        questColors:Add(self:CreateColorPicker(content, L["Objective Text Color"],
+            function() return DB().objectiveColor end,
+            function(v) restyle("objectiveColor", v) end,
+            L["Color of the objective lines under each title. The count at the start of a line has its own three colors below."]))
 
-        local scrollBar = stack(self:CreateGroup(content, L["Scroll Bar"]))
+        questColors:Add(self:CreateColorPicker(content, L["Count Color: None Done"],
+            function() return DB().countColorNone end,
+            function(v) restyle("countColorNone", v) end,
+            L["Color of a count like 0/5, while none of it is done."]))
 
-        -- Heads its own group rather than sitting on the Tracker tab, where it switched off
-        -- six controls the player could not see from there.
-        scrollBar:Add(self:CreateCheckbox(content, L["Hide scroll bar"],
-            function() return DB().hideScrollBar end,
-            function(v) relayout("hideScrollBar", v); syncDependents() end,
-            L["Removes the tracker's scroll bar entirely and scrolls with the mouse wheel instead. Everything else in this group styles that bar, so it all stops applying while this is on."]))
+        questColors:Add(self:CreateColorPicker(content, L["Count Color: In Progress"],
+            function() return DB().countColorPartial end,
+            function(v) restyle("countColorPartial", v) end,
+            L["Color of a count like 2/5, while some of it is done."]))
 
-        w.sbCheck = self:CreateCheckbox(content, L["Scroll Bar Background"],
-            function() return DB().scrollBarBg ~= false end,
-            function(v) relayout("scrollBarBg", v); syncDependents() end,
-            L["Draws a track behind the scroll bar so it stays visible over bright terrain."])
-        local sbRow = scrollBar:Add(w.sbCheck)
+        questColors:Add(self:CreateColorPicker(content, L["Count Color: Done"],
+            function() return DB().countColorDone end,
+            function(v) restyle("countColorDone", v) end,
+            L["Color of a count like 5/5 once all of it is done. Finished objectives take it too, unless a Finished Objective Color is picked, or Use title color for completed quests is on with Quest Title Color set to Class color, Custom color or Original Style."]))
 
-        w.sbPicker = self:CreateColorPicker(content, L["Scroll Bar Color"],
-            function() return DB().scrollBarBgColor end,
-            function(v) relayout("scrollBarBgColor", v) end,
-            L["Color and opacity of the scroll bar track."], true)
-        satellite(self, sbRow, w.sbPicker)
-
-        w.thumbSkinCheck = self:CreateCheckbox(content, L["Solid color thumb"],
-            function() return DB().skinScrollBar end,
-            function(v) relayout("skinScrollBar", v); syncDependents() end,
-            L["Replaces the tracker scroll bar's textured thumb (the draggable block) with a flat single-color block. Use the Thumb Color and Thumb Width controls to style it. Off restores the stock Blizzard bar."])
-        local thumbRow = scrollBar:Add(w.thumbSkinCheck)
-
-        w.thumbColorPicker = self:CreateColorPicker(content, L["Thumb Color"],
-            function() return DB().scrollBarThumbColor end,
-            function(v) relayout("scrollBarThumbColor", v) end,
-            L["Color and opacity of the draggable block. Only used while Solid color thumb is on."], true)
-        satellite(self, thumbRow, w.thumbColorPicker)
-
-        w.thumbWidthSlider = self:CreateSlider(content, L["Thumb Width"], 4, 16, 0.5,
-            function() return DB().scrollBarThumbWidth or 8 end,
-            function(v) relayout("scrollBarThumbWidth", v) end,
-            L["How wide the draggable block is. Only used while Solid color thumb is on."])
-        scrollBar:Add(w.thumbWidthSlider, DEPENDENT)
-
-        w.hideArrowsCheck = self:CreateCheckbox(content, L["Hide scroll bar arrows"],
-            function() return DB().hideScrollArrows end,
-            function(v) relayout("hideScrollArrows", v) end,
-            L["Hides the up and down arrow buttons at the ends of the tracker scroll bar. The bar still scrolls by dragging the thumb or using the mouse wheel."])
-        scrollBar:Add(w.hideArrowsCheck)
+        -- Unset by default, so until one is picked a finished line takes the title color the box
+        -- gives, else the done count's.
+        questColors:Add(self:CreateColorPicker(content, L["Finished Objective Color"],
+            function() return DB().finishedObjectiveColor end,
+            function(v) restyle("finishedObjectiveColor", v) end,
+            L["Color of an objective you have finished. While unset it follows Count Color: Done, or the title color when Use title color for completed quests gives one."],
+            false,
+            function() restyle("finishedObjectiveColor", nil) end))
 
         local tracker = stack(self:CreateGroup(content, L["Tracker"]))
+
+        local scaleSlider = self:CreateSlider(content, L["Tracker Scale"], 0.7, 1.5, 0.05,
+            function() return DB().scale or 1 end,
+            function(v)
+                DB().scale = v
+                ns:GetModule("Tracker"):ApplyScale()
+            end,
+            L["Scales the whole tracker. Takes effect immediately out of combat."])
+        tracker:Add(scaleSlider)
+
+        local syncFade
+        -- Stored as a fraction and shown as a whole number, so no key carries a bare percent sign.
+        local fadeSlider = self:CreateSlider(content, L["Tracker Opacity"], 10, 100, 5,
+            function() return math.floor((DB().trackerAlpha or 1) * 100 + 0.5) end,
+            function(v)
+                DB().trackerAlpha = v / 100
+                ns:GetModule("Visibility"):ApplyFade()
+                syncFade()
+                refreshPreview()
+            end,
+            L["How solid the tracker is. At 100 it is fully solid, and lower values let the game show through it."])
+        tracker:Add(fadeSlider)
+
+        local fadeHover = self:CreateCheckbox(content, L["Full opacity on mouseover"],
+            function() return DB().trackerAlphaHover ~= false end,
+            function(v)
+                DB().trackerAlphaHover = v
+                ns:GetModule("Visibility"):ApplyFade()
+            end,
+            L["Brings the tracker back to full while the mouse is over its quests or headers. Only used while Tracker Opacity is below 100."])
+        tracker:Add(fadeHover, DEPENDENT)
+
+        local fadeFocus = self:CreateCheckbox(content, L["Keep the focused quest at full opacity"],
+            function() return DB().trackerAlphaFocus ~= false end,
+            function(v)
+                DB().trackerAlphaFocus = v
+                ns:GetModule("Visibility"):ApplyFade()
+            end,
+            L["The quest you are following stays fully solid while the rest of the tracker is faded. Only used while Tracker Opacity is below 100."])
+        tracker:Add(fadeFocus, DEPENDENT)
+
+        -- Swept on its own rather than through syncDependents: the slider calls it on every
+        -- step of a drag, and these two boxes are all that step can change.
+        syncFade = function()
+            local faded = (DB().trackerAlpha or 1) < 1
+            self:SetDependent(fadeHover, faded)
+            self:SetDependent(fadeFocus, faded)
+        end
+        syncFade()
 
         local bgRow = tracker:Add(self:CreateCheckbox(content, L["Background"],
             function() return DB().showBackground end,
@@ -375,9 +421,25 @@ Options:RegisterTab({
             L["Border thickness in pixels."])
         tracker:Add(w.borderThickSlider, DEPENDENT)
 
-        local headerBar = stack(self:CreateGroup(content, L["Header Bar"]))
+        local headers = stack(self:CreateGroup(content, L["Section Headers"]))
 
-        local hbRow = headerBar:Add(self:CreateCheckbox(content, L["Show header bars"],
+        headers:Add(self:CreateCheckbox(content, L["Use class color for headers"],
+            function() return DB().headerColorUseClass end,
+            function(v) relayout("headerColorUseClass", v); syncDependents() end,
+            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))
+
+        w.headerPicker = self:CreateColorPicker(content, L["Section Header Color"],
+            function() return DB().headerColor end,
+            function(v) relayout("headerColor", v) end,
+            L["Color of the Quests, Campaign and World Quests headings."])
+        headers:Add(w.headerPicker, DEPENDENT)
+
+        headers:Add(self:CreateColorPicker(content, L["Divider Line Color"],
+            function() return DB().headerDividerColor end,
+            function(v) relayout("headerDividerColor", v) end,
+            L["Sets the color of the thin line under each section header. Defaults to the original gold."], true))
+
+        local hbRow = headers:Add(self:CreateCheckbox(content, L["Show header bars"],
             function() return DB().headerBar end,
             function(v) relayout("headerBar", v); syncDependents() end,
             L["Draws a colored gradient bar behind each section header (Quests, Campaign, World Quests, and so on), for a look closer to the default Blizzard tracker. Off by default."]))
@@ -395,210 +457,45 @@ Options:RegisterTab({
             nil, nil,
             L["Bar Style"],
             L["Header Bar 1 is a horizontal gradient (bright on the left, dark on the right). Header Bar 2 is a vertical gradient (bright at the top, dark at the bottom). Bar Color, Bar Height, and Soft edges all apply to whichever style you pick."])
-        headerBar:Add(w.hbStyle)
+        headers:Add(w.hbStyle)
 
         w.hbHeightSlider = self:CreateSlider(content, L["Bar Height"], 6, 26, 0.5,
             function() return DB().headerBarHeight or 22 end,
             function(v) relayout("headerBarHeight", v) end,
             L["How tall the section-header bar is. The bar is centered on the header row, so larger values fill more of it."])
-        headerBar:Add(w.hbHeightSlider)
+        headers:Add(w.hbHeightSlider)
 
         w.hbSoftCheck = self:CreateCheckbox(content, L["Soft edges"],
             function() return DB().headerBarSoftEdges end,
             function(v) relayout("headerBarSoftEdges", v); syncDependents() end,
             L["Feathers the top, left, and right edges of the header bar so it blends into the UI instead of sitting in a hard box. The gradient color is unchanged. Only applies while Header bars is on. Off by default."])
-        headerBar:Add(w.hbSoftCheck)
+        headers:Add(w.hbSoftCheck)
 
         w.hbSoftSlider = self:CreateSlider(content, L["Edge Softness"], 1, 10, 0.5,
             function() return DB().headerBarSoftEdgeStrength or 10 end,
             function(v) relayout("headerBarSoftEdgeStrength", v) end,
             L["How soft the header bar's feathered edges are when Soft edges is on. Higher is softer, lower tightens toward a hard edge."])
-        headerBar:Add(w.hbSoftSlider, DEPENDENT)
+        headers:Add(w.hbSoftSlider, DEPENDENT)
 
-        -- Whether the provider registered, which the TOC already decides per flavor. ns.Has
-        -- is a CAPABILITY probe and reads true on Classic, where the client keeps the
-        -- functions and ships no scenarios behind them.
-        if ns.Has.ScenarioBonus and ns:GetModule("Registry"):Get("scenarios") then
-            local bonus = stack(self:CreateGroup(content, L["Scenario Bonus Objectives"]))
-
-            bonus:Add(self:CreateCheckbox(content, L["Show bonus objectives HUD"],
-                function() local st = sbState(); return st and st.enabled end,
-                function(v) ns:GetModule("ScenarioBonusHUD"):SetEnabled(v) end,
-                L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."]))
-
-            -- The HUD only draws inside a scenario or delve, so without this the position,
-            -- scale and colors below can only be set somewhere the player cannot see them.
-            bonus:Add(self:CreateButton(content, L["Test"], 120, function()
-                ns:GetModule("ScenarioBonusHUD"):ToggleTest()
-            end, L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."]))
-
-            -- This group sweeps itself rather than joining syncDependents below. That began as a
-            -- hard constraint: the sweep once closed over 55 upvalues against Lua's limit of 60,
-            -- past which this FILE stops compiling and the Appearance tab disappears. It now
-            -- reads one table, and a dimmed control joins that table rather than becoming an
-            -- upvalue of its own.
-            local syncHUD
-
-            local sbBgRow = bonus:Add(self:CreateCheckbox(content, L["Background"],
-                function() local st = sbState(); return not (st and st.showBackground == false) end,
-                function(v) sbSet("showBackground", v); syncHUD() end,
-                L["Fills the HUD behind its text."]))
-
-            -- The onClear below is what the border picker does not have: this key is the one
-            -- with no DB default, so unset is a state the user can get back to.
-            local sbBgPicker = self:CreateColorPicker(content, L["Background Color"],
-                function() local st = sbState(); return st and st.backgroundColor end,
-                function(v) sbSet("backgroundColor", v) end,
-                L["Background color and opacity for the HUD. While this is unset it uses a plain black fill that fades slightly once locked."], true,
-                function() sbSet("backgroundColor", nil) end)
-            satellite(self, sbBgRow, sbBgPicker)
-
-            local sbBorderRow = bonus:Add(self:CreateCheckbox(content, L["Border"],
-                function() local st = sbState(); return not (st and st.showBorder == false) end,
-                function(v) sbSet("showBorder", v); syncHUD() end,
-                L["Draws a border around the HUD."]))
-
-            local sbBorderPicker = self:CreateColorPicker(content, L["Border Color"],
-                function() local st = sbState(); return st and st.borderColor end,
-                function(v) sbSet("borderColor", v) end,
-                L["Border color and opacity for the HUD."], true)
-            satellite(self, sbBorderRow, sbBorderPicker)
-
-            local sbScale = self:CreateSlider(content, L["HUD Scale"], 0.5, 2.0, 0.05,
-                function() local st = sbState(); return (st and st.scale) or 1.0 end,
-                function(v) ns:GetModule("ScenarioBonusHUD"):SetScale(v) end,
-                L["Sizes the bonus objectives HUD."])
-            bonus:Add(sbScale)
-
-            -- Each picker dims on its own box, and nothing dims on the HUD's own switch. Test
-            -- draws the HUD with that switch off, which is what the button is for, so the
-            -- colors and the scale are reachable settings there rather than inert ones.
-            syncHUD = function()
-                local st = sbState() or {}
-                self:SetDependent(sbBgPicker,     st.showBackground ~= false)
-                self:SetDependent(sbBorderPicker, st.showBorder ~= false)
-            end
-            syncHUD()
-            content._syncHUD = syncHUD
-        end
-
-        local colors = stack(self:CreateGroup(content, L["Colors & Dimensions"]))
-
-        -- Above the picker it overrides, so the color it dims sits under the switch that does it.
-        colors:Add(self:CreateCheckbox(content, L["Use class color for titles"],
-            function() return DB().titleColorUseClass end,
-            function(v) restyle("titleColorUseClass", v); syncDependents() end,
-            L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))
-
-        -- onClear rather than a button of our own: the helper hides it while the color is
-        -- unset, so a live Clear no longer sits beside a swatch it cannot change.
-        w.titlePicker = self:CreateColorPicker(content, L["Quest Title Color Override"],
-            function() return DB().titleColorOverride end,
-            function(v)
-                local had = DB().titleColorOverride ~= nil
-                restyle("titleColorOverride", v)
-                -- Only when the nil state actually changes, in either direction. The wheel
-                -- fires this setter every frame of a drag, and the sweep is ~40 SetAlpha
-                -- calls. Cancel comes back through here with the previous value, so testing
-                -- only for the arriving transition left the control undimmed and inert.
-                if had ~= (v ~= nil) then syncDependents() end
-            end,
-            L["When cleared, falls back to difficulty coloring or default yellow."],
-            false,
-            function()
-                restyle("titleColorOverride", nil)
-                syncDependents()
-            end)
-        colors:Add(w.titlePicker, DEPENDENT)
-
-        w.recolorCheck = self:CreateCheckbox(content, L["Use title color for completed quests"],
-            function() return DB().overrideCompleteGreen ~= false end,
-            function(v) restyle("overrideCompleteGreen", v) end,
-            L["Instead of green."])
-        colors:Add(w.recolorCheck)
-
-        colors:Add(self:CreateCheckbox(content, L["Use class color for headers"],
-            function() return DB().headerColorUseClass end,
-            function(v) relayout("headerColorUseClass", v); syncDependents() end,
-            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))
-
-        w.headerPicker = self:CreateColorPicker(content, L["Section Header Color"],
-            function() return DB().headerColor end,
-            function(v) relayout("headerColor", v) end,
-            L["Color of the Quests, Campaign and World Quests headings."])
-        colors:Add(w.headerPicker, DEPENDENT)
-
-        colors:Add(self:CreateColorPicker(content, L["Divider Line Color"],
-            function() return DB().headerDividerColor end,
-            function(v) relayout("headerDividerColor", v) end,
-            L["Sets the color of the thin line under each section header. Defaults to the original gold."], true))
-
-        local scaleSlider = self:CreateSlider(content, L["Tracker Scale"], 0.7, 1.5, 0.05,
-            function() return DB().scale or 1 end,
-            function(v)
-                DB().scale = v
-                ns:GetModule("Tracker"):ApplyScale()
-            end,
-            L["Scales the whole tracker. Takes effect immediately out of combat."])
-        colors:Add(scaleSlider)
-
-        local syncFade
-        -- Stored as a fraction and shown as a whole number, so no key carries a bare percent sign.
-        local fadeSlider = self:CreateSlider(content, L["Tracker Opacity"], 10, 100, 5,
-            function() return math.floor((DB().trackerAlpha or 1) * 100 + 0.5) end,
-            function(v)
-                DB().trackerAlpha = v / 100
-                ns:GetModule("Visibility"):ApplyFade()
-                syncFade()
-                refreshPreview()
-            end,
-            L["How solid the tracker is. At 100 it is fully solid, and lower values let the game show through it."])
-        colors:Add(fadeSlider)
-
-        local fadeHover = self:CreateCheckbox(content, L["Full opacity on mouseover"],
-            function() return DB().trackerAlphaHover ~= false end,
-            function(v)
-                DB().trackerAlphaHover = v
-                ns:GetModule("Visibility"):ApplyFade()
-            end,
-            L["Brings the tracker back to full while the mouse is over its quests or headers. Only used while Tracker Opacity is below 100."])
-        colors:Add(fadeHover, DEPENDENT)
-
-        local fadeFocus = self:CreateCheckbox(content, L["Keep the focused quest at full opacity"],
-            function() return DB().trackerAlphaFocus ~= false end,
-            function(v)
-                DB().trackerAlphaFocus = v
-                ns:GetModule("Visibility"):ApplyFade()
-            end,
-            L["The quest you are following stays fully solid while the rest of the tracker is faded. Only used while Tracker Opacity is below 100."])
-        colors:Add(fadeFocus, DEPENDENT)
-
-        -- Swept on its own rather than through syncDependents: the slider calls it on every
-        -- step of a drag, and these two boxes are all that step can change.
-        syncFade = function()
-            local faded = (DB().trackerAlpha or 1) < 1
-            self:SetDependent(fadeHover, faded)
-            self:SetDependent(fadeFocus, faded)
-        end
-        syncFade()
+        local spacing = stack(self:CreateGroup(content, L["Spacing"]))
 
         local spacingSlider = self:CreateSlider(content, L["Block Spacing"], 0, 12, 0.5,
             function() return DB().blockSpacing or 2 end,
             function(v) relayout("blockSpacing", v) end,
             L["Vertical gap between each entry and between sections."])
-        colors:Add(spacingSlider)
+        spacing:Add(spacingSlider)
 
         local lineSpacingSlider = self:CreateSlider(content, L["Line Spacing"], 0, 12, 1,
             function() return DB().lineSpacing or 0 end,
             function(v) restyle("lineSpacing", v) end,
             L["Adds vertical space between a quest's objective lines, across the whole tracker. 0 keeps the default spacing."])
-        colors:Add(lineSpacingSlider)
+        spacing:Add(lineSpacingSlider)
 
         local headerSpacingSlider = self:CreateSlider(content, L["Header Spacing"], -2, 12, 1,
             function() return DB().headerSpacing or 0 end,
             function(v) restyle("headerSpacing", v) end,
             L["Adds or removes space around section headers and beneath each quest's title. 0 keeps the default spacing."])
-        colors:Add(headerSpacingSlider)
+        spacing:Add(headerSpacingSlider)
 
         local questRows = stack(self:CreateGroup(content, L["Quest Rows"]))
 
@@ -669,6 +566,242 @@ Options:RegisterTab({
             function(v) restyle("cardTintRaid", v) end,
             L["Card color for raid entries. Needs Tint cards by quest type switched on."], true)
         questRows:Add(w.raidTint, DEPENDENT)
+
+        -- The quest row bars, the scenario criteria bars and the event widget bars share one
+        -- style block. They all draw identically, so splitting the styling as well as the
+        -- switches would mean setting the same seven controls three times over.
+        local progress = stack(self:CreateGroup(content, L["Progress Bars"]))
+
+        -- This key came off the Tracker tab and keeps the meaning it shipped with, so a
+        -- profile that had already switched bars off is unchanged by the split. The two
+        -- halves below are NEW keys, which is why neither can silently revert a stored choice.
+        progress:Add(self:CreateCheckbox(content, L["Show progress bars"],
+            function() return DB().showProgressBars ~= false end,
+            function(v) restyle("showProgressBars", v); syncDependents() end,
+            L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. The two boxes under this pick which of them get one."]))
+
+        w.pbQuests = self:CreateCheckbox(content, L["Quest Rows"],
+            function() return DB().showQuestProgressBars ~= false end,
+            function(v) restyle("showQuestProgressBars", v); syncDependents() end,
+            L["Bars on quest, World Quest and achievement rows. The objective's own text is drawn above its bar, matching the default tracker."])
+        progress:Add(w.pbQuests)
+
+        w.pbScenario = self:CreateCheckbox(content, L["Scenario Criteria"],
+            function() return DB().showScenarioProgressBars ~= false end,
+            function(v) restyle("showScenarioProgressBars", v); syncDependents() end,
+            L["Bars on the objective lines shown under a scenario or delve banner."])
+        progress:Add(w.pbScenario)
+
+        w.pbBgCheck = self:CreateCheckbox(content, L["Background"],
+            function() local st = pbState(); return not (st and st.showBackground == false) end,
+            function(v) pbSet("showBackground", v); syncDependents() end,
+            L["Fills the unfinished part of the bar. Unticked, only the filled part is drawn."])
+        local pbBgRow = progress:Add(w.pbBgCheck)
+
+        w.pbBgPicker = self:CreateColorPicker(content, L["Background Color"],
+            function() local st = pbState(); return st and st.backgroundColor end,
+            function(v) pbSet("backgroundColor", v) end,
+            L["Color and opacity of the unfilled part of the bar."], true)
+        satellite(self, pbBgRow, w.pbBgPicker)
+
+        w.pbBorderCheck = self:CreateCheckbox(content, L["Border"],
+            function() local st = pbState(); return not (st and st.showBorder == false) end,
+            function(v) pbSet("showBorder", v); syncDependents() end,
+            L["Draws a one pixel border around the bar."])
+        local pbBorderRow = progress:Add(w.pbBorderCheck)
+
+        w.pbBorderPicker = self:CreateColorPicker(content, L["Border Color"],
+            function() local st = pbState(); return st and st.borderColor end,
+            function(v) pbSet("borderColor", v) end,
+            L["Color and opacity of the bar's border."], true)
+        satellite(self, pbBorderRow, w.pbBorderPicker)
+
+        -- Keep this range and Media:ProgressBarHeight's clamp in step. CreateSlider's own
+        -- suppress flag is what stops a stored value outside the range being written back on
+        -- every tab view, so the two disagreeing is a silently clamped bar rather than a
+        -- corrupted profile - but only while that flag survives.
+        w.pbHeightSlider = self:CreateSlider(content, L["Bar Height"], 8, 24, 1,
+            function() local st = pbState(); return (st and st.height) or 16 end,
+            function(v) pbSet("height", v) end,
+            L["How tall each progress bar is drawn."])
+        progress:Add(w.pbHeightSlider)
+
+        w.pbTexDD = self:CreateDropdown(content, L["Bar Texture"],
+            function() return mediaOptions(ns:GetModule("Media"):GetStatusBarList()) end,
+            function() local st = pbState(); return (st and st.barTexture) or "Blizzard" end,
+            function(v) pbSet("barTexture", v) end,
+            L["Sets the fill texture of the progress bars. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."],
+            barTextureSwatch)
+        progress:Add(w.pbTexDD)
+
+        w.pbBarColorPicker = self:CreateColorPicker(content, L["Bar Color"],
+            function() local st = pbState(); return st and st.barColor end,
+            function(v) pbSet("barColor", v) end,
+            L["Fill color and opacity of the bar itself."], true)
+        progress:Add(w.pbBarColorPicker)
+
+        local scrollBar = stack(self:CreateGroup(content, L["Scroll Bar"]))
+
+        -- Heads its own group rather than sitting on the Tracker tab, where it switched off
+        -- six controls the player could not see from there.
+        scrollBar:Add(self:CreateCheckbox(content, L["Hide scroll bar"],
+            function() return DB().hideScrollBar end,
+            function(v) relayout("hideScrollBar", v); syncDependents() end,
+            L["Removes the tracker's scroll bar entirely and scrolls with the mouse wheel instead. Everything else in this group styles that bar, so it all stops applying while this is on."]))
+
+        w.sbCheck = self:CreateCheckbox(content, L["Scroll Bar Background"],
+            function() return DB().scrollBarBg ~= false end,
+            function(v) relayout("scrollBarBg", v); syncDependents() end,
+            L["Draws a track behind the scroll bar so it stays visible over bright terrain."])
+        local sbRow = scrollBar:Add(w.sbCheck)
+
+        w.sbPicker = self:CreateColorPicker(content, L["Scroll Bar Color"],
+            function() return DB().scrollBarBgColor end,
+            function(v) relayout("scrollBarBgColor", v) end,
+            L["Color and opacity of the scroll bar track."], true)
+        satellite(self, sbRow, w.sbPicker)
+
+        w.thumbSkinCheck = self:CreateCheckbox(content, L["Solid color thumb"],
+            function() return DB().skinScrollBar end,
+            function(v) relayout("skinScrollBar", v); syncDependents() end,
+            L["Replaces the tracker scroll bar's textured thumb (the draggable block) with a flat single-color block. Use the Thumb Color and Thumb Width controls to style it. Off restores the stock Blizzard bar."])
+        local thumbRow = scrollBar:Add(w.thumbSkinCheck)
+
+        w.thumbColorPicker = self:CreateColorPicker(content, L["Thumb Color"],
+            function() return DB().scrollBarThumbColor end,
+            function(v) relayout("scrollBarThumbColor", v) end,
+            L["Color and opacity of the draggable block. Only used while Solid color thumb is on."], true)
+        satellite(self, thumbRow, w.thumbColorPicker)
+
+        w.thumbWidthSlider = self:CreateSlider(content, L["Thumb Width"], 4, 16, 0.5,
+            function() return DB().scrollBarThumbWidth or 8 end,
+            function(v) relayout("scrollBarThumbWidth", v) end,
+            L["How wide the draggable block is. Only used while Solid color thumb is on."])
+        scrollBar:Add(w.thumbWidthSlider, DEPENDENT)
+
+        w.hideArrowsCheck = self:CreateCheckbox(content, L["Hide scroll bar arrows"],
+            function() return DB().hideScrollArrows end,
+            function(v) relayout("hideScrollArrows", v) end,
+            L["Hides the up and down arrow buttons at the ends of the tracker scroll bar. The bar still scrolls by dragging the thumb or using the mouse wheel."])
+        scrollBar:Add(w.hideArrowsCheck)
+
+        local scenario = stack(self:CreateGroup(content, L["Scenario"]))
+
+        local scShadowRow = scenario:Add(self:CreateCheckbox(content, L["Text Shadow"],
+            function() return DB().scenarioTextShadow ~= false end,
+            function(v) bannerRestyle("scenarioTextShadow", v); syncDependents() end,
+            L["Draws a drop-shadow behind the scenario / delve banner text (the Stage and name lines). This is SEPARATE from the Text Shadow above, which affects only the quest and objective text. The banner is styled on its own."]))
+
+        w.scShadowPicker = self:CreateColorPicker(content, L["Shadow Color"],
+            function() return DB().scenarioTextShadowColor end,
+            function(v) bannerRestyle("scenarioTextShadowColor", v) end,
+            L["Color and opacity of the banner's drop shadow."], true)
+        satellite(self, scShadowRow, w.scShadowPicker)
+
+        w.scShadowSizeSlider = self:CreateSlider(content, L["Shadow Size"], 1, 6, 0.5,
+            function() return DB().scenarioTextShadowStrength or 1 end,
+            function(v) bannerRestyle("scenarioTextShadowStrength", v) end,
+            L["How far the scenario banner's drop-shadow is cast. Higher values give a larger, more pronounced shadow. Lower values keep it tight. Only applies while the Scenario Text Shadow above is on."])
+        scenario:Add(w.scShadowSizeSlider, DEPENDENT)
+
+        scenario:Add(self:CreateRadioGroup(content, L["Banner Alignment"],
+            SCENARIO_ALIGN,
+            function() return alignValue(DB().scenarioTextAlign) end,
+            function(v) relayout("scenarioTextAlign", v) end,
+            nil, nil,
+            L["Banner Alignment"],
+            L["Positions the scenario / delve banner within the tracker. Left lines it up with the quest text, Center keeps it centered (the default), and Right pushes it to the tracker's right edge."]))
+
+        local scSizeSlider = self:CreateSlider(content, L["Banner Text Size"], -4, 6, 0.5,
+            function() return DB().scenarioTextSizeDelta or 0 end,
+            function(v) relayout("scenarioTextSizeDelta", v) end,
+            L["Grows or shrinks the scenario / delve banner's Stage and name text. 0 is the default size. The banner artwork is a fixed size, so large values may overflow it."])
+        scenario:Add(scSizeSlider)
+
+        local scCritSizeSlider = self:CreateSlider(content, L["Criteria Text Size"], 8, 24, 0.5,
+            function() return DB().scenarioFontSize or 13 end,
+            function(v) relayout("scenarioFontSize", v) end,
+            L["Sizes the scenario / delve objective (criteria) lines shown under the banner, separately from the Banner Text Size above. Raise it if the criteria text looks small next to your quest and World Quest text."])
+        scenario:Add(scCritSizeSlider)
+
+        -- Out of syncDependents: they dim on nothing.
+        local scTitleSizeSlider = self:CreateSlider(content, L["Event Title Text Size"], -4, 12, 0.5,
+            function() return DB().scenarioTitleSizeDelta or 4 end,
+            function(v) relayout("scenarioTitleSizeDelta", v) end,
+            L["Grows or shrinks the event title above the scenario / delve banner, the line naming the scenario itself. This value is added to the Font Size above, so 4 is the default and keeps the title sizing like a section heading. A long title wraps rather than trailing off, so large values make the panel taller."])
+        scenario:Add(scTitleSizeSlider)
+
+        scenario:Add(self:CreateColorPicker(content, L["Event Title Color"],
+            function() return DB().scenarioTitleColor end,
+            function(v) relayout("scenarioTitleColor", v) end,
+            L["Color of the event title above the scenario / delve banner. It matches the Section Header Color by default but is set separately, because the scenario panel is not one of the tracker's sections."]))
+
+        -- Whether the provider registered, which the TOC already decides per flavor. ns.Has
+        -- is a CAPABILITY probe and reads true on Classic, where the client keeps the
+        -- functions and ships no scenarios behind them.
+        if ns.Has.ScenarioBonus and ns:GetModule("Registry"):Get("scenarios") then
+            local bonus = stack(self:CreateGroup(content, L["Scenario Bonus Objectives"]))
+
+            bonus:Add(self:CreateCheckbox(content, L["Show bonus objectives HUD"],
+                function() local st = sbState(); return st and st.enabled end,
+                function(v) ns:GetModule("ScenarioBonusHUD"):SetEnabled(v) end,
+                L["Shows a small movable checklist of the extra bonus objectives that appear during some scenarios and delves, so you do not miss their rewards. Drag to move, right-click to lock or reset. Off by default."]))
+
+            -- The HUD only draws inside a scenario or delve, so without this the position,
+            -- scale and colors below can only be set somewhere the player cannot see them.
+            bonus:Add(self:CreateButton(content, L["Test"], 120, function()
+                ns:GetModule("ScenarioBonusHUD"):ToggleTest()
+            end, L["Draws the HUD with two made-up bonus objectives so you can position and size it without being in a scenario or delve. Click again to clear it."]))
+
+            -- This group sweeps itself rather than joining syncDependents below. That began as a
+            -- hard constraint: the sweep once closed over 55 upvalues against Lua's limit of 60,
+            -- past which this FILE stops compiling and the Appearance tab disappears. It now
+            -- reads one table, and a dimmed control joins that table rather than becoming an
+            -- upvalue of its own.
+            local syncHUD
+
+            local sbBgRow = bonus:Add(self:CreateCheckbox(content, L["Background"],
+                function() local st = sbState(); return not (st and st.showBackground == false) end,
+                function(v) sbSet("showBackground", v); syncHUD() end,
+                L["Fills the HUD behind its text."]))
+
+            -- The onClear below is what the border picker does not have: this key is the one
+            -- with no DB default, so unset is a state the user can get back to.
+            local sbBgPicker = self:CreateColorPicker(content, L["Background Color"],
+                function() local st = sbState(); return st and st.backgroundColor end,
+                function(v) sbSet("backgroundColor", v) end,
+                L["Background color and opacity for the HUD. While this is unset it uses a plain black fill that fades slightly once locked."], true,
+                function() sbSet("backgroundColor", nil) end)
+            satellite(self, sbBgRow, sbBgPicker)
+
+            local sbBorderRow = bonus:Add(self:CreateCheckbox(content, L["Border"],
+                function() local st = sbState(); return not (st and st.showBorder == false) end,
+                function(v) sbSet("showBorder", v); syncHUD() end,
+                L["Draws a border around the HUD."]))
+
+            local sbBorderPicker = self:CreateColorPicker(content, L["Border Color"],
+                function() local st = sbState(); return st and st.borderColor end,
+                function(v) sbSet("borderColor", v) end,
+                L["Border color and opacity for the HUD."], true)
+            satellite(self, sbBorderRow, sbBorderPicker)
+
+            local sbScale = self:CreateSlider(content, L["HUD Scale"], 0.5, 2.0, 0.05,
+                function() local st = sbState(); return (st and st.scale) or 1.0 end,
+                function(v) ns:GetModule("ScenarioBonusHUD"):SetScale(v) end,
+                L["Sizes the bonus objectives HUD."])
+            bonus:Add(sbScale)
+
+            -- Each picker dims on its own box, and nothing dims on the HUD's own switch. Test
+            -- draws the HUD with that switch off, which is what the button is for, so the
+            -- colors and the scale are reachable settings there rather than inert ones.
+            syncHUD = function()
+                local st = sbState() or {}
+                self:SetDependent(sbBgPicker,     st.showBackground ~= false)
+                self:SetDependent(sbBorderPicker, st.showBorder ~= false)
+            end
+            syncHUD()
+            content._syncHUD = syncHUD
+        end
 
         -- The whole feature lives here: its two toggles came off the Tracker tab so the
         -- switch that turns the bar on is not two tabs away from the controls that style it.
@@ -759,79 +892,6 @@ Options:RegisterTab({
             L["Fill color and opacity of the bar itself."], true)
         zone:Add(w.zbBarColorPicker)
 
-        -- The quest row bars, the scenario criteria bars and the event widget bars share one
-        -- style block. They all draw identically, so splitting the styling as well as the
-        -- switches would mean setting the same seven controls three times over.
-        local progress = stack(self:CreateGroup(content, L["Progress Bars"]))
-
-        -- This key came off the Tracker tab and keeps the meaning it shipped with, so a
-        -- profile that had already switched bars off is unchanged by the split. The two
-        -- halves below are NEW keys, which is why neither can silently revert a stored choice.
-        progress:Add(self:CreateCheckbox(content, L["Show progress bars"],
-            function() return DB().showProgressBars ~= false end,
-            function(v) restyle("showProgressBars", v); syncDependents() end,
-            L["Draws a filled bar for objectives that report a percentage or a running total, the way the default tracker does, instead of a plain line of text. The two boxes under this pick which of them get one."]))
-
-        w.pbQuests = self:CreateCheckbox(content, L["Quest Rows"],
-            function() return DB().showQuestProgressBars ~= false end,
-            function(v) restyle("showQuestProgressBars", v); syncDependents() end,
-            L["Bars on quest, World Quest and achievement rows. The objective's own text is drawn above its bar, matching the default tracker."])
-        progress:Add(w.pbQuests)
-
-        w.pbScenario = self:CreateCheckbox(content, L["Scenario Criteria"],
-            function() return DB().showScenarioProgressBars ~= false end,
-            function(v) restyle("showScenarioProgressBars", v); syncDependents() end,
-            L["Bars on the objective lines shown under a scenario or delve banner."])
-        progress:Add(w.pbScenario)
-
-        w.pbBgCheck = self:CreateCheckbox(content, L["Background"],
-            function() local st = pbState(); return not (st and st.showBackground == false) end,
-            function(v) pbSet("showBackground", v); syncDependents() end,
-            L["Fills the unfinished part of the bar. Unticked, only the filled part is drawn."])
-        local pbBgRow = progress:Add(w.pbBgCheck)
-
-        w.pbBgPicker = self:CreateColorPicker(content, L["Background Color"],
-            function() local st = pbState(); return st and st.backgroundColor end,
-            function(v) pbSet("backgroundColor", v) end,
-            L["Color and opacity of the unfilled part of the bar."], true)
-        satellite(self, pbBgRow, w.pbBgPicker)
-
-        w.pbBorderCheck = self:CreateCheckbox(content, L["Border"],
-            function() local st = pbState(); return not (st and st.showBorder == false) end,
-            function(v) pbSet("showBorder", v); syncDependents() end,
-            L["Draws a one pixel border around the bar."])
-        local pbBorderRow = progress:Add(w.pbBorderCheck)
-
-        w.pbBorderPicker = self:CreateColorPicker(content, L["Border Color"],
-            function() local st = pbState(); return st and st.borderColor end,
-            function(v) pbSet("borderColor", v) end,
-            L["Color and opacity of the bar's border."], true)
-        satellite(self, pbBorderRow, w.pbBorderPicker)
-
-        -- Keep this range and Media:ProgressBarHeight's clamp in step. CreateSlider's own
-        -- suppress flag is what stops a stored value outside the range being written back on
-        -- every tab view, so the two disagreeing is a silently clamped bar rather than a
-        -- corrupted profile - but only while that flag survives.
-        w.pbHeightSlider = self:CreateSlider(content, L["Bar Height"], 8, 24, 1,
-            function() local st = pbState(); return (st and st.height) or 16 end,
-            function(v) pbSet("height", v) end,
-            L["How tall each progress bar is drawn."])
-        progress:Add(w.pbHeightSlider)
-
-        w.pbTexDD = self:CreateDropdown(content, L["Bar Texture"],
-            function() return mediaOptions(ns:GetModule("Media"):GetStatusBarList()) end,
-            function() local st = pbState(); return (st and st.barTexture) or "Blizzard" end,
-            function(v) pbSet("barTexture", v) end,
-            L["Sets the fill texture of the progress bars. Textures added by other media addons (such as SharedMedia, ElvUI, or Details) appear here too."],
-            barTextureSwatch)
-        progress:Add(w.pbTexDD)
-
-        w.pbBarColorPicker = self:CreateColorPicker(content, L["Bar Color"],
-            function() local st = pbState(); return st and st.barColor end,
-            function(v) pbSet("barColor", v) end,
-            L["Fill color and opacity of the bar itself."], true)
-        progress:Add(w.pbBarColorPicker)
-
         syncDependents = function()
             local cfg = DB() or {}
             local zb  = zbState() or {}
@@ -862,11 +922,9 @@ Options:RegisterTab({
             dim(w.hbSoftCheck,    cfg.headerBar)
             dim(w.hbSoftSlider,   cfg.headerBar and cfg.headerBarSoftEdges)
 
-            -- The class color overrides the picker under it rather than the other way
-            -- round, so the picker is what goes dim.
-            dim(w.titlePicker,  not cfg.titleColorUseClass)
-            -- Inert until one of those two gives it a color to use instead of green.
-            dim(w.recolorCheck, cfg.titleColorOverride ~= nil or cfg.titleColorUseClass)
+            dim(w.titlePicker,  ns.Util.TitleColorMode(cfg) == "custom")
+            -- Inert until the mode gives it one color to use instead of green.
+            dim(w.recolorCheck, ns.Util.EffectiveTitleColor(cfg) ~= nil)
             dim(w.headerPicker, not cfg.headerColorUseClass)
 
             local card = (cfg.blockLayout or "classic") == "card"

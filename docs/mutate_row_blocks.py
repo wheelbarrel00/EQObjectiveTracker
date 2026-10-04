@@ -116,7 +116,7 @@ MUTANTS = [
     ("the label goes back inside the bar instead of sitting above it",
      '                if label ~= "" then\n'
      '                    _nText = _nText + 1\n'
-     '                    _scratch[_nText] = "- " .. Util.ColorizeProgress(label)\n'
+     '                    _scratch[_nText] = "- " .. Util.ColorizeProgress(label, cfg)\n'
      '                end\n'
      '                flushText()',
      '                flushText()'),

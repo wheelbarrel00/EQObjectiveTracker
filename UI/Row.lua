@@ -216,11 +216,63 @@ function Row:DebugLine()
     return ("focus icon: %s | drawn %.1fs ago"):format(Row._focusIcon, age)
 end
 
+-- Original Style reads its colors off the client, so this is where a reading of them lives.
+function Row:TitleColorLine()
+    local cfg = ns:GetModule("DB"):Tracker()
+    local r, g, b = Util.OriginalTitleColor(false)
+    local cr, cg, cb = Util.OriginalTitleColor(true)
+    local hr, hg, hb = Util.OriginalTitleHighlight()
+    return ("title color: %s | original %.2f %.2f %.2f, finished %.2f %.2f %.2f, hover %s")
+        :format(Util.TitleColorMode(cfg), r, g, b, cr, cg, cb,
+                hr and ("%.2f %.2f %.2f"):format(hr, hg, hb) or "none")
+end
+
+-- With no finished color picked and no title color to take, a finished line follows the done
+-- count's color, which defaults to the green finished lines always had, so picking one recolors it.
 local function doneHex(cfg)
-    if not cfg or cfg.overrideCompleteGreen == false then return DEFAULT_DONE_HEX end
-    local r, g, b = Util.EffectiveTitleColor(cfg)
-    if r then return Util.Hex(r, g, b) end
+    local f = cfg and cfg.finishedObjectiveColor
+    if f and f.r then return Util.Hex(f.r, f.g, f.b) end
+    if cfg and cfg.overrideCompleteGreen ~= false then
+        local r, g, b = Util.EffectiveTitleColor(cfg, true)
+        if r then return Util.Hex(r, g, b) end
+    end
+    local d = cfg and cfg.countColorDone
+    if d and d.r then return Util.Hex(d.r, d.g, d.b) end
     return DEFAULT_DONE_HEX
+end
+
+-- The fourth answer says the title is in Original Style's own color, the only one a hover
+-- brightens. Recoloring a finished quest needs a color to recolor it TO, so Use title color for
+-- completed quests does nothing in any mode that gives none.
+local function titleColor(entry, cfg)
+    if FOCUS_TINT and entry.isFocused then
+        -- Ahead of the state colors deliberately: there is exactly one focused row, it is the
+        -- one the player just picked, and on this client nothing else marks it.
+        return FOCUS_TINT[1], FOCUS_TINT[2], FOCUS_TINT[3], false
+    end
+    if entry.state == STATE.FAILED then return 0.85, 0.27, 0.27, false end
+    local complete = entry.state == STATE.COMPLETE
+    local r, g, b = Util.EffectiveTitleColor(cfg, complete)
+    if complete and not (r and (not cfg or cfg.overrideCompleteGreen ~= false)) then
+        return 0.27, 0.85, 0.27, false
+    end
+    if r then return r, g, b, Util.TitleColorMode(cfg) == "original" end
+    if Util.TitleColorMode(cfg) == "difficulty" and entry.level and GetQuestDifficultyColor then
+        local c = GetQuestDifficultyColor(entry.level)
+        return c.r, c.g, c.b, false
+    end
+    return 0.92, 0.72, 0.02, false
+end
+
+-- Render paints through here too, so a render while the cursor rests on a row keeps it lit.
+local function paintTitle(row)
+    local hr, hg, hb
+    if row._hovered and row._tLit then hr, hg, hb = Util.OriginalTitleHighlight() end
+    if hr then
+        row.title:SetTextColor(hr, hg, hb)
+    elseif row._tR then
+        row.title:SetTextColor(row._tR, row._tG, row._tB)
+    end
 end
 
 -- The run is written into these shared arrays rather than returned, because Render rebuilds it
@@ -282,7 +334,7 @@ local function buildBlocks(entry, cfg)
                 local label = Util.StripLeadingCount(ln.text or "")
                 if label ~= "" then
                     _nText = _nText + 1
-                    _scratch[_nText] = "- " .. Util.ColorizeProgress(label)
+                    _scratch[_nText] = "- " .. Util.ColorizeProgress(label, cfg)
                 end
                 flushText()
                 _nBlocks = _nBlocks + 1
@@ -319,7 +371,7 @@ local function buildBlocks(entry, cfg)
                     elseif ln.kind == LINE.NOTE then
                         text = "|cff999999- " .. text .. "|r"
                     else
-                        text = "- " .. Util.ColorizeProgress(text)
+                        text = "- " .. Util.ColorizeProgress(text, cfg)
                     end
                 end
                 _nText = _nText + 1
@@ -629,6 +681,8 @@ local function onEnter(row)
     if row._wasDragging then return end
     if not row._entry or clickThrough() then return end
     row._hintShown = splitHintWanted(row)
+    row._hovered = true
+    paintTitle(row)
     paintTooltip(row)
     if FOCUS_TINT and splitClickWanted(row) then
         row._hintClock = 0
@@ -642,6 +696,10 @@ function onLeave(frame)
     if frame and frame.iconHolder then
         frame:SetScript("OnUpdate", nil)
         frame._hintShown, frame._hintClock = nil, nil
+        if frame._hovered then
+            frame._hovered = nil
+            paintTitle(frame)
+        end
     end
 end
 
@@ -723,7 +781,8 @@ function Row:Reset(row)
     local tip = ns.Util.Tooltip()
     if tip:GetOwner() == row then tip:Hide() end
     row:SetScript("OnUpdate", nil)
-    row._hintShown, row._hintClock = nil, nil
+    row._hintShown, row._hintClock, row._hovered = nil, nil, nil
+    row._tR, row._tG, row._tB, row._tLit = nil, nil, nil, nil
     row._sTitle, row._sSub, row._sState  = nil, nil, nil
     row._sFocus, row._sWidth, row._sText = nil, nil, nil
     row._sTime, row._sGen, row._sCardBg  = nil, nil, nil
@@ -874,26 +933,9 @@ function Row:Render(row, entry, width, cfg)
     row.subtitle:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -TITLE_TO_SUB)
 
     row.title:SetText(titleText)
-    local ovR, ovG, ovB = Util.EffectiveTitleColor(cfg)
-    -- Recoloring completed entries needs a color to recolor them TO, so the toggle is
-    -- inert until an override or class color is set.
-    local recolorComplete = ovR and (not cfg or cfg.overrideCompleteGreen ~= false)
-    if FOCUS_TINT and entry.isFocused then
-        -- Ahead of the state colors deliberately: there is exactly one focused row, it is the
-        -- one the player just picked, and on this client nothing else marks it.
-        row.title:SetTextColor(FOCUS_TINT[1], FOCUS_TINT[2], FOCUS_TINT[3])
-    elseif entry.state == STATE.FAILED then
-        row.title:SetTextColor(0.85, 0.27, 0.27)
-    elseif entry.state == STATE.COMPLETE and not recolorComplete then
-        row.title:SetTextColor(0.27, 0.85, 0.27)
-    elseif ovR then
-        row.title:SetTextColor(ovR, ovG, ovB)
-    elseif (not cfg or cfg.colorByDifficulty ~= false) and entry.level and GetQuestDifficultyColor then
-        local c = GetQuestDifficultyColor(entry.level)
-        row.title:SetTextColor(c.r, c.g, c.b)
-    else
-        row.title:SetTextColor(0.92, 0.72, 0.02)
-    end
+    local tr, tg, tb, lit = titleColor(entry, cfg)
+    row._tR, row._tG, row._tB, row._tLit = tr, tg, tb, lit
+    paintTitle(row)
 
     local subGap = math.max(0, SUB_TO_LINES + Media:HeaderSpacing())
     local anchor
@@ -918,6 +960,9 @@ function Row:Render(row, entry, width, cfg)
 
     local nText, nBar, linesH, prevBar = 0, 0, 0, false
     local textH = 0
+    local oc = cfg and cfg.objectiveColor
+    local oR, oG, oB = 0.85, 0.85, 0.85
+    if oc and oc.r then oR, oG, oB = oc.r, oc.g, oc.b end
     for i = 1, _nBlocks do
         local isBar = _bKind[i] == BLOCK_BAR
         -- The first block keeps the old gap under the title, so a row that is all text sits
@@ -949,6 +994,7 @@ function Row:Render(row, entry, width, cfg)
             nText = nText + 1
             block = acquireTextBlock(row, nText)
             Media:ApplyFont(block, -2)
+            block:SetTextColor(oR, oG, oB)
             block:SetSpacing(Media:LineSpacing())
             if textW > 0 then block:SetWidth(blockW) end
             block:SetText(_bText[i])

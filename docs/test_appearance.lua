@@ -11,8 +11,8 @@
 -- two conditions deep in places, and no harness had ever driven it: a control dimmed on the
 -- wrong key, or a master whose setter forgot to re-run the sweep, was visible only in game. The
 -- sweep is checked against the rules written out independently below, across a fixed run of
--- generated profiles that toggles every key it reads. Beside it: the card order section 8 of
--- the design spec sets, every card's rows as the author approved them on 2026-10-01, and the cap
+-- generated profiles that toggles every key it reads. Beside it: the card order the author set on
+-- 2026-10-03, every card's rows as the author approved them, and the cap
 -- that keeps the sweep away from Lua 5.1's 60-upvalue ceiling.
 --
 -- OUT OF SCOPE BY CONSTRUCTION: how any of it looks. The stub draws nothing, so row heights,
@@ -47,16 +47,31 @@ end
 -- Builds the tab once. bonus is whether the scenario provider registered, which is what puts
 -- the bonus objectives HUD card on the tab (retail). The capability probe reads true on every
 -- flavor, Classic included, so it is never what keeps the card off.
-local function appearanceTab(bonus)
+-- marked: every lookup comes back as "\1<key>", so a string that bypassed the table reads bare.
+local function appearanceTab(bonus, marked)
     local cfg = {}
     local calls = { applyFade = 0, render = 0, invalidate = 0, hud = 0, preview = 0, zoneLook = 0,
                     banner = 0, applyScale = 0, hudTest = 0, hudEnabled = {}, hudScale = {}, log = {} }
     local modules = {}
+    -- Every key looked up, so a label typed as a bare English string can be told from a wrapped one.
+    local looked = {}
     local ns = {
-        L = setmetatable({}, { __index = function(_, k) return k end }),
+        L = setmetatable({}, { __index = function(_, k) looked[k] = true; return marked and ("\1" .. k) or k end }),
         Has = { ScenarioBonus = true },
     }
     function ns:GetModule(name) return modules[name] end
+    -- The real Util, since the title color dropdown and the sweep both read the mode through
+    -- it. A class is stubbed so Class color has a color to give.
+    do
+        local utilNs = { RegisterModule = function(_, _, m) return m end, Has = {} }
+        local utilChunk = assert(loadfile(repoFile("Core/Util.lua")))
+        setfenv(utilChunk, setmetatable({
+            UnitClass = function() return "Mage", "MAGE" end,
+            RAID_CLASS_COLORS = { MAGE = { r = 0.25, g = 0.78, b = 0.92 } },
+        }, { __index = _G }))
+        utilChunk("EQObjectiveTracker", utilNs)
+        ns.Util = utilNs.Util
+    end
     local spec
     modules.Options = { RegisterTab = function(_, s) spec = s end }
     modules.DB = { Tracker = function() return cfg end,
@@ -88,7 +103,7 @@ local function appearanceTab(bonus)
         Build = function(_, panel) calls.previewPanel = panel end,
     }
 
-    local t = { cfg = cfg, calls = calls, cards = {}, dims = {}, dimCalls = 0, controls = {} }
+    local t = { cfg = cfg, calls = calls, cards = {}, dims = {}, dimCalls = 0, controls = {}, looked = looked }
     local ui = {}
     local function control(kind, label, getter, setter, tooltip)
         local f = frame()
@@ -175,17 +190,42 @@ local function appearanceTab(bonus)
     return t
 end
 
+-- The author's order of 2026-10-03: the big tickets first, the self-contained features last.
+-- It replaced the one card per old heading that section 8 of the design spec set for phase 1.
 local CARD_ORDER = {
-    "Appearance", "Scenario", "Scroll Bar", "Tracker", "Header Bar", "Scenario Bonus Objectives",
-    "Colors & Dimensions", "Quest Rows", "Zone Progress Bar", "Progress Bars",
+    "Text", "Quest Colors", "Tracker", "Section Headers", "Spacing", "Quest Rows", "Progress Bars",
+    "Scroll Bar", "Scenario", "Scenario Bonus Objectives", "Zone Progress Bar",
 }
 
 -- { label, kind, dependent, the picker at the row's end }
 local ROWS = {
-    ["Appearance"] = {
+    ["Text"] = {
         { "Font", "dropdown" }, { "Font Size", "slider" }, { "Title Size Offset", "slider" },
         { "Header Size Offset", "slider" }, { "Font Outline", "dropdown" },
         { "Text Shadow", "checkbox", false, "Shadow Color" }, { "Shadow Size", "slider", true },
+    },
+    ["Quest Colors"] = {
+        { "Quest Title Color", "radio" }, { "Custom Title Color", "picker", true },
+        { "Use title color for completed quests", "checkbox" },
+        { "Objective Text Color", "picker" }, { "Count Color: None Done", "picker" },
+        { "Count Color: In Progress", "picker" }, { "Count Color: Done", "picker" },
+        { "Finished Objective Color", "picker" },
+    },
+    ["Tracker"] = {
+        { "Tracker Scale", "slider" }, { "Tracker Opacity", "slider" },
+        { "Full opacity on mouseover", "checkbox", true },
+        { "Keep the focused quest at full opacity", "checkbox", true },
+        { "Background", "checkbox", false, "Background Color" },
+        { "Border", "checkbox", false, "Border Color" }, { "Border Thickness", "slider", true },
+    },
+    ["Section Headers"] = {
+        { "Use class color for headers", "checkbox" }, { "Section Header Color", "picker", true },
+        { "Divider Line Color", "picker" },
+        { "Show header bars", "checkbox", false, "Bar Color" }, { "Bar Style", "radio" },
+        { "Bar Height", "slider" }, { "Soft edges", "checkbox" }, { "Edge Softness", "slider", true },
+    },
+    ["Spacing"] = {
+        { "Block Spacing", "slider" }, { "Line Spacing", "slider" }, { "Header Spacing", "slider" },
     },
     ["Scenario"] = {
         { "Text Shadow", "checkbox", false, "Shadow Color" }, { "Shadow Size", "slider", true },
@@ -199,27 +239,10 @@ local ROWS = {
         { "Solid color thumb", "checkbox", false, "Thumb Color" }, { "Thumb Width", "slider", true },
         { "Hide scroll bar arrows", "checkbox" },
     },
-    ["Tracker"] = {
-        { "Background", "checkbox", false, "Background Color" },
-        { "Border", "checkbox", false, "Border Color" }, { "Border Thickness", "slider", true },
-    },
-    ["Header Bar"] = {
-        { "Show header bars", "checkbox", false, "Bar Color" }, { "Bar Style", "radio" },
-        { "Bar Height", "slider" }, { "Soft edges", "checkbox" }, { "Edge Softness", "slider", true },
-    },
     ["Scenario Bonus Objectives"] = {
         { "Show bonus objectives HUD", "checkbox" }, { "Test", "button" },
         { "Background", "checkbox", false, "Background Color" },
         { "Border", "checkbox", false, "Border Color" }, { "HUD Scale", "slider" },
-    },
-    ["Colors & Dimensions"] = {
-        { "Use class color for titles", "checkbox" }, { "Quest Title Color Override", "picker", true },
-        { "Use title color for completed quests", "checkbox" },
-        { "Use class color for headers", "checkbox" }, { "Section Header Color", "picker", true },
-        { "Divider Line Color", "picker" }, { "Tracker Scale", "slider" },
-        { "Tracker Opacity", "slider" }, { "Full opacity on mouseover", "checkbox", true },
-        { "Keep the focused quest at full opacity", "checkbox", true },
-        { "Block Spacing", "slider" }, { "Line Spacing", "slider" }, { "Header Spacing", "slider" },
     },
     ["Quest Rows"] = {
         { "Row Layout", "radio" }, { "Background Color", "picker" }, { "Border Color", "picker" },
@@ -256,9 +279,19 @@ local function drawn(cfg)
     return cfg.showProgressBars ~= false
        and (cfg.showQuestProgressBars ~= false or cfg.showScenarioProgressBars ~= false)
 end
+-- A profile from before the dropdown keeps the colors its three old switches gave it: class over
+-- a set override, then difficulty unless it was switched off, which reads as Gold.
+local MODES = { difficulty = true, gold = true, class = true, custom = true, original = true }
+local function titleMode(c)
+    if MODES[c.titleColorMode] then return c.titleColorMode end
+    if c.titleColorUseClass then return "class" end
+    if c.titleColorOverride and c.titleColorOverride.r then return "custom" end
+    if c.colorByDifficulty == false then return "gold" end
+    return "difficulty"
+end
 local SWEEP = {
-    ["Appearance/Shadow Color"]   = function(c) return c.textShadow end,
-    ["Appearance/Shadow Size"]    = function(c) return c.textShadow end,
+    ["Text/Shadow Color"]   = function(c) return c.textShadow end,
+    ["Text/Shadow Size"]    = function(c) return c.textShadow end,
     ["Scenario/Shadow Color"]     = function(c) return c.scenarioTextShadow ~= false end,
     ["Scenario/Shadow Size"]      = function(c) return c.scenarioTextShadow ~= false end,
     ["Scroll Bar/Scroll Bar Background"]  = noBar,
@@ -270,15 +303,18 @@ local SWEEP = {
     ["Tracker/Background Color"] = function(c) return c.showBackground end,
     ["Tracker/Border Color"]     = function(c) return c.showBorder end,
     ["Tracker/Border Thickness"] = function(c) return c.showBorder end,
-    ["Header Bar/Bar Color"]     = function(c) return c.headerBar end,
-    ["Header Bar/Bar Style"]     = function(c) return c.headerBar end,
-    ["Header Bar/Bar Height"]    = function(c) return c.headerBar end,
-    ["Header Bar/Soft edges"]    = function(c) return c.headerBar end,
-    ["Header Bar/Edge Softness"] = function(c) return c.headerBar and c.headerBarSoftEdges end,
-    ["Colors & Dimensions/Quest Title Color Override"] = function(c) return not c.titleColorUseClass end,
-    ["Colors & Dimensions/Use title color for completed quests"] =
-        function(c) return c.titleColorOverride ~= nil or c.titleColorUseClass end,
-    ["Colors & Dimensions/Section Header Color"] = function(c) return not c.headerColorUseClass end,
+    ["Section Headers/Bar Color"]     = function(c) return c.headerBar end,
+    ["Section Headers/Bar Style"]     = function(c) return c.headerBar end,
+    ["Section Headers/Bar Height"]    = function(c) return c.headerBar end,
+    ["Section Headers/Soft edges"]    = function(c) return c.headerBar end,
+    ["Section Headers/Edge Softness"] = function(c) return c.headerBar and c.headerBarSoftEdges end,
+    ["Quest Colors/Custom Title Color"] = function(c) return titleMode(c) == "custom" end,
+    ["Quest Colors/Use title color for completed quests"] = function(c)
+        local m = titleMode(c)
+        return m == "class" or m == "original" or (m == "custom" and c.titleColorOverride ~= nil
+                                                     and c.titleColorOverride.r ~= nil)
+    end,
+    ["Section Headers/Section Header Color"] = function(c) return not c.headerColorUseClass end,
     ["Quest Rows/Background Color"]               = card,
     ["Quest Rows/Border Color"]                   = card,
     ["Quest Rows/Border Thickness"]               = card,
@@ -314,8 +350,8 @@ local SWEEP = {
 }
 
 local FADE = {
-    ["Colors & Dimensions/Full opacity on mouseover"] = true,
-    ["Colors & Dimensions/Keep the focused quest at full opacity"] = true,
+    ["Tracker/Full opacity on mouseover"] = true,
+    ["Tracker/Keep the focused quest at full opacity"] = true,
 }
 local HUD = {
     ["Scenario Bonus Objectives/Background Color"] = function(s) return s.showBackground ~= false end,
@@ -329,7 +365,9 @@ local DOMAIN = {
     textShadow = SWITCH, scenarioTextShadow = SWITCH, hideScrollBar = SWITCH, scrollBarBg = SWITCH,
     skinScrollBar = SWITCH, showBackground = SWITCH, showBorder = SWITCH, headerBar = SWITCH,
     headerBarSoftEdges = SWITCH, titleColorUseClass = SWITCH, headerColorUseClass = SWITCH,
-    titleColorOverride = { ABSENT, { r = 1, g = 0, b = 0 } },
+    titleColorOverride = { ABSENT, { r = 1, g = 0, b = 0 }, {} },
+    titleColorMode = { ABSENT, "difficulty", "gold", "class", "custom", "original", "bogus" },
+    colorByDifficulty = SWITCH,
     blockLayout = { ABSENT, "classic", "card" }, cardTintByType = SWITCH,
     showZoneProgressBar = SWITCH, zoneProgressLocation = { ABSENT, "floating", "tracker" },
     showProgressBars = SWITCH, showQuestProgressBars = SWITCH, showScenarioProgressBars = SWITCH,
@@ -363,7 +401,7 @@ end
 
 local function lit(v) return v and true or false end
 
-print("== the cards, in the order section 8 of the design spec sets")
+print("== the cards, in the order the author set on 2026-10-03")
 do
     local good, err = pcall(function()
         for _, bonus in ipairs({ true, false }) do
@@ -434,7 +472,7 @@ do
     local good, err = pcall(function()
         local t = appearanceTab(true)
         local align = t.byKey["Scenario/Banner Alignment"]
-        local style = t.byKey["Header Bar/Bar Style"]
+        local style = t.byKey["Section Headers/Bar Style"]
         local function values(ctl)
             local out = {}
             for _, o in ipairs(ctl and ctl.options or {}) do out[#out + 1] = tostring(o.value) .. "=" .. o.label end
@@ -502,18 +540,31 @@ do
         local t = appearanceTab(true)
         local sweepSize = 0
         for _ in pairs(SWEEP) do sweepSize = sweepSize + 1 end
+        -- Counting the sweep's calls cannot see one run before the setter stores, which dims for
+        -- the state before the click, so every setter's result is held against the rules too.
+        local function stale()
+            local out = {}
+            for key, rule in pairs(SWEEP) do
+                local ctl = t.byKey[key]
+                if ctl and t.dims[ctl] ~= lit(rule(t.cfg)) then out[#out + 1] = key end
+            end
+            table.sort(out)
+            return table.concat(out, ", ")
+        end
         local function sweeps(key, value)
             local ctl = t.byKey[key]
             assert(ctl and ctl.setter, "no setter for " .. key)
             local before = t.dimCalls
             ctl.setter(value)
+            local s = stale()
+            ok(s == "", key .. " leaves every dependent dimmed for the new value: " .. s)
             return t.dimCalls - before >= sweepSize
         end
         for _, key in ipairs({
-            "Appearance/Text Shadow", "Scenario/Text Shadow", "Scroll Bar/Hide scroll bar",
+            "Text/Text Shadow", "Scenario/Text Shadow", "Scroll Bar/Hide scroll bar",
             "Scroll Bar/Scroll Bar Background", "Scroll Bar/Solid color thumb", "Tracker/Background",
-            "Tracker/Border", "Header Bar/Show header bars", "Header Bar/Soft edges",
-            "Colors & Dimensions/Use class color for titles", "Colors & Dimensions/Use class color for headers",
+            "Tracker/Border", "Section Headers/Show header bars", "Section Headers/Soft edges",
+            "Section Headers/Use class color for headers",
             "Quest Rows/Tint cards by quest type", "Zone Progress Bar/Show zone progress bar",
             "Zone Progress Bar/Float as a movable bar", "Zone Progress Bar/Background",
             "Zone Progress Bar/Border", "Progress Bars/Show progress bars", "Progress Bars/Quest Rows",
@@ -523,30 +574,39 @@ do
         end
         ok(sweeps("Quest Rows/Row Layout", "card"), "Quest Rows/Row Layout re-runs the sweep when it changes")
         ok(t.cfg.blockLayout == "card", "and stores the layout it was handed")
-        -- No rule reads these, so none re-runs the sweep. The first is inert by design until a
-        -- title color exists (options.md, the two masked color controls).
+        ok(sweeps("Quest Colors/Quest Title Color", "custom"),
+           "Quest Colors/Quest Title Color re-runs the sweep when it changes")
+        ok(t.cfg.titleColorMode == "custom", "and stores the mode it was handed")
+        -- No rule reads these, so none re-runs the sweep. The first does nothing until the title
+        -- mode gives a color, and is dimmed until then.
         for _, key in ipairs({
-            "Colors & Dimensions/Use title color for completed quests", "Appearance/Shadow Color",
+            "Quest Colors/Use title color for completed quests", "Text/Shadow Color",
             "Scroll Bar/Hide scroll bar arrows", "Quest Rows/Card behind the scenario panel",
-            "Appearance/Font Size", "Colors & Dimensions/Divider Line Color",
+            "Text/Font Size", "Section Headers/Divider Line Color",
         }) do
             ok(not sweeps(key, true), key .. " does not re-run the sweep")
         end
 
         -- The title override sweeps only when its nil state changes, in either direction.
-        local title = t.byKey["Colors & Dimensions/Quest Title Color Override"]
+        local title = t.byKey["Quest Colors/Custom Title Color"]
         t.cfg.titleColorOverride = nil
-        ok(sweeps("Colors & Dimensions/Quest Title Color Override", { r = 1, g = 0, b = 0 }),
+        ok(sweeps("Quest Colors/Custom Title Color", { r = 1, g = 0, b = 0 }),
            "setting a title color from none re-runs the sweep")
-        ok(not sweeps("Colors & Dimensions/Quest Title Color Override", { r = 0, g = 1, b = 0 }),
+        ok(not sweeps("Quest Colors/Custom Title Color", { r = 0, g = 1, b = 0 }),
            "dragging an already set color does not")
-        ok(sweeps("Colors & Dimensions/Quest Title Color Override", nil),
+        ok(sweeps("Quest Colors/Custom Title Color", nil),
            "and a Cancel back to none does")
         t.cfg.titleColorOverride = { r = 1, g = 1, b = 1 }
         local before = t.dimCalls
         if title and title.onClear then title.onClear() end
         ok(t.cfg.titleColorOverride == nil and t.dimCalls - before >= sweepSize,
            "Clear unsets it and re-runs the sweep")
+        ok(stale() == "", "leaving every dependent dimmed for the cleared color: " .. stale())
+        -- An empty table is no color to every reader, so a pick over one is a nil-to-set change.
+        t.cfg.titleColorMode, t.cfg.titleColorOverride = "custom", {}
+        t.content._syncDependents()
+        ok(sweeps("Quest Colors/Custom Title Color", { r = 1, g = 0, b = 0 }),
+           "a color picked over an empty one re-runs the sweep")
         ok(title and title.hasAlpha == false, "the title color takes no alpha")
     end)
     ok(good, "the masters raised: " .. tostring(err))
@@ -575,9 +635,9 @@ do
             ["Scenario Bonus Objectives/Border"] = true,
             ["Scenario Bonus Objectives/Border Color"] = true,
             ["Scenario Bonus Objectives/HUD Scale"] = true,
-            ["Colors & Dimensions/Tracker Scale"] = true,
-            ["Colors & Dimensions/Full opacity on mouseover"] = true,
-            ["Colors & Dimensions/Keep the focused quest at full opacity"] = true,
+            ["Tracker/Tracker Scale"] = true,
+            ["Tracker/Full opacity on mouseover"] = true,
+            ["Tracker/Keep the focused quest at full opacity"] = true,
         }
         local function valueFor(c)
             if c.kind == "checkbox" then return true end
@@ -634,7 +694,7 @@ print("== the opacity slider and its two boxes")
 do
     local good, err = pcall(function()
         local t = appearanceTab(true)
-        local slider = t.byKey["Colors & Dimensions/Tracker Opacity"]
+        local slider = t.byKey["Tracker/Tracker Opacity"]
         ok(slider and slider.min == 10 and slider.max == 100 and slider.step == 5,
            "the slider runs 10 to 100 in fives, so it can never reach invisible")
         t.cfg.trackerAlpha = 0.35
@@ -650,10 +710,10 @@ do
         for key in pairs(FADE) do
             ok(t.dims[t.byKey[key]] == false, key .. " is dimmed at 100")
         end
-        local hover = t.byKey["Colors & Dimensions/Full opacity on mouseover"]
+        local hover = t.byKey["Tracker/Full opacity on mouseover"]
         hover.setter(false)
         ok(t.cfg.trackerAlphaHover == false and t.calls.applyFade == fades + 3, "the mouseover box writes and applies")
-        local focus = t.byKey["Colors & Dimensions/Keep the focused quest at full opacity"]
+        local focus = t.byKey["Tracker/Keep the focused quest at full opacity"]
         focus.setter(false)
         ok(t.cfg.trackerAlphaFocus == false and t.calls.applyFade == fades + 4, "and so does the focused quest box")
 
@@ -721,9 +781,9 @@ end
 -- S is the HUD's own apply. The preview redraw is checked in "every setter redraws the preview".
 local R, LAY, B, Z, ZS, P, S = "R", "L", "B", "Z", "ZS", "P", "S"
 local PATH = {
-    ["Appearance/Font"] = R, ["Appearance/Font Size"] = R, ["Appearance/Title Size Offset"] = R,
-    ["Appearance/Header Size Offset"] = LAY, ["Appearance/Font Outline"] = R,
-    ["Appearance/Text Shadow"] = R, ["Appearance/Shadow Color"] = R, ["Appearance/Shadow Size"] = R,
+    ["Text/Font"] = R, ["Text/Font Size"] = R, ["Text/Title Size Offset"] = R,
+    ["Text/Header Size Offset"] = LAY, ["Text/Font Outline"] = R,
+    ["Text/Text Shadow"] = R, ["Text/Shadow Color"] = R, ["Text/Shadow Size"] = R,
     ["Scenario/Text Shadow"] = B, ["Scenario/Shadow Color"] = B, ["Scenario/Shadow Size"] = B,
     ["Scenario/Banner Alignment"] = LAY, ["Scenario/Banner Text Size"] = LAY,
     ["Scenario/Criteria Text Size"] = LAY, ["Scenario/Event Title Text Size"] = LAY,
@@ -733,17 +793,22 @@ local PATH = {
     ["Scroll Bar/Thumb Color"] = LAY, ["Scroll Bar/Thumb Width"] = LAY, ["Scroll Bar/Hide scroll bar arrows"] = LAY,
     ["Tracker/Background"] = LAY, ["Tracker/Background Color"] = LAY, ["Tracker/Border"] = LAY,
     ["Tracker/Border Color"] = LAY, ["Tracker/Border Thickness"] = LAY,
-    ["Header Bar/Show header bars"] = LAY, ["Header Bar/Bar Color"] = LAY, ["Header Bar/Bar Style"] = LAY,
-    ["Header Bar/Bar Height"] = LAY, ["Header Bar/Soft edges"] = LAY, ["Header Bar/Edge Softness"] = LAY,
+    ["Section Headers/Show header bars"] = LAY, ["Section Headers/Bar Color"] = LAY, ["Section Headers/Bar Style"] = LAY,
+    ["Section Headers/Bar Height"] = LAY, ["Section Headers/Soft edges"] = LAY, ["Section Headers/Edge Softness"] = LAY,
     ["Scenario Bonus Objectives/Background"] = S, ["Scenario Bonus Objectives/Background Color"] = S,
     ["Scenario Bonus Objectives/Border"] = S, ["Scenario Bonus Objectives/Border Color"] = S,
-    ["Colors & Dimensions/Use class color for titles"] = R,
-    ["Colors & Dimensions/Quest Title Color Override"] = R,
-    ["Colors & Dimensions/Use title color for completed quests"] = R,
-    ["Colors & Dimensions/Use class color for headers"] = LAY,
-    ["Colors & Dimensions/Section Header Color"] = LAY, ["Colors & Dimensions/Divider Line Color"] = LAY,
-    ["Colors & Dimensions/Block Spacing"] = LAY, ["Colors & Dimensions/Line Spacing"] = R,
-    ["Colors & Dimensions/Header Spacing"] = R,
+    ["Quest Colors/Quest Title Color"] = R,
+    ["Quest Colors/Custom Title Color"] = R,
+    ["Quest Colors/Use title color for completed quests"] = R,
+    ["Quest Colors/Objective Text Color"] = R,
+    ["Quest Colors/Count Color: None Done"] = R,
+    ["Quest Colors/Count Color: In Progress"] = R,
+    ["Quest Colors/Count Color: Done"] = R,
+    ["Quest Colors/Finished Objective Color"] = R,
+    ["Section Headers/Use class color for headers"] = LAY,
+    ["Section Headers/Section Header Color"] = LAY, ["Section Headers/Divider Line Color"] = LAY,
+    ["Spacing/Block Spacing"] = LAY, ["Spacing/Line Spacing"] = R,
+    ["Spacing/Header Spacing"] = R,
     ["Quest Rows/Row Layout"] = R, ["Quest Rows/Background Color"] = R, ["Quest Rows/Border Color"] = R,
     ["Quest Rows/Border Thickness"] = R, ["Quest Rows/Card Padding"] = R,
     ["Quest Rows/Card behind the scenario panel"] = LAY, ["Quest Rows/Tint cards by quest type"] = R,
@@ -763,10 +828,10 @@ local PATH = {
 local OWN_PATH = {
     ["Scenario Bonus Objectives/Show bonus objectives HUD"] = true,
     ["Scenario Bonus Objectives/HUD Scale"] = true,
-    ["Colors & Dimensions/Tracker Scale"] = true,
-    ["Colors & Dimensions/Tracker Opacity"] = true,
-    ["Colors & Dimensions/Full opacity on mouseover"] = true,
-    ["Colors & Dimensions/Keep the focused quest at full opacity"] = true,
+    ["Tracker/Tracker Scale"] = true,
+    ["Tracker/Tracker Opacity"] = true,
+    ["Tracker/Full opacity on mouseover"] = true,
+    ["Tracker/Keep the focused quest at full opacity"] = true,
     ["Zone Progress Bar/Show zone progress bar"] = true,
     ["Zone Progress Bar/Float as a movable bar"] = true,
 }
@@ -832,7 +897,7 @@ do
         ok(c.hudTest == 1, "the Test button toggles the HUD's test draw once: " .. c.hudTest)
         t.byKey["Scenario Bonus Objectives/HUD Scale"].setter(0.75)
         ok(#c.hudScale == 1 and c.hudScale[1] == 0.75, "HUD Scale hands the HUD its scale")
-        local scale = t.byKey["Colors & Dimensions/Tracker Scale"]
+        local scale = t.byKey["Tracker/Tracker Scale"]
         scale.setter(1.2)
         ok(t.cfg.scale == 1.2 and c.applyScale == 1, "Tracker Scale stores the scale and applies it once")
         t.byKey["Zone Progress Bar/Show zone progress bar"].setter(true)
@@ -872,7 +937,7 @@ print("== the font lists draw each face in itself")
 do
     local good, err = pcall(function()
         local t = appearanceTab(true)
-        local font = t.byKey["Appearance/Font"]
+        local font = t.byKey["Text/Font"]
         ok(font and type(font.previewFont) == "function" and font.previewFont("Friz") == "file:Friz",
            "the tracker font list previews each face from its media file")
         local zone = t.byKey["Zone Progress Bar/Font"]
@@ -883,18 +948,211 @@ do
     ok(good, "the font previews raised: " .. tostring(err))
 end
 
-print("== each class color box names what it colors and the picker below it")
+print("== the headers' class color box names what it colors and the picker below it")
 do
     local good, err = pcall(function()
         local t = appearanceTab(true)
-        local titles = t.byKey["Colors & Dimensions/Use class color for titles"]
-        local headers = t.byKey["Colors & Dimensions/Use class color for headers"]
-        local tt = tostring(titles and titles.tooltip)
+        local headers = t.byKey["Section Headers/Use class color for headers"]
         local ht = tostring(headers and headers.tooltip)
-        ok(tt:find("titles", 1, true) and tt:find("color below", 1, true), "the titles box's tooltip: " .. tt)
         ok(ht:find("section headers", 1, true) and ht:find("color below", 1, true), "the headers box's tooltip: " .. ht)
+        ok(t.byKey["Quest Colors/Use class color for titles"] == nil,
+           "the titles' box is gone, now one choice of Quest Title Color")
     end)
     ok(good, "the class color tooltips raised: " .. tostring(err))
+end
+
+print("== the objective and count colors each read and store their own key")
+do
+    local good, err = pcall(function()
+        local t = appearanceTab(true)
+        local PICKERS = {
+            { "Objective Text Color", "objectiveColor" },
+            { "Count Color: None Done", "countColorNone" },
+            { "Count Color: In Progress", "countColorPartial" },
+            { "Count Color: Done", "countColorDone" },
+            { "Finished Objective Color", "finishedObjectiveColor" },
+        }
+        for i, p in ipairs(PICKERS) do
+            local ctl = t.byKey["Quest Colors/" .. p[1]]
+            ok(ctl ~= nil, p[1] .. " is built")
+            if ctl then
+                local color = { r = i / 10, g = 0, b = 0 }
+                ctl.setter(color)
+                ok(t.cfg[p[2]] == color, p[1] .. " stores " .. p[2])
+                ok(ctl.getter() == color, p[1] .. " reads it back")
+                for _, other in ipairs(PICKERS) do
+                    if other[2] ~= p[2] then
+                        ok(t.cfg[other[2]] ~= color, p[1] .. " leaves " .. other[2] .. " alone")
+                    end
+                end
+            end
+        end
+        local finished = t.byKey["Quest Colors/Finished Objective Color"]
+        ok(finished and type(finished.onClear) == "function", "the finished color can be cleared")
+        if finished and finished.onClear then
+            local inv = t.calls.invalidate
+            finished.onClear()
+            ok(t.cfg.finishedObjectiveColor == nil, "Clear unsets it, which is what brings green back")
+            ok(t.calls.invalidate == inv + 1, "and repaints the rows")
+        end
+        ok(finished and finished.hasAlpha == false, "a finished line's color takes no alpha")
+        for i = 1, 4 do
+            local ctl = t.byKey["Quest Colors/" .. PICKERS[i][1]]
+            ok(ctl and ctl.onClear == nil, PICKERS[i][1] .. " has a default, so no Clear")
+            ok(ctl and not ctl.hasAlpha, PICKERS[i][1] .. " takes no alpha")
+        end
+    end)
+    ok(good, "the objective colors raised: " .. tostring(err))
+end
+
+print("== every card title and control label on the tab is a wrapped phrase")
+do
+    local good, err = pcall(function()
+        local t = appearanceTab(true)
+        local bare = {}
+        for _, group in ipairs(t.cards) do
+            if not t.looked[group.title] then bare[#bare + 1] = "card " .. tostring(group.title) end
+        end
+        for _, c in ipairs(t.controls) do
+            if c.label ~= nil and not t.looked[c.label] then bare[#bare + 1] = tostring(c.label) end
+        end
+        ok(#t.cards > 0 and #t.controls > 0, "the tab built its cards and controls")
+        ok(#bare == 0, "each one was looked up in the locale table: " .. table.concat(bare, ", "))
+    end)
+    ok(good, "the label sweep raised: " .. tostring(err))
+end
+
+-- A key looked up in one place says nothing about a bare string drawn in another, so the tab is
+-- built again with a marking table and every string it draws must carry the mark. Media names
+-- are their own value and unwrapped on purpose, so a choice whose label is its value is skipped.
+print("== built with a marking locale table, every string the tab draws comes through it")
+do
+    local good, err = pcall(function()
+        local t = appearanceTab(true, true)
+        local bare = {}
+        local function check(where, s)
+            if type(s) == "string" and s:sub(1, 1) ~= "\1" then bare[#bare + 1] = where .. " '" .. s .. "'" end
+        end
+        for _, group in ipairs(t.cards) do check("card", group.title) end
+        for _, c in ipairs(t.controls) do
+            local name = tostring(c.label)
+            check("label", c.label)
+            check("tooltip of " .. name, c.tooltip)
+            check("tip title of " .. name, c.tipTitle)
+            local opts = c.options
+            if type(opts) == "function" then
+                local okCall, res = pcall(opts)
+                opts = okCall and res or nil
+            end
+            for _, o in ipairs(type(opts) == "table" and opts or {}) do
+                if o.value ~= o.label then check("choice of " .. name, o.label) end
+                check("choice tip of " .. name, o.tip)
+            end
+        end
+        local made = #t.controls
+        t.spec.footer(t.ui, {})
+        local reset = t.controls[made + 1]
+        ok(reset and reset.kind == "button", "the footer builds its Reset button")
+        if reset then
+            check("footer button", reset.label)
+            check("footer tooltip", reset.tooltip)
+            reset.onClick()
+            local d = t.calls.dialog
+            ok(d ~= nil, "Reset asks first")
+            if d then
+                check("prompt text", d.text)
+                check("prompt accept", d.button1)
+                check("prompt cancel", d.button2)
+            end
+        end
+        ok(#t.controls > 60, "the marked build drew the whole tab: " .. #t.controls)
+        ok(#bare == 0, "nothing drawn bypasses the table: " .. table.concat(bare, "; "))
+    end)
+    ok(good, "the marked build raised: " .. tostring(err))
+end
+
+print("== Quest Title Color offers the five modes, each with its own tip, and reads the old switches")
+do
+    local good, err = pcall(function()
+        local t = appearanceTab(true)
+        local dd = t.byKey["Quest Colors/Quest Title Color"]
+        ok(dd ~= nil, "the control is built")
+        local want = { "difficulty", "gold", "class", "custom", "original" }
+        -- "Gold color", never the bare "Gold" the shared store translates as money.
+        local labels = { "By difficulty", "Gold color", "Class color", "Custom color", "Original Style" }
+        local tips = {
+            "Each quest title takes the color of how hard it is for your level, the way the quest log does. Entries with no level are gold.",
+            "Every title in the same gold.",
+            "Every title in the class color of the character you are logged in on.",
+            "Every title in the color you pick under this.",
+            "Titles colored the way Blizzard's own tracker colors them on this version of the game.",
+        }
+        ok(dd and #dd.options == #want, "five choices: " .. tostring(dd and #dd.options))
+        for i = 1, #want do
+            local o = dd and dd.options[i]
+            ok(o and o.value == want[i] and o.label == labels[i], "choice " .. i .. " is " .. labels[i])
+            ok(o and o.tip == tips[i], "choice " .. i .. " carries its own tip: " .. tostring(o and o.tip))
+            ok(o and t.looked[o.label] and t.looked[o.tip], "choice " .. i .. "'s label and tip are both wrapped")
+        end
+        ok(dd and dd.tipTitle == "Quest Title Color" and tostring(dd.tooltip):find("Failed quests are always red", 1, true),
+           "the control's own tooltip says what stays fixed: " .. tostring(dd and dd.tooltip))
+        -- Each old profile shape reads as the mode it already drew.
+        local cases = {
+            { {}, "difficulty" },
+            { { colorByDifficulty = false }, "gold" },
+            { { titleColorOverride = { r = 1, g = 0, b = 0 } }, "custom" },
+            { { titleColorOverride = { r = 1, g = 0, b = 0 }, colorByDifficulty = false }, "custom" },
+            { { titleColorUseClass = true, titleColorOverride = { r = 1, g = 0, b = 0 } }, "class" },
+            { { titleColorUseClass = true, titleColorMode = "original" }, "original" },
+            { { titleColorMode = "bogus", colorByDifficulty = false }, "gold" },
+            { { titleColorOverride = {} }, "difficulty" },
+        }
+        for i, c in ipairs(cases) do
+            for k in pairs(t.cfg) do t.cfg[k] = nil end
+            for k, v in pairs(c[1]) do t.cfg[k] = v end
+            ok(dd and dd.getter() == c[2], "profile " .. i .. " reads " .. c[2] .. ": " .. tostring(dd and dd.getter()))
+        end
+        local picker = t.byKey["Quest Colors/Custom Title Color"]
+        ok(picker and tostring(picker.tooltip):find("set to Custom color.", 1, true), "the picker says when it applies")
+
+        -- With no mode saved, the override is one of the switches the mode is read off, so the
+        -- dimmed picker must save the mode the player sees before it touches the override.
+        local function fresh(c)
+            for k in pairs(t.cfg) do t.cfg[k] = nil end
+            for k, v in pairs(c) do t.cfg[k] = v end
+        end
+        fresh({})
+        picker.setter({ r = 1, g = 0, b = 0 })
+        ok(dd.getter() == "difficulty" and t.cfg.titleColorMode == "difficulty",
+           "picking a color on an upgraded By difficulty profile keeps By difficulty: "
+           .. tostring(dd.getter()) .. "/" .. tostring(t.cfg.titleColorMode))
+        ok(t.cfg.titleColorOverride and t.cfg.titleColorOverride.r == 1 and t.cfg.titleColorOverride.g == 0,
+           "and still stores the color for when Custom is picked")
+        fresh({ colorByDifficulty = false })
+        picker.setter({ r = 0, g = 0, b = 1 })
+        ok(dd.getter() == "gold" and t.cfg.titleColorMode == "gold",
+           "an upgraded Gold profile stays Gold: " .. tostring(dd.getter()))
+        fresh({ titleColorUseClass = true })
+        picker.setter({ r = 0, g = 1, b = 0 })
+        ok(t.cfg.titleColorMode == "class", "an upgraded Class color profile stays Class color")
+        fresh({ titleColorOverride = { r = 1, g = 0, b = 0 } })
+        picker.onClear()
+        ok(dd.getter() == "custom" and t.cfg.titleColorMode == "custom" and t.cfg.titleColorOverride == nil,
+           "Clear on an upgraded Custom profile keeps Custom rather than falling to By difficulty: "
+           .. tostring(dd.getter()))
+        fresh({ titleColorOverride = { r = 1, g = 0, b = 0 } })
+        picker.setter(nil)
+        ok(t.cfg.titleColorMode == "custom", "and so does a Cancel back to none")
+        fresh({ titleColorMode = "original" })
+        picker.setter({ r = 1, g = 1, b = 0 })
+        ok(t.cfg.titleColorMode == "original", "a mode already saved is kept")
+        fresh({ titleColorMode = "bogus", colorByDifficulty = false })
+        picker.setter({ r = 1, g = 0, b = 0 })
+        ok(dd.getter() == "gold" and t.cfg.titleColorMode == "gold",
+           "an unknown saved mode reads off the old switches too, so it is replaced by the one shown: "
+           .. tostring(dd.getter()) .. "/" .. tostring(t.cfg.titleColorMode))
+    end)
+    ok(good, "the title color dropdown raised: " .. tostring(err))
 end
 
 print(("test_appearance: %d passed, %d failed"):format(pass, fail))

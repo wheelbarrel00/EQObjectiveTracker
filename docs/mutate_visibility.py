@@ -333,16 +333,16 @@ MUTANTS = [
         (A, "            self:SetDependent(fadeFocus, faded)\n", "")]),
 
     ("the boxes are never dimmed when the tab is built", [
-        (A, "        end\n        syncFade()\n\n        local spacingSlider",
-            "        end\n\n        local spacingSlider")]),
+        (A, "        end\n        syncFade()\n\n        local bgRow = tracker:Add(",
+            "        end\n\n        local bgRow = tracker:Add(")]),
 
-    ("Block Spacing is added among the new controls", [
-        (A, "        colors:Add(spacingSlider)\n", ""),
-        (A, "        colors:Add(fadeHover, DEPENDENT)\n",
-            "        colors:Add(spacingSlider)\n        colors:Add(fadeHover, DEPENDENT)\n")]),
+    ("the focused-quest box is added below the background, out of the opacity group", [
+        (A, "        tracker:Add(fadeFocus, DEPENDENT)\n", ""),
+        (A, "        tracker:Add(w.borderThickSlider, DEPENDENT)\n",
+            "        tracker:Add(fadeFocus, DEPENDENT)\n        tracker:Add(w.borderThickSlider, DEPENDENT)\n")]),
 
     ("the mouseover box is not indented under the slider", [
-        (A, "        colors:Add(fadeHover, DEPENDENT)\n", "        colors:Add(fadeHover)\n")]),
+        (A, "        tracker:Add(fadeHover, DEPENDENT)\n", "        tracker:Add(fadeHover)\n")]),
 
     ("the boxes are indented by a table that indents nothing", [
         (A, "local DEPENDENT = { dependent = true }\n", "local DEPENDENT = {}\n")]),
@@ -536,14 +536,14 @@ MUTANTS = [
             "    end\n")]),
 
     ("the opacity slider is added above Tracker Scale", [
-        (A, "        colors:Add(scaleSlider)\n", ""),
-        (A, "        colors:Add(fadeSlider)\n",
-            "        colors:Add(fadeSlider)\n        colors:Add(scaleSlider)\n")]),
+        (A, "        tracker:Add(scaleSlider)\n", ""),
+        (A, "        tracker:Add(fadeSlider)\n",
+            "        tracker:Add(fadeSlider)\n        tracker:Add(scaleSlider)\n")]),
 
     ("the focused-quest box is added above the mouseover box", [
-        (A, "        colors:Add(fadeHover, DEPENDENT)\n", ""),
-        (A, "        colors:Add(fadeFocus, DEPENDENT)\n",
-            "        colors:Add(fadeFocus, DEPENDENT)\n        colors:Add(fadeHover, DEPENDENT)\n")]),
+        (A, "        tracker:Add(fadeHover, DEPENDENT)\n", ""),
+        (A, "        tracker:Add(fadeFocus, DEPENDENT)\n",
+            "        tracker:Add(fadeFocus, DEPENDENT)\n        tracker:Add(fadeHover, DEPENDENT)\n")]),
 
     ("the slider re-dims the boxes but through a stale copy (syncFade before store)", [
         (A, "                DB().trackerAlpha = v / 100\n"

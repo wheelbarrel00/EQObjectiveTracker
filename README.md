@@ -153,8 +153,10 @@ events, which would otherwise not appear anywhere.
 | `/eqot enable <name>` | Switch a part back on, or `all` |
 | `/eqot debug` | Toggle entry validation warnings |
 
-The options window, opened with `/eqot` or the cog on the tracker's header, has a sidebar with
-four tabs, General, Tracker, Appearance and About, each laid out in cards. The Appearance tab
+The options window, opened with `/eqot` or the cogwheel on the tracker's header, has a sidebar
+with four tabs, General, Tracker, Appearance and About, each laid out in cards. To hide the
+cogwheel, untick Show the options cogwheel on the tracker on the Tracker tab, and `/eqot` still
+opens the window. The Appearance tab
 draws a sample tracker beside its settings that changes as you adjust them.
 
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
@@ -190,6 +192,12 @@ If that map lists none of its own, such as a building interior, a covenant sanct
 dungeon, it asks the zone around it instead, so you still get that zone's quests rather
 than an empty tracker. On retail, an option keeps your campaign quests on screen from every
 zone while that filter is on.
+
+Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick,
+or in Original Style, the way the game's own tracker colors them on your version of the game. The
+objective text, a count like 0/5 as it goes from none done to in progress to done, and finished
+objectives can each be given their own color as well. Section headers can also stay at the top of
+the list while you scroll through their section, so you can always see which one you are in.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.

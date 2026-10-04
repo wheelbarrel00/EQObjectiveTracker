@@ -48,6 +48,7 @@ lib.tokens = {
     alpha = {
         bg         = 0.97,
         accentSoft = 0.18,
+        dangerSoft = 0.12,
         hover      = 0.06,
     },
 

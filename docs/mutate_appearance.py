@@ -31,6 +31,7 @@ LUA = r"C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe"
 HARNESS = "docs/test_appearance.lua"
 
 A = "Options/TabAppearance.lua"
+U = "Core/Util.lua"
 
 MUTANTS = [
     # --------------------------------------------------------------------------- the cards
@@ -49,20 +50,30 @@ MUTANTS = [
         (A, 'stack(self:CreateGroup(content, L["Scroll Bar"]))',
             'stack(self:CreateGroup(content, L["Scrollbar"]))')]),
 
+    ("the first card goes back to the old heading, the tab's own name", [
+        (A, 'stack(self:CreateGroup(content, L["Text"]))',
+            'stack(self:CreateGroup(content, L["Appearance"]))')]),
+
+    ("the quest colors are built after the tracker card instead of before it", [
+        (A, '        local questColors = stack(self:CreateGroup(content, L["Quest Colors"]))\n',
+            '        local questColors = self:CreateGroup(content, L["Quest Colors"])\n'),
+        (A, '        local tracker = stack(self:CreateGroup(content, L["Tracker"]))\n',
+            '        local tracker = stack(self:CreateGroup(content, L["Tracker"]))\n        stack(questColors)\n')]),
+
     ("the bonus HUD card is built on Classic, where the capability reads true with nothing behind it", [
         (A, '        if ns.Has.ScenarioBonus and ns:GetModule("Registry"):Get("scenarios") then',
             '        if ns.Has.ScenarioBonus then')]),
 
     # ---------------------------------------------------------------------- rows and order
     ("Bar Height goes back under Soft edges, between the switch and its slider", [
-        (A, "        headerBar:Add(w.hbHeightSlider)\n", ""),
-        (A, "        headerBar:Add(w.hbSoftCheck)\n",
-            "        headerBar:Add(w.hbSoftCheck)\n        headerBar:Add(w.hbHeightSlider)\n")]),
+        (A, "        headers:Add(w.hbHeightSlider)\n", ""),
+        (A, "        headers:Add(w.hbSoftCheck)\n",
+            "        headers:Add(w.hbSoftCheck)\n        headers:Add(w.hbHeightSlider)\n")]),
 
     ("the title color goes back below the boxes rather than under the switch that dims it", [
-        (A, "        colors:Add(w.titlePicker, DEPENDENT)\n", ""),
-        (A, "        colors:Add(w.recolorCheck)\n",
-            "        colors:Add(w.recolorCheck)\n        colors:Add(w.titlePicker, DEPENDENT)\n")]),
+        (A, "        questColors:Add(w.titlePicker, DEPENDENT)\n", ""),
+        (A, "        questColors:Add(w.recolorCheck)\n",
+            "        questColors:Add(w.recolorCheck)\n        questColors:Add(w.titlePicker, DEPENDENT)\n")]),
 
     ("Header Color goes back below Bar Color, out of the floating block", [
         (A, "        zone:Add(w.zbHeaderPicker, DEPENDENT)\n", ""),
@@ -82,10 +93,10 @@ MUTANTS = [
         (A, "        tracker:Add(w.borderThickSlider, DEPENDENT)", "        tracker:Add(w.borderThickSlider)")]),
 
     ("Edge Softness is not indented under Soft edges", [
-        (A, "        headerBar:Add(w.hbSoftSlider, DEPENDENT)", "        headerBar:Add(w.hbSoftSlider)")]),
+        (A, "        headers:Add(w.hbSoftSlider, DEPENDENT)", "        headers:Add(w.hbSoftSlider)")]),
 
     ("Section Header Color is not indented under its class box", [
-        (A, "        colors:Add(w.headerPicker, DEPENDENT)", "        colors:Add(w.headerPicker)")]),
+        (A, "        headers:Add(w.headerPicker, DEPENDENT)", "        headers:Add(w.headerPicker)")]),
 
     ("Raid is not indented under Tint cards by quest type", [
         (A, "        questRows:Add(w.raidTint, DEPENDENT)", "        questRows:Add(w.raidTint)")]),
@@ -117,7 +128,7 @@ MUTANTS = [
             '    picker:SetPoint("RIGHT", row, "RIGHT", 0, 0)')]),
 
     ("Bar Color becomes a row of its own instead of the header bar switch's color", [
-        (A, "        satellite(self, hbRow, w.hbPicker)", "        headerBar:Add(w.hbPicker)")]),
+        (A, "        satellite(self, hbRow, w.hbPicker)", "        headers:Add(w.hbPicker)")]),
 
     # ----------------------------------------------------------------------- segmented
     ("Banner Alignment goes back to a dropdown, losing its tooltip on the way", [
@@ -175,13 +186,25 @@ MUTANTS = [
     ("Bar Style is never dimmed", [
         (A, "            dim(w.hbStyle,        cfg.headerBar)\n", "")]),
 
-    ("the title color dims the wrong way round, lit while the class color overrides it", [
-        (A, "            dim(w.titlePicker,  not cfg.titleColorUseClass)",
-            "            dim(w.titlePicker,  cfg.titleColorUseClass)")]),
+    ("the custom title color dims the wrong way round, lit unless Custom is picked", [
+        (A, "            dim(w.titlePicker,  ns.Util.TitleColorMode(cfg) == \"custom\")",
+            "            dim(w.titlePicker,  ns.Util.TitleColorMode(cfg) ~= \"custom\")")]),
 
-    ("Use title color for completed quests forgets the class color gives it a color too", [
-        (A, "            dim(w.recolorCheck, cfg.titleColorOverride ~= nil or cfg.titleColorUseClass)",
+    ("Use title color for completed quests reads the raw override, missing Class color and Original Style", [
+        (A, "            dim(w.recolorCheck, ns.Util.EffectiveTitleColor(cfg) ~= nil)",
             "            dim(w.recolorCheck, cfg.titleColorOverride ~= nil)")]),
+
+    ("the custom title color dims on the raw key, so an old profile's custom color reads dim", [
+        (A, "            dim(w.titlePicker,  ns.Util.TitleColorMode(cfg) == \"custom\")",
+            "            dim(w.titlePicker,  cfg.titleColorMode == \"custom\")")]),
+
+    ("Quest Title Color stores its pick but never re-runs the sweep", [
+        (A, "            function(v) restyle(\"titleColorMode\", v); syncDependents() end,",
+            "            function(v) restyle(\"titleColorMode\", v) end,")]),
+
+    ("Quest Title Color reads the raw key, so every old profile reads blank", [
+        (A, "            function() return ns.Util.TitleColorMode(DB()) end,",
+            "            function() return DB().titleColorMode end,")]),
 
     ("Section Header Color dims on the TITLE class box", [
         (A, "            dim(w.headerPicker, not cfg.headerColorUseClass)",
@@ -250,7 +273,7 @@ MUTANTS = [
     ("the sweep creeps back toward the ceiling, closing over each card", [
         (A, "            local zb  = zbState() or {}\n",
             "            local zb  = zbState() or {}\n"
-            "            local _ = look, scenario, scrollBar, tracker, headerBar, colors\n")]),
+            "            local _ = look, questColors, tracker, headers, spacing, scrollBar, scenario\n")]),
 
     # ----------------------------------------------------------------------- the masters
     ("Text Shadow stops re-running the sweep", [
@@ -299,15 +322,38 @@ MUTANTS = [
             "                if v ~= nil and not had then syncDependents() end")]),
 
     ("Clear on the title color stops re-running the sweep", [
-        (A, '                restyle("titleColorOverride", nil)\n                syncDependents()\n',
-            '                restyle("titleColorOverride", nil)\n')]),
+        (A, '                setTitleOverride(nil)\n                syncDependents()\n',
+            '                setTitleOverride(nil)\n')]),
+
+    ("the title picker stops saving the mode first, so on an upgraded profile it switches the titles", [
+        (A, "            db.titleColorMode = ns.Util.TitleColorMode(db)\n", "")]),
+
+    ("the mode is saved after the color, so it is read off the new override", [
+        (A, "            db.titleColorMode = ns.Util.TitleColorMode(db)\n"
+            "            restyle(\"titleColorOverride\", v)\n",
+            "            restyle(\"titleColorOverride\", v)\n"
+            "            db.titleColorMode = ns.Util.TitleColorMode(db)\n")]),
+
+    ("the mode is saved as By difficulty whatever the old switches say", [
+        (A, "            db.titleColorMode = ns.Util.TitleColorMode(db)\n",
+            "            db.titleColorMode = \"difficulty\"\n")]),
+
+    ("only a missing mode is saved, so a profile with an unknown one still switches its titles", [
+        (A, "            db.titleColorMode = ns.Util.TitleColorMode(db)\n",
+            "            if db.titleColorMode == nil then db.titleColorMode = ns.Util.TitleColorMode(db) end\n")]),
+
+    ("the picker's setter goes straight to the override, past the saved mode", [
+        (A, "                setTitleOverride(v)\n", "                restyle(\"titleColorOverride\", v)\n")]),
+
+    ("Clear goes straight to the override, so an upgraded Custom profile falls to By difficulty", [
+        (A, "                setTitleOverride(nil)\n", "                restyle(\"titleColorOverride\", nil)\n")]),
 
     # ------------------------------------------------------------------- the small sweeps
     ("the opacity slider stores a whole number where a fraction belongs", [
         (A, "                DB().trackerAlpha = v / 100\n", "                DB().trackerAlpha = v\n")]),
 
     ("the opacity boxes are never dimmed when the tab is built", [
-        (A, "        syncFade()\n\n        local spacingSlider", "\n        local spacingSlider")]),
+        (A, "        syncFade()\n\n        local bgRow = tracker:Add(", "\n        local bgRow = tracker:Add(")]),
 
     ("the HUD background color dims on the border box", [
         (A, "                self:SetDependent(sbBgPicker,     st.showBackground ~= false)",
@@ -395,16 +441,93 @@ MUTANTS = [
     ("the zone bar's Same as tracker font row asks for a face it does not have", [
         (A, '    if not name or name == "" then return nil end\n', '    if not name then return nil end\n')]),
     # Which tooltip sits on which class color box. Both keys stay valid, so the locale gate cannot see a swap.
-    ("the two class color tooltips are swapped between their boxes", [
-        (A, '            L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', "@@SWAP@@"),
-        (A, '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', '            L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))'),
-        (A, "@@SWAP@@", '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))')]),
+    ("Quest Title Color carries the custom picker's tooltip", [
+        (A, '            L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on."]))', '            L["The color every title takes while Quest Title Color is set to Custom color. Until one is picked they are gold."]))')]),
 
     ("the headers box carries the titles tooltip", [
         (A, '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', '            L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))')]),
 
-    ("the titles tooltip points at the picker above again", [
-        (A, '            L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', '            L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color above while it is on. Off by default."]))')]),
+    ("the in-progress count color writes the none-done key", [
+        (A, "            function(v) restyle(\"countColorPartial\", v) end,",
+            "            function(v) restyle(\"countColorNone\", v) end,")]),
+
+    ("the objective text color reads the done count's key", [
+        (A, "            function() return DB().objectiveColor end,",
+            "            function() return DB().countColorDone end,")]),
+
+    ("the finished objective color loses its Clear, so green can never come back", [
+        (A, "            function() restyle(\"finishedObjectiveColor\", nil) end))",
+            "            nil))")]),
+
+    ("the finished objective color takes alpha", [
+        (A, "L[\"Color of an objective you have finished. While unset it follows Count Color: Done, or the title color when Use title color for completed quests gives one.\"],\n            false,",
+            "L[\"Color of an objective you have finished. While unset it follows Count Color: Done, or the title color when Use title color for completed quests gives one.\"],\n            true,")]),
+
+    ("the gold choice goes back to the bare key the store translates as money", [
+        (A, 'label = L["Gold color"],', 'label = L["Gold"],')]),
+
+    ("the gold choice is typed in English, so no language can translate it", [
+        (A, 'label = L["Gold color"],', 'label = "Gold color",')]),
+
+    ("the Quest Colors card title is typed in English", [
+        (A, 'stack(self:CreateGroup(content, L["Quest Colors"]))', 'stack(self:CreateGroup(content, "Quest Colors"))')]),
+
+    ("the Gold and Class color choices carry each other's tips", [
+        (A, 'tip = L["Every title in the same gold."] },', 'tip = L["Every title in the class color of the character you are logged in on."] },'),
+        (A, '      tip = L["Every title in the class color of the character you are logged in on."] },\n    -- Not L["Custom"]',
+            '      tip = L["Every title in the same gold."] },\n    -- Not L["Custom"]')]),
+
+    ("an empty override table reads as Custom, so the profile's titles go gold", [
+        (U, '    if ov and ov.r then return "custom" end', '    if ov then return "custom" end')]),
+
+    ("the objective text color takes alpha", [
+        (A, 'L["Color of the objective lines under each title. The count at the start of a line has its own three colors below."]))',
+            'L["Color of the objective lines under each title. The count at the start of a line has its own three colors below."], true))')]),
+
+    # ------------------------------------------- strings drawn bare, which only a marked build sees
+    ("Quest Title Color's own label is typed in English, its tooltip title still wrapped", [
+        (A, 'self:CreateRadioGroup(content, L["Quest Title Color"],', 'self:CreateRadioGroup(content, "Quest Title Color",')]),
+
+    ("the Tracker card's Background box is typed in English, while three other cards wrap it", [
+        (A, '        local bgRow = tracker:Add(self:CreateCheckbox(content, L["Background"],',
+            '        local bgRow = tracker:Add(self:CreateCheckbox(content, "Background",')]),
+
+    ("the Quest Rows card title is typed in English", [
+        (A, 'stack(self:CreateGroup(content, L["Quest Rows"]))', 'stack(self:CreateGroup(content, "Quest Rows"))')]),
+
+    ("the Card layout choice is typed in English", [
+        (A, '{ value = "card",    label = L["Card"] },', '{ value = "card",    label = "Card" },')]),
+
+    ("the Left banner alignment is typed in English", [
+        (A, '{ value = "LEFT",   label = L["Left"] },', '{ value = "LEFT",   label = "Left" },')]),
+
+    ("a tooltip is typed in English", [
+        (A, 'L["Shadow color and opacity."]', '"Shadow color and opacity."')]),
+
+    ("the Reset prompt is typed in English", [
+        (A, 'text     = L["Reset every setting on this tab to its defaults? The interface will reload."],',
+            'text     = "Reset every setting on this tab to its defaults? The interface will reload.",')]),
+
+    # ------------------------------------------------- a sweep that runs before the setter stores
+    ("Text Shadow sweeps before it stores, so its dependents dim for the old value", [
+        (A, 'function(v) restyle("textShadow", v); syncDependents() end,',
+            'function(v) syncDependents(); restyle("textShadow", v) end,')]),
+
+    ("the title picker sweeps before it stores", [
+        (A, '                setTitleOverride(v)\n', ''),
+        (A, '                if had ~= (v ~= nil) then syncDependents() end',
+            '                if had ~= (v ~= nil) then syncDependents() end\n                setTitleOverride(v)')]),
+
+    ("Clear on the title color sweeps before it clears", [
+        (A, '                setTitleOverride(nil)\n                syncDependents()\n',
+            '                syncDependents()\n                setTitleOverride(nil)\n')]),
+
+    ("a color picked over an empty one counts as no change, so the sweep is skipped", [
+        (A, 'local had = (DB().titleColorOverride or {}).r ~= nil', 'local had = DB().titleColorOverride ~= nil')]),
+
+    ("Quest Title Color loses Original Style", [
+        (A, "    { value = \"original\",   label = L[\"Original Style\"],\n"
+            "      tip = L[\"Titles colored the way Blizzard's own tracker colors them on this version of the game.\"] },\n", "")]),
 
     ("the headers tooltip points at the picker above again", [
         (A, '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color above while it is on. Off by default."]))')]),

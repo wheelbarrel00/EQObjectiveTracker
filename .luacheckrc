@@ -105,6 +105,8 @@ read_globals = {
     -- on Vanilla and TBC where ObjectiveTrackerFrame is retail's. QuestTimerFrame is a THIRD
     -- Blizzard frame, a sibling of neither tracker, drawing a floating countdown of its own.
     "BackdropTemplateMixin", "QuestWatchFrame", "QuestTimerFrame",
+    -- The colors Blizzard's own tracker draws titles in, for Original Style.
+    "NORMAL_FONT_COLOR", "OBJECTIVE_TRACKER_BLOCK_HEADER_COLOR",
 
     "GetNumAutoQuestPopUps", "GetAutoQuestPopUp", "RemoveAutoQuestPopUp",
     "ShowQuestComplete", "ShowQuestOffer", "QUEST_WATCH_CLICK_TO_COMPLETE",

@@ -7,7 +7,8 @@
 -- record the calls these cases check. The Filters card has its own cases in test_filter.lua. This
 -- file covers the rest: Sort Order and its Manual hint, Simplify tracked achievements, the section
 -- show boxes, the World Quests height controls, World Quests Position, the Section Order rows and
--- their chevrons, the difficulty box's dimming, the display boxes and the three sounds.
+-- their chevrons, the difficulty box staying gone, the display boxes, Keep section headers in
+-- view and the three sounds.
 --
 -- Every lookup in the locale table reads "<key>", so a hard-coded English string cannot pass for
 -- a translated one.
@@ -69,9 +70,11 @@ local function trackerTab(o)
     local spec
     modules.Options = { RegisterTab = function(_, s) spec = s end }
     modules.DB = { Tracker = function() return st.cfg end }
+    st.seq = {}
     modules.Tracker = {
-        Render = function() st.render = st.render + 1 end,
-        ApplyHeaderIcons = function() st.icons = st.icons + 1 end,
+        Render = function() st.render = st.render + 1; st.seq[#st.seq + 1] = "render" end,
+        ApplyWorldQuestsPosition = function() st.seq[#st.seq + 1] = "anchor" end,
+        ApplyHeaderIcons = function() st.icons = st.icons + 1; st.iconsSaw = st.cfg.showOptionsIcon end,
         SetWorldQuestsPosition = function(_, v) st.wqPositions[#st.wqPositions + 1] = v end,
     }
     modules.Row = { Invalidate = function() st.invalidate = st.invalidate + 1 end }
@@ -407,33 +410,139 @@ case("the three sounds: each switch stores its key, each picker stores and plays
     end
 end)
 
-case("the difficulty box dims under a title color set on Appearance, read again on every view", function()
+-- It became one choice of Quest Title Color on the Appearance tab. Built here as well, it would
+-- be a second switch for the same thing that loses to the first without saying so.
+case("Quest Title Color By Difficulty is no longer on this tab", function()
     local st = trackerTab()
-    local diff = st.ui.boxes[K"Quest Title Color By Difficulty"]
-    ok(st.dims[diff] == true, "lit when no title color is set")
-    st.cfg.titleColorOverride = { r = 1, g = 0, b = 0 }
-    st.spec.refresh(st.ui, st.content)
-    ok(st.dims[diff] == false, "dimmed on the next view once a title color is set")
-    st.cfg.titleColorOverride = nil
-    st.cfg.titleColorUseClass = true
-    st.spec.refresh(st.ui, st.content)
-    ok(st.dims[diff] == false, "and while class colored titles are on")
-    st.cfg.titleColorUseClass = false
-    st.spec.refresh(st.ui, st.content)
-    ok(st.dims[diff] == true, "lit again with neither")
+    ok(st.ui.boxes[K"Quest Title Color By Difficulty"] == nil, "the box is not built")
+    for label in pairs(st.ui.boxes) do
+        ok(not label:find("Difficulty", 1, true), "no box names difficulty: " .. label)
+    end
+    ok(st.spec.refresh == nil, "and the tab needs no per-view pass now that nothing on it dims from Appearance")
 end)
 
-case("Show Options icon applies at once", function()
+case("the cogwheel box says cogwheel, and applies at once", function()
     local st = trackerTab()
-    local box = st.ui.boxes[K"Show Options icon on the tracker"]
+    ok(st.ui.boxes[K"Show Options icon on the tracker"] == nil, "the old label, which nobody could find, is gone")
+    local box = st.ui.boxes[K"Show the options cogwheel on the tracker"]
     ok(box.getter() == true, "on while unset")
     box.setter(false)
     ok(st.cfg.showOptionsIcon == false and st.icons == 1, "unticked, it stores off and redraws the header icons")
+    ok(st.iconsSaw == false, "storing before the redraw, so the redraw reads the new value")
+    ok(box.getter() == false, "and reads back off")
+    box.setter(true)
+    ok(box.getter() == true, "ticked again, it reads back on")
+end)
+
+-- The box only stores the key. The tracker's header pass is what hides the cogwheel, reading the
+-- key the cogwheel is built with, so the rebuild and that pass are driven here and the build pinned.
+case("the tracker hides the cogwheel on the key this box writes", function()
+    local fh = assert(io.open(repoFile("UI/Tracker.lua"), "r"))
+    local src = fh:read("*a")
+    fh:close()
+    local a = src:find("function Tracker:RebuildHeaderIcons()", 1, true)
+    local applyAt = a and src:find("function Tracker:ApplyHeaderIcons()", a, true)
+    local b = applyAt and src:find("\nend\n", applyAt, true)
+    ok(a ~= nil and applyAt ~= nil and b ~= nil, "RebuildHeaderIcons and ApplyHeaderIcons are found, in that order")
+    if not (a and applyAt and b) then return end
+    local T, cfg, specs, made = {}, {}, {}, {}
+    local function icon(key)
+        local f = frame()
+        f._dbKey, f.points = key, {}
+        function f:ClearAllPoints() self.points = {} end
+        function f:SetPoint(...) self.points[#self.points + 1] = { ... } end
+        return f
+    end
+    local mods = {
+        DB = { Tracker = function() return cfg end },
+        API = { HeaderIcons = function() return specs end },
+    }
+    local ns = { GetModule = function(_, n) return mods[n] end }
+    local chunk = assert(loadstring(src:sub(a, b + 4), "header-icons"))
+    setfenv(chunk, setmetatable({ Tracker = T, ns = ns, makeHeaderIcon = function()
+        local m = icon(nil)
+        made[#made + 1] = m
+        return m
+    end }, { __index = _G }))
+    chunk()
+
+    local cog = icon("showOptionsIcon")
+    T.frame = { headerIcons = { cog } }
+    specs[1] = { id = "chain", onClick = function() end }
+    T:RebuildHeaderIcons()
+    local icons, chain = T.frame.headerIcons, made[1]
+    ok(#icons == 2 and icons[1] == cog and icons[2] == chain, "rebuilt, the cogwheel stays first and the API icon follows")
+    ok(cog.shown and chain and chain.shown, "with the key unset both show")
+    ok(cog.points[1] and cog.points[1][1] == "TOPRIGHT" and cog.points[1][4] == -4 and cog.points[1][5] == -1,
+       "the cogwheel takes the corner")
+    ok(chain and chain.points[1] and chain.points[1][1] == "RIGHT" and chain.points[1][2] == cog
+       and chain.points[1][3] == "LEFT" and chain.points[1][4] == -3,
+       "and the next icon sits 3px to its left")
+    cfg.showOptionsIcon = false
+    T:RebuildHeaderIcons()
+    ok(#T.frame.headerIcons == 2 and T.frame.headerIcons[1] == cog, "unticked, a rebuild still keeps the cogwheel first")
+    ok(not cog.shown and chain.shown and chain.points[1] and chain.points[1][1] == "TOPRIGHT",
+       "and hides it, the next icon taking its corner")
+    specs[1] = nil
+    T:RebuildHeaderIcons()
+    ok(#T.frame.headerIcons == 1 and T.frame.headerIcons[1] == cog and not chain.shown,
+       "an icon no longer registered is dropped and hidden, the cogwheel kept")
+
+    local build = {}
+    for line in src:gmatch("[^\n]+") do
+        if not line:match("^%s*%-%-") then build[#build + 1] = line end
+    end
+    local code = table.concat(build, "\n")
+    local function once(stmt)
+        local n, from = 0, 1
+        while true do
+            local at = code:find(stmt, from, true)
+            if not at then break end
+            n, from = n + 1, at + 1
+        end
+        return n
+    end
+    ok(once('    cog._dbKey = "showOptionsIcon"') == 1, "the cogwheel is built carrying the key this box writes")
+    ok(once("    f.headerIcons = { cog }") == 1, "and is the first and only icon before the rebuild")
+end)
+
+-- The band joins or leaves the list's anchor chain, so the anchoring has to come first: a render
+-- before it lays the list out for the chain that is still in place.
+case("Keep section headers in view re-anchors the list, then redraws", function()
+    local st = trackerTab()
+    local box = st.ui.boxes[K"Keep section headers in view while scrolling"]
+    ok(box ~= nil, "the box is built")
+    if not box then return end
+    ok(box.getter() == true, "on while unset, as it ships")
+    ok(box.tooltip == K"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default.",
+       "carries its tooltip")
+    st.seq = {}
+    box.setter(false)
+    ok(st.cfg.stickySectionHeaders == false and not box.getter(), "unticked, it stores off and reads back off")
+    st.seq = {}
+    box.setter(true)
+    ok(st.cfg.stickySectionHeaders == true, "ticked, it stores on")
+    ok(box.getter() and true or false, "and reads back on")
+    ok(table.concat(st.seq, ",") == "anchor,render", "re-anchors once, then redraws once: " .. table.concat(st.seq, ","))
+    ok(st.invalidate == 0, "and leaves the rows alone")
+    st.seq = {}
+    box.setter(false)
+    ok(st.cfg.stickySectionHeaders == false and table.concat(st.seq, ",") == "anchor,render",
+       "unticked, the same two calls in the same order")
+    ok(not box.getter(), "and reads back off")
+
+    local rows, at, countAt = st.ui.cards[K"Options"].rows, nil, nil
+    for i, r in ipairs(rows) do
+        if r == box then at = i end
+        if r == st.ui.boxes[K"Show the visible / total count on section headers"] then countAt = i end
+    end
+    ok(at ~= nil and countAt ~= nil and at == countAt + 1,
+       "sits on the Options card straight under the header count box: " .. tostring(at) .. ", " .. tostring(countAt))
+    ok(box.dependent == false, "and is not indented under it")
 end)
 
 -- Each changes how a row reads, so the rows are invalidated before the redraw.
 local ROW_BOXES = {
-    { "Quest Title Color By Difficulty", "colorByDifficulty", true },
     { "Show quest level prefix", "showLevelInTracker", false },
     { "Show zone label under quest titles", "showZoneTag", false },
     { "Show objective progress numbers", "showObjectiveNumbers", true },
@@ -463,6 +572,7 @@ case("a display box that changes how a row reads invalidates the rows before the
             local inv, ren = st.invalidate, st.render
             box.setter(not r[3])
             ok(st.cfg[r[2]] == (not r[3]), r[1] .. " stores " .. r[2])
+            ok((box.getter() and true or false) == (not r[3]), r[1] .. " reads back what it stored")
             ok(st.invalidate == inv + 1 and st.render == ren + 1,
                r[1] .. " invalidates the rows once and redraws once: " .. (st.invalidate - inv) .. ", " .. (st.render - ren))
         end
@@ -478,6 +588,7 @@ case("a box that changes only what is listed redraws without invalidating", func
             local inv, ren = st.invalidate, st.render
             box.setter(false)
             ok(st.cfg[r[2]] == false, r[1] .. " stores " .. r[2])
+            ok(not box.getter(), r[1] .. " reads back what it stored")
             ok(st.render == ren + 1 and st.invalidate == inv,
                r[1] .. " redraws once and leaves the rows alone: " .. (st.render - ren) .. ", " .. (st.invalidate - inv))
         end

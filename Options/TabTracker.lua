@@ -370,19 +370,6 @@ Options:RegisterTab({
         display:SetPoint("TOPLEFT", order, "BOTTOMLEFT", 0, -gap)
         display:SetPoint("TOPRIGHT", order, "BOTTOMRIGHT", 0, -gap)
 
-        local diff = self:CreateCheckbox(content, L["Quest Title Color By Difficulty"],
-            rowSetting("colorByDifficulty", true))
-        display:Add(diff)
-        -- Its master is on the Appearance tab, so the sweep there can never reach it. Per
-        -- view rather than per setter for the same reason.
-        content._syncDiff = function()
-            local cfg = DB() or {}
-            self:SetDependent(diff, cfg.titleColorOverride == nil and not cfg.titleColorUseClass)
-        end
-        content._syncDiff()
-        self:AttachTooltip(diff, L["Quest Title Color By Difficulty"],
-            L["Colors each quest title by how hard it is for your level, the way the quest log does. The Quest Title Color Override on the Appearance tab wins over this while it is set."])
-
         local lvl = self:CreateCheckbox(content, L["Show quest level prefix"],
             rowSetting("showLevelInTracker"))
         display:Add(lvl)
@@ -423,13 +410,24 @@ Options:RegisterTab({
             function(v) DB().showQuestTotal = v; render() end,
             L["For example, 3/9. Applies to every section header."]))
 
+        display:Add(self:CreateCheckbox(content, L["Keep section headers in view while scrolling"],
+            function() return DB().stickySectionHeaders ~= false end,
+            function(v)
+                DB().stickySectionHeaders = v
+                ns:GetModule("Tracker"):ApplyWorldQuestsPosition()
+                render()
+            end,
+            L["The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default."]))
+
         local itemBtnCheck = self:CreateCheckbox(content, L["Show usable quest item buttons"],
             rowSetting("showItemButtons", true))
         display:Add(itemBtnCheck)
         self:AttachTooltip(itemBtnCheck, L["Show usable quest item buttons"],
             L["Puts a button on the tracker row of any quest that carries a usable item, so you can use it without opening your bags."])
 
-        display:Add(self:CreateCheckbox(content, L["Show Options icon on the tracker"],
+        -- Named after the cogwheel itself: as "Options icon" two players, the author among them,
+        -- went looking for a way to hide it and never found this box.
+        display:Add(self:CreateCheckbox(content, L["Show the options cogwheel on the tracker"],
             function() return DB().showOptionsIcon ~= false end,
             function(v)
                 DB().showOptionsIcon = v
@@ -438,8 +436,7 @@ Options:RegisterTab({
             L["A small cogwheel at the top-right of the tracker that opens the options panel."]))
 
         -- EQ has Show Chain Guide icon after this one. Deliberately not ported: it opens
-        -- EQ's Chain Guide, which EQOT does not have. Hide scroll bar used to sit here too,
-        -- and now heads the Scroll Bar group on Appearance that it switches off.
+        -- EQ's Chain Guide, which EQOT does not have.
         display:Add(self:CreateCheckbox(content, L["Show Quest Discovered popups"],
             function() return DB().showQuestPopups ~= false end,
             function(v) DB().showQuestPopups = v; render() end,
@@ -518,9 +515,5 @@ Options:RegisterTab({
         -- The zone progress bar's two toggles used to sit here, and so did the bonus
         -- objectives HUD's three. Both features live under their own Appearance heading now,
         -- beside the controls that style them - one feature, one place.
-    end,
-
-    refresh = function(_, content)
-        if content._syncDiff then content._syncDiff() end
     end,
 })
