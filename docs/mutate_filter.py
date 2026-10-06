@@ -232,6 +232,20 @@ MUTANTS = [
 
     ("the quest provider stops DECLARING the campaign tag, so the box is never built", [
         (Q, '    tags     = { "campaign", "daily",', '    tags     = { "daily",')]),
+
+    # ------------------------------------------- found by the 2.2.0 pre-release scan
+    # A dot call hands the accessor no self, a Lua error in game that a stub ignoring self passes.
+    ("the status line calls DB.Tracker with a dot", [
+        (F, "    local cfg = DB and DB:Tracker()\n    local f   = cfg and cfg.filters\n",
+            "    local cfg = DB and DB.Tracker()\n    local f   = cfg and cfg.filters\n")]),
+
+    ("the pin test calls DB.Char with a dot", [
+        (F, "    local char = DB and DB:Char()\n    local byProvider",
+            "    local char = DB and DB.Char()\n    local byProvider")]),
+
+    ("the Tracker tab calls DB.Tracker with a dot", [
+        (O, "local function DB() return ns:GetModule(\"DB\"):Tracker() end\n",
+            "local function DB() return ns:GetModule(\"DB\").Tracker() end\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_filter: (\d+) passed, (\d+) failed$")

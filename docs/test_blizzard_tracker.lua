@@ -581,6 +581,7 @@ case("/eqot status names the tracker in use and the saved choice", function()
         m.Tracker.DebugScroll = function() return "no frame" end
         m.Tracker.HeightLine = function() return "tracker height: unmeasured" end
         m.ItemButtons.DebugLine = function() return "item buttons: on | container none" end
+        m.ZoneGroups.DebugLine = function() return "zone headers: on | nothing grouped" end
         -- Each flavor's own frame and count. Retail also answers the bare count with another
         -- figure, so reading the wrong one shows. Classic's frame is hidden with nothing watched,
         -- as QuestWatch_Update leaves it, and Classic has a C_QuestLog with no watch count in it.
@@ -617,6 +618,8 @@ case("/eqot status names the tracker in use and the saved choice", function()
        "the tracker window's own lines are not printed for a window never built")
     ok(count(t, "container none") == 0 and count(t, "ItemButtons: off, Blizzard's tracker in use") == 1,
        "nor are the item buttons', which have no window to sit in")
+    ok(count(t, "nothing grouped") == 0 and count(t, "ZoneGroups: off, Blizzard's tracker in use") == 1,
+       "nor the zone headers', which have no feed to group")
     ok(built == 0, "and no feed is built for a tracker that is not there: " .. built)
     ok(provider:find("off, Blizzard's tracker in use", 1, true) ~= nil, "a provider says why it is off: " .. provider)
     ok(t.printed("QuestieCoexist: off, Blizzard's tracker in use") and not t.printed("hook missing"),
@@ -985,6 +988,53 @@ local function code(rel)
     end
     return "\n" .. table.concat(out, "\n") .. "\n"
 end
+
+-- Core/DB.lua's accessors read self, so DB.Tracker() raises in game while luacheck, and any stub
+-- that ignores self, passes it. Read off every file a TOC loads.
+case("no file calls a DB accessor with a dot", function()
+    local seen, files, colon, holders, dots = {}, 0, 0, 0, {}
+    for _, toc in ipairs({ "EQObjectiveTracker.toc", "EQObjectiveTracker_Mainline.toc",
+                           "EQObjectiveTracker_Camelot.toc", "EQObjectiveTracker_Vanilla.toc",
+                           "EQObjectiveTracker_TBC.toc" }) do
+        for line in (readFile(toc) .. "\n"):gmatch("([^\n]*)\n") do
+            local rel = line:match("^([CDUO][%w]*\\.-%.lua)%s*$")
+            if rel and not seen[rel] then
+                seen[rel] = true
+                files = files + 1
+                local src = code((rel:gsub("\\", "/")))
+                for _ in src:gmatch("%f[%w_]DB:%u[%w_]*%(") do colon = colon + 1 end
+                for _ in src:gmatch('GetModule%("DB"%):%u[%w_]*%(') do colon = colon + 1 end
+                -- Reached with a dot or brackets, called or not, so an alias or a spaced call shows too.
+                for name in src:gmatch("%f[%w_]DB%s*%.%s*(%u[%w_]*)") do dots[#dots + 1] = rel .. " DB." .. name end
+                for name in src:gmatch("%f[%w_]DB%s*%[%s*[\"'](%u[%w_]*)") do dots[#dots + 1] = rel .. " DB[" .. name .. "]" end
+                for name in src:gmatch('GetModule%("DB"%)%s*%.%s*(%u[%w_]*)') do dots[#dots + 1] = rel .. " DB." .. name end
+                for name in src:gmatch('GetModule%("DB"%)%s*%[%s*["\'](%u[%w_]*)') do
+                    dots[#dots + 1] = rel .. " DB[" .. name .. "]"
+                end
+                -- Every GetModule("DB") is a colon call or the whole right side of "local DB =", and
+                -- the bare module is never assigned or passed on, so the patterns above see every use.
+                local from = 1
+                while true do
+                    local a, b = src:find('GetModule%("DB"%)', from)
+                    if not a then break end
+                    local before, after = src:sub(1, a - 1):match("[^\n]*$"), src:sub(b + 1)
+                    if before:match("^%s*local%s+DB%s*=%s*ns:$") and after:match("^[ \t]*\n") then
+                        holders = holders + 1
+                    elseif not after:match("^%s*:") then
+                        dots[#dots + 1] = rel .. " takes the DB module as: " .. before .. 'GetModule("DB")'
+                    end
+                    from = b + 1
+                end
+                for hit in src:gmatch("[=,(]%s*DB%s*[,;)\n]") do
+                    dots[#dots + 1] = rel .. " passes the DB module on: " .. hit
+                end
+            end
+        end
+    end
+    ok(files >= 70 and colon >= 100 and holders >= 40,
+       "every loaded file is read: " .. files .. " files, " .. colon .. " colon calls, " .. holders .. " holders")
+    ok(#dots == 0, "and none reaches a DB accessor with a dot: " .. table.concat(dots, ", "))
+end)
 
 case("seams", function()
     local init = code("Core/Init.lua")

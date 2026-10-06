@@ -817,7 +817,8 @@ function Row:Render(row, entry, width, cfg)
     row._providerID = entry.providerID
 
     local titleText = decorateTitle(entry, cfg)
-    local subtitle = (cfg and cfg.showZoneTag ~= false) and entry.subtitle or nil
+    -- Zone headers name the heading already, so the label would say it twice.
+    local subtitle = (cfg and cfg.showZoneTag ~= false and not cfg.zoneHeaders) and entry.subtitle or nil
     -- Fills the shared block arrays. Nothing between here and the layout loop below may call
     -- buildBlocks again, which is the only thing that rewrites them.
     buildBlocks(entry, cfg)

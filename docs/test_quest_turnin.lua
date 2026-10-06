@@ -11,17 +11,23 @@
 -- Blizzard's tracker and drew the popup box only, so a quest that raised no popup had no way in.
 --
 -- WHAT IS HELD HERE. A left click on a finished auto-complete row hands it in, and so does the
--- title half of a split click, which is Blizzard's header click. The icon half super-tracks and
--- nothing more, as Blizzard's POI button does, and a right click never hands in. A press released
--- off the row is a cancel and does nothing, since this click can now open the reward window. The
--- menu's Open item still only opens the log, as Blizzard's does. The row says it can be clicked,
--- in Blizzard's own translated string, as an ordinary unfinished objective line so simplify mode
--- and the completed-line filters keep it.
+-- title half of a split click, which is Blizzard's header click. The icon half only changes the
+-- focus, as Blizzard's POI button does, and a right click never hands in. A press released off the
+-- row is a cancel and does nothing, since this click can now open the reward window. With Click a
+-- focused quest to unfocus it on, a click on the followed quest unfocuses it instead of sending it
+-- again, a finished or failed one too, and a hand-in still comes first. The option reads its own
+-- key, never Split quest click's. Clicks hand over entries carrying the state, lines, campaign
+-- tag, group and tracked flag fullRebuild sets, and the DB module is one object over Core/DB.lua's
+-- own DB:Tracker, sliced, so a dot call raises as in game.
+-- The menu's Open item still only opens the log, as Blizzard's does. The row says it can be
+-- clicked, in Blizzard's own translated string, as an ordinary unfinished objective line so
+-- simplify mode and the completed-line filters keep it.
 --
 -- OUT OF SCOPE BY CONSTRUCTION, so a green run says nothing about any of it: how UI/Row.lua draws
 -- the line (docs/test_row_blocks.lua covers line kinds), whether the reward window really opens,
--- whether a Prey hunt raises QUEST_AUTOCOMPLETE at all (unmeasured), and the Classic provider,
--- which is untouched.
+-- whether a Prey hunt raises QUEST_AUTOCOMPLETE at all (unmeasured), the Classic provider, which
+-- is untouched, and Blizzard's own focus clears, such as OnQuestWatchChanged and OnQuestTurnedIn,
+-- which are not modeled.
 --
 -- The provider cannot be loaded whole without stubbing the whole quest log, so the functions are
 -- sliced out by TEXT ANCHORS rather than line numbers. If an anchor stops matching it fails
@@ -106,15 +112,54 @@ local STATE, LINE = Entry.STATE, Entry.LINE
 -- while shipping English to every translated client.
 local STR = "<the client's own click-to-complete string>"
 
--- id -> { index, complete, failed, auto, noInfo, objs, fallback }
+-- id -> { index, complete, failed, auto, noInfo, objs, fallback, campaign, untracked }
 local world
 local calls
 -- The quest the client says is super-tracked, and whether the Focus module is there to ask.
 local followed
 local focusLoaded = true
+-- The saved tracker settings, and whether the DB module is there to hand them over.
+local cfg
+local dbLoaded = true
 
 local function note(what) calls[#calls + 1] = what end
 local focusSpy = { Resend = function() note("resend") end }
+
+-- Core/DB.lua's own DB:Tracker, sliced, over a stub profile. It reads through self, so a call
+-- written DB.Tracker() raises here as it does in game.
+local dbTracker
+local function realDB(tracker)
+    if not dbTracker then
+        local db = readFile("Core/DB.lua")
+        local a = db:find("\nfunction DB:Tracker()\n", 1, true)
+        local b = a and db:find("\nend\n", a + 1, true)
+        assert(a and b, "Core/DB.lua defines DB:Tracker")
+        local holder = {}
+        local chunk = assert(loadstring(db:sub(a + 1, b + 4), "DB:Tracker"))
+        setfenv(chunk, { DB = holder })
+        chunk()
+        dbTracker = holder.Tracker
+    end
+    return { db = { profile = { tracker = tracker } }, Tracker = dbTracker }
+end
+
+-- The game has one DB module, so the provider gets the same object every time, its profile
+-- reading the current cfg. A module cached at file load then still sees each case's settings.
+local dbModule = realDB(nil)
+dbModule.db.profile = setmetatable({}, { __index = function(_, k)
+    if k == "tracker" then return cfg end
+end })
+
+-- A set of the saved keys beside the unfocus option, all real keys of Core/DB.lua's tracker block,
+-- set to v, leaving any key already in c alone.
+local NEIGHBORS = { "focusAcceptedQuests", "splitQuestClick", "showOnlyWatched", "simplifyMode",
+                    "trackerAlphaFocus", "trackerAlphaHover" }
+local function neighbors(c, v)
+    for _, k in ipairs(NEIGHBORS) do
+        if c[k] == nil then c[k] = v end
+    end
+    return c
+end
 
 -- The client's quest APIs RAISE on a nil id, so these do too. A forgiving stub lets a real
 -- guard be deleted with every assertion green.
@@ -130,6 +175,7 @@ local ns = {
             QuestWatchAPI = true, SuperTrack = true },
     GetModule = function(_, name)
         if name == "Focus" then return focusLoaded and focusSpy or nil end
+        if name == "DB" then return dbLoaded and dbModule or nil end
         error("unexpected module: " .. tostring(name), 0)
     end,
 }
@@ -187,6 +233,8 @@ local GET_INDEX = C_QuestLog.GetLogIndexForQuestID
 local function reset()
     world, calls = {}, {}
     followed, focusLoaded = nil, true
+    cfg, dbLoaded = {}, true
+    ns.Has.SuperTrack = true
     env.C_SuperTrack.GetSuperTrackedQuestID = function() return followed or 0 end
     env.ShowQuestComplete = showStub
     env.RemoveAutoQuestPopUp = removeStub
@@ -207,11 +255,16 @@ end
 
 -- ------------------------------------------------------------------------------- helpers
 
--- The entry is built the way fullRebuild builds it: state from questState, then fillLines.
+-- The entry is built the way fullRebuild builds it: state from questState, the tracked flag, the
+-- campaign tag and the group it picks, then fillLines. The tag stands in for fillTags, whose
+-- client reads are not sliced here.
 local function fill(e, id)
-    e = e or { id = id, lines = {} }
+    e = e or { id = id, lines = {}, tags = {} }
     local okCall, err = pcall(function()
         e.state = api.questState(id)
+        e.isTracked = not (world[id] and world[id].untracked)
+        e.tags.campaign = (world[id] and world[id].campaign) or nil
+        e.groupID = e.tags.campaign and "campaign" or "quests"
         api.fillLines(e, id)
     end)
     ok(okCall, "fillLines does not raise for quest " .. id .. (okCall and "" or (" - " .. tostring(err))))
@@ -233,9 +286,13 @@ local function call(fn, why, ...)
     return table.concat(calls, " ")
 end
 
-local function click(id, button, splitIcon)
-    return call(Quests.OnEntryClick, "OnEntryClick", Quests, { id = id },
-                button or "LeftButton", splitIcon)
+-- The entry the row hands over, built by fill above, so its state, lines, group and flags are
+-- the quest's own. extra overrides any field, such as a stale isFocused.
+local function click(id, button, splitIcon, extra)
+    local e = fill(nil, id)
+    e.isFocused = env.C_SuperTrack.GetSuperTrackedQuestID ~= nil and followed == id
+    for k, v in pairs(extra or {}) do e[k] = v end
+    return call(Quests.OnEntryClick, "OnEntryClick", Quests, e, button or "LeftButton", splitIcon)
 end
 
 local function openLog(id)
@@ -442,6 +499,180 @@ do
     env.C_SuperTrack.GetSuperTrackedQuestID = nil
     got = click(66)
     ok(got == "supertrack:66 notify", "and a client with no super-track getter resends nothing: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    followed = 66
+    cfg.clickToUnfocus = false
+    got = click(66)
+    ok(got == "supertrack:66 resend notify", "with Click a focused quest to unfocus it saved off, it still resends: "
+       .. got)
+end
+
+print("== with Click a focused quest to unfocus it on, a click on the followed quest unfocuses it")
+do
+    -- Driven there and back on one quest, so a click that only ever clears, or only ever sets,
+    -- cannot pass both halves.
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 66
+    -- followed is written through by the set, so the next click reads the client's new answer.
+    local got = click(66)
+    ok(got == "supertrack:0 notify", "the followed quest is unfocused, sent nowhere and repainted: " .. got)
+    got = click(66)
+    ok(got == "supertrack:66 notify", "the next click focuses it again, which is its own announcement: " .. got)
+    got = click(66)
+    ok(got == "supertrack:0 notify", "and the one after unfocuses it again: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 67
+    got = click(66)
+    ok(got == "supertrack:66 notify", "a quest that is not followed is focused, the other one dropped: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    got = click(66)
+    ok(got == "supertrack:66 notify", "and so is one clicked while nothing is followed: " .. got)
+
+    reset()
+    quest(69, { complete = true, auto = true })
+    cfg.clickToUnfocus = true
+    followed = 69
+    got = click(69, "LeftButton", true)
+    ok(got == "supertrack:0 notify", "the icon half of a split click unfocuses too: " .. got)
+    followed = 69
+    got = click(69)
+    ok(got == "remove:69 show:69 notify", "while the whole row still hands a finished quest in first: " .. got)
+
+    reset()
+    quest(70, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 70
+    -- Every set is recorded in calls, so an untouched focus needs no second check.
+    got = click(70, "RightButton")
+    ok(got == "rmwatch:70", "a right click only untracks, focus untouched: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 66
+    env.C_SuperTrack.GetSuperTrackedQuestID = nil
+    got = click(66)
+    ok(got == "supertrack:66 notify", "a client with no super-track getter cannot tell, so it only focuses: " .. got)
+
+    -- The setting is asked of the DB module on every click, so a missing module or profile is the
+    -- shipped behavior rather than a Lua error inside the row's mouse script.
+    reset()
+    quest(66, { complete = false, auto = false })
+    followed = 66
+    dbLoaded = false
+    got = click(66)
+    ok(got == "supertrack:66 resend notify", "with no DB module it keeps resending: " .. got)
+
+    reset()
+    quest(66, { complete = false, auto = false })
+    followed = 66
+    cfg = nil
+    got = click(66)
+    ok(got == "supertrack:66 resend notify", "and with no saved tracker settings too: " .. got)
+end
+
+print("== the unfocus option reads its own key and the client's answer, for every kind of quest")
+do
+    -- Split quest click on its own is not the unfocus option, so the followed quest is sent again.
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg = { splitQuestClick = true }
+    followed = 66
+    local got = click(66, "LeftButton", true)
+    ok(got == "supertrack:66 resend notify", "with only Split quest click on, the icon half resends: " .. got)
+    got = click(66)
+    ok(got == "supertrack:66 resend notify", "and so does the whole row: " .. got)
+
+    for _, v in ipairs({ true, false }) do
+        reset()
+        quest(66, { complete = false, auto = false })
+        cfg = neighbors({}, v)
+        followed = 66
+        got = click(66)
+        ok(got == "supertrack:66 resend notify", "unset beside neighbors all " .. tostring(v) .. ", it resends: " .. got)
+        reset()
+        quest(66, { complete = false, auto = false })
+        cfg = neighbors({ clickToUnfocus = true }, v)
+        followed = 66
+        got = click(66)
+        ok(got == "supertrack:0 notify", "on beside neighbors all " .. tostring(v) .. ", it unfocuses: " .. got)
+    end
+
+    -- A finished quest handed in to an NPC, and a failed one, are rows like any other.
+    reset()
+    quest(61, { complete = true, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 61
+    got = click(61)
+    ok(got == "supertrack:0 notify", "a followed finished NPC quest is unfocused: " .. got)
+    reset()
+    quest(63, { complete = true, failed = true, auto = true })
+    cfg.clickToUnfocus = true
+    followed = 63
+    got = click(63)
+    ok(got == "supertrack:0 notify", "and so is a followed failed one: " .. got)
+
+    -- The Campaign section's rows, and an untracked quest shown with Show only tracked quests off.
+    reset()
+    quest(71, { complete = false, auto = false, campaign = true })
+    cfg.clickToUnfocus = true
+    followed = 71
+    got = click(71)
+    ok(got == "supertrack:0 notify", "a followed campaign quest is unfocused: " .. got)
+    reset()
+    quest(72, { complete = false, auto = false, untracked = true })
+    cfg.clickToUnfocus = true
+    followed = 72
+    got = click(72)
+    ok(got == "supertrack:0 notify", "and so is a followed quest that is not tracked: " .. got)
+    reset()
+    quest(73, { complete = false, auto = false, campaign = true, untracked = true })
+    cfg.clickToUnfocus = true
+    followed = 73
+    got = click(73)
+    ok(got == "supertrack:0 notify", "and an untracked campaign quest: " .. got)
+
+    -- The client's answer decides, never a list built before the focus moved.
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 67
+    got = click(66, nil, nil, { isFocused = true })
+    ok(got == "supertrack:66 notify", "an entry still marked focused is focused, the other quest dropped: " .. got)
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 66
+    got = click(66, nil, nil, { isFocused = false })
+    ok(got == "supertrack:0 notify", "and an entry not yet marked is still unfocused: " .. got)
+end
+
+print("== a client with no super-track hands in and focuses nothing")
+do
+    -- Core/Compat.lua reads false there, never nil.
+    reset()
+    quest(66, { complete = false, auto = false })
+    cfg.clickToUnfocus = true
+    followed = 66
+    ns.Has.SuperTrack = false
+    local got = click(66)
+    ok(got == "", "a left click sets no focus at all: " .. got)
+    reset()
+    quest(60, { complete = true, auto = true })
+    ns.Has.SuperTrack = false
+    got = click(60)
+    ok(got == "remove:60 show:60 notify", "while a finished auto-complete quest is still handed in: " .. got)
+    reset()
 end
 
 print("== a right click never hands a quest in")
@@ -579,19 +810,22 @@ do
     local rsrc = slicer("UI/Row.lua")("local function clickThrough()",
                                       "-- Offered only where both halves are really wired")
     local got, splitOn, menuOpens, cursorX
-    local provider = {
+    -- The icon holder's state and the row's effective scale, which the cursor is divided by.
+    local iconShown, iconRight, scale = true, 100, 1
+    local logProvider = {
         OnEntryClick = function(_, _, button, splitIcon)
             got[#got + 1] = "click:" .. tostring(button) .. (splitIcon and ":icon" or "")
         end,
         OnEntryOpenLog = function(_, _, ...) got[#got + 1] = "openlog:" .. select("#", ...) end,
     }
+    -- A provider with a click and no quest log, such as achievements.
+    local plainProvider = { OnEntryClick = logProvider.OnEntryClick }
+    local provider = logProvider
     local rowEnv = setmetatable({
         ns = { GetModule = function(_, name)
             if name == "Tracker" then return { IsClickThrough = function() return false end } end
             if name == "Registry" then return { Get = function() return provider end } end
-            if name == "DB" then
-                return { Tracker = function() return { splitQuestClick = splitOn } end }
-            end
+            if name == "DB" then return realDB({ splitQuestClick = splitOn }) end
             if name == "RowMenu" then return { Show = function() return menuOpens end } end
             error("unexpected module " .. tostring(name), 0)
         end },
@@ -604,9 +838,9 @@ do
     setfenv(chunk, rowEnv)
     local onMouseUp = chunk()
     local row = { _entry = { id = 1 }, _providerID = "quests",
-                  iconHolder = { IsShown = function() return true end,
-                                 GetRight = function() return 100 end },
-                  GetEffectiveScale = function() return 1 end }
+                  iconHolder = { IsShown = function() return iconShown end,
+                                 GetRight = function() return iconRight end },
+                  GetEffectiveScale = function() return scale end }
     local function press(button, upInside)
         got = {}
         local okCall, err = pcall(onMouseUp, row, button, upInside)
@@ -642,6 +876,44 @@ do
     cursorX, menuOpens = 500, false
     ok(press("RightButton", true) == "click:RightButton",
        "and a right click never reaches OnEntryOpenLog: " .. press("RightButton", true))
+    cursorX = 50
+    ok(press("RightButton", true) == "click:RightButton",
+       "and a right click over the icon is never the icon half: " .. press("RightButton", true))
+
+    -- The icon's right edge itself is the icon, and a hidden icon or one not laid out is none.
+    menuOpens = true
+    cursorX = 100
+    ok(press("LeftButton", true) == "click:LeftButton:icon",
+       "a press on the icon's right edge is the icon half: " .. press("LeftButton", true))
+    cursorX = 101
+    ok(press("LeftButton", true) == "openlog:0", "one pixel past it is the title: " .. press("LeftButton", true))
+    cursorX, iconShown = 50, false
+    ok(press("LeftButton", true) == "openlog:0",
+       "with the icon hidden the whole row is the title: " .. press("LeftButton", true))
+    iconShown, iconRight = true, nil
+    ok(press("LeftButton", true) == "openlog:0",
+       "and so it is with an icon that has no edge yet: " .. press("LeftButton", true))
+    iconRight = 100
+
+    -- The cursor comes in raw pixels and is divided by the row's effective scale.
+    scale = 0.5
+    cursorX = 40
+    ok(press("LeftButton", true) == "click:LeftButton:icon",
+       "at half scale, raw 40 is 80 and over the icon: " .. press("LeftButton", true))
+    cursorX = 60
+    ok(press("LeftButton", true) == "openlog:0", "raw 60 is 120 and over the title: " .. press("LeftButton", true))
+    cursorX = 150
+    ok(press("LeftButton", true) == "openlog:0", "and raw 150 is 300: " .. press("LeftButton", true))
+    scale = 2
+    ok(press("LeftButton", true) == "click:LeftButton:icon",
+       "at double scale, raw 150 is 75 and over the icon: " .. press("LeftButton", true))
+    scale = 1
+
+    -- Split click is offered only to a provider that opens a quest log.
+    provider, cursorX = plainProvider, 500
+    ok(press("LeftButton", true) == "click:LeftButton",
+       "a provider with no quest log gets its ordinary click on the title: " .. press("LeftButton", true))
+    provider = logProvider
 
     splitOn = false
     row._wasDragging = true

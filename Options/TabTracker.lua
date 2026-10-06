@@ -379,7 +379,10 @@ Options:RegisterTab({
             rowSetting("showZoneTag"))
         display:Add(zoneCheck)
         self:AttachTooltip(zoneCheck, L["Show zone label under quest titles"],
-            L["Adds the quest log heading each quest came from as a small line under its title."])
+            L["Adds the quest log heading each quest came from as a small line under its title. Not shown while Show zone headers is on, on the Appearance tab."])
+        -- Its master is on another tab, so its dimming is set again each time this tab is shown.
+        content._syncZoneTag = function() self:SetDependent(zoneCheck, not DB().zoneHeaders) end
+        content._syncZoneTag()
 
         local objCheck = self:CreateCheckbox(content, L["Show objective progress numbers"],
             rowSetting("showObjectiveNumbers", true))
@@ -402,13 +405,13 @@ Options:RegisterTab({
         self:AttachTooltip(qidCheck, L["Show quest ID"], L["Useful for bug reports."])
 
         -- UI/Tracker.lua reads showQuestTotal for every ordinary section and for the pinned
-        -- world quest region, not just Quests and Campaign, and the pair it draws is
-        -- visible/total rather than tracked/total.
+        -- world quest region, not just Quests and Campaign, and UI/ZoneHeaders.lua for every zone
+        -- header. The pair drawn is visible/total rather than tracked/total.
         display:Add(self:CreateCheckbox(content,
             L["Show the visible / total count on section headers"],
             function() return DB().showQuestTotal ~= false end,
             function(v) DB().showQuestTotal = v; render() end,
-            L["For example, 3/9. Applies to every section header."]))
+            L["For example, 3/9. Applies to every section header and zone header."]))
 
         display:Add(self:CreateCheckbox(content, L["Keep section headers in view while scrolling"],
             function() return DB().stickySectionHeaders ~= false end,
@@ -417,7 +420,7 @@ Options:RegisterTab({
                 ns:GetModule("Tracker"):ApplyWorldQuestsPosition()
                 render()
             end,
-            L["The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default."]))
+            L["The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. With zone headers on, the header of the zone you are scrolled into stays just under it. On by default."]))
 
         local itemBtnCheck = self:CreateCheckbox(content, L["Show usable quest item buttons"],
             rowSetting("showItemButtons", true))
@@ -454,6 +457,18 @@ Options:RegisterTab({
         display:Add(splitCheck)
         self:AttachTooltip(splitCheck, L["Split quest click"],
             L["Click the icon to focus, click the title to open the quest log."])
+
+        -- Classic already toggles its focus on every click, and its game never focuses a quest on its own.
+        if ns.Has.SuperTrack then
+            display:Add(self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],
+                function() return DB().clickToUnfocus == true end,
+                function(v) DB().clickToUnfocus = v end,
+                L["Click the focused quest again to unfocus it. With Split quest click on, click its icon."]))
+            display:Add(self:CreateCheckbox(content, L["Focus newly accepted quests"],
+                function() return DB().focusAcceptedQuests ~= false end,
+                function(v) DB().focusAcceptedQuests = v end,
+                L["While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused."]))
+        end
 
         local function playSound(value)
             ns:GetModule("Media"):Play(value)
@@ -515,5 +530,9 @@ Options:RegisterTab({
         -- The zone progress bar's two toggles used to sit here, and so did the bonus
         -- objectives HUD's three. Both features live under their own Appearance heading now,
         -- beside the controls that style them - one feature, one place.
+    end,
+
+    refresh = function(_, content)
+        if content._syncZoneTag then content._syncZoneTag() end
     end,
 })

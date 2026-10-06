@@ -36,6 +36,23 @@ local function readFile(rel)
 end
 
 local pass, fail = 0, 0
+-- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
+-- stand-in raises the same way, rather than answering a call the client would refuse.
+local function strictDB(methods)
+    local db = {}
+    for name, v in pairs(methods) do
+        if type(v) == "function" then
+            db[name] = function(self, ...)
+                if self ~= db then error("DB:" .. name .. " called without self", 2) end
+                return v(self, ...)
+            end
+        else
+            db[name] = v
+        end
+    end
+    return db
+end
+
 local function ok(cond, msg)
     if cond then pass = pass + 1 else fail = fail + 1 print("FAIL: " .. msg) end
 end
@@ -52,10 +69,10 @@ function ns:IsModuleDisabled(name) return disabled[name] == true end
 function ns:IsStandingDown() return false end
 ns.Util ={ Tooltip = function() return { Hide = function() end } end }
 
-mods.DB = {
+mods.DB = strictDB({
     General = function() return general end,
     Tracker = function() return tracker end,
-}
+})
 
 local frame = {
     _shown = true, _alpha = 1,
@@ -1028,14 +1045,16 @@ do
     local t = stripComments(tsrc)
     ok(occurrences(t, "        y = y + Row:Render(row, entry, width, cfg) + gap\n        noteFocus(entry, row)\n") == 1,
        "the world quest loop reports its rows, straight after drawing each")
-    ok(occurrences(t, "                        y = y + Row:Render(row, entry, width, cfg) + gap\n"
-             .. "                        noteFocus(entry, row)\n") == 1,
+    -- The section loop sits inside the zone run loop since zone headers (2.2.0), and draws its
+    -- rows at the zone indent.
+    ok(occurrences(t, "                            y = y + Row:Render(row, entry, width - left, cfg) + gap\n"
+             .. "                            noteFocus(entry, row)\n") == 1,
        "and so does the section loop")
     -- Call shape, indented: the bare name also matches "local function noteFocus(entry, row)".
     ok(occurrences(t, "        noteFocus(entry, row)\n") == 2, "and nowhere else")
 
     local resetAt  = t:find("    soonestExpiry  = nil\n    focusRow, focusQuestID = nil, nil\n", 1, true)
-    local loopAt   = t:find("                        noteFocus(entry, row)\n", 1, true)
+    local loopAt   = t:find("                            noteFocus(entry, row)\n", 1, true)
     local wqAt     = t:find("self:_RenderPinnedWorldQuests(byGroup[PINNED_GROUP]", 1, true)
     local sweepAt  = t:find("    RowPool:Sweep(_resetRow)\n", 1, true)
     local commitAt = t:find("    ItemButtons:Commit()\n", 1, true)

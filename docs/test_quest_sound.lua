@@ -52,6 +52,23 @@ local function repoFile(rel)
 end
 
 local pass, fail = 0, 0
+-- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
+-- stand-in raises the same way, rather than answering a call the client would refuse.
+local function strictDB(methods)
+    local db = {}
+    for name, v in pairs(methods) do
+        if type(v) == "function" then
+            db[name] = function(self, ...)
+                if self ~= db then error("DB:" .. name .. " called without self", 2) end
+                return v(self, ...)
+            end
+        else
+            db[name] = v
+        end
+    end
+    return db
+end
+
 local function ok(cond, msg)
     if cond then pass = pass + 1 else fail = fail + 1 print("FAIL: " .. msg) end
 end
@@ -165,7 +182,7 @@ local function build(classic, opts)
         questTurnInSoundEnabled = false,
         questTurnInSound        = "EQ: Raid Warning",
     }
-    mods.DB    = { Tracker = function() return cfg end }
+    mods.DB    = strictDB({ Tracker = function() return cfg end })
     -- Data/QuestSound.lua takes this at file scope, so it has to exist before the chunk loads.
     -- Ready by default because every case in this file bar one section is an ordinary scan with
     -- no loading screen anywhere near it, which is the state they were all written in.

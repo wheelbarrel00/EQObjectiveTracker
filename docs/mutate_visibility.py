@@ -48,8 +48,8 @@ HOLD_IF = ("    if hoverOn() and (fade.over or (fade.leftAt and GetTime() - fade
 FADELINE_ARGS = '        :format(fadeLevel(), hoverOn() and "on" or "off", focusOn() and "on" or "off",'
 WQ_REPORT = ("        y = y + Row:Render(row, entry, width, cfg) + gap\n"
              "        noteFocus(entry, row)\n")
-SECTION_REPORT = ("                        y = y + Row:Render(row, entry, width, cfg) + gap\n"
-                  "                        noteFocus(entry, row)\n")
+SECTION_REPORT = ("                            y = y + Row:Render(row, entry, width - left, cfg) + gap\n"
+                  "                            noteFocus(entry, row)\n")
 REPORT = "        Visibility:SetFocus(focusRow, focusQuestID)\n"
 TAIL = ('    local Visibility = ns:GetModule("Visibility")\n'
         "    if Visibility then\n" + REPORT +
@@ -257,7 +257,7 @@ MUTANTS = [
 
     ("the section loop never reports its focused row", [
         (T, SECTION_REPORT,
-            "                        y = y + Row:Render(row, entry, width, cfg) + gap\n")]),
+            "                            y = y + Row:Render(row, entry, width - left, cfg) + gap\n")]),
 
     ("a later focused entry replaces the first", [
         (T, "    if entry.isFocused and not focusRow then", "    if entry.isFocused then")]),
@@ -522,12 +522,12 @@ MUTANTS = [
             "    if row and not inCombat() then")]),
 
     ("the section loop reports focus only for quests with an item", [
-        (T, "                        if entry.hasItem then ItemButtons:Want(entry.id, row) end\n"
-            "                        y = y + Row:Render(row, entry, width, cfg) + gap\n"
-            "                        noteFocus(entry, row)\n",
-            "                        if entry.hasItem then ItemButtons:Want(entry.id, row) end\n"
-            "                        y = y + Row:Render(row, entry, width, cfg) + gap\n"
-            "                        noteFocus(entry.hasItem and entry or {}, row)\n")]),
+        (T, "                            if entry.hasItem then ItemButtons:Want(entry.id, row) end\n"
+            "                            y = y + Row:Render(row, entry, width - left, cfg) + gap\n"
+            "                            noteFocus(entry, row)\n",
+            "                            if entry.hasItem then ItemButtons:Want(entry.id, row) end\n"
+            "                            y = y + Row:Render(row, entry, width - left, cfg) + gap\n"
+            "                            noteFocus(entry.hasItem and entry or {}, row)\n")]),
 
     ("the fade line is gated behind a capability that never exists", [
         (C, "    debugLine(\"Visibility\", nil, \"FadeLine\")\n",

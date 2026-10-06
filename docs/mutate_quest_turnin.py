@@ -49,13 +49,14 @@ RIGHT_BRANCH = ("    if button == \"RightButton\" then\n"
                 "        if ns.Has.QuestWatchAPI then C_QuestLog.RemoveQuestWatch(entry.id) end\n"
                 "        return\n"
                 "    end\n")
-ICON_NOTE = ("    -- The icon half of a split click super-tracks and nothing else, as"
-             " Blizzard's POI button does\n")
 TURNIN_CALL = "    if not splitIcon and turnIn(self, entry.id) then return end\n"
-CLICK_TURNIN = RIGHT_BRANCH + ICON_NOTE + TURNIN_CALL
 DISPATCH_CLICK = "    dispatch(row, \"OnEntryClick\", button, splitIcon)\n"
 OPENLOG_TURNIN = ("function Quests:OnEntryOpenLog(entry)\n"
                   "    if turnIn(self, entry.id) then return end\n")
+
+UNFOCUS_TEST = "        if again and clickUnfocuses() then\n"
+SPLIT_ICON = "    local splitIcon = button == \"LeftButton\" and splitClickWanted(row) and overIcon(row)\n"
+CURSOR = "    local mx = GetCursorPosition() / (row:GetEffectiveScale() or 1)\n"
 
 INDEX = ("    local index = C_QuestLog.GetLogIndexForQuestID"
          " and C_QuestLog.GetLogIndexForQuestID(id)\n")
@@ -185,19 +186,20 @@ MUTANTS = [
         (Q, SHOW + NOTIFY, SHOW)]),
 
     # ------------------------------------------------------------------ the click paths
+    # Anchored on code only, in two edits where a move is needed, so the note between the right
+    # button branch and the hand-in can be reworded without taking these to SKIPPED.
     ("the plain click never hands in, so the reported bug is back", [
-        (Q, CLICK_TURNIN, RIGHT_BRANCH)]),
+        (Q, TURNIN_CALL, "")]),
 
     ("the hand-in moves above the right-button branch, so a right click hands in", [
-        (Q, CLICK_TURNIN, ICON_NOTE + TURNIN_CALL + RIGHT_BRANCH)]),
+        (Q, TURNIN_CALL, ""),
+        (Q, RIGHT_BRANCH, TURNIN_CALL + RIGHT_BRANCH)]),
 
     ("the plain click hands in and then super-tracks as well", [
-        (Q, CLICK_TURNIN, RIGHT_BRANCH + ICON_NOTE
-            + "    if not splitIcon then turnIn(self, entry.id) end\n")]),
+        (Q, TURNIN_CALL, "    if not splitIcon then turnIn(self, entry.id) end\n")]),
 
     ("the plain click passes the entry where the id is expected", [
-        (Q, CLICK_TURNIN, RIGHT_BRANCH + ICON_NOTE
-            + "    if not splitIcon and turnIn(self, entry) then return end\n")]),
+        (Q, TURNIN_CALL, "    if not splitIcon and turnIn(self, entry) then return end\n")]),
 
     ("the split title click never hands in", [
         (Q, OPENLOG_TURNIN, "function Quests:OnEntryOpenLog(entry)\n")]),
@@ -308,8 +310,7 @@ MUTANTS = [
         (Q, "        if again then\n", "        if true then\n")]),
 
     ("the followed quest is read after the set, so every click looks like a repeat", [
-        (Q, "        local again = superTrackedID() == entry.id\n"
-            "        C_SuperTrack.SetSuperTrackedQuestID(entry.id)\n",
+        (Q, "        local again = superTrackedID() == entry.id\n",
             "        C_SuperTrack.SetSuperTrackedQuestID(entry.id)\n"
             "        local again = superTrackedID() == entry.id\n")]),
 
@@ -323,6 +324,130 @@ MUTANTS = [
     ("superTrackedID asks for a getter the client may not have", [
         (Q, "    if not (ns.Has.SuperTrack and C_SuperTrack.GetSuperTrackedQuestID) then return nil end\n",
             "    if not ns.Has.SuperTrack then return nil end\n")]),
+
+    # ------------------------------ Click a focused quest to unfocus it (2.2.0, retail and Forever)
+    ("the option is ignored, so a click on the followed quest only ever resends", [
+        (Q, "        if again and clickUnfocuses() then\n", "        if false then\n")]),
+
+    ("the option unfocuses on every click, followed or not", [
+        (Q, "        if again and clickUnfocuses() then\n", "        if clickUnfocuses() then\n")]),
+
+    ("the option unfocuses the followed quest whether it is on or not", [
+        (Q, "        if again and clickUnfocuses() then\n", "        if again then\n")]),
+
+    ("the unfocus sets the clicked quest again instead of clearing", [
+        (Q, "            C_SuperTrack.SetSuperTrackedQuestID(0)\n        else\n",
+            "            C_SuperTrack.SetSuperTrackedQuestID(entry.id)\n        else\n")]),
+
+    ("the unfocus also resends the quest it just dropped", [
+        (Q, "            C_SuperTrack.SetSuperTrackedQuestID(0)\n        else\n",
+            "            C_SuperTrack.SetSuperTrackedQuestID(0)\n"
+            "            ns:GetModule(\"Focus\"):Resend()\n        else\n")]),
+
+    ("the unfocus skips the repaint", [
+        (Q, "            C_SuperTrack.SetSuperTrackedQuestID(0)\n        else\n",
+            "            C_SuperTrack.SetSuperTrackedQuestID(0)\n            return\n        else\n")]),
+
+    ("the option is read off the wrong key", [
+        (Q, "    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    return (cfg and cfg.splitQuestClick) == true\n")]),
+
+    ("the option is read inverted, so it unfocuses while unset", [
+        (Q, "    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    return (cfg and cfg.clickToUnfocus) ~= true\n")]),
+
+    ("the option raises with no DB module", [
+        (Q, "    local cfg = DB and DB:Tracker()\n    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    local cfg = DB:Tracker()\n    return (cfg and cfg.clickToUnfocus) == true\n")]),
+
+    ("the option raises with no saved tracker settings", [
+        (Q, "    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    return cfg.clickToUnfocus == true\n")]),
+
+    # ------------------------------------------- found by the pre-release scan's hand-breaks
+    # A dot call hands DB:Tracker no self, a Lua error in game that a stub ignoring self passes.
+    ("the option calls DB.Tracker with a dot", [
+        (Q, "    local cfg = DB and DB:Tracker()\n    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    local cfg = DB and DB.Tracker()\n    return (cfg and cfg.clickToUnfocus) == true\n")]),
+
+    ("the split click test calls DB.Tracker with a dot", [
+        (R, "    local cfg = DB and DB:Tracker()\n    if not (cfg and cfg.splitQuestClick) then return false end\n",
+            "    local cfg = DB and DB.Tracker()\n    if not (cfg and cfg.splitQuestClick) then return false end\n")]),
+
+    ("the option also turns on with Split quest click", [
+        (Q, "    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    return (cfg and (cfg.clickToUnfocus or cfg.splitQuestClick)) == true\n")]),
+
+    ("the option also turns off when the accept option is off", [
+        (Q, "    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    return (cfg and cfg.clickToUnfocus and cfg.focusAcceptedQuests ~= false) == true\n")]),
+
+    ("a finished quest can never be unfocused", [
+        (Q, "        if again and clickUnfocuses() then\n",
+            "        if again and clickUnfocuses() and entry.state ~= STATE.COMPLETE then\n")]),
+
+    ("only an active quest can be unfocused", [
+        (Q, "        if again and clickUnfocuses() then\n",
+            "        if again and clickUnfocuses() and entry.state == STATE.ACTIVE then\n")]),
+
+    ("a stale entry still marked focused is cleared, dropping another quest's focus", [
+        (Q, "        local again = superTrackedID() == entry.id\n",
+            "        local again = entry.isFocused or superTrackedID() == entry.id\n")]),
+
+    ("the followed test trusts the entry alone", [
+        (Q, "        local again = superTrackedID() == entry.id\n",
+            "        local again = entry.isFocused\n")]),
+
+    ("the click focuses on Classic, where super-track reads false", [
+        (Q, "    if ns.Has.SuperTrack then\n        local again",
+            "    if ns.Has.SuperTrack ~= nil then\n        local again")]),
+
+    # ------------------------------------------ found by the 2.2.0 fix pass's second scan
+    ("a campaign quest is never unfocused by a click", [
+        (Q, UNFOCUS_TEST, "        if again and clickUnfocuses() and entry.groupID ~= \"campaign\" then\n")]),
+
+    ("an untracked quest shown with Show only tracked off is never unfocused", [
+        (Q, UNFOCUS_TEST, "        if again and clickUnfocuses() and entry.isTracked ~= false then\n")]),
+
+    ("a campaign-tagged quest is never unfocused", [
+        (Q, UNFOCUS_TEST, "        if again and clickUnfocuses() and not (entry.tags and entry.tags.campaign) then\n")]),
+
+    ("the quest click unfocuses only while Keep the focused quest solid is on", [
+        (Q, "    return (cfg and cfg.clickToUnfocus) == true\n",
+            "    return (cfg and cfg.clickToUnfocus and cfg.trackerAlphaFocus ~= false) == true\n")]),
+
+    ("the icon half is judged for any button, so a right click over the icon carries it", [
+        (R, SPLIT_ICON, "    local splitIcon = splitClickWanted(row) and overIcon(row)\n")]),
+
+    ("the icon hit-test ignores the row's effective scale", [
+        (R, CURSOR, "    local mx = GetCursorPosition()\n")]),
+
+    ("the icon hit-test multiplies by the scale instead of dividing", [
+        (R, CURSOR, "    local mx = GetCursorPosition() * (row:GetEffectiveScale() or 1)\n")]),
+
+    ("the icon hit-test ignores whether the icon is shown, so an iconless row's left side is the icon", [
+        (R, "    if not (ih and ih:IsShown()) then return false end\n", "    if not ih then return false end\n")]),
+
+    ("the icon hit-test drops its nil-edge guard, raising on a row not laid out", [
+        (R, "    if not iconRight then return false end\n", "")]),
+
+    ("the icon's right edge itself counts as the title", [
+        (R, "    return mx <= iconRight\n", "    return mx < iconRight\n")]),
+
+    ("the icon reaches a pixel past its right edge", [
+        (R, "    return mx <= iconRight\n", "    return mx <= iconRight + 1\n")]),
+
+    ("the icon hit-test divides by the scale twice", [
+        (R, CURSOR, "    local mx = GetCursorPosition() / (row:GetEffectiveScale() or 1) / (row:GetEffectiveScale() or 1)\n")]),
+
+    ("split click is offered to any provider with a click, not only those that open a log", [
+        (R, "    return (provider and provider.OnEntryOpenLog) and true or false\n",
+            "    return (provider and provider.OnEntryClick) and true or false\n")]),
+
+    # A correct rewrite the fixture once refused. Caught here is a fixture rejecting good code.
+    ("EQUIVALENT: the quest click caches the DB module once at file load, as the game has one", [
+        (Q, "local function clickUnfocuses()\n    local DB  = ns:GetModule(\"DB\")\n",
+            "local DBM = ns:GetModule(\"DB\")\nlocal function clickUnfocuses()\n    local DB  = DBM\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_quest_turnin: (\d+) passed, (\d+) failed$")

@@ -12,8 +12,8 @@
 -- wrong key, or a master whose setter forgot to re-run the sweep, was visible only in game. The
 -- sweep is checked against the rules written out independently below, across a fixed run of
 -- generated profiles that toggles every key it reads. Beside it: the card order the author set on
--- 2026-10-03, every card's rows as the author approved them, and the cap
--- that keeps the sweep away from Lua 5.1's 60-upvalue ceiling.
+-- 2026-10-03, every card's rows as the author approved them, the zone headers card's keys, slider
+-- ranges and steps, and the cap that keeps the sweep away from Lua 5.1's 60-upvalue ceiling.
 --
 -- OUT OF SCOPE BY CONSTRUCTION: how any of it looks. The stub draws nothing, so row heights,
 -- the label column and the swatch's place at the row's end are the library's tests' business.
@@ -25,6 +25,23 @@ local function repoFile(rel)
 end
 
 local pass, fail = 0, 0
+-- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
+-- stand-in raises the same way, rather than answering a call the client would refuse.
+local function strictDB(methods)
+    local db = {}
+    for name, v in pairs(methods) do
+        if type(v) == "function" then
+            db[name] = function(self, ...)
+                if self ~= db then error("DB:" .. name .. " called without self", 2) end
+                return v(self, ...)
+            end
+        else
+            db[name] = v
+        end
+    end
+    return db
+end
+
 local function ok(cond, msg)
     if cond then pass = pass + 1 else fail = fail + 1 print("FAIL: " .. msg) end
 end
@@ -74,8 +91,8 @@ local function appearanceTab(bonus, marked)
     end
     local spec
     modules.Options = { RegisterTab = function(_, s) spec = s end }
-    modules.DB = { Tracker = function() return cfg end,
-                   ResetTrackerAppearance = function() calls.log[#calls.log + 1] = "reset" end }
+    modules.DB = strictDB({ Tracker = function() return cfg end,
+                   ResetTrackerAppearance = function() calls.log[#calls.log + 1] = "reset" end })
     modules.Tracker = { Render = function() calls.render = calls.render + 1 end,
                         ApplyScale = function() calls.applyScale = calls.applyScale + 1 end }
     modules.Row = { Invalidate = function() calls.invalidate = calls.invalidate + 1 end }
@@ -192,9 +209,10 @@ end
 
 -- The author's order of 2026-10-03: the big tickets first, the self-contained features last.
 -- It replaced the one card per old heading that section 8 of the design spec set for phase 1.
+-- Zone Headers sits between Section Headers and Spacing, where the author placed it for 2.2.0.
 local CARD_ORDER = {
-    "Text", "Quest Colors", "Tracker", "Section Headers", "Spacing", "Quest Rows", "Progress Bars",
-    "Scroll Bar", "Scenario", "Scenario Bonus Objectives", "Zone Progress Bar",
+    "Text", "Quest Colors", "Tracker", "Section Headers", "Zone Headers", "Spacing", "Quest Rows",
+    "Progress Bars", "Scroll Bar", "Scenario", "Scenario Bonus Objectives", "Zone Progress Bar",
 }
 
 -- { label, kind, dependent, the picker at the row's end }
@@ -223,6 +241,14 @@ local ROWS = {
         { "Divider Line Color", "picker" },
         { "Show header bars", "checkbox", false, "Bar Color" }, { "Bar Style", "radio" },
         { "Bar Height", "slider" }, { "Soft edges", "checkbox" }, { "Edge Softness", "slider", true },
+    },
+    ["Zone Headers"] = {
+        { "Show zone headers", "checkbox" }, { "Zone Order", "radio" },
+        { "Zone Header Size Offset", "slider" }, { "Use class color for zone headers", "checkbox" },
+        { "Zone Header Color", "picker", true },
+        { "Show zone header bars", "checkbox", false, "Bar Color" },
+        { "Show zone header divider", "checkbox", false, "Divider Line Color" },
+        { "Quest Indent", "slider" },
     },
     ["Spacing"] = {
         { "Block Spacing", "slider" }, { "Line Spacing", "slider" }, { "Header Spacing", "slider" },
@@ -308,6 +334,15 @@ local SWEEP = {
     ["Section Headers/Bar Height"]    = function(c) return c.headerBar end,
     ["Section Headers/Soft edges"]    = function(c) return c.headerBar end,
     ["Section Headers/Edge Softness"] = function(c) return c.headerBar and c.headerBarSoftEdges end,
+    ["Zone Headers/Zone Order"]       = function(c) return c.zoneHeaders end,
+    ["Zone Headers/Zone Header Size Offset"]          = function(c) return c.zoneHeaders end,
+    ["Zone Headers/Use class color for zone headers"] = function(c) return c.zoneHeaders end,
+    ["Zone Headers/Zone Header Color"] = function(c) return c.zoneHeaders and not c.zoneHeaderColorUseClass end,
+    ["Zone Headers/Show zone header bars"]    = function(c) return c.zoneHeaders end,
+    ["Zone Headers/Bar Color"]                = function(c) return c.zoneHeaders and c.zoneHeaderBar end,
+    ["Zone Headers/Show zone header divider"] = function(c) return c.zoneHeaders end,
+    ["Zone Headers/Divider Line Color"]       = function(c) return c.zoneHeaders and c.zoneHeaderDivider end,
+    ["Zone Headers/Quest Indent"]             = function(c) return c.zoneHeaders end,
     ["Quest Colors/Custom Title Color"] = function(c) return titleMode(c) == "custom" end,
     ["Quest Colors/Use title color for completed quests"] = function(c)
         local m = titleMode(c)
@@ -371,6 +406,7 @@ local DOMAIN = {
     blockLayout = { ABSENT, "classic", "card" }, cardTintByType = SWITCH,
     showZoneProgressBar = SWITCH, zoneProgressLocation = { ABSENT, "floating", "tracker" },
     showProgressBars = SWITCH, showQuestProgressBars = SWITCH, showScenarioProgressBars = SWITCH,
+    zoneHeaders = SWITCH, zoneHeaderColorUseClass = SWITCH, zoneHeaderBar = SWITCH, zoneHeaderDivider = SWITCH,
 }
 
 -- A fixed generator rather than math.random, so a failing profile is the same on every run.
@@ -495,6 +531,70 @@ do
     ok(good, "the segmented pickers raised: " .. tostring(err))
 end
 
+print("== the zone headers switch and the zone order")
+do
+    local good, err = pcall(function()
+        local t = appearanceTab(true)
+        local box   = t.byKey["Zone Headers/Show zone headers"]
+        local order = t.byKey["Zone Headers/Zone Order"]
+        ok(box and not box.getter(), "the switch reads off while unset")
+        box.setter(true)
+        ok(t.cfg.zoneHeaders == true and box.getter() == true, "and stores and reads back on")
+        box.setter(false)
+        ok(t.cfg.zoneHeaders == false and not box.getter(), "and off again")
+
+        local out, tips = {}, 0
+        for _, o in ipairs(order and order.options or {}) do
+            out[#out + 1] = tostring(o.value) .. "=" .. o.label
+            if type(o.tip) == "string" and o.tip ~= "" then tips = tips + 1 end
+        end
+        ok(table.concat(out, ",") == "current=Current zone first,alpha=Alphabetical",
+           "Zone Order offers Current zone first, then Alphabetical: " .. table.concat(out, ","))
+        ok(tips == 2, "each choice carries its own tip: " .. tips)
+        ok(order and order.tipTitle == "Zone Order", "and titles its tooltip with its own label")
+        ok(order.getter() == "current", "unset, it reads Current zone first")
+        t.cfg.zoneHeaderOrder = "bogus"
+        ok(order.getter() == "current", "and so does a value it does not know")
+        order.setter("alpha")
+        ok(t.cfg.zoneHeaderOrder == "alpha" and order.getter() == "alpha", "a pick stores the value")
+
+        -- Each look control reads and writes its own key, never the section headers' twin.
+        local function ctl(label) return t.byKey["Zone Headers/" .. label] end
+        local size, indent = ctl("Zone Header Size Offset"), ctl("Quest Indent")
+        ok(size.getter() == 2 and size.min == -8 and size.max == 12, "the size offset reads 2 unset, from -8 to 12")
+        ok(size.step == 0.5, "in half steps, as the section headers' offset: " .. tostring(size.step))
+        size.setter(5)
+        ok(t.cfg.zoneHeaderSizeDelta == 5 and size.getter() == 5 and t.cfg.headerSizeDelta == nil,
+           "and stores its own key")
+        ok(indent.getter() == 8 and indent.min == 0 and indent.max == 30, "the indent reads 8 unset, from 0 to 30")
+        ok(indent.step == 1, "in whole pixels: " .. tostring(indent.step))
+        indent.setter(14)
+        ok(t.cfg.zoneHeaderIndent == 14 and indent.getter() == 14, "and stores its own key")
+        local switches = { { "Use class color for zone headers", "zoneHeaderColorUseClass" },
+                           { "Show zone header bars", "zoneHeaderBar" },
+                           { "Show zone header divider", "zoneHeaderDivider" } }
+        for _, s in ipairs(switches) do
+            local c = ctl(s[1])
+            ok(not c.getter(), s[1] .. " reads off while unset")
+            c.setter(true)
+            ok(t.cfg[s[2]] == true and c.getter() == true, s[1] .. " stores " .. s[2])
+        end
+        ok(t.cfg.headerColorUseClass == nil and t.cfg.headerBar == nil, "and the section headers' switches are untouched")
+        local pickers = { { "Zone Header Color", "zoneHeaderColor", false },
+                          { "Bar Color", "zoneHeaderBarColor", true },
+                          { "Divider Line Color", "zoneHeaderDividerColor", true } }
+        for _, p in ipairs(pickers) do
+            local c, v = ctl(p[1]), { r = 0.3, g = 0.4, b = 0.5, a = 0.6 }
+            c.setter(v)
+            ok(t.cfg[p[2]] == v and c.getter() == v, p[1] .. " stores " .. p[2])
+            ok((c.hasAlpha and true or false) == p[3], p[1] .. (p[3] and " takes" or " takes no") .. " alpha")
+        end
+        ok(t.cfg.headerBarColor == nil and t.cfg.headerDividerColor == nil and t.cfg.headerColor == nil,
+           "and the section headers' colors are untouched")
+    end)
+    ok(good, "the zone headers card raised: " .. tostring(err))
+end
+
 print("== the sweep dims exactly what each rule says, across generated profiles")
 do
     local good, err = pcall(function()
@@ -564,7 +664,9 @@ do
             "Text/Text Shadow", "Scenario/Text Shadow", "Scroll Bar/Hide scroll bar",
             "Scroll Bar/Scroll Bar Background", "Scroll Bar/Solid color thumb", "Tracker/Background",
             "Tracker/Border", "Section Headers/Show header bars", "Section Headers/Soft edges",
-            "Section Headers/Use class color for headers",
+            "Section Headers/Use class color for headers", "Zone Headers/Show zone headers",
+            "Zone Headers/Use class color for zone headers", "Zone Headers/Show zone header bars",
+            "Zone Headers/Show zone header divider",
             "Quest Rows/Tint cards by quest type", "Zone Progress Bar/Show zone progress bar",
             "Zone Progress Bar/Float as a movable bar", "Zone Progress Bar/Background",
             "Zone Progress Bar/Border", "Progress Bars/Show progress bars", "Progress Bars/Quest Rows",
@@ -807,6 +909,12 @@ local PATH = {
     ["Quest Colors/Finished Objective Color"] = R,
     ["Section Headers/Use class color for headers"] = LAY,
     ["Section Headers/Section Header Color"] = LAY, ["Section Headers/Divider Line Color"] = LAY,
+    -- Invalidates the rows, as the Tracker tab's zone label box does.
+    ["Zone Headers/Show zone headers"] = R, ["Zone Headers/Zone Order"] = LAY,
+    ["Zone Headers/Zone Header Size Offset"] = LAY, ["Zone Headers/Use class color for zone headers"] = LAY,
+    ["Zone Headers/Zone Header Color"] = LAY, ["Zone Headers/Show zone header bars"] = LAY,
+    ["Zone Headers/Bar Color"] = LAY, ["Zone Headers/Show zone header divider"] = LAY,
+    ["Zone Headers/Divider Line Color"] = LAY, ["Zone Headers/Quest Indent"] = LAY,
     ["Spacing/Block Spacing"] = LAY, ["Spacing/Line Spacing"] = R,
     ["Spacing/Header Spacing"] = R,
     ["Quest Rows/Row Layout"] = R, ["Quest Rows/Background Color"] = R, ["Quest Rows/Border Color"] = R,

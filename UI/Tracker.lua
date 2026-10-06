@@ -194,13 +194,11 @@ function Tracker:SetScrollInputSuspended(suspended)
     suspendBarInput(f.eventsScroll, suspended)
 end
 
--- Expanding a section near the bottom of a long list puts its rows below the viewport, so the
--- header flips to "-" and nothing else appears to happen. Scrolls only when the body is short
--- of room, and never past the end.
-function Tracker:ScrollSectionIntoView(groupID)
-    local f = self.frame
-    local top = f and f._sectionTop and f._sectionTop[groupID]
-    local sf  = f and f.scroll
+-- Expanding a section or zone near the bottom of a long list puts its rows below the viewport, so the
+-- header flips to "-" and nothing else appears to happen. Scrolls only when the header is above
+-- the view or its body is short of room, and never past the end.
+local function scrollIntoView(f, top)
+    local sf = f and f.scroll
     if not (top and sf) or secureLocked() then return end
 
     local viewH = sf:GetHeight() or 0
@@ -211,6 +209,16 @@ function Tracker:ScrollSectionIntoView(groupID)
     if top < cur or (top + need) > (cur + viewH) then
         if want ~= cur then sf:SetVerticalScroll(want) end
     end
+end
+
+function Tracker:ScrollSectionIntoView(groupID)
+    local f = self.frame
+    scrollIntoView(f, f and f._sectionTop and f._sectionTop[groupID])
+end
+
+function Tracker:ScrollZoneIntoView(zoneKey)
+    local f = self.frame
+    scrollIntoView(f, f and f._zoneTop and f._zoneTop[zoneKey])
 end
 
 -- True whenever the tracker is alpha-hidden but still on screen. Every mouse handler in the
@@ -444,6 +452,7 @@ function Tracker:BuildFrame()
     stickyBand:SetHeight(1)
     if stickyBand.SetClipsChildren then stickyBand:SetClipsChildren(true) end
     stickyBand.heads = {}
+    stickyBand.zoneHeads = {}
     f.stickyBand = stickyBand
 
     -- scroll and eventsRegion are anchored by ApplyWorldQuestsPosition per the Top/Bottom
@@ -1025,8 +1034,88 @@ local function placeHead(h, band, dy)
     h:Show()
 end
 
--- Runs on every scroll step, so it only copies strings and moves two frames. Styling them is
--- Render's job, apart from a header made here mid-scroll.
+-- stickyState for one section's zones in the band's second row. first and last bound that
+-- section's zones in the band's zone arrays, and nil means the row has nothing to show yet.
+local function zoneState(tops, first, last, offset, rowH)
+    if not (first and last) or first > last then return nil, 0 end
+    local cur
+    for i = first, last do
+        if tops[i] + rowH <= offset then cur = i else break end
+    end
+    if not cur then return nil, 0 end
+    local push = 0
+    if cur < last and offset > tops[cur + 1] then push = offset - tops[cur + 1] end
+    return cur, push
+end
+
+-- Slots 1 and 2 hang in the zone row, slot 3 in the band itself. nil when that zone drew no header,
+-- and the caller hides the slot.
+local function stickyZoneHead(band, slot, parent, zoneKey)
+    local ZoneHeaders = ns:GetModule("ZoneHeaders")
+    local h = band.zoneHeads[slot]
+    if not h then
+        h = ZoneHeaders:NewHeader(parent)
+        band.zoneHeads[slot] = h
+    end
+    if not ZoneHeaders:Mirror(h, zoneKey) then return nil end
+    -- Once per render, after the text is in, since the height is read off it. A copy hidden
+    -- through a look change would otherwise come back in the old look.
+    if h._gen ~= ZoneHeaders.gen then
+        ZoneHeaders:ApplyStyle(h, ns:GetModule("DB"):Tracker())
+        h._gen = ZoneHeaders.gen
+    end
+    return h
+end
+
+local function hideZoneHeads(band)
+    for _, h in pairs(band.zoneHeads or {}) do h:Hide() end
+    if band.zoneRow then band.zoneRow:Hide() end
+end
+
+-- The band's second row, under the section header, while any zone header is drawn. The row clips
+-- itself, so a zone the next one pushes up never draws over the section header above it.
+function Tracker:_UpdateStickyZones(band, cur, push, offset, clip)
+    local f = self.frame
+    if not f._stickyZoned then
+        hideZoneHeads(band)
+        self._stickyZone = nil
+        return
+    end
+    local row1, row2, bandH = f._stickyRow1 or 0, f._stickyRow2 or 0, f._stickyH or 0
+    local row = band.zoneRow
+    if not row then
+        row = CreateFrame("Frame", nil, band)
+        if row.SetClipsChildren then row:SetClipsChildren(true) end
+        band.zoneRow = row
+    end
+    -- Moves with the section header, so a section's push carries its zone up with it.
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT",  band, "TOPLEFT",  0, push - row1)
+    row:SetPoint("TOPRIGHT", band, "TOPRIGHT", 0, push - row1)
+    row:SetHeight(row2)
+    row:Show()
+
+    local keys, tops = f._stickyZKeys, f._stickyZTops
+    local zcur, zpush = zoneState(tops, f._stickyZFirst[cur], f._stickyZLast[cur], offset, row2)
+    if not (clip and row.SetClipsChildren) then zpush = 0 end
+    self._stickyZone = zcur and keys[zcur] or nil
+    local a = zcur and stickyZoneHead(band, 1, row, keys[zcur])
+    if a then placeHead(a, row, zpush) elseif band.zoneHeads[1] then band.zoneHeads[1]:Hide() end
+    local b = zpush > 0 and stickyZoneHead(band, 2, row, keys[zcur + 1])
+    if b then placeHead(b, row, zpush - row2) elseif band.zoneHeads[2] then band.zoneHeads[2]:Hide() end
+
+    -- The next section's first zone comes up under its header, where the list has it.
+    local nf = push > 0 and f._stickyZFirst[cur + 1]
+    local c = nf and nf <= (f._stickyZLast[cur + 1] or 0) and stickyZoneHead(band, 3, band, keys[nf])
+    if c then
+        placeHead(c, band, offset - tops[nf] - bandH)
+    elseif band.zoneHeads[3] then
+        band.zoneHeads[3]:Hide()
+    end
+end
+
+-- Runs on every scroll step, so it mostly copies strings and moves frames. Render styles the
+-- section copies. This styles one made mid-scroll, and each zone copy once per render.
 function Tracker:_UpdateSticky()
     local f    = self.frame
     local band = f and f.stickyBand
@@ -1034,11 +1123,13 @@ function Tracker:_UpdateSticky()
     local heads, n = band.heads, f._stickyN or 0
     if not f._stickyAnchored or n == 0 then
         for i = 1, #heads do heads[i]:Hide() end
+        hideZoneHeads(band)
         return
     end
 
     local bandH = f._stickyH or 0
-    local cur, push = stickyState(f._stickyTops, n, f.scroll:GetVerticalScroll() or 0, bandH)
+    local offset = f.scroll:GetVerticalScroll() or 0
+    local cur, push = stickyState(f._stickyTops, n, offset, bandH)
     -- Without clipping a pushed header would draw over whatever sits above the band, so it
     -- is handed over in place instead.
     if not band.SetClipsChildren then push = 0 end
@@ -1050,15 +1141,17 @@ function Tracker:_UpdateSticky()
     elseif heads[2] then
         heads[2]:Hide()
     end
+    self:_UpdateStickyZones(band, cur, push, offset, band.SetClipsChildren ~= nil)
 end
 
 function Tracker:StickyLine()
     local f = self.frame
     local band = f and f.stickyBand
     if not (band and f._stickyAnchored) then return "sticky headers: off" end
-    return ("sticky headers: on, band %.0fpx, %d section(s), showing %s, pushed %.0f, clip %s")
+    return ("sticky headers: on, band %.0fpx, %d section(s), showing %s, pushed %.0f, clip %s, zone %s")
         :format(band:GetHeight() or 0, f._stickyN or 0, tostring(self._stickyShown),
-                self._stickyPush or 0, band.SetClipsChildren and "yes" or "no")
+                self._stickyPush or 0, band.SetClipsChildren and "yes" or "no",
+                f._stickyZoned and tostring(self._stickyZone) or "row off")
 end
 
 function Tracker:_RenderScenario(group, cfg)
@@ -1209,6 +1302,7 @@ function Tracker:Render()
     local Row      = ns:GetModule("Row")
     local RowPool  = ns:GetModule("RowPool")
     local Sections = ns:GetModule("Sections")
+    local ZoneHeaders = ns:GetModule("ZoneHeaders")
     local ItemButtons = ns:GetModule("ItemButtons")
     local PopupBoxes  = ns:GetModule("AutoQuestPopup")
     local Popups      = ns:GetModule("AutoQuestPopups")
@@ -1235,6 +1329,7 @@ function Tracker:Render()
     _dragCount = 0
     PopupBoxes:ReleaseAll()
     Sections:HideAll()
+    ZoneHeaders:Begin()
 
     -- Before Feed:Build, because Filter reads the popup suppression set to keep a quest
     -- that is drawn as a popup box out of the section run as well.
@@ -1273,6 +1368,10 @@ function Tracker:Render()
     local tops = f._sectionTop
     if not tops then tops = {}; f._sectionTop = tops end
     wipe(tops)
+    local zoneTops = f._zoneTop
+    if not zoneTops then zoneTops = {}; f._zoneTop = zoneTops end
+    wipe(zoneTops)
+    local indent = ZoneHeaders:Indent(cfg)
 
     -- The first section's header lives in the band, so the list starts with its body.
     local sticky = f._stickyAnchored and f.stickyBand
@@ -1282,6 +1381,15 @@ function Tracker:Render()
         f._stickyIDs, f._stickyTops = stickyIDs, stickyTops
     end
     local stickyN = 0
+    -- Each drawn zone's top for the band's second row, and the run of them each section owns.
+    local zKeys, zTops, zFirst, zLast = f._stickyZKeys, f._stickyZTops, f._stickyZFirst, f._stickyZLast
+    if not zKeys then
+        zKeys, zTops, zFirst, zLast = {}, {}, {}, {}
+        f._stickyZKeys, f._stickyZTops, f._stickyZFirst, f._stickyZLast = zKeys, zTops, zFirst, zLast
+    end
+    wipe(zFirst)
+    wipe(zLast)
+    local stickyZ = 0
 
     for _, groupID in ipairs(Sections:Order()) do
         if Sections:IsVirtual(groupID) then
@@ -1318,23 +1426,52 @@ function Tracker:Render()
                     if popupCount > 0 then
                         y = y + PopupBoxes:Render(content, width, y, groupID)
                     end
-                    for i = 1, group.visibleCount do
-                        local entry = group.entries[i]
-                        if noteExpiry(entry) then hasTimed = true end
-                        local row = RowPool:Acquire(content, entry.providerID, entry.id, _buildRow)
-                        row:SetWidth(width)
-                        row:ClearAllPoints()
-                        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
-                        if entry.hasItem then ItemButtons:Want(entry.id, row) end
-                        y = y + Row:Render(row, entry, width, cfg) + gap
-                        noteFocus(entry, row)
-                        -- After Render, which is what stamps row._entry - DragDrop reads it
-                        -- back off the row to scope a drag to its own section.
-                        if entry.providerID == dragProvider then
-                            _dragCount = _dragCount + 1
-                            _dragRows[_dragCount] = row
+                    if sticky then zFirst[stickyN] = stickyZ + 1 end
+                    -- One pass over the whole section when it has no zone runs.
+                    local runs = (group.zoneCount or 0) > 0 and group.zoneRuns or nil
+                    for r = 1, (runs and group.zoneCount or 1) do
+                        local first, last, left = 1, group.visibleCount, 0
+                        local run = runs and runs[r]
+                        if run then first, last = run.first, run.last end
+                        if run and run.zone ~= "" then
+                            local zoneKey = ZoneHeaders:Key(groupID, run.zone)
+                            zoneTops[zoneKey] = y
+                            local zoneH, zoneCollapsed, zoneHead = ZoneHeaders:Place(content, groupID, run, y, cfg)
+                            if sticky then
+                                stickyZ = stickyZ + 1
+                                zKeys[stickyZ] = zoneKey
+                            end
+                            -- At the top of the list it joins the first section's header in the
+                            -- band. The first zone only, since a collapsed one leaves the next at 0 too.
+                            if sticky and y == 0 and stickyZ == zFirst[stickyN] then
+                                zoneHead:Hide()
+                                zTops[stickyZ] = -(zoneH + gap)
+                            else
+                                if sticky then zTops[stickyZ] = y end
+                                y = y + zoneH + gap
+                            end
+                            left = indent
+                            if zoneCollapsed then last = first - 1 end
+                        end
+                        for i = first, last do
+                            local entry = group.entries[i]
+                            if noteExpiry(entry) then hasTimed = true end
+                            local row = RowPool:Acquire(content, entry.providerID, entry.id, _buildRow)
+                            row:SetWidth(width - left)
+                            row:ClearAllPoints()
+                            row:SetPoint("TOPLEFT", content, "TOPLEFT", left, -y)
+                            if entry.hasItem then ItemButtons:Want(entry.id, row) end
+                            y = y + Row:Render(row, entry, width - left, cfg) + gap
+                            noteFocus(entry, row)
+                            -- After Render, which is what stamps row._entry - DragDrop reads it
+                            -- back off the row to scope a drag to its own section and zone.
+                            if entry.providerID == dragProvider then
+                                _dragCount = _dragCount + 1
+                                _dragRows[_dragCount] = row
+                            end
                         end
                     end
+                    if sticky then zLast[stickyN] = stickyZ end
                 end
             end
         end
@@ -1343,17 +1480,22 @@ function Tracker:Render()
     -- collectScope walks the whole array, so a row left over from a longer previous pass
     -- would put a retired frame in the drop-index scan.
     for i = _dragCount + 1, #_dragRows do _dragRows[i] = nil end
+    ZoneHeaders:Sweep()
 
     local questContentH = y
     if not locked then content:SetHeight(math.max(1, questContentH)) end
 
     -- A header and the gap under it, which is what the list gave up for the first one. One
     -- pixel with nothing to show, since the band stays in the chain while the option is on.
+    -- A zone row joins it whenever a zone header is drawn, for the whole pass, so the band
+    -- never changes height while the list scrolls.
     local bandH = 0
     f._stickyN = sticky and stickyN or 0
     if sticky then
-        bandH = (stickyN > 0) and (Sections:Height() + gap) or 1
-        f._stickyH = bandH
+        local row1 = Sections:Height() + gap
+        local row2 = (stickyZ > 0) and (ZoneHeaders:Height() + gap) or 0
+        bandH = (stickyN > 0) and (row1 + row2) or 1
+        f._stickyH, f._stickyRow1, f._stickyRow2, f._stickyZoned = bandH, row1, row2, stickyZ > 0
         if math.abs((sticky:GetHeight() or 0) - bandH) > 0.5 then
             setRegionHeight(sticky, bandH)
         end

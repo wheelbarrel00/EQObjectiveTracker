@@ -9,6 +9,26 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.2.0", date = "2026-10-05",
+        sections = {
+            { head = "New Features", items = {
+                "Zone headers, on a new Zone Headers card on the Appearance tab. Show zone headers groups the quests in the Quests and Campaign sections under the quest log heading each one sits under, which is its zone for most quests. Each zone gets a header with a count, the way a section does, and collapses on its own, and expanding one scrolls it into view. Off by default. On retail the quest log heads campaign quests with the campaign's name, so the Campaign section shows a header for each campaign rather than one for each zone. On Classic Era and TBC Anniversary it groups the Quests section.",
+                "Zone Order, just under it, puts the zones with a quest on the map you are in first and the rest in the order your quest log lists them, or lists every zone in alphabetical order. Quests inside a zone still follow Sort Order, and with the manual sort order a quest is dragged within its own zone.",
+                "The zone headers have a look of their own on the same card: a size added on top of the Font Size, a color or your class color, an optional bar and divider line with colors of their own, and how far the quests under each header are moved in. The preview beside the settings shows two sample zones while zone headers are on. Reset to Defaults puts the look back without turning zone headers off or changing Zone Order.",
+                "With Keep section headers in view while scrolling on, the header of the zone you are scrolled into stays in view too, just under its section's header.",
+                "Two new options on the Tracker tab, on retail and WoW Forever. Click a focused quest to unfocus it, off by default, makes a click on the quest you are following unfocus it, or a click on its icon while Split quest click is on. Focus newly accepted quests, on by default because that is what the game does, can be turned off so a quest you accept while nothing is focused is left unfocused, which on WoW Forever also keeps the Everything Quests TomTom arrow from jumping to it. Like Keep focused quest after relog, it waits while Use Blizzard's quest tracker is on. Requested by jackfbrownii.",
+            } },
+            { head = "Improvements", items = {
+                "The zone label under quest titles is not shown while zone headers are on, since the header above already names the zone. The setting keeps its value, and its box on the Tracker tab is dimmed while zone headers are on, with a tooltip saying why.",
+                "/eqot status reports the zone headers, with their order, how many are collapsed and which zones count as the one you are in, and the two focus options, with how many times the game asked to focus a new quest while nothing was focused and how many of those focuses were taken back.",
+                "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover every new option in this release, including zone headers and the two focus options.",
+            } },
+            { head = "Bug Fixes", items = {
+                "A color swatch at the end of a checkbox row on the Appearance tab, such as Bar Color beside Show header bars, no longer has its name run under the swatch.",
+            } },
+        },
+    },
+    {
         version = "2.1.0", date = "2026-10-03",
         sections = {
             { head = "New Features", items = {

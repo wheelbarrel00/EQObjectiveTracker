@@ -34,6 +34,39 @@ A = "Options/TabAppearance.lua"
 U = "Core/Util.lua"
 
 MUTANTS = [
+    # --------------------------------------------------------------------------- the zone headers card
+    ("the zone header size slider writes the indent", [
+        (A, '            function(v) relayout("zoneHeaderSizeDelta", v) end,',
+            '            function(v) relayout("zoneHeaderIndent", v) end,')]),
+    ("the zone header size slider runs past 12", [
+        (A, 'L["Zone Header Size Offset"], -8, 12, 0.5,', 'L["Zone Header Size Offset"], -8, 24, 0.5,')]),
+    ("the zone header size slider moves in whole steps", [
+        (A, 'L["Zone Header Size Offset"], -8, 12, 0.5,', 'L["Zone Header Size Offset"], -8, 12, 1,')]),
+    ("the indent slider moves in half pixels", [
+        (A, 'L["Quest Indent"], 0, 30, 1,', 'L["Quest Indent"], 0, 30, 0.5,')]),
+    ("the indent reads 0 while unset", [
+        (A, "            function() return DB().zoneHeaderIndent or 8 end,", "            function() return DB().zoneHeaderIndent or 0 end,")]),
+    ("the zone class color switch does not re-run the sweep", [
+        (A, '            function(v) relayout("zoneHeaderColorUseClass", v); syncDependents() end,',
+            '            function(v) relayout("zoneHeaderColorUseClass", v) end,')]),
+    ("the zone divider switch does not re-run the sweep", [
+        (A, '            function(v) relayout("zoneHeaderDivider", v); syncDependents() end,',
+            '            function(v) relayout("zoneHeaderDivider", v) end,')]),
+    ("the zone bar color writes the section headers' bar color", [
+        (A, '            function(v) relayout("zoneHeaderBarColor", v) end,', '            function(v) relayout("headerBarColor", v) end,')]),
+    ("the zone divider color takes no alpha", [
+        (A, 'L["Color of the thin line under each zone header."], true)', 'L["Color of the thin line under each zone header."])')]),
+    ("the zone header color is not indented under the class color switch", [
+        (A, "        zoneHeads:Add(w.zoneColor, DEPENDENT)\n", "        zoneHeads:Add(w.zoneColor)\n")]),
+    ("the zone header color stays lit under the class color", [
+        (A, "            dim(w.zoneColor,      zh and not cfg.zoneHeaderColorUseClass)\n", "            dim(w.zoneColor,      zh)\n")]),
+    ("the zone bar color stays lit with its bar off", [
+        (A, "            dim(w.zoneBarPicker,  zh and cfg.zoneHeaderBar)\n", "            dim(w.zoneBarPicker,  zh)\n")]),
+    ("the zone divider color stays lit with its divider off", [
+        (A, "            dim(w.zoneLinePicker, zh and cfg.zoneHeaderDivider)\n", "            dim(w.zoneLinePicker, zh)\n")]),
+    ("the indent stays lit with zone headers off", [
+        (A, "            dim(w.zoneIndent,     zh)\n", "")]),
+
     # --------------------------------------------------------------------------- the cards
     ("a card is built but never anchored, so it draws at the top of the tab", [
         (A, '        local tracker = stack(self:CreateGroup(content, L["Tracker"]))',

@@ -309,8 +309,12 @@ MUTANTS = [
                                            "WINDOW_ONLY[name]"))]),
 
     ("/eqot status prints the item buttons' line, which reads as a fault with no window", [
-        (C, "local WINDOW_ONLY = { Tracker = true, ItemButtons = true }\n",
-            "local WINDOW_ONLY = { Tracker = true }\n")]),
+        (C, "local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true }\n",
+            "local WINDOW_ONLY = { Tracker = true, ZoneGroups = true }\n")]),
+
+    ("/eqot status prints the zone headers' line, which reads as nothing grouped with no feed", [
+        (C, "local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true }\n",
+            "local WINDOW_ONLY = { Tracker = true, ItemButtons = true }\n")]),
 
     ("/eqot status never says whether Blizzard's frame is shown", [
         (C, "        ns.stoodDown or 0, frameState))\n", "        ns.stoodDown or 0, \"\"))\n")]),
@@ -490,6 +494,45 @@ MUTANTS = [
     ("the clear-up skips its index guard", [
         (QC, '    if type(GetNumQuestWatches) ~= "function" or type(GetQuestIndexForWatch) ~= "function"\n',
              '    if type(GetNumQuestWatches) ~= "function"\n')]),
+
+    # ------------------------------------------------------------------ DB accessors called with a dot
+    # Each raises in game, and no harness drives these three lines with a DB that reads self.
+    ("Render reads the profile with a dot call", [
+        (TR, "    local cfg      = DB:Tracker()\n", "    local cfg      = DB.Tracker()\n")]),
+
+    ("resetting the position reads the profile with a dot call", [
+        (TR, "    local cfg = DB:Tracker()\n    local d   = DB.defaults.profile.tracker\n",
+             "    local cfg = DB.Tracker()\n    local d   = DB.defaults.profile.tracker\n")]),
+
+    ("the section order reads the profile with a dot call", [
+        ("UI/Sections.lua", 'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB:Tracker()',
+                            'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB.Tracker()')]),
+
+    ("the title color status line reads the profile with a dot straight off GetModule", [
+        ("UI/Row.lua", '    local cfg = ns:GetModule("DB"):Tracker()\n', '    local cfg = ns:GetModule("DB").Tracker()\n')]),
+
+    ("the section order holds the DB module under another name and calls it with a dot", [
+        ("UI/Sections.lua", 'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB:Tracker()',
+                            'function Sections:Order()\n    local db  = ns:GetModule("DB")\n    local cfg = db and db.Tracker()')]),
+
+    ("Render reads the profile through brackets", [
+        (TR, "    local cfg      = DB:Tracker()\n", '    local cfg      = DB["Tracker"]()\n')]),
+
+    ("the section order hands the DB module to a second local and calls that with a dot", [
+        ("UI/Sections.lua", 'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB:Tracker()',
+                            'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local D = DB\n    local cfg = D and D.Tracker()')]),
+
+    ("the section order takes the DB module in a multiple assignment", [
+        ("UI/Sections.lua", 'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB:Tracker()',
+                            'function Sections:Order()\n    local db, known0 = ns:GetModule("DB"), nil\n    local cfg = db and db.Tracker()')]),
+
+    ("the section order takes the DB module with a fallback", [
+        ("UI/Sections.lua", 'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB:Tracker()',
+                            'function Sections:Order()\n    local db  = ns:GetModule("DB") or nil\n    local cfg = db and db.Tracker()')]),
+
+    ("the section order takes the DB module on a line ending in a semicolon", [
+        ("UI/Sections.lua", 'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB:Tracker()',
+                            'function Sections:Order()\n    local db  = ns:GetModule("DB");\n    local cfg = db and db.Tracker()')]),
 ]
 
 SUMMARY = re.compile(r"^test_blizzard_tracker: (\d+) passed, (\d+) failed$")

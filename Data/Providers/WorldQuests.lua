@@ -538,7 +538,14 @@ function WorldQuests:OnEntryClick(entry, button)
         return
     end
     if ns.Has.SuperTrack then
-        C_SuperTrack.SetSuperTrackedQuestID(entry.id)
+        local DB  = ns:GetModule("DB")
+        local cfg = DB and DB:Tracker()
+        if cfg and cfg.clickToUnfocus == true and C_SuperTrack.GetSuperTrackedQuestID
+           and C_SuperTrack.GetSuperTrackedQuestID() == entry.id then
+            C_SuperTrack.SetSuperTrackedQuestID(0)
+        else
+            C_SuperTrack.SetSuperTrackedQuestID(entry.id)
+        end
         if self._notifyDirty then self._notifyDirty() end
     end
 end

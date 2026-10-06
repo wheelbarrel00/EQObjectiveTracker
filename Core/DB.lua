@@ -117,6 +117,17 @@ DB.defaults = {
             headerBarSoftEdges   = false,
             headerBarSoftEdgeStrength = 10,
 
+            zoneHeaders             = false,
+            zoneHeaderOrder         = "current",
+            zoneHeaderSizeDelta     = 2,
+            zoneHeaderColor         = { r = 1, g = 0.82, b = 0, a = 1 },
+            zoneHeaderColorUseClass = false,
+            zoneHeaderBar           = false,
+            zoneHeaderBarColor      = { r = 0.80, g = 0.60, b = 0.20, a = 0.85 },
+            zoneHeaderDivider       = false,
+            zoneHeaderDividerColor  = { r = 0.92, g = 0.72, b = 0.02, a = 0.85 },
+            zoneHeaderIndent        = 8,
+
             scrollBarBg          = true,
             scrollBarBgColor     = { r = 0.60, g = 0.60, b = 0.65, a = 0.25 },
             hideScrollBar        = false,
@@ -145,6 +156,9 @@ DB.defaults = {
             showRecentlyAddedTag = true,
             showOptionsIcon      = true,
             splitQuestClick      = false,
+            clickToUnfocus       = false,
+            -- On is the game's own behavior: it focuses a quest accepted while nothing is focused.
+            focusAcceptedQuests  = true,
             showItemButtons       = true,
             showQuestPopups       = true,
             colorByDifficulty     = true,
@@ -245,6 +259,7 @@ DB.defaults = {
     },
     char = {
         sectionsCollapsed  = {},
+        zonesCollapsed     = {},
         pinned             = {},
         trackedWorldQuests = {},
     },
@@ -268,6 +283,9 @@ local APPEARANCE_KEYS = {
     "objectiveColor", "countColorNone", "countColorPartial", "countColorDone", "finishedObjectiveColor",
     "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
     "headerBarSoftEdges", "headerBarSoftEdgeStrength",
+    -- The look only. zoneHeaders and zoneHeaderOrder stay out, for the zone bar's reason below.
+    "zoneHeaderSizeDelta", "zoneHeaderColor", "zoneHeaderColorUseClass", "zoneHeaderBar",
+    "zoneHeaderBarColor", "zoneHeaderDivider", "zoneHeaderDividerColor", "zoneHeaderIndent",
     "blockSpacing", "lineSpacing", "headerSpacing", "scale",
     "trackerAlpha", "trackerAlphaHover", "trackerAlphaFocus",
     "blockLayout", "cardColor", "cardBorderColor", "cardBorderSize", "cardPadding",
@@ -286,8 +304,9 @@ local APPEARANCE_KEYS = {
 }
 
 -- Clearing a key lets AceDB re-apply its default. Left alone by design: the zone bar's saved
--- position, and any switch whose default is OFF, because clearing one of those switches a
--- configured feature off rather than restoring a look.
+-- position, and zoneHeaders, zoneHeaderOrder, showZoneProgressBar and zoneProgressLocation, kept out
+-- of the list above, because clearing one of those switches a configured feature off, undocks it
+-- or reorders it rather than restoring a look.
 function DB:ResetTrackerAppearance()
     local prof = self:Tracker()
     if not prof then return end
@@ -349,6 +368,7 @@ function DB:ResetAll()
     local c = self.db.char
     if c then
         c.sectionsCollapsed = {}
+        c.zonesCollapsed    = {}
         c.pinned            = {}
         c.trackedQuests     = nil
         c.delveRun          = nil

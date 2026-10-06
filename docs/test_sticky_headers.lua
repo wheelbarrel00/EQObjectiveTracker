@@ -14,12 +14,18 @@
 -- target, styling a header the first time it is made, and the fallback with no clipping. The
 -- anchor chain ApplyWorldQuestsPosition builds with the option on and off, at either World
 -- Quests position, its combat deferral and the one Refresh it asks for on a change. The docked
--- zone bar section giving its header to the band. The opacity hover counting the band.
+-- zone bar section giving its header to the band. The opacity hover counting the band. The band's
+-- zone row (zone headers): the hand-over and push inside a section, a section push that brings the
+-- next section's first zone in without pushing this one's last, a first zone below the band, a
+-- leftover zone key under a section with no zones, the copies restyled once per render with the
+-- profile Core/DB.lua's own DB:Tracker (sliced) reads through self, and the row coming back after a
+-- pass that hid it.
 --
 -- OUT OF SCOPE BY CONSTRUCTION: Tracker:Render is too large to drive, so its share (the first
 -- header hidden instead of spaced, the band's height, the list giving that height up, the update
--- and the styling after sizing) is pinned by comment-stripped whole-statement greps at the end.
--- Whether the client clips the band, and how the push looks, are in-game questions.
+-- and the styling after sizing) is pinned by comment-stripped whole-statement greps at the end. The
+-- one block of it that is sliced and run keeps the band's zone arrays on the frame. Whether the
+-- client clips the band, and how the push looks, are in-game questions.
 
 local function repoFile(rel)
     local f = io.open(rel, "r")
@@ -35,6 +41,23 @@ local function readFile(rel)
 end
 
 local pass, fail = 0, 0
+-- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
+-- stand-in raises the same way, rather than answering a call the client would refuse.
+local function strictDB(methods)
+    local db = {}
+    for name, v in pairs(methods) do
+        if type(v) == "function" then
+            db[name] = function(self, ...)
+                if self ~= db then error("DB:" .. name .. " called without self", 2) end
+                return v(self, ...)
+            end
+        else
+            db[name] = v
+        end
+    end
+    return db
+end
+
 local function ok(cond, msg)
     if cond then pass = pass + 1 else fail = fail + 1 print("FAIL: " .. msg) end
 end
@@ -81,6 +104,26 @@ end
 
 local trackerSlice = slicer("UI/Tracker.lua")
 
+-- Core/DB.lua's own DB:Tracker, sliced, over a stub profile. It reads through self, so a call
+-- written DB.Tracker() raises here as it does in game. nil when the slice fails, which the rig
+-- that asks for it reports.
+local dbTracker
+do
+    local good, err = pcall(function()
+        local src = readFile("Core/DB.lua")
+        local head = "\nfunction DB:Tracker()\n"
+        local a = src:find(head, 1, true)
+        local b = a and src:find("\nend\n", a + 1, true)
+        assert(a and b and not src:find(head, a + 1, true), "Core/DB.lua defines DB:Tracker once")
+        local holder = {}
+        local chunk = assert(loadstring(src:sub(a + 1, b + 4), "DB:Tracker"))
+        setfenv(chunk, { DB = holder })
+        chunk()
+        dbTracker = holder.Tracker
+    end)
+    ok(good and type(dbTracker) == "function", "DB:Tracker slices out of Core/DB.lua: " .. tostring(err))
+end
+
 -- ------------------------------------------------------------------------------ the stubs
 
 local function fontString(text)
@@ -100,6 +143,7 @@ local function frame(name)
     function f:Hide() self.shown = false end
     function f:IsShown() return self.shown end
     function f:GetHeight() return self.h end
+    function f:SetHeight(h) self.h = h end
     return f
 end
 
@@ -127,7 +171,7 @@ local function anchorRig(cfg, opts)
     local T = { frame = f }
     function T:Refresh() st.refresh = st.refresh + 1 end
     local modules = {
-        DB = { Tracker = function() return st.cfg end },
+        DB = strictDB({ Tracker = function() return st.cfg end }),
         Events = { RunWhenOutOfCombat = function(_, key) st.deferred[#st.deferred + 1] = key end },
     }
     local ns = { GetModule = function(_, n) return modules[n] end }
@@ -261,16 +305,56 @@ local function bandRig(opts)
         HideDocked = function() st.hideDocked = st.hideDocked + 1 end,
         RenderDocked = function(_, _, y) st.docked[#st.docked + 1] = y; return 20 end,
     }
-    local modules = { Sections = Sections, ZoneProgressBar = (not opts.noZoneBar) and ZoneBar or nil }
+    -- The zone headers' side of the band: Mirror copies from the pooled header a zone was drawn
+    -- into, which st.zoneSrc stands in for. st.zoneStyledWith keeps the settings each styling of a
+    -- copy was handed, and st.cfg is the tracker profile the real DB:Tracker hands back.
+    st.zoneSrc, st.zoneMade, st.zoneStyled, st.zoneStyledWith = {}, 0, {}, {}
+    st.cfg = { zoneHeaders = true }
+    -- gen is what ZoneHeaders:Begin moves on every render. newPass stands in for one.
+    local ZoneHeaders = { gen = 1 }
+    st.newPass = function() ZoneHeaders.gen = ZoneHeaders.gen + 1 end
+    function ZoneHeaders:NewHeader(parent)
+        st.zoneMade = st.zoneMade + 1
+        local h = header("zone", "", "", "")
+        h.parent = parent
+        return h
+    end
+    function ZoneHeaders:Mirror(dst, key)
+        local src = st.zoneSrc[key]
+        if not src then return false end
+        dst.key = key
+        dst.text:SetText(src.text:GetText())
+        return true
+    end
+    function ZoneHeaders:ApplyStyle(h, cfg)
+        st.zoneStyled[h] = (st.zoneStyled[h] or 0) + 1
+        local with = st.zoneStyledWith[h] or {}
+        with[#with + 1] = cfg == nil and "nothing" or cfg
+        st.zoneStyledWith[h] = with
+    end
+    assert(dbTracker, "no DB:Tracker to hand the band")
+    local DB = { db = { profile = { tracker = st.cfg } }, Tracker = dbTracker }
+    local modules = { Sections = Sections, ZoneProgressBar = (not opts.noZoneBar) and ZoneBar or nil,
+                      ZoneHeaders = ZoneHeaders, DB = DB }
     local ns = { GetModule = function(_, n) return modules[n] end }
 
     local band = frame("band")
     band.heads = {}
+    band.zoneHeads = {}
     if not opts.noClip then function band.SetClipsChildren() end end
     local scrollOffset = 0
     local f = { stickyBand = band, scroll = { GetVerticalScroll = function() return scrollOffset end } }
     local T = { frame = f }
-    local env = setmetatable({ Tracker = T, ns = ns, _virtualGroup = {} }, { __index = _G })
+    st.rows = 0
+    local function createFrame(_, _, parent)
+        st.rows = st.rows + 1
+        local r = frame("zoneRow")
+        r.parent = parent
+        if not opts.noClip then function r.SetClipsChildren(self) self.clips = true end end
+        return r
+    end
+    local env = setmetatable({ Tracker = T, ns = ns, _virtualGroup = {}, CreateFrame = createFrame },
+                             { __index = _G })
     local chunk = assert(loadstring(bandSrc, "sticky-band"))
     setfenv(chunk, env)
     st.stickyState = chunk()
@@ -284,6 +368,14 @@ local function bandRig(opts)
         for i, id in ipairs(ids) do
             Sections.frames[id] = header(id, "T:" .. id, i .. "/9", "-")
         end
+    end
+    -- The drawn zones as Render records them: keys and list tops in drawing order, each
+    -- section's first and last index into them, and the two row heights the band adds up.
+    st.zoneLayout = function(keys, tops, first, last, row1, row2)
+        f._stickyZoned = true
+        f._stickyZKeys, f._stickyZTops, f._stickyZFirst, f._stickyZLast = keys, tops, first, last
+        f._stickyRow1, f._stickyRow2 = row1, row2
+        for _, k in ipairs(keys) do st.zoneSrc[k] = header("src", "Z:" .. k, "", "") end
     end
     return st
 end
@@ -420,6 +512,8 @@ case("BuildFrame makes the band inside the tracker frame, with an empty header l
     ok(band and band.shown, "and left shown, since nothing else ever shows it")
     ok(band and band.parent == tracker, "parented to the tracker, so it scales, fades and hides with it")
     ok(band and type(band.heads) == "table" and next(band.heads) == nil, "with an empty header list for the update to fill")
+    ok(band and type(band.zoneHeads) == "table" and next(band.zoneHeads) == nil and band.zoneHeads ~= band.heads,
+       "and an empty zone header list of its own")
     ok(band and band.clips == true and band.h == 1, "clipping, and 1px tall until the first render")
 end)
 
@@ -438,7 +532,7 @@ case("the real header click collapses the section the header shows now", functio
         end })
     end
     local char, renders, clickThrough, scrolled, askedBy = {}, 0, false, {}, nil
-    local mods = { DB = { Char = function() return char end } }
+    local mods = { DB = strictDB({ Char = function() return char end }) }
     mods.Tracker = {
         Render = function() renders = renders + 1 end,
         IsClickThrough = function(self) askedBy = self; return clickThrough end,
@@ -501,11 +595,246 @@ case("StickyLine says which state it is in", function()
     st.band.h = 30
     st.T:_UpdateSticky()
     local line = st.T:StickyLine()
-    ok(line == "sticky headers: on, band 30px, 2 section(s), showing campaign, pushed 0, clip yes", "on: " .. line)
+    ok(line == "sticky headers: on, band 30px, 2 section(s), showing campaign, pushed 0, clip yes, zone row off",
+       "on: " .. line)
     local nc = bandRig({ noClip = true })
     nc.layout({ "quests" }, { 0 }, 30)
     nc.T:_UpdateSticky()
     ok(nc.T:StickyLine():find("clip no", 1, true) ~= nil, "and reports a client without clipping")
+end)
+
+-- ------------------------------------------------------- the zone row (zone headers, 2.2.0)
+-- Two sections: campaign at 0 with zones A (given to the band, so recorded one row above the
+-- list) and B at 200, quests at 400 with zone C at 430. The band is 30 + 22 tall.
+
+local function zoned(opts)
+    local st = bandRig(opts)
+    st.layout({ "campaign", "quests" }, { 0, 400 }, 52)
+    st.zoneLayout({ "campaign:A", "campaign:B", "quests:C" }, { -22, 200, 430 }, { 1, 3 }, { 2, 3 }, 30, 22)
+    return st
+end
+
+local function zh(st, slot) return st.band.zoneHeads[slot] end
+local function shownKey(st, slot)
+    local h = zh(st, slot)
+    return (h and h.shown) and h.key or nil
+end
+local function dyOf(h) return h and h.points[1] and h.points[1][5] end
+-- Every styling of the copy was handed the tracker profile itself, as DB:Tracker reads it.
+local function styledWithProfile(st, h)
+    local with = h and st.zoneStyledWith[h]
+    if not with or #with == 0 then return false end
+    for _, c in ipairs(with) do
+        if c ~= st.cfg then return false end
+    end
+    return true
+end
+
+case("at rest the zone row sits under the section header and shows the section's first zone", function()
+    local st = zoned()
+    st.scrollTo(0)
+    st.T:_UpdateSticky()
+    local row = st.band.zoneRow
+    ok(row and st.rows == 1 and row.parent == st.band and row.clips == true, "one clipping row, made in the band")
+    ok(row and pointsOf(row) == "TOPLEFT>band.TOPLEFT(0,-30) TOPRIGHT>band.TOPRIGHT(0,-30)" and row.h == 22 and row.shown,
+       "a row's height under the section header's: " .. (row and pointsOf(row) or "none"))
+    local a = zh(st, 1)
+    ok(shownKey(st, 1) == "campaign:A" and a.parent == row and a.points[1][2] == row and dyOf(a) == 0,
+       "the first zone, at the top of the row")
+    ok(a.text:GetText() == "Z:campaign:A", "copied from the zone's own header")
+    ok(shownKey(st, 2) == nil and shownKey(st, 3) == nil, "nothing incoming")
+    ok(st.T._stickyZone == "campaign:A", "and the status line can say which")
+    ok(st.zoneStyled[a] == 1 and st.zoneMade == 1, "styled once when made")
+    ok(styledWithProfile(st, a), "with the tracker's own settings, read through DB:Tracker")
+    st.T:_UpdateSticky()
+    ok(st.zoneStyled[a] == 1 and st.zoneMade == 1 and st.rows == 1,
+       "a later step in the same render restyles and makes nothing")
+    st.newPass()
+    st.T:_UpdateSticky()
+    st.T:_UpdateSticky()
+    ok(st.zoneStyled[a] == 2 and st.zoneMade == 1, "the next render restyles it once: " .. tostring(st.zoneStyled[a]))
+    ok(styledWithProfile(st, a), "with the tracker's own settings again")
+end)
+
+-- A look change renders while the incoming copies are hidden, so each has to catch up the next time
+-- it is shown, or a zone pushes in drawn the old way.
+case("a copy hidden through a render is restyled the next time it is shown, and only then", function()
+    local st = zoned()
+    st.scrollTo(205)
+    st.T:_UpdateSticky()
+    local b = zh(st, 2)
+    ok(shownKey(st, 2) == "campaign:B" and st.zoneStyled[b] == 1, "the incoming zone is styled when first shown")
+    st.scrollTo(0)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 2) == nil, "and hidden once the push is over")
+    st.newPass()
+    st.T:_UpdateSticky()
+    ok(st.zoneStyled[b] == 1, "a render while it is hidden leaves it alone")
+    st.scrollTo(205)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 2) == "campaign:B" and st.zoneStyled[b] == 2,
+       "shown again after that render, it is restyled: " .. tostring(st.zoneStyled[b]))
+    ok(styledWithProfile(st, b), "each time with the tracker's own settings")
+    st.scrollTo(206)
+    st.T:_UpdateSticky()
+    ok(st.zoneStyled[b] == 2, "and not again on the next step")
+end)
+
+case("the next zone pushes the current one up inside the row, then takes it", function()
+    local st = zoned()
+    st.scrollTo(200)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 1) == "campaign:A" and dyOf(zh(st, 1)) == 0 and shownKey(st, 2) == nil,
+       "a zone exactly at the top pushes nothing yet")
+    st.scrollTo(205)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 1) == "campaign:A" and dyOf(zh(st, 1)) == 5, "pushed up by 5: " .. tostring(dyOf(zh(st, 1))))
+    ok(shownKey(st, 2) == "campaign:B" and dyOf(zh(st, 2)) == 5 - 22 and zh(st, 2).parent == st.band.zoneRow,
+       "the next one a row below it, in the row: " .. tostring(dyOf(zh(st, 2))))
+    st.scrollTo(221)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 1) == "campaign:A" and dyOf(zh(st, 1)) == 21, "still handing over a pixel short")
+    st.scrollTo(222)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 1) == "campaign:B" and dyOf(zh(st, 1)) == 0 and shownKey(st, 2) == nil,
+       "once it has scrolled a whole row under, it takes the row")
+    ok(pointsOf(st.band.zoneRow) == "TOPLEFT>band.TOPLEFT(0,-30) TOPRIGHT>band.TOPRIGHT(0,-30)",
+       "and the row itself never moved")
+end)
+
+case("a section push carries the zone row up and brings the next section's first zone in", function()
+    local st = zoned()
+    st.scrollTo(410)
+    st.T:_UpdateSticky()
+    ok(pointsOf(st.band.zoneRow) == "TOPLEFT>band.TOPLEFT(0,-20) TOPRIGHT>band.TOPRIGHT(0,-20)",
+       "the row rides up with the section header: " .. pointsOf(st.band.zoneRow))
+    ok(shownKey(st, 1) == "campaign:B" and dyOf(zh(st, 1)) == 0, "still showing the section's last zone")
+    local c = zh(st, 3)
+    ok(shownKey(st, 3) == "quests:C" and c.parent == st.band and c.points[1][2] == st.band,
+       "the next section's first zone, in the band itself")
+    ok(dyOf(c) == 410 - 430 - 52, "where the list has it: " .. tostring(dyOf(c)))
+    ok(dyOf(st.band.heads[2]) == 10 - 52 and dyOf(c) == dyOf(st.band.heads[2]) - 30,
+       "one section row under the incoming section header")
+    st.scrollTo(451)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 3) == "quests:C" and dyOf(c) == 451 - 430 - 52, "a pixel short of the hand-over it is still coming in")
+    -- The next section's first zone comes in through slot 3 alone. It never pushes this section's last.
+    ok(shownKey(st, 1) == "campaign:B" and dyOf(zh(st, 1)) == 0,
+       "the section's last zone holds still in its row: " .. tostring(dyOf(zh(st, 1))))
+    ok(shownKey(st, 2) == nil, "and no second copy comes into the row")
+    st.scrollTo(452)
+    st.T:_UpdateSticky()
+    ok(st.T._stickyShown == "quests" and shownKey(st, 1) == "quests:C" and dyOf(zh(st, 1)) == 0,
+       "then the next section and its zone hold the band")
+    ok(shownKey(st, 3) == nil, "and the incoming copy goes")
+    ok(pointsOf(st.band.zoneRow) == "TOPLEFT>band.TOPLEFT(0,-30) TOPRIGHT>band.TOPRIGHT(0,-30)", "the row back in place")
+end)
+
+case("under a section with no zones the second row stays empty", function()
+    local st = bandRig()
+    st.layout({ "campaign", "achievements" }, { 0, 300 }, 52)
+    st.zoneLayout({ "campaign:A" }, { -22 }, { 1 }, { 1 }, 30, 22)
+    st.scrollTo(400)
+    st.T:_UpdateSticky()
+    ok(st.T._stickyShown == "achievements" and shownKey(st, 1) == nil and st.T._stickyZone == nil,
+       "no zone is shown")
+    ok(st.band.zoneRow and st.band.zoneRow.shown, "though the row keeps its place, so the band never resizes")
+end)
+
+-- Popup boxes sit above a section's rows, so its first zone header can start below the band.
+case("a first zone below the band leaves the row empty until it scrolls under, and nothing raises", function()
+    local st = bandRig()
+    st.layout({ "campaign", "quests" }, { 0, 400 }, 52)
+    st.zoneLayout({ "campaign:A", "campaign:B", "quests:C" }, { 30, 200, 430 }, { 1, 3 }, { 2, 3 }, 30, 22)
+    st.scrollTo(0)
+    local good, err = pcall(function() st.T:_UpdateSticky() end)
+    ok(good and shownKey(st, 1) == nil and st.T._stickyZone == nil,
+       "no zone in the row yet: " .. tostring(err))
+    st.scrollTo(52)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 1) == "campaign:A", "then the first zone takes it: " .. tostring(shownKey(st, 1)))
+end)
+
+-- Render never wipes the band's zone keys, so a key past this pass's last zone is a leftover. Here
+-- quests:D was drawn this pass at index 2 and is still listed at index 3 from the pass before.
+case("a section with no zones never brings in a zone key left from an earlier pass", function()
+    local st = bandRig()
+    st.layout({ "campaign", "quests", "achievements" }, { 0, 400, 700 }, 52)
+    st.zoneLayout({ "quests:C", "quests:D", "quests:D" }, { 430, 500, 999 }, { 1, 1, 3 }, { 0, 2, 2 }, 30, 22)
+    st.scrollTo(710)
+    st.T:_UpdateSticky()
+    ok(st.T._stickyShown == "quests" and shownKey(st, 1) == "quests:D" and shownKey(st, 3) == nil,
+       "Achievements comes in with no zone under it: " .. tostring(shownKey(st, 3)))
+end)
+
+-- _UpdateStickyZones reads the band's zone arrays off the frame, so Render must keep them there.
+-- Its block is sliced from the first read to the section loop and run twice on one frame.
+case("Render keeps the band's zone arrays on the frame, each under its own name", function()
+    local src = trackerSlice("    local zKeys, zTops, zFirst, zLast = f._stickyZKeys",
+                             "    for _, groupID in ipairs(Sections:Order()) do")
+    local chunk = assert(loadstring(src .. "\nreturn zKeys, zTops, zFirst, zLast", "zone-arrays"))
+    local f = {}
+    local function wipe(t) for k in pairs(t) do t[k] = nil end return t end
+    setfenv(chunk, setmetatable({ f = f, wipe = wipe }, { __index = _G }))
+    local keys, tops, first, last = chunk()
+    ok(type(keys) == "table" and f._stickyZKeys == keys and f._stickyZTops == tops and f._stickyZFirst == first
+       and f._stickyZLast == last, "the first pass stores the four arrays it fills")
+    first[1], last[1] = 1, 2
+    local _, _, first2, last2 = chunk()
+    ok(f._stickyZFirst == first2 and f._stickyZLast == last2 and first2[1] == nil and last2[1] == nil,
+       "a later pass starts each section's zone runs empty")
+end)
+
+case("without clipping a zone swaps in place and the next section's never shows early", function()
+    local st = zoned({ noClip = true })
+    st.scrollTo(205)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 1) == "campaign:A" and dyOf(zh(st, 1)) == 0 and shownKey(st, 2) == nil, "no push in the row")
+    ok(st.band.zoneRow.clips == nil, "and the row asks for no clipping it cannot have")
+    st.scrollTo(410)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 3) == nil, "no incoming zone")
+    ok(pointsOf(st.band.zoneRow) == "TOPLEFT>band.TOPLEFT(0,-30) TOPRIGHT>band.TOPRIGHT(0,-30)", "and the row stays put")
+end)
+
+case("a zone that drew no header leaves its slot empty", function()
+    local st = zoned()
+    st.zoneSrc["campaign:A"] = nil
+    st.scrollTo(0)
+    st.T:_UpdateSticky()
+    ok(shownKey(st, 1) == nil and (zh(st, 1) == nil or not zh(st, 1).shown), "nothing copied, nothing shown")
+    ok(next(st.zoneStyled) == nil, "and an empty copy is never styled")
+end)
+
+case("the zone row goes when zones stop being drawn, the band goes, or the option does", function()
+    local st = zoned()
+    st.scrollTo(205)
+    st.T:_UpdateSticky()
+    st.f._stickyZoned = false
+    st.T:_UpdateSticky()
+    ok(not zh(st, 1).shown and not zh(st, 2).shown and not st.band.zoneRow.shown and st.T._stickyZone == nil,
+       "no zone drawn this pass: every copy and the row hidden")
+    local line = st.T:StickyLine()
+    ok(line:find(", zone row off$") ~= nil, "the status line says the row is off: " .. line)
+    st.f._stickyZoned = true
+    st.T:_UpdateSticky()
+    ok(st.band.zoneRow.shown and shownKey(st, 1) == "campaign:A", "zones drawn again: the row comes back with its zone")
+    local st2 = zoned()
+    st2.scrollTo(410)
+    st2.T:_UpdateSticky()
+    st2.f._stickyAnchored = false
+    st2.T:_UpdateSticky()
+    ok(not zh(st2, 1).shown and not zh(st2, 3).shown and not st2.band.zoneRow.shown, "the option off: all hidden")
+    local st3 = zoned()
+    st3.scrollTo(0)
+    st3.T:_UpdateSticky()
+    st3.f._stickyN = 0
+    st3.T:_UpdateSticky()
+    ok(not zh(st3, 1).shown and not st3.band.zoneRow.shown, "nothing drawn: all hidden")
+    st3.f._stickyN = 2
+    st3.T:_UpdateSticky()
+    ok(st3.T:StickyLine():find(", zone campaign:A$") ~= nil, "and names the zone it shows: " .. st3.T:StickyLine())
+    ok(st3.band.zoneRow.shown and shownKey(st3, 1) == "campaign:A", "sections drawn again: the row comes back")
 end)
 
 case("the docked zone bar section gives its header to the band", function()
@@ -558,6 +887,14 @@ case("the band's headers count as drawn for the mouseover", function()
     ok(drawn(f) == false, "a hidden header does not count")
     f.stickyBand = { heads = {} }
     ok(drawn(f) == false, "nor does an empty band")
+    for slot = 1, 3 do
+        local zones = {}
+        zones[slot] = region(true, true)
+        f.stickyBand = { heads = {}, zoneHeads = zones }
+        ok(drawn(f) == true, "over the band's zone header in slot " .. slot)
+    end
+    f.stickyBand = { heads = {}, zoneHeads = { region(false, true) } }
+    ok(drawn(f) == false, "a hidden zone header does not count")
 end)
 
 -- ------------------------------------------------- Render and the wiring, by whole statement
@@ -597,12 +934,22 @@ has(renderSrc, "local stickyN = 0", "the count starts from zero each pass")
 has(renderSrc, [[
     f._stickyN = sticky and stickyN or 0
     if sticky then
-        bandH = (stickyN > 0) and (Sections:Height() + gap) or 1
-        f._stickyH = bandH
+        local row1 = Sections:Height() + gap
+        local row2 = (stickyZ > 0) and (ZoneHeaders:Height() + gap) or 0
+        bandH = (stickyN > 0) and (row1 + row2) or 1
+        f._stickyH, f._stickyRow1, f._stickyRow2, f._stickyZoned = bandH, row1, row2, stickyZ > 0
         if math.abs((sticky:GetHeight() or 0) - bandH) > 0.5 then
             setRegionHeight(sticky, bandH)
         end
-    end]], "the band is a header and a gap tall, through the combat-safe setter")
+    end]], "the band is a header and a gap tall, and a zone row more while any zone header is drawn, "
+           .. "through the combat-safe setter")
+has(renderSrc, [[
+    wipe(zFirst)
+    wipe(zLast)
+    local stickyZ = 0
+]], "the zone runs each section owns are cleared, and the zone count started, every pass")
+-- A shown-only restyle here is what left a hidden copy in the old look, so it must not come back.
+ok(count(renderSrc, "ZoneHeaders:ApplyStyle") == 0, "Render styles no zone copy itself, the band does once per render")
 has(renderSrc, "local scrollH = math.min(questContentH, available - (wqH or 0) - bandH)",
     "the list gives the band's height up")
 has(renderSrc, "local bandH = 0", "and gives up nothing with the option off")

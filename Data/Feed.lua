@@ -46,6 +46,9 @@ function Feed:Build()
     end
     for _, s in pairs(spaces) do wipe(s) end
     Filter:BeginPass()
+    local ZoneGroups = ns:GetModule("ZoneGroups")
+    local zoned = ZoneGroups and cfg and cfg.zoneHeaders == true
+    if zoned then ZoneGroups:Begin() end
 
     for _, p in ipairs(Registry:Active()) do
         if p._available then
@@ -73,6 +76,7 @@ function Feed:Build()
                     e.providerID = p.id
                     local g = group(self, e.groupID)
                     g.totalCount = g.totalCount + 1
+                    if zoned then ZoneGroups:Note(e.groupID, e) end
                     if Filter:Visible(e, cfg, p) then
                         g.visibleCount = g.visibleCount + 1
                         g.entries[g.visibleCount] = e
@@ -93,6 +97,7 @@ function Feed:Build()
     for _, g in pairs(self.byGroup) do
         table.sort(g.entries, cmp)
     end
+    if ZoneGroups then ZoneGroups:Build(self.byGroup, cfg) end
 
     return self.byGroup
 end

@@ -56,6 +56,16 @@ local function menu(ctx)
         m:HookScript("OnHide", function() closer:Hide() end)
     end
 
+    -- Closes once its owner is no longer visible, as Blizzard's own menu does, so a menu opened from
+    -- the world map does not outlive the map.
+    -- IsVisible can answer a secret value on retail, which addon code may not test, so that owner is left alone.
+    m:SetScript("OnUpdate", function(self)
+        if not self.owner then return end
+        local visible = self.owner:IsVisible()
+        if issecretvalue and issecretvalue(visible) then return end
+        if not visible then self:Hide() end
+    end)
+
     shared.menu = m
     return m
 end
@@ -134,9 +144,12 @@ end
 
 -- A context menu at the cursor. items is a list of { kind, text, danger, onClick }: kind is nil
 -- for an item, "title" or "divider". An item with no onClick only closes the menu.
-function Context:ShowMenu(items)
+function Context:ShowMenu(items, owner)
     if type(items) ~= "table" or #items == 0 then
         error("EverythingUI: ShowMenu needs a list of items", 2)
+    end
+    if owner ~= nil and not (type(owner) == "table" and type(owner.IsVisible) == "function") then
+        error("EverythingUI: ShowMenu's owner must be a frame", 2)
     end
     for i = 1, #items do
         local item = items[i]
@@ -158,6 +171,7 @@ function Context:ShowMenu(items)
 
     local m = menu(self)
     m.gen = m.gen + 1
+    m.owner = owner
     for i = 1, #items do
         local b = m.rows[i]
         if not b then

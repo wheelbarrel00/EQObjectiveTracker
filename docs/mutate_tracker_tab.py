@@ -43,6 +43,22 @@ DOWN_CLICK = ("                r.down:SetScript(\"OnClick\", function()\n"
               "                    renderOrderRows()\n"
               "                    ns.Util.Tooltip():Hide()\n")
 
+UNFOCUS_OPEN = '            display:Add(self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],\n'
+ACCEPT_OPEN = '            display:Add(self:CreateCheckbox(content, L["Focus newly accepted quests"],\n'
+ST_GUARD = '        if ns.Has.SuperTrack then\n' + UNFOCUS_OPEN
+UNFOCUS_BOX = (UNFOCUS_OPEN +
+               '                function() return DB().clickToUnfocus == true end,\n'
+               '                function(v) DB().clickToUnfocus = v end,\n'
+               '                L["Click the focused quest again to unfocus it. With Split quest click on, click its icon."]))\n')
+ACCEPT_BOX = (ACCEPT_OPEN +
+              '                function() return DB().focusAcceptedQuests ~= false end,\n'
+              '                function(v) DB().focusAcceptedQuests = v end,\n'
+              '                L["While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused."]))\n')
+SPLIT_BOX = ('        local splitCheck = self:CreateCheckbox(content, L["Split quest click"],\n'
+             '            trackerSetting("splitQuestClick"))\n')
+ZONE_SYNC = ("        content._syncZoneTag = function() self:SetDependent(zoneCheck, not DB().zoneHeaders) end\n"
+             "        content._syncZoneTag()\n")
+
 MUTANTS = [
     # ------------------------------------------------------------------- Section Order
     ("the Up chevron moves its section down", [
@@ -108,10 +124,19 @@ MUTANTS = [
             "            rowSetting(\"colorByDifficulty\", true)))\n"
             "        local lvl = self:CreateCheckbox(content, L[\"Show quest level prefix\"],\n")]),
 
-    ("the tab grows a per-view pass again", [
-        (T, "        -- beside the controls that style them - one feature, one place.\n    end,\n})\n",
-            "        -- beside the controls that style them - one feature, one place.\n    end,\n"
-            "    refresh = function() end,\n})\n")]),
+    # The zone label box's master is Show zone headers on Appearance, so this tab dims it on build
+    # and again on every view (2.2.0).
+    ("the per-view pass no longer dims the zone label box", [
+        (T, "        if content._syncZoneTag then content._syncZoneTag() end\n", "")]),
+
+    ("the zone label box is dimmed the wrong way round", [
+        (T, "self:SetDependent(zoneCheck, not DB().zoneHeaders)", "self:SetDependent(zoneCheck, DB().zoneHeaders)")]),
+
+    ("the zone label box is not dimmed until the tab is shown again", [
+        (T, "        content._syncZoneTag()\n", "")]),
+
+    ("the zone label tooltip loses its zone headers sentence", [
+        (T, " Not shown while Show zone headers is on, on the Appearance tab.\"])", "\"])")]),
 
     ("Keep section headers in view redraws before it re-anchors", [
         (T, "                DB().stickySectionHeaders = v\n"
@@ -131,8 +156,8 @@ MUTANTS = [
             "                DB().stickySectionHeaders = not v\n")]),
 
     ("Keep section headers in view is indented under the count box", [
-        (T, "            L[\"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default.\"]))\n",
-            "            L[\"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default.\"]), { dependent = true })\n")]),
+        (T, "            L[\"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. With zone headers on, the header of the zone you are scrolled into stays just under it. On by default.\"]))\n",
+            "            L[\"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. With zone headers on, the header of the zone you are scrolled into stays just under it. On by default.\"]), { dependent = true })\n")]),
 
     ("the cogwheel box is stored but never applied", [
         (T, '                ns:GetModule("Tracker"):ApplyHeaderIcons()\n', "")]),
@@ -327,6 +352,187 @@ MUTANTS = [
     ("the header pass never hides an icon whose switch is off", [
         (TR, "        if cfg and b._dbKey and cfg[b._dbKey] == false then",
              "        if cfg and b._dbKey and cfg[b._dbKey] == nil then")]),
+
+    # ------------------------------------------------------- the two focus boxes (2.2.0)
+    ("the focus boxes are built on Classic too, where a click already toggles", [
+        (T, "        if ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused",
+            "        if true then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
+
+    ("the focus boxes are built only on Classic", [
+        (T, "        if ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused",
+            "        if not ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
+
+    ("the unfocus box reads on while unset", [
+        (T, "                function() return DB().clickToUnfocus == true end,\n",
+            "                function() return DB().clickToUnfocus ~= false end,\n")]),
+
+    ("the accept box reads off while unset, the opposite of the game", [
+        (T, "                function() return DB().focusAcceptedQuests ~= false end,\n",
+            "                function() return DB().focusAcceptedQuests == true end,\n")]),
+
+    ("the unfocus box writes the accept box's key", [
+        (T, "                function(v) DB().clickToUnfocus = v end,\n",
+            "                function(v) DB().focusAcceptedQuests = v end,\n")]),
+
+    ("the accept box writes the unfocus box's key", [
+        (T, "                function(v) DB().focusAcceptedQuests = v end,\n",
+            "                function(v) DB().clickToUnfocus = v end,\n")]),
+
+    ("the unfocus box stores the opposite of what was ticked", [
+        (T, "                function(v) DB().clickToUnfocus = v end,\n",
+            "                function(v) DB().clickToUnfocus = not v end,\n")]),
+
+    ("the accept box stores nothing", [
+        (T, "                function(v) DB().focusAcceptedQuests = v end,\n",
+            "                function() end,\n")]),
+
+    ("the unfocus box loses its tooltip", [
+        (T, "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]))\n",
+            "                nil))\n")]),
+
+    ("the accept box carries the unfocus box's tooltip", [
+        (T, "                L[\"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.\"]))\n",
+            "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]))\n")]),
+
+    ("the unfocus box is indented under Split quest click", [
+        (T, "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]))\n",
+            "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]), { dependent = true })\n")]),
+
+    ("the unfocus box is built but never added to the card", [
+        (T, "            display:Add(self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n",
+            "            local _ = (self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n")]),
+
+    ("the two boxes are added the other way round", [
+        (T, "            display:Add(self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n",
+            "            local unfocusBox = (self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n"),
+        (T, "                L[\"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.\"]))\n",
+            "                L[\"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.\"]))\n"
+            "            display:Add(unfocusBox)\n")]),
+
+    ("the focus boxes are added above Split quest click", [
+        (T, "        local splitCheck = self:CreateCheckbox(content, L[\"Split quest click\"],\n"
+            "            trackerSetting(\"splitQuestClick\"))\n"
+            "        display:Add(splitCheck)\n",
+            "        local splitCheck = self:CreateCheckbox(content, L[\"Split quest click\"],\n"
+            "            trackerSetting(\"splitQuestClick\"))\n"),
+        (T, "Turn this off to leave new quests unfocused.\"]))\n        end\n",
+            "Turn this off to leave new quests unfocused.\"]))\n        end\n        display:Add(splitCheck)\n")]),
+
+    # ------------------------------------------- found by the pre-release scan's hand-breaks
+    ("the unfocus box also writes Split quest click's key", [
+        (T, "                function(v) DB().clickToUnfocus = v end,\n",
+            "                function(v) DB().clickToUnfocus = v; DB().splitQuestClick = v end,\n")]),
+
+    ("the accept box also writes a second tracker key", [
+        (T, "                function(v) DB().focusAcceptedQuests = v end,\n",
+            "                function(v) DB().focusAcceptedQuests = v; DB().trackerAlphaFocus = v end,\n")]),
+
+    ("the accept box also writes auto-track in the general settings", [
+        (T, "                function(v) DB().focusAcceptedQuests = v end,\n",
+            "                function(v) DB().focusAcceptedQuests = v;"
+            " ns:GetModule(\"DB\"):General().autoTrackAccepted = v end,\n")]),
+
+    ("the unfocus box reads ticked while Split quest click is on", [
+        (T, "                function() return DB().clickToUnfocus == true end,\n",
+            "                function() return DB().clickToUnfocus == true or DB().splitQuestClick == true end,\n")]),
+
+    ("the accept box reads unticked while the unfocus option is on", [
+        (T, "                function() return DB().focusAcceptedQuests ~= false end,\n",
+            "                function() return DB().focusAcceptedQuests ~= false and DB().clickToUnfocus ~= true end,\n")]),
+
+    ("the focus boxes are built on Classic, where super-track reads false", [
+        (T, "        if ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused",
+            "        if ns.Has.SuperTrack ~= nil then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
+
+    ("the unfocus box is added full width", [
+        (T, "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]))\n",
+            "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]), { fill = true })\n")]),
+
+    ("the accept box is added full width", [
+        (T, "                L[\"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.\"]))\n",
+            "                L[\"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.\"]), { fill = true })\n")]),
+
+    # A dot call hands DB:Tracker no self, a Lua error in game that a stub ignoring self passes.
+    ("the tab calls DB.Tracker with a dot", [
+        (T, "local function DB() return ns:GetModule(\"DB\"):Tracker() end\n",
+            "local function DB() return ns:GetModule(\"DB\").Tracker() end\n")]),
+
+    ("the header pass calls DB.Tracker with a dot", [
+        (TR, "    local cfg = DB and DB:Tracker()\n\n    local prev\n",
+             "    local cfg = DB and DB.Tracker()\n\n    local prev\n")]),
+
+    # ------------------------------------- found by the 2.2.0 fix pass's second scan (T1 to T10)
+    # The library appends a checkbox to its parent's _controls, which only the content carries,
+    # so either of these stops the whole tab building in game.
+    ("the unfocus box is built on the card, not the tab's content", [
+        (T, UNFOCUS_OPEN, UNFOCUS_OPEN.replace("CreateCheckbox(content,", "CreateCheckbox(display,"))]),
+
+    ("the accept box is built with no parent", [
+        (T, ACCEPT_OPEN, ACCEPT_OPEN.replace("CreateCheckbox(content,", "CreateCheckbox(nil,"))]),
+
+    ("the unfocus box is dimmed while Split quest click is off", [
+        (T, UNFOCUS_BOX,
+         '            local unfocusBox = self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],\n'
+         '                function() return DB().clickToUnfocus == true end,\n'
+         '                function(v) DB().clickToUnfocus = v end,\n'
+         '                L["Click the focused quest again to unfocus it. With Split quest click on, click its icon."])\n'
+         '            display:Add(unfocusBox)\n'
+         '            self:SetDependent(unfocusBox, DB().splitQuestClick == true)\n')]),
+
+    ("the accept box is dimmed while Auto track accepted quests is off", [
+        (T, ACCEPT_BOX,
+         '            local acceptBox = self:CreateCheckbox(content, L["Focus newly accepted quests"],\n'
+         '                function() return DB().focusAcceptedQuests ~= false end,\n'
+         '                function(v) DB().focusAcceptedQuests = v end,\n'
+         '                L["While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused."])\n'
+         '            display:Add(acceptBox)\n'
+         '            self:SetDependent(acceptBox, (ns:GetModule("DB"):General() or {}).autoTrackAccepted ~= false)\n')]),
+
+    ("the unfocus box's setter invalidates every row and redraws, for a key no row reads", [
+        (T, "                function(v) DB().clickToUnfocus = v end,\n",
+            "                function(v) DB().clickToUnfocus = v; ns:GetModule(\"Row\"):Invalidate(); render() end,\n")]),
+
+    ("the accept box's setter invalidates every row", [
+        (T, "                function(v) DB().focusAcceptedQuests = v end,\n",
+            "                function(v) DB().focusAcceptedQuests = v; ns:GetModule(\"Row\"):Invalidate() end,\n")]),
+
+    ("the Split quest click box's tooltip is overwritten with the unfocus box's", [
+        (T, ST_GUARD, '        if ns.Has.SuperTrack then\n'
+                      '            self:AttachTooltip(splitCheck, L["Click a focused quest to unfocus it"],\n'
+                      '                L["Click the focused quest again to unfocus it. With Split quest click on, click its icon."])\n'
+                      + ST_GUARD.split("\n", 1)[1])]),
+
+    ("turning Split quest click off also turns the unfocus option off", [
+        (T, SPLIT_BOX,
+         '        local splitCheck = self:CreateCheckbox(content, L["Split quest click"],\n'
+         '            function() return DB().splitQuestClick end,\n'
+         '            function(v) DB().splitQuestClick = v; if not v then DB().clickToUnfocus = false end; render() end)\n')]),
+
+    ("the Split quest click box reads ticked while the unfocus option is on", [
+        (T, SPLIT_BOX,
+         '        local splitCheck = self:CreateCheckbox(content, L["Split quest click"],\n'
+         '            function() return DB().splitQuestClick or DB().clickToUnfocus end,\n'
+         '            function(v) DB().splitQuestClick = v; render() end)\n')]),
+
+    ("the zone label's dimming is set up only where super-track exists, so Classic never dims it", [
+        (T, ZONE_SYNC, ""),
+        (T, ST_GUARD, ST_GUARD.split("\n", 1)[0] + "\n" + ZONE_SYNC.replace("        ", "            ")
+                      + ST_GUARD.split("\n", 1)[1])]),
+
+    ("the per-view pass dims the zone label only where super-track exists", [
+        (T, "        if content._syncZoneTag then content._syncZoneTag() end\n",
+            "        if ns.Has.SuperTrack and content._syncZoneTag then content._syncZoneTag() end\n")]),
+
+    ("Show quest level prefix also writes a neighbor's key", [
+        (T, "            rowSetting(\"showLevelInTracker\"))\n",
+            "            function() return DB().showLevelInTracker end,\n"
+            "            function(v) DB().showLevelInTracker = v; DB().showQuestID = v;"
+            " ns:GetModule(\"Row\"):Invalidate(); render() end)\n")]),
+
+    ("Simplify Mode reads ticked while a neighbor is on", [
+        (T, "            trackerSetting(\"simplifyMode\"))\n",
+            "            function() return DB().simplifyMode or DB().showOnlyWatched end,\n"
+            "            function(v) DB().simplifyMode = v; render() end)\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_tracker_tab: (\d+) passed, (\d+) failed$")

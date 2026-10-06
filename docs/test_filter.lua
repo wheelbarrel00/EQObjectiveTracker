@@ -4,7 +4,8 @@
 --     "C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe" docs/test_filter.lua
 --
 -- Data/Filter.lua loads WHOLE. It creates no frame and calls no game API, so an ns carrying
--- RegisterModule, L and two module stubs is a complete stand-in.
+-- RegisterModule, L and two module stubs is a complete stand-in. The DB stub is Core/DB.lua's own
+-- accessors, sliced, so a call written DB.Tracker() raises as it does in game.
 --
 -- WHAT EARNS THIS FILE is the campaign exemption from the current-zone filter. It must keep an
 -- out-of-zone campaign quest and ONLY that: not a normal quest, not a quest the player untracked
@@ -55,6 +56,33 @@ end
 
 -- ------------------------------------------------------------------------------ the world
 
+-- Core/DB.lua's accessors, sliced once, over a stub AceDB. Each reads through self, so a call
+-- written DB.Tracker() raises as it does in game.
+local accessors
+local function realDB(profile, char)
+    if not accessors then
+        accessors = {}
+        local good, err = pcall(function()
+            local src = readFile("Core/DB.lua"):gsub("\r\n", "\n")
+            for _, name in ipairs({ "Tracker", "Char" }) do
+                local head = "\nfunction DB:" .. name .. "()\n"
+                local a = src:find(head, 1, true)
+                local b = a and src:find("\nend\n", a + 1, true)
+                assert(a and b and not src:find(head, a + 1, true), "Core/DB.lua defines DB:" .. name .. " once")
+                local holder = {}
+                local chunk = assert(loadstring(src:sub(a + 1, b + 4), "DB:" .. name))
+                setfenv(chunk, { DB = holder })
+                chunk()
+                accessors[name] = holder[name]
+            end
+        end)
+        ok(good, "Core/DB.lua's accessors slice and load: " .. tostring(err))
+    end
+    local db = { db = { profile = profile, char = char } }
+    for name, fn in pairs(accessors) do db[name] = fn end
+    return db
+end
+
 -- A fresh module per call. Production has ONE Filter for the session, so the cases that drive
 -- two passes through the same module are the ones that can see a count never being reset.
 local function fresh(opts)
@@ -66,10 +94,9 @@ local function fresh(opts)
     modules.AutoQuestPopups = {
         IsSuppressed = function(_, id) return (opts.suppressed and opts.suppressed[id]) or false end,
     }
-    modules.DB = {
-        Char    = function() return { pinned = opts.pinned } end,
-        Tracker = function() return state.cfg end,
-    }
+    -- The profile hands over whatever state.cfg holds when it is read, as the cases swap it.
+    local profile = setmetatable({}, { __index = function(_, k) if k == "tracker" then return state.cfg end end })
+    modules.DB = realDB(profile, { pinned = opts.pinned })
     assert(loadfile(repoFile("Data/Filter.lua")))("EQObjectiveTracker", ns)
     local F = modules.Filter
     assert(F and F.Visible, "Data/Filter.lua never registered its module")
@@ -400,6 +427,7 @@ end
 local function trackerTab(campaign)
     local modules = {}
     local ns = {
+        Has = { SuperTrack = true },
         L = setmetatable({}, { __index = function(_, k) return k end }),
         Util = { Tooltip = function() return { Hide = function() end } end },
     }
@@ -407,7 +435,7 @@ local function trackerTab(campaign)
     local cfg = { filters = { onlyCurrentZone = true, campaignAnyZone = true, showNormal = false } }
     local spec
     modules.Options = { RegisterTab = function(_, s) spec = s end }
-    modules.DB = { Tracker = function() return cfg end }
+    modules.DB = realDB({ tracker = cfg })
     modules.Tracker = { Render = function() end }
     modules.Row = { Invalidate = function() end }
     modules.Media = { Play = function() end, GetSoundList = function() return {}, {} end }

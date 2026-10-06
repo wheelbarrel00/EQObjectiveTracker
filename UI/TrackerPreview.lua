@@ -35,7 +35,7 @@ function Preview:Samples()
     return {
         campaign = {
             quest(90001, "campaign", "A Shadow Over the Vale", {
-                tags  = { campaign = true },
+                tags  = { campaign = true }, zone = "Northern Vale",
                 icon  = { kind = ICON.QUESTPOI, classification = QC.Campaign },
                 lines = { { text = "Investigate the ruined watchtower", kind = LINE.OBJECTIVE },
                           { text = "0/3 Ancient tablets recovered", kind = LINE.OBJECTIVE } },
@@ -43,20 +43,20 @@ function Preview:Samples()
         },
         quests = {
             quest(90002, "quests", "Wolves at the Door", {
-                addedAt = time(),
+                addedAt = time(), zone = "Ashwood Glen",
                 lines = { { text = "4/8 Gray wolves slain", kind = LINE.OBJECTIVE },
                           { text = "Speak with the innkeeper", kind = LINE.OBJECTIVE } },
             }),
             quest(90003, "quests", "Cleansing the Grove", {
-                level = level + 3,
+                level = level + 3, zone = "Ashwood Glen",
                 lines = { { text = "Corruption purged", kind = LINE.PROGRESSBAR, current = 45, required = 100 } },
             }),
             quest(90004, "quests", "Supplies for the Outpost", {
-                state = STATE.COMPLETE, level = level - 4,
+                state = STATE.COMPLETE, level = level - 4, zone = "Northern Vale",
                 lines = { { text = "6/6 Crates delivered", kind = LINE.OBJECTIVE, completed = true } },
             }),
             quest(90005, "quests", "The Missing Scout", {
-                isFocused = true, subtitle = "Northern Vale",
+                isFocused = true, subtitle = "Northern Vale", zone = "Northern Vale",
                 lines = { { text = "Find the scout's trail", kind = LINE.OBJECTIVE } },
             }),
         },
@@ -106,7 +106,7 @@ function Preview:Build(panel)
     barBG:Hide()
     self.barBG = barBG
 
-    self.rows, self.headers = {}, {}
+    self.rows, self.headers, self.zoneHeads = {}, {}, {}
 end
 
 -- Kept apart from RowPool, which the tracker sweeps on every render, and deaf to the mouse, so a
@@ -131,6 +131,33 @@ function Preview:Header(groupID)
     return h
 end
 
+-- Outside the zone header pool and deaf to the mouse, like the section headers above.
+function Preview:ZoneHeader(key)
+    local h = self.zoneHeads[key]
+    if h then return h end
+    h = ns:GetModule("ZoneHeaders"):NewHeader(self.content)
+    h:EnableMouse(false)
+    self.zoneHeads[key] = h
+    return h
+end
+
+-- The samples list each zone's quests together, so their own order is the zone order.
+function Preview:Runs(list)
+    local runs, byZone = {}, {}
+    for _, e in ipairs(list) do
+        local run = byZone[e.zone]
+        if not run then
+            run = { zone = e.zone, entries = {}, count = 0 }
+            byZone[e.zone] = run
+            runs[#runs + 1] = run
+        end
+        run.count = run.count + 1
+        run.entries[run.count] = e
+        run.total = run.count
+    end
+    return runs
+end
+
 -- Every row is reset before it is drawn, so the repaint gate never keeps a height measured while
 -- the panel was hidden. A refresh made while it is hidden is drawn once more a frame later, once
 -- it is on screen, as the library sizes text again once a tab is shown.
@@ -145,6 +172,7 @@ function Preview:Refresh(again)
     local Tracker, Sections = ns:GetModule("Tracker"), ns:GetModule("Sections")
     local Row, Card = ns:GetModule("Row"), ns:GetModule("Card")
     local ZoneBar = ns:GetModule("ZoneProgressBar")
+    local Zones   = cfg.zoneHeaders and ns:GetModule("ZoneHeaders") or nil
     local content = self.content
 
     local pad, top, bottom = Tracker:Insets()
@@ -159,11 +187,12 @@ function Preview:Refresh(again)
 
     -- The tracker's own Row and Sections record two things the real tracker reads back: the
     -- followed row's icon probe for /eqot status, and the header height its world quest region
-    -- reserves. Both are put back once the preview has drawn.
+    -- reserves. Both are put back once the preview has drawn, and so is the zone header height.
     local keepProbe, keepProbeAt, keepHeaderH = Row._focusIcon, Row._focusIconAt, Sections._h
+    local keepZoneH = Zones and Zones._h
 
     local samples = self:Samples()
-    local drawnRows, drawnHeaders, zoneDrawn = {}, {}, false
+    local drawnRows, drawnHeaders, zoneDrawn, drawnZones = {}, {}, false, {}
     local y = 0
     for _, groupID in ipairs(Sections:Order()) do
         if Sections:IsVirtual(groupID) then
@@ -182,22 +211,33 @@ function Preview:Refresh(again)
             y = y + Sections:Place(h, content, y, { visibleCount = #list, totalCount = TOTALS[groupID] },
                                    false, showTotal) + gap
             drawnHeaders[groupID] = true
-            for _, entry in ipairs(list) do
-                local row = self:Row(entry.id)
-                row:SetWidth(inner)
-                row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
-                Row:Reset(row)
-                y = y + Row:Render(row, entry, inner, cfg) + gap
-                row:Show()
-                drawnRows[entry.id] = true
+            for _, run in ipairs(Zones and self:Runs(list) or { { entries = list } }) do
+                local left = 0
+                if run.zone then
+                    local key = groupID .. ":" .. run.zone
+                    y = y + Zones:Draw(self:ZoneHeader(key), content, groupID, run, y, cfg) + gap
+                    drawnZones[key] = true
+                    left = Zones:Indent(cfg)
+                end
+                for _, entry in ipairs(run.entries) do
+                    local row = self:Row(entry.id)
+                    row:SetWidth(inner - left)
+                    row:ClearAllPoints()
+                    row:SetPoint("TOPLEFT", content, "TOPLEFT", left, -y)
+                    Row:Reset(row)
+                    y = y + Row:Render(row, entry, inner - left, cfg) + gap
+                    row:Show()
+                    drawnRows[entry.id] = true
+                end
             end
         end
     end
     for id, row in pairs(self.rows) do if not drawnRows[id] then row:Hide() end end
     for id, h in pairs(self.headers) do if not drawnHeaders[id] then h:Hide() end end
+    for key, h in pairs(self.zoneHeads) do if not drawnZones[key] then h:Hide() end end
     if self.zoneBar and not zoneDrawn then self.zoneBar:Hide() end
     Row._focusIcon, Row._focusIconAt, Sections._h = keepProbe, keepProbeAt, keepHeaderH
+    if Zones then Zones._h = keepZoneH end
 
     content:SetSize(inner, math.max(1, y))
 

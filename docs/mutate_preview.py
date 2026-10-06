@@ -56,9 +56,9 @@ MUTANTS = [
 
     # --------------------------------------------------------------------------- the samples
     ("the campaign quest loses its tag, so the tint never shows", [
-        (P, "                tags  = { campaign = true },\n", "")]),
+        (P, "                tags  = { campaign = true }, zone", "                zone")]),
     ("no sample is new", [
-        (P, "                addedAt = time(),\n", "")]),
+        (P, "                addedAt = time(), zone", "                zone")]),
     ("the progress bar sample is a plain line", [
         (P, 'kind = LINE.PROGRESSBAR, current = 45, required = 100', 'kind = LINE.OBJECTIVE, current = 45, required = 100')]),
     ("no sample is complete", [
@@ -66,7 +66,7 @@ MUTANTS = [
     ("no sample is followed", [
         (P, '                isFocused = true, subtitle = "Northern Vale",', '                subtitle = "Northern Vale",')]),
     ("every sample is one level, so the difficulty colors all match", [
-        (P, "                level = level + 3,\n", "")]),
+        (P, "                level = level + 3, zone", "                zone")]),
     ("the samples claim a provider of their own, so no quest-only title option reaches them", [
         (P, 'local e = { id = id, providerID = "quests",', 'local e = { id = id, providerID = "preview",')]),
 
@@ -76,7 +76,7 @@ MUTANTS = [
     ("a sample row answers the mouse", [
         (P, "    row:EnableMouse(false)\n", "")]),
     ("a preview header collapses the player's section on a click", [
-        (P, "    h:EnableMouse(false)\n", "")]),
+        (P, "    h:EnableMouse(false)\n    self.headers[groupID] = h\n", "    self.headers[groupID] = h\n")]),
     ("the repaint gate keeps a height measured while hidden", [
         (P, "                Row:Reset(row)\n", "")]),
     ("rows are drawn at the tracker's full width, over the scroll bar", [
@@ -100,7 +100,36 @@ MUTANTS = [
     ("headers no longer drawn stay on screen", [
         (P, "    for id, h in pairs(self.headers) do if not drawnHeaders[id] then h:Hide() end end\n", "")]),
     ("rows stack with no gap", [
-        (P, "                y = y + Row:Render(row, entry, inner, cfg) + gap", "                y = y + Row:Render(row, entry, inner, cfg)")]),
+        (P, "                    y = y + Row:Render(row, entry, inner - left, cfg) + gap", "                    y = y + Row:Render(row, entry, inner - left, cfg)")]),
+
+    # --------------------------------------------------------------------------- the zone headers
+    ("the samples sit in one zone", [
+        (P, "                addedAt = time(), zone = \"Ashwood Glen\",", "                addedAt = time(), zone = \"Northern Vale\",")]),
+    ("the preview draws zone headers with the option off", [
+        (P, "    local Zones   = cfg.zoneHeaders and ns:GetModule(\"ZoneHeaders\") or nil", "    local Zones   = ns:GetModule(\"ZoneHeaders\")")]),
+    ("every sample quest gets a zone of its own", [
+        (P, "        local run = byZone[e.zone]\n", "        local run = nil\n")]),
+    ("a preview zone header collapses a zone on a click", [
+        (P, "    h:EnableMouse(false)\n    self.zoneHeads[key] = h\n", "    self.zoneHeads[key] = h\n")]),
+    ("preview zone headers are made afresh every refresh", [
+        (P, "    local h = self.zoneHeads[key]\n    if h then return h end\n", "    local h\n")]),
+    ("no gap under a preview zone header", [
+        (P, "y = y + Zones:Draw(self:ZoneHeader(key), content, groupID, run, y, cfg) + gap",
+            "y = y + Zones:Draw(self:ZoneHeader(key), content, groupID, run, y, cfg)")]),
+    ("the preview's rows are not indented under a zone", [
+        (P, "                    left = Zones:Indent(cfg)\n", "")]),
+    ("an indented preview row keeps the full width", [
+        (P, "                    row:SetWidth(inner - left)\n", "                    row:SetWidth(inner)\n")]),
+    ("an indented preview row is laid out at the full width", [
+        (P, "Row:Render(row, entry, inner - left, cfg)", "Row:Render(row, entry, inner, cfg)")]),
+    ("preview zone headers stay up once the option is off", [
+        (P, "    for key, h in pairs(self.zoneHeads) do if not drawnZones[key] then h:Hide() end end\n", "")]),
+    ("the preview hides every zone header it drew", [
+        (P, "                    drawnZones[key] = true\n", "")]),
+    ("the preview hides the zone headers it drew and keeps the rest", [
+        (P, "if not drawnZones[key] then h:Hide() end", "if drawnZones[key] then h:Hide() end")]),
+    ("the preview leaves its zone header height on the tracker's module", [
+        (P, "    if Zones then Zones._h = keepZoneH end\n", "")]),
 
     # --------------------------------------------------------------------------- the zone section
     ("the zone section shows while the bar floats", [

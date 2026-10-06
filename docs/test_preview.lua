@@ -8,7 +8,8 @@
 -- Part one loads the preview over stub modules that record every call: which sections it draws and
 -- in what order, the samples it hands Row, the header counts, the zone section, the gaps, the view it
 -- leaves for the scroll bar, the fit to the panel, the opacity, the skins, and that nothing it builds
--- answers the mouse or borrows the tracker's pooled rows and headers.
+-- answers the mouse or borrows the tracker's pooled rows and headers. With zone headers on, each
+-- sample zone's header is drawn, left shown across refreshes, and hidden once the option goes off.
 --
 -- Part two loads the REAL UI/Tracker.lua, UI/Sections.lua and UI/ZoneProgressBar.lua and drives the
 -- methods the preview needs from them: the backdrop and scroll bar skins, the gutter, the insets, a
@@ -25,6 +26,23 @@ local function repoFile(rel)
 end
 
 local pass, fail = 0, 0
+-- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
+-- stand-in raises the same way, rather than answering a call the client would refuse.
+local function strictDB(methods)
+    local db = {}
+    for name, v in pairs(methods) do
+        if type(v) == "function" then
+            db[name] = function(self, ...)
+                if self ~= db then error("DB:" .. name .. " called without self", 2) end
+                return v(self, ...)
+            end
+        else
+            db[name] = v
+        end
+    end
+    return db
+end
+
 local function ok(cond, msg)
     if cond then pass = pass + 1 else fail = fail + 1 print("FAIL: " .. msg) end
 end
@@ -133,10 +151,29 @@ local function previewWorld(o)
     local m = ns.modules
     loadInto("Data/Entry.lua", ns, {})
     local log = { headers = {}, place = {}, rows = {}, built = 0, resets = 0, render = {},
-                  skins = {}, docked = {}, bars = 0, frames = {} }
+                  skins = {}, docked = {}, bars = 0, frames = {}, zoneHeads = {}, zoneDraws = {} }
     local cfg = o.cfg or { width = 305, blockSpacing = 2 }
     log.cfg = cfg
-    m.DB = { Tracker = function() return cfg end }
+    m.DB = strictDB({ Tracker = function() return cfg end })
+    -- Writes the shared height as the real ApplyStyle does, so the preview's restore is seen. Has no
+    -- Place and no pool: the preview must reach neither.
+    m.ZoneHeaders = {
+        NewHeader = function(_, parent)
+            local h = region("Button", parent)
+            h.mouse = true
+            log.zoneHeads[#log.zoneHeads + 1] = h
+            return h
+        end,
+        Draw = function(self, h, content, groupID, run, y, c)
+            log.zoneDraws[#log.zoneDraws + 1] = { h = h, content = content, groupID = groupID, zone = run.zone,
+                                                  count = run.count, total = run.total, y = y, cfg = c }
+            self._h = 20
+            log.zoneHeightWrites = (log.zoneHeightWrites or 0) + 1
+            h:Show()
+            return 20, false
+        end,
+        Indent = function(_, c) return c.zoneHeaders and (c.zoneHeaderIndent or 8) or 0 end,
+    }
     m.Tracker = {
         Insets = function() return 4, 14, 16 end,
         ScrollGutter = function(_, c) return c.hideScrollBar and 8 or 26 end,
@@ -297,6 +334,70 @@ case("the sample quests cover each way a row can look", function()
     ok(wolves.level == 60 and grove.level == 63 and supplies.level == 56,
        "levels around the player's, so the difficulty colors differ")
     ok(s.quests[1] ~= w.P:Samples().quests[1], "made fresh each time, so the clock and level stay current")
+    ok(wolves.zone == "Ashwood Glen" and grove.zone == "Ashwood Glen" and supplies.zone == "Northern Vale"
+       and scout.zone == "Northern Vale" and camp.zone == "Northern Vale",
+       "the quests sit in two zones, each zone's quests together, for the zone headers")
+    ok(scout.subtitle == scout.zone, "and the zone tag names the zone the quest sits in")
+end)
+
+case("with zone headers on, each sample zone gets a header of the preview's own, its rows indented", function()
+    local w = built({ cfg = { width = 305, blockSpacing = 2, zoneHeaders = true, zoneHeaderIndent = 10 } })
+    w.P:Refresh()
+    local d = w.zoneDraws
+    ok(#d == 3, "three zone headers: one in Campaign and two in Quests: " .. #d)
+    local seq = {}
+    for _, z in ipairs(d) do seq[#seq + 1] = z.groupID .. ":" .. tostring(z.zone) .. "@" .. z.y end
+    local y1 = 26 + 2
+    local y2 = y1 + 20 + 2 + 40 + 2
+    local y3 = y2 + 26 + 2
+    local y4 = y3 + 20 + 2 + 40 + 2 + 40 + 2
+    local want = ("campaign:Northern Vale@%d quests:Ashwood Glen@%d quests:Northern Vale@%d"):format(y1, y3, y4)
+    ok(table.concat(seq, " ") == want, "each zone under its section header, in sample order: " .. table.concat(seq, " "))
+    ok(w.place[2] and w.place[2].y == y2, "the Quests section header follows the campaign zone and its row")
+    ok(d[2].count == 2 and d[2].total == 2 and d[3].count == 2, "each counts its own two quests")
+    ok(d[1].content == w.P.content and d[1].cfg == w.cfg, "drawn into the preview's content with the tracker's settings")
+    for _, r in ipairs(w.render) do
+        ok(r.width == 279 - 10 and r.row.w == 269 and r.row.points[1][4] == 10,
+           "row " .. tostring(r.entry.id) .. " is drawn at the indent and narrowed by it")
+    end
+    ok(#w.zoneHeads == 3, "three headers made")
+    for _, h in ipairs(w.zoneHeads) do
+        ok(h.mouse == false and h.parent == w.P.content, "deaf to the mouse, so a click collapses nothing")
+    end
+    ok(w.render[2].entry.id == 90002 and w.render[3].entry.id == 90003 and w.render[4].entry.id == 90004,
+       "the rows follow their zones")
+    local shown = 0
+    for _, h in ipairs(w.zoneHeads) do if h.shown then shown = shown + 1 end end
+    ok(shown == 3, "and every header drawn is left shown: " .. shown)
+    w.P:Refresh()
+    ok(#w.zoneHeads == 3, "a second refresh reuses them: " .. #w.zoneHeads)
+    shown = 0
+    for _, h in ipairs(w.zoneHeads) do if h.shown then shown = shown + 1 end end
+    ok(shown == 3, "and leaves them shown: " .. shown)
+    ok(w.P.content.h == y4 + 20 + 2 + 40 + 2 + 40 + 2, "the content counts every zone header: " .. tostring(w.P.content.h))
+end)
+
+case("zone headers switched off in the preview go, and the rows come back to the edge", function()
+    local w = built({ cfg = { width = 305, blockSpacing = 2, zoneHeaders = true } })
+    w.P:Refresh()
+    w.cfg.zoneHeaders = false
+    local before = #w.zoneDraws
+    w.P:Refresh()
+    ok(#w.zoneDraws == before, "nothing more is drawn")
+    for _, h in ipairs(w.zoneHeads) do ok(not h.shown, "every zone header is hidden") end
+    local last = w.render[#w.render]
+    ok(last.width == 279 and last.row.points[1][4] == 0, "and the rows are back at the full width")
+end)
+
+case("drawing leaves the zone header height as it found it", function()
+    local w = built({ cfg = { width = 305, blockSpacing = 2, zoneHeaders = true } })
+    local Z = w.ns:GetModule("ZoneHeaders")
+    Z._h = 23
+    w.P:Refresh()
+    ok((w.zoneHeightWrites or 0) > 0 and Z._h == 23, "the sample headers wrote it, and it was put back: " .. tostring(Z._h))
+    Z._h = nil
+    w.P:Refresh()
+    ok(Z._h == nil, "and where the tracker had drawn none, nothing is left")
 end)
 
 case("a refresh draws the sections in the tracker's order, with the samples", function()
@@ -524,7 +625,7 @@ end)
 
 local function trackerFile()
     local ns = newNs()
-    ns.modules.DB = { Tracker = function() return ns.cfg end }
+    ns.modules.DB = strictDB({ Tracker = function() return ns.cfg end })
     loadInto("UI/Tracker.lua", ns, { CreateFrame = newCreateFrame(), InCombatLockdown = function() return false end })
     return ns.modules.Tracker, ns
 end
@@ -593,7 +694,7 @@ end)
 
 local function sectionsFile()
     local ns = newNs()
-    ns.modules.DB = { Tracker = function() return {} end, Char = function() return {} end }
+    ns.modules.DB = strictDB({ Tracker = function() return {} end, Char = function() return {} end })
     ns.modules.Media = { ApplyFont = function() end }
     loadInto("UI/Sections.lua", ns, { CreateFrame = newCreateFrame() })
     return ns.modules.Sections
@@ -636,7 +737,7 @@ local function zoneFile(o)
     local ns = newNs()
     ns.blizzard = o.blizzard
     local cfg = { showZoneProgressBar = o.on, zoneProgressLocation = o.where }
-    ns.modules.DB = { Tracker = function() return cfg end }
+    ns.modules.DB = strictDB({ Tracker = function() return cfg end })
     ns.modules.Media = { GetStatusBarFile = function() return "bar.tga" end, ApplyFont = function() end }
     loadInto("UI/ZoneProgressBar.lua", ns, { CreateFrame = newCreateFrame(), BackdropTemplateMixin = {} })
     return ns.modules.ZoneProgressBar

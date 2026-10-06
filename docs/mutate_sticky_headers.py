@@ -52,7 +52,8 @@ MUTANTS = [
         (T, "    if cur < n and offset > tops[cur + 1] then push = offset - tops[cur + 1] end\n", "")]),
 
     ("the push is measured from the band's own section", [
-        (T, "push = offset - tops[cur + 1] end", "push = offset - tops[cur] end")]),
+        (T, "    if cur < n and offset > tops[cur + 1] then push = offset - tops[cur + 1] end\n",
+            "    if cur < n and offset > tops[cur + 1] then push = offset - tops[cur] end\n")]),
 
     ("the last section is pushed by an entry past n", [
         (T, "    if cur < n and offset > tops[cur + 1] then", "    if tops[cur + 1] and offset > tops[cur + 1] then")]),
@@ -145,7 +146,88 @@ MUTANTS = [
         (T, "            setRegionHeight(sticky, bandH)", "            sticky:SetHeight(bandH)")]),
 
     ("the band is a header tall with no gap under it", [
-        (T, "(Sections:Height() + gap) or 1", "(Sections:Height()) or 1")]),
+        (T, "        local row1 = Sections:Height() + gap\n", "        local row1 = Sections:Height()\n")]),
+
+    # ------------------------------------------------- the zone row (zone headers, 2.2.0)
+    ("the band never grows a zone row", [
+        (T, "        local row2 = (stickyZ > 0) and (ZoneHeaders:Height() + gap) or 0\n", "        local row2 = 0\n")]),
+    ("the band always keeps a zone row", [
+        (T, "        local row2 = (stickyZ > 0) and (ZoneHeaders:Height() + gap) or 0\n",
+            "        local row2 = ZoneHeaders:Height() + gap\n")]),
+    ("the zone row never knows a zone was drawn", [
+        (T, "f._stickyH, f._stickyRow1, f._stickyRow2, f._stickyZoned = bandH, row1, row2, stickyZ > 0",
+            "f._stickyH, f._stickyRow1, f._stickyRow2, f._stickyZoned = bandH, row1, row2, false")]),
+    ("the zone runs are never cleared between passes", [
+        (T, "    wipe(zFirst)\n    wipe(zLast)\n", "")]),
+    ("the zone row does not clip, so a pushed zone draws over the section header", [
+        (T, "        if row.SetClipsChildren then row:SetClipsChildren(true) end\n", "")]),
+    ("the zone row stays put while its section is pushed", [
+        (T, '    row:SetPoint("TOPLEFT",  band, "TOPLEFT",  0, push - row1)\n'
+            '    row:SetPoint("TOPRIGHT", band, "TOPRIGHT", 0, push - row1)\n',
+            '    row:SetPoint("TOPLEFT",  band, "TOPLEFT",  0, -row1)\n'
+            '    row:SetPoint("TOPRIGHT", band, "TOPRIGHT", 0, -row1)\n')]),
+    ("the zone row is a section row tall", [
+        (T, "    row:SetHeight(row2)\n", "    row:SetHeight(row1)\n")]),
+    ("a zone takes the row as soon as its header reaches the top", [
+        (T, "        if tops[i] + rowH <= offset then cur = i else break end", "        if tops[i] <= offset then cur = i else break end")]),
+    ("a zone is pushed from its own top, not the next one's", [
+        (T, "    if cur < last and offset > tops[cur + 1] then push = offset - tops[cur + 1] end\n",
+            "    if cur < last and offset > tops[cur + 1] then push = offset - tops[cur] end\n")]),
+    ("no zone is ever pushed", [
+        (T, "    if cur < last and offset > tops[cur + 1] then push = offset - tops[cur + 1] end\n", "")]),
+    ("a section's last zone is pushed by the next section's first", [
+        (T, "    if cur < last and offset > tops[cur + 1] then", "    if offset > tops[cur + 1] then")]),
+    ("a section's last zone is pushed by the next section's first, where there is one", [
+        (T, "    if cur < last and offset > tops[cur + 1] then", "    if tops[cur + 1] and offset > tops[cur + 1] then")]),
+    ("the zone row never comes back once hidden", [
+        (T, "    row:SetHeight(row2)\n    row:Show()\n", "    row:SetHeight(row2)\n")]),
+    ("a zone is pushed without clipping", [
+        (T, "    if not (clip and row.SetClipsChildren) then zpush = 0 end\n", "")]),
+    ("the incoming zone sits on the current one", [
+        (T, "placeHead(b, row, zpush - row2)", "placeHead(b, row, zpush)")]),
+    ("the next section's first zone never comes in", [
+        (T, "    local nf = push > 0 and f._stickyZFirst[cur + 1]\n", "    local nf = false\n")]),
+    ("the next section's first zone shows at rest", [
+        (T, "    local nf = push > 0 and f._stickyZFirst[cur + 1]\n", "    local nf = f._stickyZFirst[cur + 1]\n")]),
+    ("the next section's first zone ignores where the list has it", [
+        (T, "placeHead(c, band, offset - tops[nf] - bandH)", "placeHead(c, band, push - bandH)")]),
+    ("a zone that drew nothing still gets its slot shown", [
+        (T, "    if not ZoneHeaders:Mirror(h, zoneKey) then return nil end\n", "    ZoneHeaders:Mirror(h, zoneKey)\n")]),
+    ("a band zone copy is restyled every scroll step", [
+        (T, "    if h._gen ~= ZoneHeaders.gen then\n", "    if true then\n")]),
+    ("a band zone copy never records the render it was styled for", [
+        (T, "        h._gen = ZoneHeaders.gen\n", "")]),
+    ("a band zone copy is styled only when made, so a hidden one keeps an old look", [
+        (T, "    if h._gen ~= ZoneHeaders.gen then\n", "    if h._gen == nil then\n")]),
+    ("a band zone copy is styled before its text is in", [
+        (T, "    if not ZoneHeaders:Mirror(h, zoneKey) then return nil end\n", ""),
+        (T, "    return h\nend\n\nlocal function hideZoneHeads",
+            "    if not ZoneHeaders:Mirror(h, zoneKey) then return nil end\n    return h\nend\n\nlocal function hideZoneHeads")]),
+    ("with no zone drawn the copies stay up", [
+        (T, "    if not f._stickyZoned then\n        hideZoneHeads(band)\n", "    if not f._stickyZoned then\n")]),
+    ("with no zone drawn the status line keeps the last zone", [
+        (T, "        self._stickyZone = nil\n        return\n", "        return\n")]),
+    ("switching the band off leaves its zone copies up", [
+        (T, "        for i = 1, #heads do heads[i]:Hide() end\n        hideZoneHeads(band)\n",
+            "        for i = 1, #heads do heads[i]:Hide() end\n")]),
+    ("hiding the zone copies leaves the row up", [
+        (T, "    if band.zoneRow then band.zoneRow:Hide() end\n", "")]),
+    ("a scroll step never updates the zone row", [
+        (T, "    self:_UpdateStickyZones(band, cur, push, offset, band.SetClipsChildren ~= nil)\n", "")]),
+    ("Render styles the shown zone copies itself again", [
+        (T, "    for i = 1, (heads and #heads or 0) do Sections:ApplyStyle(heads[i]) end\n",
+            "    for i = 1, (heads and #heads or 0) do Sections:ApplyStyle(heads[i]) end\n"
+            "    for _, h in pairs(f.stickyBand and f.stickyBand.zoneHeads or {}) do\n"
+            "        if h:IsShown() then ZoneHeaders:ApplyStyle(h, cfg) end\n"
+            "    end\n")]),
+    ("the band is built without its zone header list", [
+        (T, "    stickyBand.zoneHeads = {}\n", "")]),
+    ("the hover ignores the band's zone copies", [
+        (V, "    if zoneHeads and (over(zoneHeads[1]) or over(zoneHeads[2]) or over(zoneHeads[3])) then return true end\n", "")]),
+    ("the hover counts only the band's current zone", [
+        (V, "(over(zoneHeads[1]) or over(zoneHeads[2]) or over(zoneHeads[3]))", "(over(zoneHeads[1]))")]),
+    ("the status line never names the zone", [
+        (T, 'f._stickyZoned and tostring(self._stickyZone) or "row off"', '"row off"')]),
 
     ("Render never updates the band", [
         (T, "    self:_UpdateSticky()\n", "")]),
@@ -206,6 +288,33 @@ MUTANTS = [
 
     ("a missing zone bar module reads as a drawn section", [
         (T, "    if not ZoneBar then return 0, false end", "    if not ZoneBar then return 0, true end")]),
+
+    # ------------------------------------------------- the second scan's hand-breaks (zone row)
+    # Each survived the harness green until the rig read the profile through Core/DB.lua's own
+    # DB:Tracker, recorded the settings each copy was styled with, and ran Render's zone arrays block.
+    ("a band zone copy is styled with no settings, which raises in game", [
+        (T, "        ZoneHeaders:ApplyStyle(h, ns:GetModule(\"DB\"):Tracker())\n", "        ZoneHeaders:ApplyStyle(h)\n")]),
+
+    ("a band zone copy reads the profile with a dot call, which raises in game", [
+        (T, "        ZoneHeaders:ApplyStyle(h, ns:GetModule(\"DB\"):Tracker())\n",
+            "        ZoneHeaders:ApplyStyle(h, ns:GetModule(\"DB\").Tracker())\n")]),
+
+    ("a band zone copy is styled from empty settings, so it wears the default look", [
+        (T, "        ZoneHeaders:ApplyStyle(h, ns:GetModule(\"DB\"):Tracker())\n", "        ZoneHeaders:ApplyStyle(h, {})\n")]),
+
+    ("Render never keeps the band's zone arrays on the frame", [
+        (T, "        f._stickyZKeys, f._stickyZTops, f._stickyZFirst, f._stickyZLast = zKeys, zTops, zFirst, zLast\n", "")]),
+
+    ("the band's zone tops and section firsts are kept crosswise on the frame", [
+        (T, "        f._stickyZKeys, f._stickyZTops, f._stickyZFirst, f._stickyZLast = zKeys, zTops, zFirst, zLast\n",
+            "        f._stickyZKeys, f._stickyZTops, f._stickyZFirst, f._stickyZLast = zKeys, zFirst, zTops, zLast\n")]),
+
+    ("a first zone below the band raises before it reaches the row", [
+        (T, "    if not cur then return nil, 0 end\n", "")]),
+
+    ("the next section's first zone comes in without the range check, so a leftover key shows", [
+        (T, "    local c = nf and nf <= (f._stickyZLast[cur + 1] or 0) and stickyZoneHead(band, 3, band, keys[nf])\n",
+            "    local c = nf and stickyZoneHead(band, 3, band, keys[nf])\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_sticky_headers: (\d+) passed, (\d+) failed$")

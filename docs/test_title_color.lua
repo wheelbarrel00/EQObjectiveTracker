@@ -32,6 +32,23 @@ local function readFile(rel)
 end
 
 local pass, fail = 0, 0
+-- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
+-- stand-in raises the same way, rather than answering a call the client would refuse.
+local function strictDB(methods)
+    local db = {}
+    for name, v in pairs(methods) do
+        if type(v) == "function" then
+            db[name] = function(self, ...)
+                if self ~= db then error("DB:" .. name .. " called without self", 2) end
+                return v(self, ...)
+            end
+        else
+            db[name] = v
+        end
+    end
+    return db
+end
+
 local function ok(cond, msg)
     if cond then pass = pass + 1 else fail = fail + 1 print("FAIL: " .. msg) end
 end
@@ -332,7 +349,7 @@ case("the status line reads the mode and the client's colors", function()
                                     "title-line"))
     local cfg = { titleColorMode = "original" }
     setfenv(chunk, setmetatable({ Row = Row, Util = Util,
-        ns = { GetModule = function() return { Tracker = function() return cfg end } end } }, { __index = _G }))
+        ns = { GetModule = function() return strictDB({ Tracker = function() return cfg end }) end } }, { __index = _G }))
     chunk()
     local line = Row:TitleColorLine()
     ok(line == "title color: original | original 0.75 0.61 0.00, finished 1.00 0.82 0.00, hover none", "watch: " .. line)

@@ -18,7 +18,7 @@ globals = {
 
 read_globals = {
     -- Lua-side Blizzard shims
-    "wipe", "tremove", "tinsert", "strsplit", "strtrim", "strjoin", "format",
+    "wipe", "tremove", "tinsert", "strsplit", "strtrim", "strjoin", "format", "strcmputf8i",
     "CopyTable", "Mixin", "CreateFromMixins", "geterrorhandler", "securecall",
     "date", "time", "bit",
 

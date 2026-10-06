@@ -4,14 +4,19 @@
 --     "C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe" docs/test_tracker_tab.lua
 --
 -- The tab loads WHOLE over a stub context that records every control, and stub modules that
--- record the calls these cases check. The Filters card has its own cases in test_filter.lua. This
--- file covers the rest: Sort Order and its Manual hint, Simplify tracked achievements, the section
--- show boxes, the World Quests height controls, World Quests Position, the Section Order rows and
--- their chevrons, the difficulty box staying gone, the display boxes, Keep section headers in
--- view and the three sounds.
+-- record the calls these cases check. As the library does, the context appends each checkbox,
+-- slider, dropdown and radio group to its parent's _controls, which only the tab's content
+-- carries, so a control built on a card raises. The Filters card has its own cases in
+-- test_filter.lua. This file covers the rest: Sort Order and its Manual hint, Simplify tracked
+-- achievements, the section show boxes, the World Quests height controls, World Quests Position,
+-- the Section Order rows and their chevrons, the difficulty box staying gone, the display boxes
+-- (each writing and reading only its own key), Keep section headers in view, the two focus boxes
+-- (on clients with super-track only) and the three sounds.
 --
 -- Every lookup in the locale table reads "<key>", so a hard-coded English string cannot pass for
--- a translated one.
+-- a translated one. The DB module is Core/DB.lua's own accessors, sliced, over a stub profile, so
+-- a call written DB.Tracker() raises as it does in game, and Classic is Has.SuperTrack false, as
+-- Core/Compat.lua sets it.
 --
 -- OUT OF SCOPE BY CONSTRUCTION: what the library draws, and what the tracker does with a setting.
 
@@ -36,6 +41,45 @@ local function K(key) return "<" .. key .. ">" end
 
 local function near(a, b) return type(a) == "number" and math.abs(a - b) < 0.0001 end
 
+-- Core/DB.lua's accessors, sliced once. Each reads through self, so a dot call raises.
+local accessors
+local function realDB(profile)
+    if not accessors then
+        local fh = assert(io.open(repoFile("Core/DB.lua"), "rb"))
+        local src = fh:read("*a"):gsub("\r\n", "\n")
+        fh:close()
+        accessors = {}
+        for _, name in ipairs({ "Tracker", "General" }) do
+            local head = "\nfunction DB:" .. name .. "()\n"
+            local a = src:find(head, 1, true)
+            local b = a and src:find("\nend\n", a + 1, true)
+            assert(a and b and not src:find(head, a + 1, true), "Core/DB.lua defines DB:" .. name .. " once")
+            local holder = {}
+            local chunk = assert(loadstring(src:sub(a + 1, b + 4), "DB:" .. name))
+            setfenv(chunk, { DB = holder })
+            chunk()
+            accessors[name] = holder[name]
+        end
+    end
+    local db = { db = { profile = profile } }
+    for name, fn in pairs(accessors) do db[name] = fn end
+    return db
+end
+
+-- Every key that differs between two shallow copies of the saved settings.
+local function copy(t)
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    return out
+end
+local function changed(before, after)
+    local keys = {}
+    for k, v in pairs(after) do if before[k] ~= v then keys[#keys + 1] = tostring(k) end end
+    for k in pairs(before) do if after[k] == nil then keys[#keys + 1] = tostring(k) end end
+    table.sort(keys)
+    return table.concat(keys, ",")
+end
+
 local function frame()
     local f = { shown = true, scripts = {}, enabled = true }
     function f:SetPoint() end
@@ -52,14 +96,16 @@ local function frame()
 end
 
 -- o.order is the tracker's section order, o.known the sections the TOC loaded, o.tags the
--- provider tags, o.cfg the saved settings.
+-- provider tags, o.cfg the saved settings, o.gen the general ones, o.has the client's
+-- capabilities (retail's by default).
 local function trackerTab(o)
     o = o or {}
-    local st = { cfg = o.cfg or { filters = {} }, render = 0, invalidate = 0, icons = 0, played = {}, moves = {},
+    local st = { cfg = o.cfg or { filters = {} }, gen = o.gen or {}, render = 0, invalidate = 0, icons = 0, played = {}, moves = {},
                  hidden = {}, tipHides = 0, arrows = {}, dims = {}, measured = {}, wqPositions = {},
                  order = o.order or { "campaign", "quests", "achievements" } }
     local modules = {}
     local ns = {
+        Has = o.has or { SuperTrack = true },
         L = setmetatable({}, { __index = function(_, k) return K(k) end }),
         Util = { Tooltip = function()
             return { Hide = function() st.tipHides = st.tipHides + 1 end, SetOwner = function() end,
@@ -69,7 +115,7 @@ local function trackerTab(o)
     function ns:GetModule(name) return modules[name] end
     local spec
     modules.Options = { RegisterTab = function(_, s) spec = s end }
-    modules.DB = { Tracker = function() return st.cfg end }
+    modules.DB = realDB({ tracker = st.cfg, general = st.gen })
     st.seq = {}
     modules.Tracker = {
         Render = function() st.render = st.render + 1; st.seq[#st.seq + 1] = "render" end,
@@ -108,6 +154,12 @@ local function trackerTab(o)
     modules.Registry = { HasTag = function(_, tag) return tags[tag] == true end }
 
     local ui = { boxes = {}, dropdowns = {}, cards = {}, sliders = {}, radios = {} }
+    -- The library appends each of these controls to its parent's _controls, which only the tab's
+    -- content carries (Libs/EverythingUI/Controls.lua), so one built on a card or on nothing
+    -- raises here as it does in game.
+    local function adopt(parent, f)
+        parent._controls[#parent._controls + 1] = f
+    end
     function ui:CreateGroup(_, label)
         local card = frame()
         card.title, card.rows, card.label = label, {}, frame()
@@ -122,27 +174,31 @@ local function trackerTab(o)
         ui.cards[label] = card
         return card
     end
-    function ui:CreateCheckbox(_, label, getter, setter, tooltip)
+    function ui:CreateCheckbox(parent, label, getter, setter, tooltip)
         local f = frame()
         f.label, f.getter, f.setter, f.tooltip = label, getter, setter, tooltip
+        adopt(parent, f)
         ui.boxes[label] = f
         return f
     end
-    function ui:CreateSlider(_, label, minV, maxV, step, getter, setter, tooltip)
+    function ui:CreateSlider(parent, label, minV, maxV, step, getter, setter, tooltip)
         local f = frame()
         f.label, f.min, f.max, f.step, f.getter, f.setter, f.tooltip = label, minV, maxV, step, getter, setter, tooltip
+        adopt(parent, f)
         ui.sliders[label] = f
         return f
     end
-    function ui:CreateDropdown(_, label, options, getter, setter, tooltip, _, onTest)
+    function ui:CreateDropdown(parent, label, options, getter, setter, tooltip, _, onTest)
         local f = frame()
         f.label, f.options, f.getter, f.setter, f.tooltip, f.onTest = label, options, getter, setter, tooltip, onTest
+        adopt(parent, f)
         ui.dropdowns[label] = f
         return f
     end
-    function ui:CreateRadioGroup(_, label, options, getter, setter, _, _, tipTitle, tipBody)
+    function ui:CreateRadioGroup(parent, label, options, getter, setter, _, _, tipTitle, tipBody)
         local f = frame()
         f.label, f.options, f.getter, f.setter, f.tipTitle, f.tipBody = label, options, getter, setter, tipTitle, tipBody
+        adopt(parent, f)
         ui.radios[label] = f
         return f
     end
@@ -154,13 +210,15 @@ local function trackerTab(o)
         st.arrows[#st.arrows + 1] = f
         return f
     end
-    function ui:AttachTooltip() end
+    function ui:AttachTooltip(f, title, body)
+        if f then f.tipTitle, f.tipBody = title, body end
+    end
     function ui:SetDependent(control, on) st.dims[control] = on and true or false end
     function ui:MeasureContent(content) st.measured[#st.measured + 1] = content end
     function ui:Spacing() return 10 end
 
     assert(loadfile(repoFile("Options/TabTracker.lua")))("EQObjectiveTracker", ns)
-    st.content = {}
+    st.content = { _controls = {} }
     spec.build(ui, st.content)
     st.ui, st.spec = ui, spec
     return st
@@ -418,7 +476,34 @@ case("Quest Title Color By Difficulty is no longer on this tab", function()
     for label in pairs(st.ui.boxes) do
         ok(not label:find("Difficulty", 1, true), "no box names difficulty: " .. label)
     end
-    ok(st.spec.refresh == nil, "and the tab needs no per-view pass now that nothing on it dims from Appearance")
+end)
+
+-- Its master, Show zone headers, is on the Appearance tab, so this tab sets its dimming again on every view.
+case("the zone label box dims while zone headers are on, and each view dims it again", function()
+    local st  = trackerTab()
+    local box = st.ui.boxes[K"Show zone label under quest titles"]
+    ok(box ~= nil and st.dims[box] == true, "lit at build while zone headers are off")
+    ok(box and box.tipBody == K"Adds the quest log heading each quest came from as a small line under its title. Not shown while Show zone headers is on, on the Appearance tab.",
+       "and its tooltip says when it is not shown")
+    ok(type(st.spec.refresh) == "function", "the tab has a per-view pass")
+    st.cfg.zoneHeaders = true
+    if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
+    ok(st.dims[box] == false, "a view with zone headers on dims it")
+    st.cfg.zoneHeaders = false
+    if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
+    ok(st.dims[box] == true, "and a view with them off lights it again")
+    box.setter(true)
+    ok(st.cfg.showZoneTag == true, "dimmed or not, it still stores the choice")
+    local on = trackerTab({ cfg = { filters = {}, zoneHeaders = true } })
+    ok(on.dims[on.ui.boxes[K"Show zone label under quest titles"]] == false, "built with zone headers on, it starts dimmed")
+
+    -- Zone headers group the Quests section on Classic too, so the box dims there the same way.
+    local classic = trackerTab({ has = { SuperTrack = false } })
+    local cbox = classic.ui.boxes[K"Show zone label under quest titles"]
+    ok(cbox ~= nil and classic.dims[cbox] == true, "on a client with no super-track it is lit at build")
+    classic.cfg.zoneHeaders = true
+    if classic.spec.refresh then classic.spec.refresh(classic.ui, classic.content) end
+    ok(classic.dims[cbox] == false, "and a view with zone headers on dims it there too")
 end)
 
 case("the cogwheel box says cogwheel, and applies at once", function()
@@ -454,7 +539,7 @@ case("the tracker hides the cogwheel on the key this box writes", function()
         return f
     end
     local mods = {
-        DB = { Tracker = function() return cfg end },
+        DB = realDB({ tracker = cfg }),
         API = { HeaderIcons = function() return specs end },
     }
     local ns = { GetModule = function(_, n) return mods[n] end }
@@ -514,7 +599,7 @@ case("Keep section headers in view re-anchors the list, then redraws", function(
     ok(box ~= nil, "the box is built")
     if not box then return end
     ok(box.getter() == true, "on while unset, as it ships")
-    ok(box.tooltip == K"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. On by default.",
+    ok(box.tooltip == K"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. With zone headers on, the header of the zone you are scrolled into stays just under it. On by default.",
        "carries its tooltip")
     st.seq = {}
     box.setter(false)
@@ -541,6 +626,105 @@ case("Keep section headers in view re-anchors the list, then redraws", function(
     ok(box.dependent == false, "and is not indented under it")
 end)
 
+-- Every setter call is checked for the one key it may write, over the tracker and the general
+-- settings both.
+local function setOnly(st, box, v, key)
+    local t, g = copy(st.cfg), copy(st.gen)
+    box.setter(v)
+    local got = changed(t, st.cfg) .. "|" .. changed(g, st.gen)
+    ok(got == key .. "|", (box.label or "?") .. " set " .. tostring(v) .. " writes " .. key .. " and nothing else: " .. got)
+end
+
+-- A set of the real boolean keys of Core/DB.lua's tracker and general blocks these boxes sit among, so a
+-- getter or setter that reads or writes a neighbor fails when they are all set one way.
+local TRACKER_KEYS = { "showOnlyWatched", "simplifyMode", "splitQuestClick", "clickToUnfocus",
+                       "focusAcceptedQuests", "autoListZoneWorldQuests", "showQuestTotal",
+                       "showQuestPopups", "stickySectionHeaders", "showOptionsIcon", "trackerAlphaFocus",
+                       "trackerAlphaHover", "showLevelInTracker", "showZoneTag", "showObjectiveNumbers",
+                       "showTrackerWidgets", "showQuestID", "showItemButtons", "showRecentlyAddedTag" }
+local GENERAL_KEYS = { "autoTrackAccepted", "restoreSuperTrackOnLogin", "useBlizzardTracker" }
+local function allSet(v, own, ownV)
+    local cfg, gen = { filters = {} }, {}
+    for _, k in ipairs(TRACKER_KEYS) do cfg[k] = v end
+    for _, k in ipairs(GENERAL_KEYS) do gen[k] = v end
+    cfg[own] = ownV
+    return trackerTab({ cfg = cfg, gen = gen })
+end
+
+-- Both are retail and WoW Forever only: Classic toggles its focus on every click already, and
+-- nothing there focuses a quest on its own.
+case("the two focus boxes sit under Split quest click, where the client has super-track", function()
+    local st = trackerTab()
+    local unfocus = st.ui.boxes[K"Click a focused quest to unfocus it"]
+    local accept = st.ui.boxes[K"Focus newly accepted quests"]
+    ok(unfocus ~= nil and accept ~= nil, "both are built")
+    if not (unfocus and accept) then return end
+    -- Built on anything but the tab's content, either one raises in trackerTab, as in game.
+    local at = {}
+    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    local splitBox = st.ui.boxes[K"Split quest click"]
+    local split = at[splitBox]
+    ok(split ~= nil and at[unfocus] == split + 1 and at[accept] == split + 2,
+       "on the Options card straight under Split quest click, in that order: "
+       .. tostring(split) .. ", " .. tostring(at[unfocus]) .. ", " .. tostring(at[accept]))
+    ok(unfocus.dependent == false and accept.dependent == false, "and neither is indented under it")
+    ok(unfocus.fill == false and accept.fill == false, "and neither is added full width")
+    ok(unfocus.tooltip == K"Click the focused quest again to unfocus it. With Split quest click on, click its icon.",
+       "the unfocus box carries its own tooltip: " .. tostring(unfocus.tooltip))
+    ok(accept.tooltip == K"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.",
+       "and so does the accept box: " .. tostring(accept.tooltip))
+    ok(splitBox.tipTitle == K"Split quest click"
+       and splitBox.tipBody == K"Click the icon to focus, click the title to open the quest log.",
+       "while Split quest click keeps its own: " .. tostring(splitBox.tipTitle) .. " " .. tostring(splitBox.tipBody))
+
+    -- Neither depends on Split quest click or any other switch, so neither is ever dimmed.
+    ok(st.dims[unfocus] == nil and st.dims[accept] == nil, "neither is dimmed with Split quest click off")
+    splitBox.setter(true)
+    ok(st.dims[unfocus] == nil and st.dims[accept] == nil, "nor once it is ticked")
+    local splitOn = trackerTab({ cfg = { filters = {}, splitQuestClick = true }, gen = { autoTrackAccepted = false } })
+    ok(splitOn.dims[splitOn.ui.boxes[K"Click a focused quest to unfocus it"]] == nil
+       and splitOn.dims[splitOn.ui.boxes[K"Focus newly accepted quests"]] == nil,
+       "nor in a tab built with it on and Auto track accepted quests off")
+    splitBox.setter(false)
+
+    ok(not unfocus.getter(), "the unfocus box is off while unset")
+    local inv, ren = st.invalidate, st.render
+    setOnly(st, unfocus, true, "clickToUnfocus")
+    ok(st.cfg.clickToUnfocus == true and unfocus.getter() == true, "ticked, it stores on and reads back on")
+    setOnly(st, unfocus, false, "clickToUnfocus")
+    ok(st.cfg.clickToUnfocus == false and not unfocus.getter(), "unticked, it stores off and reads back off")
+
+    ok(accept.getter() == true, "the accept box is on while unset, which is the game's own behavior")
+    setOnly(st, accept, false, "focusAcceptedQuests")
+    ok(st.cfg.focusAcceptedQuests == false and accept.getter() == false, "unticked, it stores off and reads back off")
+    setOnly(st, accept, true, "focusAcceptedQuests")
+    ok(st.cfg.focusAcceptedQuests == true and accept.getter() == true, "ticked, it stores on and reads back on")
+    -- Each key is read at the click or the accept, and no row draws either.
+    ok(st.invalidate == inv, "neither box invalidates the rows: " .. (st.invalidate - inv) .. " (" .. (st.render - ren) .. " redraws)")
+
+    local saved = trackerTab({ cfg = { filters = {}, clickToUnfocus = true, focusAcceptedQuests = false } })
+    ok(saved.ui.boxes[K"Click a focused quest to unfocus it"].getter() == true
+       and saved.ui.boxes[K"Focus newly accepted quests"].getter() == false,
+       "a tab built on a saved profile reads both choices back")
+
+    -- Each box reads its own key only, whatever its neighbors hold.
+    for _, v in ipairs({ true, false }) do
+        local t = allSet(v, "clickToUnfocus", nil)
+        ok(not t.ui.boxes[K"Click a focused quest to unfocus it"].getter(),
+           "the unfocus box reads off while unset, beside neighbors all " .. tostring(v))
+        t = allSet(v, "focusAcceptedQuests", nil)
+        ok(t.ui.boxes[K"Focus newly accepted quests"].getter() == true,
+           "the accept box reads on while unset, beside neighbors all " .. tostring(v))
+    end
+
+    -- Core/Compat.lua reads false there, never nil.
+    local classic = trackerTab({ has = { SuperTrack = false } })
+    ok(classic.ui.boxes[K"Click a focused quest to unfocus it"] == nil
+       and classic.ui.boxes[K"Focus newly accepted quests"] == nil,
+       "neither is built on a client with no super-track")
+    ok(classic.ui.boxes[K"Split quest click"] ~= nil, "where Split quest click still is")
+end)
+
 -- Each changes how a row reads, so the rows are invalidated before the redraw.
 local ROW_BOXES = {
     { "Show quest level prefix", "showLevelInTracker", false },
@@ -562,6 +746,26 @@ local PLAIN_BOXES = {
     { "Show Quest Discovered popups", "showQuestPopups" },
 }
 
+-- Each box set both ways writes its own key and nothing else, and reads only its own key over
+-- neighbors all set the other way.
+local function ownKeyOnly(list)
+    for _, r in ipairs(list) do
+        local st = trackerTab()
+        local box = st.ui.boxes[K(r[1])]
+        if box then
+            setOnly(st, box, true, r[2])
+            setOnly(st, box, false, r[2])
+            setOnly(st, box, true, r[2])
+        end
+        for _, v in ipairs({ true, false }) do
+            local t = allSet(v, r[2], not v)
+            local b = t.ui.boxes[K(r[1])]
+            ok(b and (b.getter() and true or false) == (not v),
+               r[1] .. " reads its own " .. tostring(not v) .. " beside neighbors all " .. tostring(v))
+        end
+    end
+end
+
 case("a display box that changes how a row reads invalidates the rows before the redraw", function()
     local st = trackerTab()
     for _, r in ipairs(ROW_BOXES) do
@@ -577,6 +781,7 @@ case("a display box that changes how a row reads invalidates the rows before the
                r[1] .. " invalidates the rows once and redraws once: " .. (st.invalidate - inv) .. ", " .. (st.render - ren))
         end
     end
+    ownKeyOnly(ROW_BOXES)
 end)
 
 case("a box that changes only what is listed redraws without invalidating", function()
@@ -593,6 +798,7 @@ case("a box that changes only what is listed redraws without invalidating", func
                r[1] .. " redraws once and leaves the rows alone: " .. (st.render - ren) .. ", " .. (st.invalidate - inv))
         end
     end
+    ownKeyOnly(PLAIN_BOXES)
 end)
 
 print(("test_tracker_tab: %d passed, %d failed"):format(pass, fail))

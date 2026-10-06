@@ -120,6 +120,8 @@ local function mouseOverDrawn(f)
     if over(f.scroll) and over(f.content) then return true end
     local heads = f.stickyBand and f.stickyBand.heads
     if heads and (over(heads[1]) or over(heads[2])) then return true end
+    local zoneHeads = f.stickyBand and f.stickyBand.zoneHeads
+    if zoneHeads and (over(zoneHeads[1]) or over(zoneHeads[2]) or over(zoneHeads[3])) then return true end
     if overBar(f.scroll) or overBar(f.eventsScroll) then return true end
     -- A locked grip sits at alpha 0 but still reads as visible.
     if not over(f.grip) then return false end

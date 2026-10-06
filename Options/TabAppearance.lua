@@ -42,6 +42,13 @@ local TITLE_MODES = {
       tip = L["Titles colored the way Blizzard's own tracker colors them on this version of the game."] },
 }
 
+local ZONE_ORDERS = {
+    { value = "current", label = L["Current zone first"],
+      tip = L["Zones with a quest on the map you are in come first, then the rest in the order your quest log lists them."] },
+    { value = "alpha",   label = L["Alphabetical"],
+      tip = L["Every zone in alphabetical order."] },
+}
+
 local SCENARIO_ALIGN = {
     { value = "LEFT",   label = L["Left"] },
     { value = "CENTER", label = L["Center"] },
@@ -476,6 +483,70 @@ Options:RegisterTab({
             function(v) relayout("headerBarSoftEdgeStrength", v) end,
             L["How soft the header bar's feathered edges are when Soft edges is on. Higher is softer, lower tightens toward a hard edge."])
         headers:Add(w.hbSoftSlider, DEPENDENT)
+
+        local zoneHeads = stack(self:CreateGroup(content, L["Zone Headers"]))
+
+        zoneHeads:Add(self:CreateCheckbox(content, L["Show zone headers"],
+            function() return DB().zoneHeaders end,
+            function(v) restyle("zoneHeaders", v); syncDependents() end,
+            L["Groups the quests in the Quests and Campaign sections under the quest log heading each one sits under, which is its zone for most quests. Each zone collapses on its own. Off by default."]))
+
+        w.zoneOrder = self:CreateRadioGroup(content, L["Zone Order"],
+            ZONE_ORDERS,
+            function() return DB().zoneHeaderOrder == "alpha" and "alpha" or "current" end,
+            function(v) relayout("zoneHeaderOrder", v) end,
+            nil, nil,
+            L["Zone Order"],
+            L["The order of the zones inside each section. Quests inside a zone still follow Sort Order on the Tracker tab."])
+        zoneHeads:Add(w.zoneOrder)
+
+        w.zoneSize = self:CreateSlider(content, L["Zone Header Size Offset"], -8, 12, 0.5,
+            function() return DB().zoneHeaderSizeDelta or 2 end,
+            function(v) relayout("zoneHeaderSizeDelta", v) end,
+            L["Sizes the zone headers, added on top of the Font Size on the Text card. The default 2 sits between the quest titles and the section headers."])
+        zoneHeads:Add(w.zoneSize)
+
+        w.zoneClass = self:CreateCheckbox(content, L["Use class color for zone headers"],
+            function() return DB().zoneHeaderColorUseClass end,
+            function(v) relayout("zoneHeaderColorUseClass", v); syncDependents() end,
+            L["Colors the zone headers with the class color of the character you are logged in on. Overrides the color below while it is on."])
+        zoneHeads:Add(w.zoneClass)
+
+        w.zoneColor = self:CreateColorPicker(content, L["Zone Header Color"],
+            function() return DB().zoneHeaderColor end,
+            function(v) relayout("zoneHeaderColor", v) end,
+            L["Color of the zone names, their counts and their collapse signs. Gold by default."])
+        zoneHeads:Add(w.zoneColor, DEPENDENT)
+
+        w.zoneBarCheck = self:CreateCheckbox(content, L["Show zone header bars"],
+            function() return DB().zoneHeaderBar end,
+            function(v) relayout("zoneHeaderBar", v); syncDependents() end,
+            L["Draws a colored bar behind each zone header, bright on the left and darker on the right. Off by default."])
+        local zoneBarRow = zoneHeads:Add(w.zoneBarCheck)
+
+        w.zoneBarPicker = self:CreateColorPicker(content, L["Bar Color"],
+            function() return DB().zoneHeaderBarColor end,
+            function(v) relayout("zoneHeaderBarColor", v) end,
+            L["Brightest end of the bar gradient. The other end is the same color darkened."], true)
+        satellite(self, zoneBarRow, w.zoneBarPicker)
+
+        w.zoneLineCheck = self:CreateCheckbox(content, L["Show zone header divider"],
+            function() return DB().zoneHeaderDivider end,
+            function(v) relayout("zoneHeaderDivider", v); syncDependents() end,
+            L["Draws a thin line under each zone header. Off by default."])
+        local zoneLineRow = zoneHeads:Add(w.zoneLineCheck)
+
+        w.zoneLinePicker = self:CreateColorPicker(content, L["Divider Line Color"],
+            function() return DB().zoneHeaderDividerColor end,
+            function(v) relayout("zoneHeaderDividerColor", v) end,
+            L["Color of the thin line under each zone header."], true)
+        satellite(self, zoneLineRow, w.zoneLinePicker)
+
+        w.zoneIndent = self:CreateSlider(content, L["Quest Indent"], 0, 30, 1,
+            function() return DB().zoneHeaderIndent or 8 end,
+            function(v) relayout("zoneHeaderIndent", v) end,
+            L["How far the quests under each zone header are moved in from the left edge."])
+        zoneHeads:Add(w.zoneIndent)
 
         local spacing = stack(self:CreateGroup(content, L["Spacing"]))
 
@@ -921,6 +992,18 @@ Options:RegisterTab({
             dim(w.hbHeightSlider, cfg.headerBar)
             dim(w.hbSoftCheck,    cfg.headerBar)
             dim(w.hbSoftSlider,   cfg.headerBar and cfg.headerBarSoftEdges)
+
+            -- Show zone headers heads the card and so is never dimmed.
+            local zh = cfg.zoneHeaders
+            dim(w.zoneOrder,      zh)
+            dim(w.zoneSize,       zh)
+            dim(w.zoneClass,      zh)
+            dim(w.zoneColor,      zh and not cfg.zoneHeaderColorUseClass)
+            dim(w.zoneBarCheck,   zh)
+            dim(w.zoneBarPicker,  zh and cfg.zoneHeaderBar)
+            dim(w.zoneLineCheck,  zh)
+            dim(w.zoneLinePicker, zh and cfg.zoneHeaderDivider)
+            dim(w.zoneIndent,     zh)
 
             dim(w.titlePicker,  ns.Util.TitleColorMode(cfg) == "custom")
             -- Inert until the mode gives it one color to use instead of green.

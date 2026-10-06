@@ -32,8 +32,8 @@ activities and the neighborhood tasks you have tracked.
 ### What works on Classic today
 
 Quest tracking and the customization around it: sorting, manual drag ordering, per-quest
-pinning, filters, section visibility and ordering, the card layout, fonts and colors,
-profiles, row tooltips, and the row right-click menu. Blizzard's own quest watch frame is
+pinning, filters, section visibility and ordering, zone headers, the card layout, fonts and
+colors, profiles, row tooltips, and the row right-click menu. Blizzard's own quest watch frame is
 suppressed so you do not get two trackers.
 
 The tracker keeps its own list of which quests you are tracking rather than using the game's,
@@ -93,7 +93,9 @@ tracker is back. The parts of this addon that do not need the window keep workin
 quest sounds, the flight point highlight, the zone progress bar, which floats on its own then, and
 on WoW Forever the TomTom arrow Everything Quests draws for the quest you follow. Settings for the
 window itself, such as its hide rules, the bonus objectives HUD and hiding Questie's tracker, wait
-until you switch back. Untick it to get the window back, again after a reload.
+until you switch back, and so do Keep focused quest after relog and Focus newly accepted quests, so
+the game focuses each quest you accept as usual. Untick it to get the window back, again after a
+reload.
 
 On retail and WoW Forever both trackers use the game's own list of tracked quests. On Classic Era
 and TBC Anniversary the game's tracker starts empty, so shift-click quests in the quest log to
@@ -104,7 +106,8 @@ back.
 
 - **Quests and Campaign**, in separate sections, with objectives, completion, and Find
   Group on any quest the game will form a group for, both as a button on the row and on the
-  right-click menu
+  right-click menu. With zone headers on, both sections group their quests under a header for
+  each quest log heading (the zone, for most quests), each header collapsing on its own
 - **World quests** in their own capped area, with the quest type on the marker, a
   color-coded countdown, and the same Find Group button and menu item where the game allows
   one. Every world quest in your current zone is listed, not only the ones you have tracked,
@@ -160,7 +163,10 @@ opens the window. The Appearance tab
 draws a sample tracker beside its settings that changes as you adjust them.
 
 Drag the strip along the top to move the tracker, and the corner grip to resize it.
-Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. A
+Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. On
+retail and WoW Forever two options on the Tracker tab change how focusing works: Click a focused quest
+to unfocus it makes a click on the quest you are following unfocus it, and turning off Focus newly
+accepted quests stops the game focusing each quest you accept while nothing is focused. A
 finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt,
 shows a click to complete line, and left-clicking it should open the reward window instead. That last part could
 not be tested on a finished hunt before release, so please report anything that looks wrong.
@@ -170,11 +176,13 @@ opens a menu to pin, track, focus, open the quest log, pop out the details, find
 the quest up on Wowhead, or abandon it - the Classic menu is shorter, since those clients have no
 group finder and popping out and abandoning need frames they do not have. A pinned quest stays
 on the tracker whatever your filters say. In manual sort mode you can also drag quests into
-whatever order you like.
+whatever order you like, and with zone headers on a quest moves within its own zone.
 
 Most settings that only apply while another one is on are dimmed while that one is off, so it
 is clear which settings are actually in effect. Always show campaign quests is the exception: it
-stays lit, and only acts while Show only quests in current zone is on.
+stays lit, and only acts while Show only quests in current zone is on. The zone label box on the
+Tracker tab works the other way around: it is dimmed while zone headers are on, since the header
+above a quest already names its zone.
 
 The tracker can hide itself while you are in combat, inside an instance, on a Mythic+ run,
 while the world map is open, or while you have no quests showing. Each is its own toggle, and
@@ -197,7 +205,17 @@ Quest titles can be colored by difficulty, all in gold, in your class color, in 
 or in Original Style, the way the game's own tracker colors them on your version of the game. The
 objective text, a count like 0/5 as it goes from none done to in progress to done, and finished
 objectives can each be given their own color as well. Section headers can also stay at the top of
-the list while you scroll through their section, so you can always see which one you are in.
+the list while you scroll through their section, and with zone headers on, the header of the zone
+you are scrolled into stays just under them, so you can always see where you are.
+
+Zone headers, off by default and switched on from the Appearance tab, group the quests in the
+Quests and Campaign sections under the quest log heading each one sits under, which is its zone for
+most quests. Each zone shows a count and collapses on its own. The zones with a quest on the map
+you are in can come first, with the rest in quest log order, or every zone can be listed in
+alphabetical order, and quests inside a zone still follow the sort order. The headers have a look
+of their own: a size, a color or your class color, an optional bar and divider line, and how far
+the quests under them are moved in. On Classic Era and TBC Anniversary they group the Quests
+section.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.
@@ -255,7 +273,8 @@ Callbacks receive the provider ID and the entry ID, never the entry table, becau
 rebuilt on every quest event. `onFocus` is called with a nil quest ID when the focus is
 cleared. It fires on Classic Era and TBC, where the tracker owns the focus, and on WoW Forever,
 where it follows the quest you super-track and fires again when you click the quest you already
-follow. On retail it never fires. `/eqot status` reports what is registered. Everything Quests uses this
+follow, or with a nil quest ID when Click a focused quest to unfocus it is on, since that click
+clears the focus. On retail it never fires. `/eqot status` reports what is registered. Everything Quests uses this
 for two header icons, its Chain Guide and its own options, for its "Get Directions" menu entry,
 and for its TomTom arrow.
 

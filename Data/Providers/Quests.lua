@@ -220,6 +220,12 @@ local function superTrackedID()
     return C_SuperTrack.GetSuperTrackedQuestID()
 end
 
+local function clickUnfocuses()
+    local DB  = ns:GetModule("DB")
+    local cfg = DB and DB:Tracker()
+    return (cfg and cfg.clickToUnfocus) == true
+end
+
 local function isWatched(id)
     return (ns.Has.QuestWatchType and C_QuestLog.GetQuestWatchType(id) ~= nil) and true or false
 end
@@ -549,14 +555,20 @@ function Quests:OnEntryClick(entry, button, splitIcon)
         if ns.Has.QuestWatchAPI then C_QuestLog.RemoveQuestWatch(entry.id) end
         return
     end
-    -- The icon half of a split click super-tracks and nothing else, as Blizzard's POI button does
+    -- The icon half of a split click only changes the focus, as Blizzard's POI button does
     if not splitIcon and turnIn(self, entry.id) then return end
     if ns.Has.SuperTrack then
         local again = superTrackedID() == entry.id
-        C_SuperTrack.SetSuperTrackedQuestID(entry.id)
-        if again then
-            local Focus = ns:GetModule("Focus")
-            if Focus then Focus:Resend() end
+        -- Unfocusing replaces the resend, so an arrow TomTom cleared on arrival comes back only on the
+        -- next click, which focuses the quest again.
+        if again and clickUnfocuses() then
+            C_SuperTrack.SetSuperTrackedQuestID(0)
+        else
+            C_SuperTrack.SetSuperTrackedQuestID(entry.id)
+            if again then
+                local Focus = ns:GetModule("Focus")
+                if Focus then Focus:Resend() end
+            end
         end
         if self._notifyDirty then self._notifyDirty() end
     end

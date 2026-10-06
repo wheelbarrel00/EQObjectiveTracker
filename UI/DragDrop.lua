@@ -68,8 +68,8 @@ end
 
 -- A quest cannot move between Campaign and Quests, so only the dragged row's own section
 -- takes part. Including the other one would draw a drop line promising a move that the
--- commit cannot make.
-local function collectScope(groupID)
+-- commit cannot make. Under zone headers it cannot leave its zone either, so zone narrows it.
+local function collectScope(groupID, zone)
     local Tracker = ns:GetModule("Tracker")
     local rows = Tracker and Tracker.DragRows and Tracker:DragRows()
 
@@ -80,7 +80,7 @@ local function collectScope(groupID)
     for i = 1, #rows do
         local row = rows[i]
         local e   = row._entry
-        if e and e.groupID == groupID then
+        if e and e.groupID == groupID and (zone == nil or (e.zone or "") == zone) then
             n = n + 1
             _scope[n] = row
         end
@@ -114,6 +114,9 @@ function DragDrop:OnDragStart(row)
 
     self.dragID    = e.id
     self.dragGroup = e.groupID
+    -- nil means the whole section, which is what it is while zone headers are off.
+    local cfg = ns:GetModule("DB"):Tracker()
+    self.dragZone  = (cfg and cfg.zoneHeaders) and (e.zone or "") or nil
     self.dragRow   = row
     self.dropIndex = nil
 
@@ -154,7 +157,7 @@ function DragDrop:UpdateVisuals()
     g:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", cx / s + 12, cy / s - 24)
 
     local ind = self.indicator
-    local n = collectScope(self.dragGroup)
+    local n = collectScope(self.dragGroup, self.dragZone)
     if n == 0 then
         self.dropIndex = nil
         if ind then ind:Hide() end
@@ -202,15 +205,15 @@ function DragDrop:Cancel()
     -- flag left set makes that row ignore its next click and show no tooltip.
     local row = self.dragRow
     if row then C_Timer.After(0, function() row._wasDragging = nil end) end
-    self.dragID, self.dragGroup, self.dropIndex, self.dragRow = nil, nil, nil, nil
+    self.dragID, self.dragGroup, self.dragZone, self.dropIndex, self.dragRow = nil, nil, nil, nil, nil
 end
 
 function DragDrop:OnDragStop()
-    local dragID, dragGroup, dropIndex = self.dragID, self.dragGroup, self.dropIndex
+    local dragID, dragGroup, dragZone, dropIndex = self.dragID, self.dragGroup, self.dragZone, self.dropIndex
     self:Cancel()
     if not (dragID and dropIndex) then return end
 
-    local n = collectScope(dragGroup)
+    local n = collectScope(dragGroup, dragZone)
     wipe(_ids)
     for i = 1, n do
         local e = _scope[i]._entry

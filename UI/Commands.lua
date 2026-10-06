@@ -38,7 +38,7 @@ handlers.debug = function()
     tracker():Render()
 end
 
-local WINDOW_ONLY = { Tracker = true, ItemButtons = true }
+local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true }
 
 -- One module raising must not take the rest of the report
 -- with it: this is the tool for diagnosing a broken subsystem, so it has to outlive one, and
@@ -48,8 +48,8 @@ local function debugLine(name, prefix, method)
     method = method or "DebugLine"
     if not (m and m[method]) then return end
     -- A module that never enabled reports itself as broken, which it is not. Said once, on its
-    -- main line, rather than once per line it has. The window's own parts never stand down
-    -- through the loader but have no window to report on either.
+    -- main line, rather than once per line it has. The window's own parts, and the zone grouping
+    -- its feed fills, never stand down through the loader but have nothing to report without it.
     if ns:IsStandingDown(name) or (WINDOW_ONLY[name] and ns:UsesBlizzardTracker()) then
         if method == "DebugLine" then ns:Print(("%s: off, Blizzard's tracker in use"):format(name)) end
         return
@@ -163,6 +163,7 @@ handlers.status = function()
     debugLine("Tracker", "scroll: ", "DebugScroll")
     debugLine("Tracker", nil, "HeightLine")
     debugLine("Tracker", nil, "StickyLine")
+    debugLine("ZoneGroups")
 
     debugLine("ItemButtons")
     debugLine("ScenarioSpells")
@@ -175,6 +176,7 @@ handlers.status = function()
     debugLine("Blizzard")
     debugLine("Blizzard", nil, "QuestTimerLine")
     debugLine("AutoTrack")
+    debugLine("SuperTrackPersist")
     debugLine("QuestSound")
     debugLine("QuestProgress")
     debugLine("QuestRewards")

@@ -21,6 +21,23 @@ local function repoFile(rel)
 end
 
 local pass, fail = 0, 0
+-- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
+-- stand-in raises the same way, rather than answering a call the client would refuse.
+local function strictDB(methods)
+    local db = {}
+    for name, v in pairs(methods) do
+        if type(v) == "function" then
+            db[name] = function(self, ...)
+                if self ~= db then error("DB:" .. name .. " called without self", 2) end
+                return v(self, ...)
+            end
+        else
+            db[name] = v
+        end
+    end
+    return db
+end
+
 local function ok(cond, msg)
     if cond then pass = pass + 1 else fail = fail + 1 print("FAIL: " .. msg) end
 end
@@ -73,6 +90,7 @@ local function generalTab(o)
         Global = function() if not o.noGlobal then return st.global end end,
         ResetAll = function() log("resetAll") end,
     }
+    modules.DB = strictDB(modules.DB)
     modules.Tracker = {
         ResetPosition = function() log("resetPosition") end,
         ApplyLockState = function() st.lock = st.lock + 1 end,
