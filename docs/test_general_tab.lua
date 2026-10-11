@@ -105,6 +105,21 @@ local function generalTab(o)
         QuestiePresent = function() return o.questie == true end,
         Apply = function() st.questie = st.questie + 1 end,
     }
+    -- Every stub method checks self, so a call written with a dot raises here. In game the first
+    -- argument becomes self, which raises or misreads wherever the method reads self or takes
+    -- arguments.
+    for name, m in pairs(modules) do
+        if name ~= "DB" then
+            for k, fn in pairs(m) do
+                if type(fn) == "function" then
+                    m[k] = function(self, ...)
+                        if self ~= m then error(name .. ":" .. k .. " called without self", 2) end
+                        return fn(self, ...)
+                    end
+                end
+            end
+        end
+    end
 
     local ui = { boxes = {}, buttons = {}, cards = {} }
     function ui:CreateGroup(_, label)

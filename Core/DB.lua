@@ -119,6 +119,8 @@ DB.defaults = {
 
             zoneHeaders             = false,
             zoneHeaderOrder         = "current",
+            dungeonHeader           = false,
+            dungeonHeaderLast       = false,
             zoneHeaderSizeDelta     = 2,
             zoneHeaderColor         = { r = 1, g = 0.82, b = 0, a = 1 },
             zoneHeaderColorUseClass = false,
@@ -155,6 +157,7 @@ DB.defaults = {
             showQuestID          = false,
             showRecentlyAddedTag = true,
             showOptionsIcon      = true,
+            showSortButton       = false,
             splitQuestClick      = false,
             clickToUnfocus       = false,
             -- On is the game's own behavior: it focuses a quest accepted while nothing is focused.
@@ -173,8 +176,10 @@ DB.defaults = {
             countColorNone     = { r = 1, g = 80 / 255, b = 80 / 255 },
             countColorPartial  = { r = 238 / 255, g = 170 / 255, b = 0 },
             countColorDone     = { r = 68 / 255, g = 1, b = 68 / 255 },
+            newTagColor        = { r = 107 / 255, g = 175 / 255, b = 1 },
             -- finishedObjectiveColor is left unset: a finished line then takes the title color when
             -- Use title color for completed quests is on and the mode gives one, else the done color.
+            -- finishedQuestColor is unset for the same reason, so a finished title keeps its old rules.
             -- titleColorMode must never get a default either. Absent, Util.TitleColorMode reads it
             -- off the three title keys, so a default would read every old profile as that default.
 
@@ -281,9 +286,10 @@ local APPEARANCE_KEYS = {
     -- Both, or a reset could land on Gold: the mode is read off colorByDifficulty while unset.
     "titleColorMode", "colorByDifficulty",
     "objectiveColor", "countColorNone", "countColorPartial", "countColorDone", "finishedObjectiveColor",
+    "finishedQuestColor", "newTagColor",
     "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
     "headerBarSoftEdges", "headerBarSoftEdgeStrength",
-    -- The look only. zoneHeaders and zoneHeaderOrder stay out, for the zone bar's reason below.
+    -- The look only. The two switches and the two orders stay out, for the zone bar's reason below.
     "zoneHeaderSizeDelta", "zoneHeaderColor", "zoneHeaderColorUseClass", "zoneHeaderBar",
     "zoneHeaderBarColor", "zoneHeaderDivider", "zoneHeaderDividerColor", "zoneHeaderIndent",
     "blockSpacing", "lineSpacing", "headerSpacing", "scale",
@@ -304,9 +310,9 @@ local APPEARANCE_KEYS = {
 }
 
 -- Clearing a key lets AceDB re-apply its default. Left alone by design: the zone bar's saved
--- position, and zoneHeaders, zoneHeaderOrder, showZoneProgressBar and zoneProgressLocation, kept out
--- of the list above, because clearing one of those switches a configured feature off, undocks it
--- or reorders it rather than restoring a look.
+-- position, and zoneHeaders, zoneHeaderOrder, dungeonHeader, dungeonHeaderLast, showZoneProgressBar
+-- and zoneProgressLocation, kept out of the list above, because clearing one of those switches a
+-- configured feature off, undocks it or reorders it rather than restoring a look.
 function DB:ResetTrackerAppearance()
     local prof = self:Tracker()
     if not prof then return end

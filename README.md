@@ -107,7 +107,8 @@ back.
 - **Quests and Campaign**, in separate sections, with objectives, completion, and Find
   Group on any quest the game will form a group for, both as a button on the row and on the
   right-click menu. With zone headers on, both sections group their quests under a header for
-  each quest log heading (the zone, for most quests), each header collapsing on its own
+  each quest log heading (the zone, for most quests), each header collapsing on its own. An
+  optional Dungeons header gathers every dungeon quest in one place, with or without zone headers
 - **World quests** in their own capped area, with the quest type on the marker, a
   color-coded countdown, and the same Find Group button and menu item where the game allows
   one. Every world quest in your current zone is listed, not only the ones you have tracked,
@@ -162,7 +163,10 @@ cogwheel, untick Show the options cogwheel on the tracker on the Tracker tab, an
 opens the window. The Appearance tab
 draws a sample tracker beside its settings that changes as you adjust them.
 
-Drag the strip along the top to move the tracker, and the corner grip to resize it.
+Drag the strip along the top to move the tracker, and the corner grip to resize it. Tick Show
+the sort button on the tracker, on the Tracker tab, for a small button at the tracker's top left
+that opens a list of the sort orders, so switching between Level and Distance, or any other two,
+takes two clicks.
 Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. On
 retail and WoW Forever two options on the Tracker tab change how focusing works: Click a focused quest
 to unfocus it makes a click on the quest you are following unfocus it, and turning off Focus newly
@@ -176,13 +180,15 @@ opens a menu to pin, track, focus, open the quest log, pop out the details, find
 the quest up on Wowhead, or abandon it - the Classic menu is shorter, since those clients have no
 group finder and popping out and abandoning need frames they do not have. A pinned quest stays
 on the tracker whatever your filters say. In manual sort mode you can also drag quests into
-whatever order you like, and with zone headers on a quest moves within its own zone.
+whatever order you like, and with zone headers on a quest moves within its own zone, as a dungeon
+quest does within the Dungeons header.
 
 Most settings that only apply while another one is on are dimmed while that one is off, so it
 is clear which settings are actually in effect. Always show campaign quests is the exception: it
 stays lit, and only acts while Show only quests in current zone is on. The zone label box on the
 Tracker tab works the other way around: it is dimmed while zone headers are on, since the header
-above a quest already names its zone.
+above a quest already names its zone, and lit again while the Dungeons header is on too, since a
+quest under that header keeps its label.
 
 The tracker can hide itself while you are in combat, inside an instance, on a Mythic+ run,
 while the world map is open, or while you have no quests showing. Each is its own toggle, and
@@ -203,8 +209,9 @@ zone while that filter is on.
 
 Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick,
 or in Original Style, the way the game's own tracker colors them on your version of the game. The
-objective text, a count like 0/5 as it goes from none done to in progress to done, and finished
-objectives can each be given their own color as well. Section headers can also stay at the top of
+objective text, a count like 0/5 as it goes from none done to in progress to done, finished
+objectives, the title of a finished quest and the NEW tag on quests you accepted in the last hour
+can each be given their own color as well. Section headers can also stay at the top of
 the list while you scroll through their section, and with zone headers on, the header of the zone
 you are scrolled into stays just under them, so you can always see where you are.
 
@@ -216,6 +223,14 @@ alphabetical order, and quests inside a zone still follow the sort order. The he
 of their own: a size, a color or your class color, an optional bar and divider line, and how far
 the quests under them are moved in. On Classic Era and TBC Anniversary they group the Quests
 section.
+
+A Dungeons header, also off by default and on the Appearance tab's Zone Headers card, gathers every
+quest the game marks as a dungeon quest, heroic ones included, under one header of its own. With
+zone headers off, your other quests stay as they are and the Dungeons header comes after them.
+With zone headers on, dungeon quests leave their zones for it, and under the current-zone-first
+order it moves to the top while one of its quests is on the map you are in, unless Keep Dungeons at
+the bottom is ticked. A quest under it keeps its zone label, if you show zone labels, so you can
+tell which dungeon it is for.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.
@@ -268,6 +283,9 @@ API:AddHeaderIcon{ id = "mine", texture = [[Interface\Icons\INV_Misc_QuestionMar
 API:AddFocusListener{ id = "mine",
                       onFocus = function(providerID, questID) end }
 ```
+
+A header icon's tooltip must be a string. Any other value is ignored, and the icon is added
+without one.
 
 Callbacks receive the provider ID and the entry ID, never the entry table, because entries are
 rebuilt on every quest event. `onFocus` is called with a nil quest ID when the focus is

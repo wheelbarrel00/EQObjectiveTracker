@@ -150,6 +150,8 @@ local function previewWorld(o)
     local ns = newNs()
     local m = ns.modules
     loadInto("Data/Entry.lua", ns, {})
+    -- The real one, whose RunKey the preview groups its samples by.
+    loadInto("Data/ZoneGroups.lua", ns, {})
     local log = { headers = {}, place = {}, rows = {}, built = 0, resets = 0, render = {},
                   skins = {}, docked = {}, bars = 0, frames = {}, zoneHeads = {}, zoneDraws = {} }
     local cfg = o.cfg or { width = 305, blockSpacing = 2 }
@@ -172,7 +174,7 @@ local function previewWorld(o)
             h:Show()
             return 20, false
         end,
-        Indent = function(_, c) return c.zoneHeaders and (c.zoneHeaderIndent or 8) or 0 end,
+        Indent = function(_, c) return (c.zoneHeaders or c.dungeonHeader) and (c.zoneHeaderIndent or 8) or 0 end,
     }
     m.Tracker = {
         Insets = function() return 4, 14, 16 end,
@@ -310,12 +312,12 @@ case("the sample quests cover each way a row can look", function()
     local w = previewWorld()
     local s = w.P:Samples()
     local STATE, LINE, ICON = w.ns.modules.Entry.STATE, w.ns.modules.Entry.LINE, w.ns.modules.Entry.ICON
-    ok(#s.campaign == 1 and #s.quests == 4, "one campaign quest and four quests")
+    ok(#s.campaign == 1 and #s.quests == 5, "one campaign quest and five quests")
     local seen = {}
     for _, g in ipairs({ "campaign", "quests" }) do
         for _, e in ipairs(s[g]) do
             ok(e.providerID == "quests" and e.groupID == g, e.title .. " is a quest of the " .. g .. " group")
-            ok(not seen[e.id] and e.id >= 90001 and e.id <= 90005, e.title .. " has its own id")
+            ok(not seen[e.id] and e.id >= 90001 and e.id <= 90006, e.title .. " has its own id")
             seen[e.id] = true
             ok(e.icon and e.icon.kind == ICON.QUESTPOI, e.title .. " carries a quest marker")
             ok(not e.hasItem and not e.canGroup and not e.expiresAt,
@@ -338,20 +340,68 @@ case("the sample quests cover each way a row can look", function()
        and scout.zone == "Northern Vale" and camp.zone == "Northern Vale",
        "the quests sit in two zones, each zone's quests together, for the zone headers")
     ok(scout.subtitle == scout.zone, "and the zone tag names the zone the quest sits in")
+    local sunken = s.quests[5]
+    ok(sunken.tags.dungeon == true and sunken.zone == "The Sunken Halls" and sunken.state == STATE.ACTIVE,
+       "the last is a dungeon quest in a zone of its own, for the Dungeons header and the dungeon tint")
+    ok(sunken.subtitle == sunken.zone,
+       "with a zone label naming it, so the preview shows a dungeon quest keeping it under the Dungeons header")
+    local others = 0
+    for i = 1, 4 do if s.quests[i].tags.dungeon then others = others + 1 end end
+    ok(others == 0 and not camp.tags.dungeon, "and it is the only one")
+end)
+
+-- Requested by Andreon (2026-10-10). The real ZoneGroups:RunKey decides which run a sample joins.
+case("with only the dungeon header on, the dungeon sample alone gets a header, at the end", function()
+    local w = built({ cfg = { width = 305, blockSpacing = 2, dungeonHeader = true, zoneHeaderIndent = 10 } })
+    w.P:Refresh()
+    local d = w.zoneDraws
+    ok(#d == 1 and d[1].groupID == "quests" and d[1].zone == "Dungeons" and d[1].count == 1 and d[1].total == 1,
+       "one header, Dungeons, in the Quests section, counting its one quest: " .. #d .. " " .. tostring(d[1] and d[1].zone))
+    local y = (26 + 2) + (40 + 2) + (26 + 2) + 4 * (40 + 2)
+    ok(d[1] and d[1].y == y, "under the other four quests: " .. tostring(d[1] and d[1].y))
+    for i = 1, 5 do
+        local r = w.render[i]
+        ok(r and r.width == 279 and r.row.points[1][4] == 0,
+           "row " .. i .. " stays at the full width under no header of its own")
+    end
+    local last = w.render[6]
+    ok(last and last.entry.id == 90006 and last.width == 269 and last.row.points[1][4] == 10,
+       "the dungeon quest is indented under its header")
+    ok(w.P.content.h == y + 20 + 2 + 40 + 2, "and the content counts the header: " .. tostring(w.P.content.h))
+end)
+
+case("with both headers on, the dungeon sample leaves its zone for the Dungeons header", function()
+    local w = built({ cfg = { width = 305, blockSpacing = 2, zoneHeaders = true, dungeonHeader = true } })
+    w.P:Refresh()
+    local seq = {}
+    for _, z in ipairs(w.zoneDraws) do seq[#seq + 1] = z.groupID .. ":" .. tostring(z.zone) end
+    ok(table.concat(seq, ",") == "campaign:Northern Vale,quests:Ashwood Glen,quests:Northern Vale,quests:Dungeons",
+       "every zone keeps its header and Dungeons takes the last place: " .. table.concat(seq, ","))
+    w.cfg.dungeonHeader = false
+    w.P:Refresh()
+    local after = {}
+    for i = 5, #w.zoneDraws do after[#after + 1] = tostring(w.zoneDraws[i].zone) end
+    ok(table.concat(after, ",") == "Northern Vale,Ashwood Glen,Northern Vale,The Sunken Halls",
+       "switched off, it is back under its own zone: " .. table.concat(after, ","))
+    local shown = 0
+    for _, h in ipairs(w.zoneHeads) do if h.shown then shown = shown + 1 end end
+    ok(shown == 4, "and the Dungeons header is hidden, four left: " .. shown)
 end)
 
 case("with zone headers on, each sample zone gets a header of the preview's own, its rows indented", function()
     local w = built({ cfg = { width = 305, blockSpacing = 2, zoneHeaders = true, zoneHeaderIndent = 10 } })
     w.P:Refresh()
     local d = w.zoneDraws
-    ok(#d == 3, "three zone headers: one in Campaign and two in Quests: " .. #d)
+    ok(#d == 4, "four zone headers: one in Campaign and three in Quests: " .. #d)
     local seq = {}
     for _, z in ipairs(d) do seq[#seq + 1] = z.groupID .. ":" .. tostring(z.zone) .. "@" .. z.y end
     local y1 = 26 + 2
     local y2 = y1 + 20 + 2 + 40 + 2
     local y3 = y2 + 26 + 2
     local y4 = y3 + 20 + 2 + 40 + 2 + 40 + 2
-    local want = ("campaign:Northern Vale@%d quests:Ashwood Glen@%d quests:Northern Vale@%d"):format(y1, y3, y4)
+    local y5 = y4 + 20 + 2 + 40 + 2 + 40 + 2
+    local want = ("campaign:Northern Vale@%d quests:Ashwood Glen@%d quests:Northern Vale@%d quests:The Sunken Halls@%d")
+        :format(y1, y3, y4, y5)
     ok(table.concat(seq, " ") == want, "each zone under its section header, in sample order: " .. table.concat(seq, " "))
     ok(w.place[2] and w.place[2].y == y2, "the Quests section header follows the campaign zone and its row")
     ok(d[2].count == 2 and d[2].total == 2 and d[3].count == 2, "each counts its own two quests")
@@ -360,7 +410,7 @@ case("with zone headers on, each sample zone gets a header of the preview's own,
         ok(r.width == 279 - 10 and r.row.w == 269 and r.row.points[1][4] == 10,
            "row " .. tostring(r.entry.id) .. " is drawn at the indent and narrowed by it")
     end
-    ok(#w.zoneHeads == 3, "three headers made")
+    ok(#w.zoneHeads == 4, "four headers made")
     for _, h in ipairs(w.zoneHeads) do
         ok(h.mouse == false and h.parent == w.P.content, "deaf to the mouse, so a click collapses nothing")
     end
@@ -368,13 +418,13 @@ case("with zone headers on, each sample zone gets a header of the preview's own,
        "the rows follow their zones")
     local shown = 0
     for _, h in ipairs(w.zoneHeads) do if h.shown then shown = shown + 1 end end
-    ok(shown == 3, "and every header drawn is left shown: " .. shown)
+    ok(shown == 4, "and every header drawn is left shown: " .. shown)
     w.P:Refresh()
-    ok(#w.zoneHeads == 3, "a second refresh reuses them: " .. #w.zoneHeads)
+    ok(#w.zoneHeads == 4, "a second refresh reuses them: " .. #w.zoneHeads)
     shown = 0
     for _, h in ipairs(w.zoneHeads) do if h.shown then shown = shown + 1 end end
-    ok(shown == 3, "and leaves them shown: " .. shown)
-    ok(w.P.content.h == y4 + 20 + 2 + 40 + 2 + 40 + 2, "the content counts every zone header: " .. tostring(w.P.content.h))
+    ok(shown == 4, "and leaves them shown: " .. shown)
+    ok(w.P.content.h == y5 + 20 + 2 + 40 + 2, "the content counts every zone header: " .. tostring(w.P.content.h))
 end)
 
 case("zone headers switched off in the preview go, and the rows come back to the edge", function()
@@ -407,13 +457,13 @@ case("a refresh draws the sections in the tracker's order, with the samples", fu
     local camp, quests = w.place[1], w.place[2]
     ok(camp.y == 0 and camp.group.visibleCount == 1 and camp.group.totalCount == 4 and camp.collapsed == false
        and camp.showTotal == true and camp.content == w.P.content, "the campaign header at the top, 1 of 4, open, with its total")
-    ok(#w.render == 5, "five rows drawn")
+    ok(#w.render == 6, "six rows drawn")
     local y = 26 + 2
     ok(w.render[1].entry.groupID == "campaign" and w.render[1].row.points[1][5] == -y, "the campaign row under its header and the gap")
     y = y + 40 + 2
-    ok(quests.y == y and quests.group.visibleCount == 4 and quests.group.totalCount == 25, "then the quests header, 4 of 25")
+    ok(quests.y == y and quests.group.visibleCount == 5 and quests.group.totalCount == 25, "then the quests header, 5 of 25")
     y = y + 26 + 2
-    for i = 2, 5 do
+    for i = 2, 6 do
         local r = w.render[i]
         ok(r.row.points[1][1] == "TOPLEFT" and r.row.points[1][2] == w.P.content and r.row.points[1][5] == -y,
            "row " .. i .. " stacks under the one above with the gap")
@@ -453,7 +503,7 @@ case("rows and headers are built once and kept apart from the tracker's pools", 
     local w = built()
     w.P:Refresh()
     w.P:Refresh()
-    ok(w.built == 5 and #w.headers == 2, "five rows and two headers across two refreshes")
+    ok(w.built == 6 and #w.headers == 2, "six rows and two headers across two refreshes")
     ok(w.ns.modules.RowPool == nil and w.ns.modules.Sections.Acquire == nil,
        "and it never reaches the row pool or the pooled headers, which do not exist here")
 end)
@@ -464,7 +514,7 @@ case("the order, the client's groups and hidden sections all follow the tracker"
     ok(placesOf(w) == "quests,campaign", "the player's own section order: " .. placesOf(w))
     local c = built({ groups = { "quests" } })
     c.P:Refresh()
-    ok(placesOf(c) == "quests" and #c.render == 4, "a client with no campaign group shows none")
+    ok(placesOf(c) == "quests" and #c.render == 5, "a client with no campaign group shows none")
     local n = built({ noProvider = true })
     n.P:Refresh()
     ok(placesOf(n) == "quests", "with no quest provider the quests section still shows")
@@ -499,7 +549,7 @@ case("a section shown again brings its rows back", function()
     w.P:Refresh()
     local campRow = w.P.rows[90001]
     ok(campRow and campRow.shown, "the row hidden with its section is drawn again once the section is back")
-    ok(w.built == 5, "on the same frame, not a new one: " .. w.built)
+    ok(w.built == 6, "on the same frame, not a new one: " .. w.built)
 end)
 
 case("the docked zone section, only while the bar is docked", function()
@@ -538,7 +588,7 @@ end)
 case("the view leaves the sample running past it, and the frame fits the panel", function()
     local w = built()
     w.P:Refresh()
-    local contentH = 2 * (26 + 2) + 5 * (40 + 2)
+    local contentH = 2 * (26 + 2) + 6 * (40 + 2)
     local scale = (320 - 24) / 305
     local avail = (600 - 24) / scale - 14 - 3 - 16
     local view = math.min(avail, math.max(160, contentH - 48))
@@ -604,11 +654,11 @@ case("a refresh made while hidden is drawn once more, once on screen", function(
     local w = built()
     w.P.box.visible = false
     w.P:Refresh()
-    ok(#timers == 1 and #w.render == 5, "drawn now and once more a frame later")
+    ok(#timers == 1 and #w.render == 6, "drawn now and once more a frame later")
     w.P.box.visible = true
     local fn = table.remove(timers)
     fn()
-    ok(#w.render == 10 and #timers == 0, "the second pass draws and asks for no third")
+    ok(#w.render == 12 and #timers == 0, "the second pass draws and asks for no third")
     w.P.box.visible = false
     fn()
     ok(#timers == 0, "even when the panel is still hidden")

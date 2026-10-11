@@ -283,7 +283,7 @@ Options:RegisterTab({
             function(v) restyle("titleColorMode", v); syncDependents() end,
             nil, nil,
             L["Quest Title Color"],
-            L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on."]))
+            L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on or a Finished Quest Color is picked."]))
 
         -- Until a known mode is saved the override is one of the switches the mode is read off, so
         -- the mode shown is saved first or the picker and its Clear would switch every title.
@@ -317,8 +317,21 @@ Options:RegisterTab({
         w.recolorCheck = self:CreateCheckbox(content, L["Use title color for completed quests"],
             function() return DB().overrideCompleteGreen ~= false end,
             function(v) restyle("overrideCompleteGreen", v) end,
-            L["A finished quest's title takes the title color instead of green, and so do its finished objectives unless a Finished Objective Color is picked. Only Class color, Custom color and Original Style give a title color."])
+            L["A finished quest's title takes the title color instead of green, and so do its finished objectives. A picked Finished Quest Color or Finished Objective Color wins over it. Only Class color, Custom color and Original Style give a title color."])
         questColors:Add(w.recolorCheck)
+
+        -- Unset by default, so until one is picked a finished title keeps the rules above.
+        questColors:Add(self:CreateColorPicker(content, L["Finished Quest Color"],
+            function() return DB().finishedQuestColor end,
+            function(v) restyle("finishedQuestColor", v) end,
+            L["Color of a quest's title once all of its objectives are done, in every Quest Title Color mode. While unset, finished quests are green, or keep the title color when Use title color for completed quests gives one."],
+            false,
+            function() restyle("finishedQuestColor", nil) end))
+
+        questColors:Add(self:CreateColorPicker(content, L["NEW Tag Color"],
+            function() return DB().newTagColor end,
+            function(v) restyle("newTagColor", v) end,
+            L["Color of the NEW tag on quests accepted in the last hour. The tag is switched on and off on the Tracker tab."]))
 
         questColors:Add(self:CreateColorPicker(content, L["Objective Text Color"],
             function() return DB().objectiveColor end,
@@ -499,6 +512,18 @@ Options:RegisterTab({
             L["Zone Order"],
             L["The order of the zones inside each section. Quests inside a zone still follow Sort Order on the Tracker tab."])
         zoneHeads:Add(w.zoneOrder)
+
+        -- Works with zone headers off too, so it is never dimmed.
+        zoneHeads:Add(self:CreateCheckbox(content, L["Group dungeon quests under one header"],
+            function() return DB().dungeonHeader == true end,
+            function(v) relayout("dungeonHeader", v); syncDependents() end,
+            L["Moves every quest the game marks as a dungeon quest into one Dungeons header in the Quests and Campaign sections, drawn like the zone headers below. With Show zone headers off, every other quest stays as it is and Dungeons comes last. With it on, dungeon quests leave their zones for it, and under Current zone first it comes to the top while one of its quests is in your zone. Off by default."]))
+
+        w.dungeonLast = self:CreateCheckbox(content, L["Keep Dungeons at the bottom"],
+            function() return DB().dungeonHeaderLast == true end,
+            function(v) relayout("dungeonHeaderLast", v) end,
+            L["Keeps the Dungeons header last in its section. Without this, Current zone first brings it to the top while the game shows one of its quests on the map you are in. Off by default."])
+        zoneHeads:Add(w.dungeonLast, DEPENDENT)
 
         w.zoneSize = self:CreateSlider(content, L["Zone Header Size Offset"], -8, 12, 0.5,
             function() return DB().zoneHeaderSizeDelta or 2 end,
@@ -993,17 +1018,20 @@ Options:RegisterTab({
             dim(w.hbSoftCheck,    cfg.headerBar)
             dim(w.hbSoftSlider,   cfg.headerBar and cfg.headerBarSoftEdges)
 
-            -- Show zone headers heads the card and so is never dimmed.
+            -- Show zone headers heads the card and so is never dimmed. The look below styles the
+            -- Dungeons header too, so it stays lit while either header is on.
             local zh = cfg.zoneHeaders
+            local headed = zh or cfg.dungeonHeader
             dim(w.zoneOrder,      zh)
-            dim(w.zoneSize,       zh)
-            dim(w.zoneClass,      zh)
-            dim(w.zoneColor,      zh and not cfg.zoneHeaderColorUseClass)
-            dim(w.zoneBarCheck,   zh)
-            dim(w.zoneBarPicker,  zh and cfg.zoneHeaderBar)
-            dim(w.zoneLineCheck,  zh)
-            dim(w.zoneLinePicker, zh and cfg.zoneHeaderDivider)
-            dim(w.zoneIndent,     zh)
+            dim(w.dungeonLast,    cfg.dungeonHeader)
+            dim(w.zoneSize,       headed)
+            dim(w.zoneClass,      headed)
+            dim(w.zoneColor,      headed and not cfg.zoneHeaderColorUseClass)
+            dim(w.zoneBarCheck,   headed)
+            dim(w.zoneBarPicker,  headed and cfg.zoneHeaderBar)
+            dim(w.zoneLineCheck,  headed)
+            dim(w.zoneLinePicker, headed and cfg.zoneHeaderDivider)
+            dim(w.zoneIndent,     headed)
 
             dim(w.titlePicker,  ns.Util.TitleColorMode(cfg) == "custom")
             -- Inert until the mode gives it one color to use instead of green.

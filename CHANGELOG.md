@@ -5,6 +5,46 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-10-11
+
+### New Features
+
+- A sort button at the top-left of the tracker. A click opens a list of the sort orders with the
+  current one named at the top, and picking one switches the tracker to it, so changing between,
+  say, Level and Distance takes two clicks. It changes the same Sort Order as the Tracker tab. It is
+  off by default: turn on Show the sort button on the tracker, on the Tracker tab under the cogwheel's
+  switch. Requested by Andreon.
+- Group dungeon quests under one header, on the Appearance tab's Zone Headers card. Every quest the
+  game marks as a dungeon quest, heroic dungeon quests included, moves into a Dungeons header in each
+  of the Quests and Campaign sections, styled by the zone header controls on the same card. It works
+  with zone headers on or off: with them off, every other quest stays as it is and Dungeons comes last,
+  and with them on, dungeon quests leave their zones for it and, under Current zone first, it comes to
+  the top while one of its quests is in your zone. Keep Dungeons at the bottom, just under it, keeps the
+  header last even then. A quest under the Dungeons header keeps its zone label, even with zone headers
+  on, so you can still tell which dungeon it is for, and Show zone label under quest titles, on the
+  Tracker tab, stays lit while the Dungeons header is on. With zone headers off, the Dungeons header
+  scrolls with the list rather than staying in view under its section header. Both are off by default,
+  and Reset to Defaults leaves both as they are, as it does Show zone headers. The preview beside the
+  settings has a sample dungeon quest to show it. Requested by Andreon.
+- Finished Quest Color, on the Appearance tab's Quest Colors card, colors the title of a quest whose
+  objectives are all done. It starts unset, so finished quests stay green, or keep the title color
+  while Use title color for completed quests gives one, until you pick a color. Once picked it applies
+  in every Quest Title Color mode, and Clear puts the old color back. Finished objectives keep their
+  own color, Finished Objective Color.
+- NEW Tag Color, on the same card, colors the NEW tag on quests accepted in the last hour. It starts
+  as the blue the tag has always had, and Reset to Defaults puts that blue back.
+
+### Improvements
+
+- Heroic dungeon quests, such as TBC Anniversary's heroic dailies, count as dungeon quests, so Tint
+  cards by quest type gives them the Dungeon color too.
+- `/eqot status` reports the Dungeons header and Keep Dungeons at the bottom on its zone headers line,
+  counting only the zones that draw a header, and Finished Quest Color and NEW Tag Color on its title
+  color line.
+- Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and
+  Traditional Chinese cover every new option in this release, including the sort button, the Dungeons
+  header and the two new colors.
+
 ## [2.2.0] - 2026-10-05
 
 ### New Features

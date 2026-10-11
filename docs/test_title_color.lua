@@ -14,6 +14,11 @@
 -- a finished objective line takes. Then Original Style on each tracker family, the hover
 -- brighten, the status line, and the wiring by comment-stripped whole statement.
 --
+-- Since 2026-10-10 also the two colors added beside it: Finished Quest Color, driven over every
+-- mode, box state and family, and the NEW tag's color through decorateTitle, sliced from the
+-- table of tags to the click routing (its default the old blue, a color moved in place, and the
+-- tag still shown only where and when it was).
+--
 -- OUT OF SCOPE BY CONSTRUCTION: whether OBJECTIVE_TRACKER_BLOCK_HEADER_COLOR holds what Blizzard's
 -- code says on a live client (the status line reads it), and the dropdown itself, which
 -- test_appearance.lua drives.
@@ -242,6 +247,77 @@ case("every old profile draws every title exactly as v2.0.0 did, on both familie
     ok(checked > 1000, "and the grid is the whole grid: " .. checked)
 end)
 
+-- Finished Objective Color colors finished lines only, so a profile with one picked still draws
+-- every title by v2.0.0's rule. The lines are left out: they are that color's whole job.
+case("a picked Finished Objective Color never reaches a title", function()
+    local checked, wrong = 0, 0
+    for _, client in ipairs({ "retail", "watch" }) do
+        for _, focusTint in ipairs({ false, true }) do
+            local R = loadRow(client, focusTint)
+            for _, c in ipairs(profiles()) do
+                local cfg = {}
+                for k, v in pairs(c or {}) do cfg[k] = v end
+                cfg.finishedObjectiveColor = { r = 0.30, g = 0.70, b = 0.20 }
+                for i, e in ipairs(ENTRIES) do
+                    local r, g, b = R.titleColor(e, cfg)
+                    local wr, wg, wb = oldTitle(e, cfg, focusTint)
+                    checked = checked + 1
+                    if not same(r, g, b, wr, wg, wb) then
+                        wrong = wrong + 1
+                        if wrong <= 5 then
+                            print(("  %s focus=%s %s entry %d: got %s, v2.0.0 drew %s"):format(client,
+                                  tostring(focusTint), describe(cfg), i, fmt(r, g, b), fmt(wr, wg, wb)))
+                        end
+                    end
+                end
+            end
+        end
+    end
+    ok(wrong == 0, ("%d of %d titles changed for a picked Finished Objective Color"):format(wrong, checked))
+    ok(checked > 1000, "and the grid is the whole grid: " .. checked)
+end)
+
+-- Core/DB.lua's own tracker defaults, which AceDB hands every profile, so a color with a default
+-- (Count Color: Done, the objective text, the NEW tag) is always set in game.
+local function shippedDefaults()
+    local got
+    local chunk = assert(loadfile(repoFile("Core/DB.lua")))
+    setfenv(chunk, setmetatable({}, { __index = _G }))
+    chunk("EQObjectiveTracker", { RegisterModule = function(_, _, m) got = m return m end, Has = {} })
+    return got.defaults.profile.tracker
+end
+
+case("on top of the shipped defaults every title still draws as v2.0.0 did", function()
+    local defaults = shippedDefaults()
+    ok(defaults.countColorDone and defaults.objectiveColor and defaults.newTagColor,
+       "the defaults carry the colors a finished title must not take")
+    local checked, wrong = 0, 0
+    for _, client in ipairs({ "retail", "watch" }) do
+        for _, focusTint in ipairs({ false, true }) do
+            local R = loadRow(client, focusTint)
+            for _, c in ipairs(profiles()) do
+                local cfg = {}
+                for k, v in pairs(defaults) do cfg[k] = v end
+                for k, v in pairs(c or {}) do cfg[k] = v end
+                for i, e in ipairs(ENTRIES) do
+                    local r, g, b = R.titleColor(e, cfg)
+                    local wr, wg, wb = oldTitle(e, cfg, focusTint)
+                    checked = checked + 1
+                    if not same(r, g, b, wr, wg, wb) then
+                        wrong = wrong + 1
+                        if wrong <= 5 then
+                            print(("  %s focus=%s %s entry %d: got %s, v2.0.0 drew %s"):format(client,
+                                  tostring(focusTint), describe(c), i, fmt(r, g, b), fmt(wr, wg, wb)))
+                        end
+                    end
+                end
+            end
+        end
+    end
+    ok(wrong == 0, ("%d of %d titles over the shipped defaults differ from v2.0.0"):format(wrong, checked))
+    ok(checked > 1000, "and the grid is the whole grid: " .. checked)
+end)
+
 case("each mode picked explicitly draws what it names", function()
     local R = loadRow("retail", false)
     local active = { state = STATE.ACTIVE, level = 40 }
@@ -352,11 +428,221 @@ case("the status line reads the mode and the client's colors", function()
         ns = { GetModule = function() return strictDB({ Tracker = function() return cfg end }) end } }, { __index = _G }))
     chunk()
     local line = Row:TitleColorLine()
-    ok(line == "title color: original | original 0.75 0.61 0.00, finished 1.00 0.82 0.00, hover none", "watch: " .. line)
+    ok(line == "title color: original | original 0.75 0.61 0.00, finished 1.00 0.82 0.00, hover none"
+       .. " | finished quest color unset, NEW tag color unset", "watch: " .. line)
     -- An upgraded profile has no mode saved, and it is the one most likely to be asked about.
     cfg = { colorByDifficulty = false }
     line = Row:TitleColorLine()
     ok(line:find("title color: gold |", 1, true) == 1, "an upgraded Gold profile reads gold: " .. line)
+    -- The two picked colors, each in its own place, so a status paste can answer a color question.
+    cfg = { titleColorMode = "original", finishedQuestColor = { r = 0.1, g = 0.6, b = 0.9 },
+            newTagColor = { r = 1, g = 0.5, b = 0.25 } }
+    line = Row:TitleColorLine()
+    local tail = " | finished quest color 0.10 0.60 0.90, NEW tag color 1.00 0.50 0.25"
+    ok(line:sub(-#tail) == tail, "picked: " .. line)
+    cfg = { titleColorMode = "original", finishedQuestColor = {} }
+    line = Row:TitleColorLine()
+    ok(line:find(" | finished quest color unset, NEW tag color unset", 1, true) ~= nil,
+       "an empty color reads unset, as every reader treats it: " .. line)
+    -- Each reads its own key only, so a neighbor's color is never reported in its place.
+    cfg = { titleColorMode = "custom", titleColorOverride = { r = 0.3, g = 0.3, b = 0.3 },
+            finishedObjectiveColor = { r = 0.4, g = 0.4, b = 0.4 }, countColorDone = { r = 0.5, g = 0.5, b = 0.5 },
+            objectiveColor = { r = 0.6, g = 0.6, b = 0.6 } }
+    line = Row:TitleColorLine()
+    ok(line:find(" | finished quest color unset, NEW tag color unset", 1, true) ~= nil,
+       "beside every other color set, both still read unset: " .. line)
+    cfg = { titleColorMode = "original", newTagColor = { r = 1, g = 0.5, b = 0.25 } }
+    line = Row:TitleColorLine()
+    ok(line:sub(-#" | finished quest color unset, NEW tag color 1.00 0.50 0.25")
+       == " | finished quest color unset, NEW tag color 1.00 0.50 0.25",
+       "an unset finished quest color never reports the NEW tag's: " .. line)
+    -- DB:Tracker() answers nil when no profile exists, as after a DB:OnInitialize that raised,
+    -- and the status line must still print.
+    cfg = nil
+    local good, got = pcall(function() return Row:TitleColorLine() end)
+    ok(good and got:find(" | finished quest color unset, NEW tag color unset", 1, true) ~= nil,
+       "with no profile it still prints, both unset: " .. tostring(got))
+end)
+
+-- ------------------------------------------------------------------ Finished Quest Color
+
+-- Its own value in every channel and like no mode's color, so a swapped channel or a mode's color
+-- answered in its place both show.
+local TEAL = { r = 0.10, g = 0.60, b = 0.90 }
+
+local function copy(t)
+    local out = {}
+    for k, v in pairs(t) do out[k] = v end
+    return out
+end
+
+case("a picked Finished Quest Color wins for a finished title in every mode, and only there", function()
+    local checked = 0
+    for _, client in ipairs({ "retail", "watch" }) do
+        local R = loadRow(client, false)
+        for _, m in ipairs({ "difficulty", "gold", "class", "custom", "original" }) do
+            for _, box in ipairs({ "nil", true, false }) do
+                local base = { titleColorMode = m, titleColorOverride = { r = 1, g = 0, b = 0 },
+                               countColorDone = { r = 0, g = 0, b = 1 } }
+                if box ~= "nil" then base.overrideCompleteGreen = box end
+                local picked = copy(base)
+                picked.finishedQuestColor = TEAL
+                local where = ("%s %s box=%s"):format(client, m, tostring(box))
+                -- The finished objective color beside it, which a finished title must not take.
+                local lined = copy(base)
+                lined.finishedObjectiveColor = { r = 0.30, g = 0.70, b = 0.20 }
+                local lr, lg, lb, ll = R.titleColor({ state = STATE.COMPLETE, level = 30 }, lined)
+                local br, bg, bb, bl = R.titleColor({ state = STATE.COMPLETE, level = 30 }, base)
+                ok(same(lr, lg, lb, br, bg, bb) and ll == bl,
+                   where .. ": a picked finished objective color leaves the finished title alone: " .. fmt(lr, lg, lb))
+                lined.finishedQuestColor = TEAL
+                lr, lg, lb = R.titleColor({ state = STATE.COMPLETE, level = 30 }, lined)
+                ok(same(lr, lg, lb, TEAL.r, TEAL.g, TEAL.b), where .. ": and with both picked the title takes its own")
+                local r, g, b, lit = R.titleColor({ state = STATE.COMPLETE, level = 30 }, picked)
+                ok(same(r, g, b, TEAL.r, TEAL.g, TEAL.b) and lit == false,
+                   where .. ": a finished title takes it, never lit: " .. fmt(r, g, b) .. " " .. tostring(lit))
+                r, g, b, lit = R.titleColor({ state = STATE.COMPLETE }, picked)
+                ok(same(r, g, b, TEAL.r, TEAL.g, TEAL.b) and lit == false, where .. ": with no level too")
+                for _, e in ipairs({ { state = STATE.ACTIVE, level = 30 }, { state = STATE.ACTIVE },
+                                     { state = STATE.FAILED, level = 30 } }) do
+                    local wr, wg, wb, wl = R.titleColor(e, base)
+                    local gr, gg, gb, gl = R.titleColor(e, picked)
+                    ok(same(gr, gg, gb, wr, wg, wb) and gl == wl,
+                       where .. ": a " .. e.state .. " title is untouched: " .. fmt(gr, gg, gb))
+                end
+                ok(R.doneHex(picked) == R.doneHex(base),
+                   where .. ": finished lines keep their own rules: " .. R.doneHex(picked))
+                checked = checked + 1
+            end
+        end
+    end
+    ok(checked == 30, "every mode, box state and family was driven: " .. checked)
+end)
+
+case("unset or empty, a finished title keeps its old rules, and the Classic focus tint still wins", function()
+    local R = loadRow("retail", false)
+    local r, g, b = R.titleColor({ state = STATE.COMPLETE }, { finishedQuestColor = {} })
+    ok(same(r, g, b, 0.27, 0.85, 0.27), "an empty color table counts as unset, so green: " .. fmt(r, g, b))
+    r, g, b = R.titleColor({ state = STATE.COMPLETE }, { titleColorMode = "class", finishedQuestColor = {} })
+    ok(same(r, g, b, CLASS.r, CLASS.g, CLASS.b), "and Class color still recolors it: " .. fmt(r, g, b))
+    r, g, b = R.titleColor({ state = STATE.COMPLETE }, nil)
+    ok(same(r, g, b, 0.27, 0.85, 0.27), "no profile at all: green")
+    r, g, b = R.titleColor({ state = STATE.COMPLETE, isFocused = true }, { finishedQuestColor = TEAL })
+    ok(same(r, g, b, TEAL.r, TEAL.g, TEAL.b), "a followed quest on retail, which has no tint, takes it: " .. fmt(r, g, b))
+    local F = loadRow("watch", true)
+    r, g, b = F.titleColor({ state = STATE.COMPLETE, isFocused = true }, { finishedQuestColor = TEAL })
+    ok(same(r, g, b, FOCUS[1], FOCUS[2], FOCUS[3]), "the Classic focus tint still marks the focused row: " .. fmt(r, g, b))
+    r, g, b = F.titleColor({ state = STATE.COMPLETE }, { finishedQuestColor = TEAL })
+    ok(same(r, g, b, TEAL.r, TEAL.g, TEAL.b), "while an unfocused one there takes it: " .. fmt(r, g, b))
+    -- The same table changed in place, as the picker's wheel does while dragging.
+    local c = { r = 0.10, g = 0.60, b = 0.90 }
+    R.titleColor({ state = STATE.COMPLETE }, { finishedQuestColor = c })
+    c.g = 0.20
+    r, g, b = R.titleColor({ state = STATE.COMPLETE }, { finishedQuestColor = c })
+    ok(same(r, g, b, 0.10, 0.20, 0.90), "a color moved in place is read again: " .. fmt(r, g, b))
+end)
+
+-- ----------------------------------------------------------------------- the NEW tag's color
+
+local NOW = 1000000
+local dbAll = readFile("Core/DB.lua")
+local newDefaultExpr = dbAll:match("\n%s*newTagColor%s*=%s*(%b{})%s*,")
+local NEW_DEFAULT = newDefaultExpr and assert(loadstring("return " .. newDefaultExpr))() or nil
+
+local decoSrc = slice("UI/Row.lua", "local TITLE_META_PROVIDER = \"quests\"", "local function clickThrough()")
+    .. "\nreturn decorateTitle"
+
+-- A fresh chunk per call, so each holds its own cached tag. pinned lists quest ids the Filter
+-- stub answers as pinned. Filter's IsPinned reads self, so the stub refuses a dot call.
+local function loadDecorate(pinned)
+    local Filter = {}
+    function Filter.IsPinned(self, e)
+        if self ~= Filter then error("Filter:IsPinned called without self", 2) end
+        return pinned ~= nil and pinned[e.id] == true
+    end
+    local chunk = assert(loadstring(decoSrc, "row-decorate"))
+    setfenv(chunk, setmetatable({
+        Util = loadUtil("retail"),
+        time = function() return NOW end,
+        ns = { GetModule = function(_, name)
+            if name ~= "Filter" then error("decorateTitle asked for " .. tostring(name), 2) end
+            return Filter
+        end },
+    }, { __index = _G }))
+    return chunk()
+end
+
+-- As the quest provider builds one, so a guard reading any other field cannot lean on a gap.
+local function quest(o)
+    local e = { id = 101, providerID = "quests", groupID = "quests", title = "Supplies", level = 30,
+                addedAt = NOW - 60, state = STATE.ACTIVE, tags = {}, isTracked = true }
+    for k, v in pairs(o or {}) do e[k] = v end
+    return e
+end
+
+case("the shipped default draws the NEW tag in the blue it always had", function()
+    ok(NEW_DEFAULT ~= nil, "Core/DB.lua carries a newTagColor default")
+    local deco = loadDecorate()
+    local got = deco(quest(), { newTagColor = NEW_DEFAULT })
+    ok(got == "|cff6bafffNEW|r Supplies", "the default: " .. tostring(got))
+    -- v2.2.0 wrote the same color in capitals, which the client reads alike.
+    ok(got:sub(1, 10) == ("|cff6BAFFF"):lower(), "the very hex v2.2.0 drew")
+    ok(deco(quest(), {}) == got, "a profile with no color draws the same")
+    ok(deco(quest(), { newTagColor = {} }) == got, "and so does an empty color table")
+end)
+
+case("a picked color recolors the tag, and a color moved in place is picked up", function()
+    local deco = loadDecorate()
+    local c = { r = 1, g = 0.5, b = 0 }
+    local cfg = { newTagColor = c }
+    local function now() return deco(quest(), cfg) end
+    ok(now() == "|cffff8000NEW|r Supplies", "picked: " .. now())
+    -- One channel at a time, so a change test that forgets any one of them is seen. Green lands
+    -- on blue's value first, so a cache that stored the wrong channel is seen too.
+    c.g = 0
+    ok(now() == "|cffff0000NEW|r Supplies", "only green lowered, onto blue's value: " .. now())
+    c.g = 0.5
+    ok(now() == "|cffff8000NEW|r Supplies", "and back: " .. now())
+    c.r = 0
+    ok(now() == "|cff008000NEW|r Supplies", "only red lowered: " .. now())
+    c.g = 1
+    ok(now() == "|cff00ff00NEW|r Supplies", "only green raised: " .. now())
+    c.b = 1
+    ok(now() == "|cff00ffffNEW|r Supplies", "only blue raised: " .. now())
+    cfg.newTagColor = { r = 0, g = 1, b = 1 }
+    ok(now() == "|cff00ffffNEW|r Supplies", "an equal new table reads the same")
+    cfg.newTagColor = nil
+    ok(now() == "|cff6bafffNEW|r Supplies", "unset, back to the old blue: " .. now())
+    -- The very color held before the unset, so a cache that outlived the unset would keep blue.
+    cfg.newTagColor = { r = 0, g = 1, b = 1 }
+    ok(now() == "|cff00ffffNEW|r Supplies", "and the same pick after that is taken again: " .. now())
+end)
+
+case("the tag still shows only where and when it did", function()
+    local deco = loadDecorate({ [202] = true })
+    local cfg = { newTagColor = { r = 1, g = 0, b = 0 } }
+    local tag = "|cffff0000NEW|r "
+    ok(deco(quest({ addedAt = NOW - 3599 }), cfg) == tag .. "Supplies", "accepted 3599 seconds ago: tagged")
+    ok(deco(quest({ addedAt = NOW - 3600 }), cfg) == "Supplies", "an hour ago: not")
+    ok(deco(quest({ addedAt = 0 }), cfg) == "Supplies", "no time recorded: not")
+    ok(deco(quest({ addedAt = false }), cfg) == "Supplies", "nothing recorded at all: not")
+    local off = copy(cfg)
+    off.showRecentlyAddedTag = false
+    ok(deco(quest(), off) == "Supplies", "the Tracker tab's switch off: not")
+    local on = copy(cfg)
+    on.showRecentlyAddedTag = true
+    ok(deco(quest(), on) == tag .. "Supplies", "switched on: tagged")
+    ok(deco(quest({ providerID = "worldquests" }), cfg) == "Supplies", "never on a world quest")
+    ok(deco(quest({ providerID = "achievements" }), cfg) == "Supplies", "or an achievement")
+    ok(deco(quest(), nil) == "Supplies", "no profile: the bare title")
+    local pin = deco(quest({ id = 202 }), cfg)
+    -- The star's bytes built here, so the decimal escape grep keeps counting production's alone.
+    local star = string.char(226, 152, 133)
+    ok(pin == tag .. "|cffEBB706" .. star .. "|r Supplies", "the tag comes before a pin's star: " .. pin)
+    local full = copy(cfg)
+    full.showLevelInTracker, full.showQuestID = true, true
+    local got = deco(quest(), full)
+    ok(got == tag .. "[30] Supplies |cff666666(#101)|r", "and before the level and the quest id: " .. got)
 end)
 
 -- ---------------------------------------------------------------- the wiring, by statement
@@ -400,6 +686,20 @@ local _, overrideSets = plainDefaults:gsub("titleColorOverride%s*=", "")
 ok(overrideSets == 1 and plainDefaults:find("titleColorOverride%s*=%s*nil,") ~= nil,
    "the custom title color has no AceDB default either, or every old profile would read as Custom color")
 has(stripComments(readFile("UI/Commands.lua")), [[debugLine("Row", nil, "TitleColorLine")]], "/eqot status prints the line")
+
+-- The decorated title is what Render draws and what its repaint gate keys on, so a recolored tag
+-- needs no gate field of its own.
+has(row, "    local titleText = decorateTitle(entry, cfg)", "Render decorates the title once")
+has(row, "    row.title:SetText(titleText)", "draws that string")
+has(row, "    row._sTitle, row._sSub, row._sState = titleText, subtitle, entry.state",
+    "and keys the repaint gate on it")
+has(row, "        text = newTagFor(cfg) .. text", "the tag comes through the picked color")
+ok(count(row, "NEW_TAG .. text") == 0, "and never the fixed one directly")
+ok(not plainDefaults:find("finishedQuestColor%s*="),
+   "Finished Quest Color has no AceDB default, so it starts unset")
+for _, k in ipairs({ "finishedQuestColor", "newTagColor" }) do
+    ok(count(resetKeys, '"' .. k .. '"') == 1, "Reset to Defaults clears " .. k)
+end
 ok(count(stripComments(readFile("Options/TabTracker.lua")), "colorByDifficulty") == 0,
    "the Tracker tab no longer carries a difficulty box")
 

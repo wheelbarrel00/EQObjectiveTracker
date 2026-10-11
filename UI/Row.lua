@@ -219,12 +219,18 @@ end
 -- Original Style reads its colors off the client, so this is where a reading of them lives.
 function Row:TitleColorLine()
     local cfg = ns:GetModule("DB"):Tracker()
+    local function picked(c)
+        if not (c and c.r) then return "unset" end
+        return ("%.2f %.2f %.2f"):format(c.r, c.g, c.b)
+    end
     local r, g, b = Util.OriginalTitleColor(false)
     local cr, cg, cb = Util.OriginalTitleColor(true)
     local hr, hg, hb = Util.OriginalTitleHighlight()
-    return ("title color: %s | original %.2f %.2f %.2f, finished %.2f %.2f %.2f, hover %s")
+    return ("title color: %s | original %.2f %.2f %.2f, finished %.2f %.2f %.2f, hover %s"
+            .. " | finished quest color %s, NEW tag color %s")
         :format(Util.TitleColorMode(cfg), r, g, b, cr, cg, cb,
-                hr and ("%.2f %.2f %.2f"):format(hr, hg, hb) or "none")
+                hr and ("%.2f %.2f %.2f"):format(hr, hg, hb) or "none",
+                picked(cfg and cfg.finishedQuestColor), picked(cfg and cfg.newTagColor))
 end
 
 -- With no finished color picked and no title color to take, a finished line follows the done
@@ -252,6 +258,8 @@ local function titleColor(entry, cfg)
     end
     if entry.state == STATE.FAILED then return 0.85, 0.27, 0.27, false end
     local complete = entry.state == STATE.COMPLETE
+    local fq = complete and cfg and cfg.finishedQuestColor
+    if fq and fq.r then return fq.r, fq.g, fq.b, false end
     local r, g, b = Util.EffectiveTitleColor(cfg, complete)
     if complete and not (r and (not cfg or cfg.overrideCompleteGreen ~= false)) then
         return 0.27, 0.85, 0.27, false
@@ -472,9 +480,22 @@ end
 -- get them - the same set that pays for the item-button gutter, for the same reason.
 local TITLE_META_PROVIDER = "quests"
 local NEW_WINDOW = 3600
-local NEW_TAG    = "|cff6BAFFFNEW|r "
+local NEW_TAG    = "|cff6bafffNEW|r "
 -- Escaped U+2605 so this file stays ASCII, matching EQ's pinned marker.
 local PIN_TAG    = "|cffEBB706\226\152\133|r "
+
+-- Rebuilt only when the picked color moves, since a NEW title is decorated again on every repaint.
+local newTag, newRGB = NEW_TAG, {}
+local function newTagFor(cfg)
+    local c = cfg.newTagColor
+    if not (c and c.r) then
+        newTag, newRGB.r = NEW_TAG, nil
+    elseif newRGB.r ~= c.r or newRGB.g ~= c.g or newRGB.b ~= c.b then
+        newRGB.r, newRGB.g, newRGB.b = c.r, c.g, c.b
+        newTag = "|cff" .. Util.Hex(c.r, c.g, c.b) .. "NEW|r "
+    end
+    return newTag
+end
 
 local function decorateTitle(entry, cfg)
     local text = entry.title or ""
@@ -494,7 +515,7 @@ local function decorateTitle(entry, cfg)
     end
     if cfg.showRecentlyAddedTag ~= false and entry.addedAt and entry.addedAt > 0
        and (time() - entry.addedAt) < NEW_WINDOW then
-        text = NEW_TAG .. text
+        text = newTagFor(cfg) .. text
     end
     return text
 end
@@ -817,8 +838,10 @@ function Row:Render(row, entry, width, cfg)
     row._providerID = entry.providerID
 
     local titleText = decorateTitle(entry, cfg)
-    -- Zone headers name the heading already, so the label would say it twice.
-    local subtitle = (cfg and cfg.showZoneTag ~= false and not cfg.zoneHeaders) and entry.subtitle or nil
+    -- Zone headers name the heading already, so the label would say it twice. A quest in the
+    -- Dungeons header is no longer under its zone's header, so it keeps the label.
+    local headed = cfg and cfg.zoneHeaders and not (cfg.dungeonHeader == true and entry.tags and entry.tags.dungeon)
+    local subtitle = (cfg and cfg.showZoneTag ~= false and not headed) and entry.subtitle or nil
     -- Fills the shared block arrays. Nothing between here and the layout loop below may call
     -- buildBlocks again, which is the only thing that rewrites them.
     buildBlocks(entry, cfg)

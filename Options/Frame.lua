@@ -66,6 +66,13 @@ function Options:SelectTab(id)
     ui:SelectTab(id)
 end
 
+-- Viewing a tab again re-reads every control on it, so a setting changed from the tracker shows on
+-- the tab at once when that tab is the one on screen.
+function Options:RefreshIfShown(id)
+    local c = ns:GetModule("DB"):Char()
+    if self.frame and self.frame:IsShown() and c and c.lastOptionsTab == id then ui:SelectTab(id) end
+end
+
 function Options:Build()
     if self.frame then return end
     self.frame = ui:BuildSettings("EQOTOptionsFrame")

@@ -59,6 +59,13 @@ function Preview:Samples()
                 isFocused = true, subtitle = "Northern Vale", zone = "Northern Vale",
                 lines = { { text = "Find the scout's trail", kind = LINE.OBJECTIVE } },
             }),
+            -- Last, where the Dungeons header goes. Tagged as a dungeon quest so Tint cards by
+            -- quest type shows its color, and given a zone label, which it keeps under that header.
+            quest(90006, "quests", "Into the Sunken Halls", {
+                tags = { dungeon = true }, level = level + 1, zone = "The Sunken Halls",
+                subtitle = "The Sunken Halls",
+                lines = { { text = "0/1 Tidecaller Vossa slain", kind = LINE.OBJECTIVE } },
+            }),
         },
     }
 end
@@ -141,14 +148,17 @@ function Preview:ZoneHeader(key)
     return h
 end
 
--- The samples list each zone's quests together, so their own order is the zone order.
-function Preview:Runs(list)
+-- The samples list each zone's quests together, so their own order is the zone order. Keyed the
+-- way the tracker keys its runs, so the dungeon sample joins the Dungeons header when that is on.
+function Preview:Runs(list, cfg)
+    local ZoneGroups = ns:GetModule("ZoneGroups")
     local runs, byZone = {}, {}
     for _, e in ipairs(list) do
-        local run = byZone[e.zone]
+        local key = ZoneGroups:RunKey(e, cfg)
+        local run = byZone[key]
         if not run then
-            run = { zone = e.zone, entries = {}, count = 0 }
-            byZone[e.zone] = run
+            run = { zone = key, entries = {}, count = 0 }
+            byZone[key] = run
             runs[#runs + 1] = run
         end
         run.count = run.count + 1
@@ -172,7 +182,7 @@ function Preview:Refresh(again)
     local Tracker, Sections = ns:GetModule("Tracker"), ns:GetModule("Sections")
     local Row, Card = ns:GetModule("Row"), ns:GetModule("Card")
     local ZoneBar = ns:GetModule("ZoneProgressBar")
-    local Zones   = cfg.zoneHeaders and ns:GetModule("ZoneHeaders") or nil
+    local Zones   = (cfg.zoneHeaders or cfg.dungeonHeader) and ns:GetModule("ZoneHeaders") or nil
     local content = self.content
 
     local pad, top, bottom = Tracker:Insets()
@@ -211,9 +221,9 @@ function Preview:Refresh(again)
             y = y + Sections:Place(h, content, y, { visibleCount = #list, totalCount = TOTALS[groupID] },
                                    false, showTotal) + gap
             drawnHeaders[groupID] = true
-            for _, run in ipairs(Zones and self:Runs(list) or { { entries = list } }) do
+            for _, run in ipairs(Zones and self:Runs(list, cfg) or { { entries = list } }) do
                 local left = 0
-                if run.zone then
+                if run.zone and run.zone ~= "" then
                     local key = groupID .. ":" .. run.zone
                     y = y + Zones:Draw(self:ZoneHeader(key), content, groupID, run, y, cfg) + gap
                     drawnZones[key] = true

@@ -495,6 +495,91 @@ MUTANTS = [
         (QC, '    if type(GetNumQuestWatches) ~= "function" or type(GetQuestIndexForWatch) ~= "function"\n',
              '    if type(GetNumQuestWatches) ~= "function"\n')]),
 
+    # ----------------------------------------------------- other module methods called with a dot
+    ("the sort box applies the header icons with a dot", [
+        ("Options/TabTracker.lua", '                DB().showSortButton = v\n                ns:GetModule("Tracker"):ApplyHeaderIcons()\n',
+                                   '                DB().showSortButton = v\n                ns:GetModule("Tracker").ApplyHeaderIcons()\n')]),
+
+    ("a restyle repaints the rows with a spaced dot call", [
+        ("Options/TabAppearance.lua", '    DB()[key] = v\n    ns:GetModule("Row"):Invalidate()\n    ns:GetModule("Tracker"):Render()\n    refreshPreview()\n',
+                                      '    DB()[key] = v\n    ns:GetModule("Row") . Invalidate ()\n    ns:GetModule("Tracker"):Render()\n    refreshPreview()\n')]),
+
+    ("the General tab resets the position through a single-quoted dot call", [
+        (G, 'nil, function()\n            ns:GetModule("Tracker"):ResetPosition()\n',
+            "nil, function()\n            ns:GetModule('Tracker').ResetPosition()\n")]),
+
+    ("the General tab locks the tracker through a bracketed call", [
+        (G, '                DB:General().lockTracker = v\n                ns:GetModule("Tracker"):ApplyLockState()\n',
+            '                DB:General().lockTracker = v\n                ns:GetModule("Tracker")["ApplyLockState"]()\n')]),
+
+    ("the General tab applies the hide rules through an alias called with a dot", [
+        (G, '                    DB:General()[key] = v\n                    ns:GetModule("Visibility"):Apply()\n',
+            '                    DB:General()[key] = v\n                    local Vis = ns:GetModule("Visibility")\n'
+            '                    Vis.Apply()\n')]),
+
+    ("/eqot status redraws through a single-quoted dot call", [
+        (C, '    if not ns:UsesBlizzardTracker() then\n        ns:GetModule("Tracker"):Render()\n',
+            "    if not ns:UsesBlizzardTracker() then\n        ns:GetModule('Tracker').Render()\n")]),
+
+    ("the About tab lists the providers through a single-quoted dot call", [
+        ("Options/TabAbout.lua", '        content._providerRows = {}\n        for _, p in ipairs(ns:GetModule("Registry"):Active()) do\n',
+                                 "        content._providerRows = {}\n        for _, p in ipairs(ns:GetModule('Registry').Active()) do\n")]),
+
+    # The scan's other forms, after the third 2.3.0 scan: a module's own name, a helper that
+    # returns one, a two-name alias line, an underscore method, and a dot-declared helper called
+    # with a colon.
+    ("/eqot reset calls the tracker through its helper with a dot", [
+        (C, "    tracker():ResetPosition()\n", "    tracker().ResetPosition()\n")]),
+
+    ("/eqot lock calls the tracker through its helper with a dot", [
+        (C, "lockTracker = true\n    tracker():ApplyLockState()\n", "lockTracker = true\n    tracker().ApplyLockState()\n")]),
+
+    ("/eqot toggle calls the tracker through its helper with a dot", [
+        (C, "    tracker():Toggle()\n", "    tracker().Toggle()\n")]),
+
+    ("the tracker's size change asks for a redraw through its own name with a dot", [
+        (TR, '    f:SetScript("OnSizeChanged", function() Tracker:Refresh() end)\n',
+             '    f:SetScript("OnSizeChanged", function() Tracker.Refresh() end)\n')]),
+
+    ("the scroll hook updates the sticky band with a dot on an underscore method", [
+        (TR, "function() Tracker:_UpdateSticky() end)", "function() Tracker._UpdateSticky() end)")]),
+
+    ("the height check reads a row's drift through a two-name alias with a dot", [
+        (TR, "            local d = Row:Drift(row)\n", "            local d = Row.Drift(row)\n")]),
+
+    ("the preview renders each row through a two-name alias with a dot", [
+        ("UI/TrackerPreview.lua", "y = y + Row:Render(row, entry, inner - left, cfg) + gap",
+                                  "y = y + Row.Render(row, entry, inner - left, cfg) + gap")]),
+
+    ("the preview skins its backdrop through a two-name alias with a dot", [
+        ("UI/TrackerPreview.lua", "    Tracker:SkinBackdrop(self.bg, self.background, cfg)\n",
+                                  "    Tracker.SkinBackdrop(self.bg, self.background, cfg)\n")]),
+
+    ("a dot-declared Entry helper is called with a colon", [
+        ("Data/Providers/Initiative.lua", "    Entry.EndLines(e)\n", "    Entry:EndLines(e)\n")]),
+
+    # The final check's spellings.
+    ("/eqot toggle reaches the tracker through its helper with brackets", [
+        (C, "    tracker():Toggle()\n", "    tracker()[\"Toggle\"]()\n")]),
+
+    ("achievements trim their lines through a colon call straight off GetModule", [
+        ("Data/Providers/Achievements.lua", "    Entry.EndLines(e)\n", "    ns:GetModule(\"Entry\"):EndLines(e)\n")]),
+
+    ("the reward tooltip colors Time Left through a colon call straight off GetModule", [
+        ("UI/RewardTooltip.lua", "                        Util.TimeColor(mins))",
+                                 "                        ns:GetModule(\"Util\"):TimeColor(mins))")]),
+
+    ("Util calls its own dot-declared Hex with a colon", [
+        ("Core/Util.lua", "        countEsc[i] = \"|cff\" .. Util.Hex(c.r, c.g, c.b)\n",
+                          "        countEsc[i] = \"|cff\" .. Util:Hex(c.r, c.g, c.b)\n")]),
+
+    ("the preview reads the card state through the second name of an alias line with a dot", [
+        ("UI/TrackerPreview.lua", "(Card:State(cfg))", "(Card.State(cfg))")]),
+
+    ("a relayout redraws the tracker with a dot", [
+        ("Options/TabAppearance.lua", 'local function relayout(key, v)\n    DB()[key] = v\n    ns:GetModule("Tracker"):Render()\n',
+                                      'local function relayout(key, v)\n    DB()[key] = v\n    ns:GetModule("Tracker").Render()\n')]),
+
     # ------------------------------------------------------------------ DB accessors called with a dot
     # Each raises in game, and no harness drives these three lines with a DB that reads self.
     ("Render reads the profile with a dot call", [

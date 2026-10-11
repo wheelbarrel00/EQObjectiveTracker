@@ -37,9 +37,10 @@ local MAX_LOG_INDEX = 75
 -- emptied the tracker whenever the Daily filter was unticked.
 local DAILY_FREQ, WEEKLY_FREQ = 2, 3
 
--- Fallback ids read off Enum.QuestTag on 1.15.9: Dungeon 81, Raid 62, Raid10 88, Raid25 89.
+-- Fallback ids read off Enum.QuestTag on 1.15.9: Dungeon 81, Heroic 85, Raid 62, Raid10 88, Raid25 89.
 -- 85 is Heroic and was wrong here for both raid sizes.
 local TAG_DUNGEON = (Enum and Enum.QuestTag and Enum.QuestTag.Dungeon) or 81
+local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 85
 local TAG_RAID    = (Enum and Enum.QuestTag and Enum.QuestTag.Raid)    or 62
 local TAG_RAID10  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid10)  or 88
 local TAG_RAID25  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid25)  or 89
@@ -285,7 +286,8 @@ local function fillTags(e, id, frequency)
     if frequency == DAILY_FREQ  then tags.daily  = true end
     if frequency == WEEKLY_FREQ then tags.weekly = true end
     local tagID = getTagID(id)
-    if tagID == TAG_DUNGEON then
+    -- TBC's heroic dungeon dailies carry Heroic in place of Dungeon, and count as dungeon quests.
+    if tagID == TAG_DUNGEON or tagID == TAG_HEROIC then
         tags.dungeon = true
     elseif tagID == TAG_RAID or tagID == TAG_RAID10 or tagID == TAG_RAID25 then
         tags.raid = true

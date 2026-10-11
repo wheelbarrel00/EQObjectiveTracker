@@ -25,6 +25,16 @@ local function repoFile(rel)
 end
 
 local pass, fail = 0, 0
+
+-- Core/DB.lua's own tracker defaults, read by running the file.
+local function shippedDefaults()
+    local got
+    local chunk = assert(loadfile(repoFile("Core/DB.lua")))
+    setfenv(chunk, setmetatable({}, { __index = _G }))
+    chunk("EQObjectiveTracker", { RegisterModule = function(_, _, m) got = m return m end, Has = {} })
+    return got.defaults.profile.tracker
+end
+
 -- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
 -- stand-in raises the same way, rather than answering a call the client would refuse.
 local function strictDB(methods)
@@ -101,7 +111,7 @@ local function appearanceTab(bonus, marked)
     modules.Dialog = { Show = function(_, o) calls.dialog = o end }
     modules.Media = {
         GetFontList = function() return { "Friz" } end, GetStatusBarList = function() return { "Blizzard" } end,
-        GetFontFile = function(_, name) return "file:" .. tostring(name) end, GetStatusBarFile = function() return "X" end,
+        GetFontFile = function(_, name) return "file:" .. tostring(name) end, GetStatusBarFile = function(_, name) return "bar:" .. tostring(name) end,
     }
     modules.ZoneProgressBar = {
         RefreshAppearance = function() calls.zoneLook = calls.zoneLook + 1 end,
@@ -119,6 +129,19 @@ local function appearanceTab(bonus, marked)
         Refresh = function() calls.preview = calls.preview + 1 end,
         Build = function(_, panel) calls.previewPanel = panel end,
     }
+    -- The other stubs check self the same way, so a dot call to Row or Tracker raises here too.
+    for name, m in pairs(modules) do
+        if name ~= "DB" then
+            for k, fn in pairs(m) do
+                if type(fn) == "function" then
+                    m[k] = function(self, ...)
+                        if self ~= m then error(name .. ":" .. k .. " called without self", 2) end
+                        return fn(self, ...)
+                    end
+                end
+            end
+        end
+    end
 
     local t = { cfg = cfg, calls = calls, cards = {}, dims = {}, dimCalls = 0, controls = {}, looked = looked }
     local ui = {}
@@ -225,6 +248,7 @@ local ROWS = {
     ["Quest Colors"] = {
         { "Quest Title Color", "radio" }, { "Custom Title Color", "picker", true },
         { "Use title color for completed quests", "checkbox" },
+        { "Finished Quest Color", "picker" }, { "NEW Tag Color", "picker" },
         { "Objective Text Color", "picker" }, { "Count Color: None Done", "picker" },
         { "Count Color: In Progress", "picker" }, { "Count Color: Done", "picker" },
         { "Finished Objective Color", "picker" },
@@ -244,6 +268,7 @@ local ROWS = {
     },
     ["Zone Headers"] = {
         { "Show zone headers", "checkbox" }, { "Zone Order", "radio" },
+        { "Group dungeon quests under one header", "checkbox" }, { "Keep Dungeons at the bottom", "checkbox", true },
         { "Zone Header Size Offset", "slider" }, { "Use class color for zone headers", "checkbox" },
         { "Zone Header Color", "picker", true },
         { "Show zone header bars", "checkbox", false, "Bar Color" },
@@ -335,14 +360,16 @@ local SWEEP = {
     ["Section Headers/Soft edges"]    = function(c) return c.headerBar end,
     ["Section Headers/Edge Softness"] = function(c) return c.headerBar and c.headerBarSoftEdges end,
     ["Zone Headers/Zone Order"]       = function(c) return c.zoneHeaders end,
-    ["Zone Headers/Zone Header Size Offset"]          = function(c) return c.zoneHeaders end,
-    ["Zone Headers/Use class color for zone headers"] = function(c) return c.zoneHeaders end,
-    ["Zone Headers/Zone Header Color"] = function(c) return c.zoneHeaders and not c.zoneHeaderColorUseClass end,
-    ["Zone Headers/Show zone header bars"]    = function(c) return c.zoneHeaders end,
-    ["Zone Headers/Bar Color"]                = function(c) return c.zoneHeaders and c.zoneHeaderBar end,
-    ["Zone Headers/Show zone header divider"] = function(c) return c.zoneHeaders end,
-    ["Zone Headers/Divider Line Color"]       = function(c) return c.zoneHeaders and c.zoneHeaderDivider end,
-    ["Zone Headers/Quest Indent"]             = function(c) return c.zoneHeaders end,
+    ["Zone Headers/Keep Dungeons at the bottom"] = function(c) return c.dungeonHeader end,
+    -- The look styles the Dungeons header too, so it is lit while either header is on.
+    ["Zone Headers/Zone Header Size Offset"]          = function(c) return (c.zoneHeaders or c.dungeonHeader) end,
+    ["Zone Headers/Use class color for zone headers"] = function(c) return (c.zoneHeaders or c.dungeonHeader) end,
+    ["Zone Headers/Zone Header Color"] = function(c) return (c.zoneHeaders or c.dungeonHeader) and not c.zoneHeaderColorUseClass end,
+    ["Zone Headers/Show zone header bars"]    = function(c) return (c.zoneHeaders or c.dungeonHeader) end,
+    ["Zone Headers/Bar Color"]                = function(c) return (c.zoneHeaders or c.dungeonHeader) and c.zoneHeaderBar end,
+    ["Zone Headers/Show zone header divider"] = function(c) return (c.zoneHeaders or c.dungeonHeader) end,
+    ["Zone Headers/Divider Line Color"]       = function(c) return (c.zoneHeaders or c.dungeonHeader) and c.zoneHeaderDivider end,
+    ["Zone Headers/Quest Indent"]             = function(c) return (c.zoneHeaders or c.dungeonHeader) end,
     ["Quest Colors/Custom Title Color"] = function(c) return titleMode(c) == "custom" end,
     ["Quest Colors/Use title color for completed quests"] = function(c)
         local m = titleMode(c)
@@ -407,6 +434,7 @@ local DOMAIN = {
     showZoneProgressBar = SWITCH, zoneProgressLocation = { ABSENT, "floating", "tracker" },
     showProgressBars = SWITCH, showQuestProgressBars = SWITCH, showScenarioProgressBars = SWITCH,
     zoneHeaders = SWITCH, zoneHeaderColorUseClass = SWITCH, zoneHeaderBar = SWITCH, zoneHeaderDivider = SWITCH,
+    dungeonHeader = SWITCH,
 }
 
 -- A fixed generator rather than math.random, so a failing profile is the same on every run.
@@ -558,6 +586,90 @@ do
         order.setter("alpha")
         ok(t.cfg.zoneHeaderOrder == "alpha" and order.getter() == "alpha", "a pick stores the value")
 
+        -- Requested by Andreon (2026-10-10). It works with zone headers off, so nothing dims it.
+        local dungeon = t.byKey["Zone Headers/Group dungeon quests under one header"]
+        ok(dungeon and not dungeon.getter(), "the dungeon box reads off while unset")
+        t.cfg.dungeonHeader = 1
+        ok(dungeon.getter() == false, "and only a real true reads on")
+        local before = t.dimCalls
+        dungeon.setter(true)
+        ok(t.cfg.dungeonHeader == true and dungeon.getter() == true, "it stores and reads back on")
+        ok(t.dimCalls > before, "and re-runs the sweep, since the look below now styles the Dungeons header")
+        ok(t.cfg.zoneHeaders == false, "without touching Show zone headers")
+        dungeon.setter(false)
+        ok(t.cfg.dungeonHeader == false and dungeon.getter() == false, "and off again")
+        ok(t.dims[dungeon] == nil, "never dimmed, by either switch")
+        local tip = tostring(dungeon.tooltip)
+        ok(tip:find("With Show zone headers off", 1, true) and tip:find("leave their zones", 1, true)
+           and tip:find("Off by default.", 1, true), "its tooltip says what it does with zone headers off and on: " .. tip)
+
+        -- The author's request of 2026-10-11, right under the dungeon box and indented under it.
+        local last = t.byKey["Zone Headers/Keep Dungeons at the bottom"]
+        ok(last and not last.getter(), "Keep Dungeons at the bottom reads off while unset")
+        t.cfg.dungeonHeaderLast = 1
+        ok(last.getter() == false, "and only a real true reads on")
+        local sweepsBefore = t.dimCalls
+        last.setter(true)
+        ok(t.cfg.dungeonHeaderLast == true and last.getter() == true, "it stores and reads back on")
+        ok(t.dimCalls == sweepsBefore, "without re-running the sweep, since nothing hangs off it")
+        ok(t.cfg.dungeonHeader == false and t.cfg.zoneHeaderOrder == "alpha", "and touches neither the box above nor Zone Order")
+        last.setter(false)
+        ok(t.cfg.dungeonHeaderLast == false and last.getter() == false, "and off again")
+        local lastTip = tostring(last.tooltip)
+        ok(lastTip:find("Current zone first", 1, true) and lastTip:find("Off by default.", 1, true),
+           "its tooltip names the order it overrides: " .. lastTip)
+
+        -- Each read beside every switch Core/DB.lua ships, on and then off, and with the zone order
+        -- at each value and unset, so a getter that reads a neighbor shows.
+        local NEIGHBORS = {}
+        for k, v in pairs(shippedDefaults()) do
+            if type(v) == "boolean" then NEIGHBORS[#NEIGHBORS + 1] = k end
+        end
+        ok(#NEIGHBORS > 40, "the neighbors are read off the shipped defaults: " .. #NEIGHBORS)
+        local saved, savedOrder = {}, t.cfg.zoneHeaderOrder
+        for _, k in ipairs(NEIGHBORS) do saved[k] = t.cfg[k] end
+        for _, pair in ipairs({ { dungeon, "dungeonHeader" }, { last, "dungeonHeaderLast" } }) do
+            for _, zoneOrder in ipairs({ "current", "alpha", false }) do
+                for _, v in ipairs({ true, false }) do
+                    for _, on in ipairs({ true, false }) do
+                        for _, k in ipairs(NEIGHBORS) do t.cfg[k] = v end
+                        t.cfg.zoneHeaderOrder = zoneOrder or nil
+                        t.cfg[pair[2]] = on
+                        ok(pair[1].getter() == on, ("%s reads %s beside neighbors all %s, order %s"):format(
+                           pair[2], tostring(on), tostring(v), tostring(zoneOrder or "unset")))
+                    end
+                end
+            end
+        end
+        for _, k in ipairs(NEIGHBORS) do t.cfg[k] = saved[k] end
+        t.cfg.zoneHeaderOrder = savedOrder
+        -- And beside every other default moved to another value of its type, and each sort order.
+        local neg, zero, extras = {}, {}, {}
+        for k, v in pairs(shippedDefaults()) do
+            if type(v) == "number" then
+                neg[k], zero[k] = -1, 0
+            elseif type(v) == "table" then
+                neg[k], zero[k] = {}, {}
+            elseif type(v) == "string" and k ~= "zoneHeaderOrder" then
+                neg[k], zero[k] = "", ""
+            end
+        end
+        extras[1], extras[2] = neg, zero
+        for _, mode in ipairs({ "zone", "title", "status", "type", "level", "distance", "recent", "manual" }) do
+            extras[#extras + 1] = { sortMode = mode }
+        end
+        for _, pair in ipairs({ { dungeon, "dungeonHeader" }, { last, "dungeonHeaderLast" } }) do
+            for ei, extra in ipairs(extras) do
+                local kept = {}
+                for k, v in pairs(extra) do kept[k] = t.cfg[k]; t.cfg[k] = v end
+                for _, on in ipairs({ true, false }) do
+                    t.cfg[pair[2]] = on
+                    ok(pair[1].getter() == on, ("%s reads %s beside neighbors %d"):format(pair[2], tostring(on), ei))
+                end
+                for k in pairs(extra) do t.cfg[k] = kept[k] end
+            end
+        end
+
         -- Each look control reads and writes its own key, never the section headers' twin.
         local function ctl(label) return t.byKey["Zone Headers/" .. label] end
         local size, indent = ctl("Zone Header Size Offset"), ctl("Quest Indent")
@@ -664,7 +776,9 @@ do
             "Text/Text Shadow", "Scenario/Text Shadow", "Scroll Bar/Hide scroll bar",
             "Scroll Bar/Scroll Bar Background", "Scroll Bar/Solid color thumb", "Tracker/Background",
             "Tracker/Border", "Section Headers/Show header bars", "Section Headers/Soft edges",
-            "Section Headers/Use class color for headers", "Zone Headers/Show zone headers",
+            "Section Headers/Use class color for headers",
+            -- Ahead of Show zone headers, so the look below it is lit by this box alone.
+            "Zone Headers/Group dungeon quests under one header", "Zone Headers/Show zone headers",
             "Zone Headers/Use class color for zone headers", "Zone Headers/Show zone header bars",
             "Zone Headers/Show zone header divider",
             "Quest Rows/Tint cards by quest type", "Zone Progress Bar/Show zone progress bar",
@@ -902,6 +1016,8 @@ local PATH = {
     ["Quest Colors/Quest Title Color"] = R,
     ["Quest Colors/Custom Title Color"] = R,
     ["Quest Colors/Use title color for completed quests"] = R,
+    ["Quest Colors/Finished Quest Color"] = R,
+    ["Quest Colors/NEW Tag Color"] = R,
     ["Quest Colors/Objective Text Color"] = R,
     ["Quest Colors/Count Color: None Done"] = R,
     ["Quest Colors/Count Color: In Progress"] = R,
@@ -911,6 +1027,8 @@ local PATH = {
     ["Section Headers/Section Header Color"] = LAY, ["Section Headers/Divider Line Color"] = LAY,
     -- Invalidates the rows, as the Tracker tab's zone label box does.
     ["Zone Headers/Show zone headers"] = R, ["Zone Headers/Zone Order"] = LAY,
+    ["Zone Headers/Group dungeon quests under one header"] = LAY,
+    ["Zone Headers/Keep Dungeons at the bottom"] = LAY,
     ["Zone Headers/Zone Header Size Offset"] = LAY, ["Zone Headers/Use class color for zone headers"] = LAY,
     ["Zone Headers/Zone Header Color"] = LAY, ["Zone Headers/Show zone header bars"] = LAY,
     ["Zone Headers/Bar Color"] = LAY, ["Zone Headers/Show zone header divider"] = LAY,
@@ -1079,6 +1197,8 @@ do
             { "Count Color: In Progress", "countColorPartial" },
             { "Count Color: Done", "countColorDone" },
             { "Finished Objective Color", "finishedObjectiveColor" },
+            { "Finished Quest Color", "finishedQuestColor" },
+            { "NEW Tag Color", "newTagColor" },
         }
         for i, p in ipairs(PICKERS) do
             local ctl = t.byKey["Quest Colors/" .. p[1]]
@@ -1104,11 +1224,43 @@ do
             ok(t.calls.invalidate == inv + 1, "and repaints the rows")
         end
         ok(finished and finished.hasAlpha == false, "a finished line's color takes no alpha")
-        for i = 1, 4 do
+        for _, i in ipairs({ 1, 2, 3, 4, 7 }) do
             local ctl = t.byKey["Quest Colors/" .. PICKERS[i][1]]
             ok(ctl and ctl.onClear == nil, PICKERS[i][1] .. " has a default, so no Clear")
             ok(ctl and not ctl.hasAlpha, PICKERS[i][1] .. " takes no alpha")
         end
+
+        local quest = t.byKey["Quest Colors/Finished Quest Color"]
+        ok(quest and type(quest.onClear) == "function", "the finished quest color can be cleared")
+        -- An unset swatch that showed a neighbor's color would read as a color already picked.
+        if quest then
+            t.cfg.finishedQuestColor = nil
+            t.cfg.countColorDone, t.cfg.finishedObjectiveColor = { r = 0, g = 1, b = 0 }, { r = 0, g = 0.5, b = 0 }
+            t.cfg.titleColorOverride, t.cfg.newTagColor = { r = 1, g = 1, b = 0 }, { r = 0, g = 0, b = 1 }
+            ok(quest.getter() == nil, "unset, it reads unset beside every other quest color set")
+        end
+        if quest and quest.onClear then
+            t.cfg.finishedQuestColor = { r = 1, g = 0, b = 0 }
+            t.cfg.finishedObjectiveColor = { r = 0, g = 1, b = 0 }
+            local inv, ren, pre = t.calls.invalidate, t.calls.render, t.calls.preview
+            quest.onClear()
+            ok(t.cfg.finishedQuestColor == nil, "Clear unsets it, which puts the old finished title back")
+            ok(t.cfg.finishedObjectiveColor ~= nil, "and leaves the finished objective color alone")
+            ok(t.calls.invalidate == inv + 1 and t.calls.render == ren + 1 and t.calls.preview == pre + 1,
+               "repainting the rows and the preview")
+        end
+        ok(quest and quest.hasAlpha == false, "a finished title's color takes no alpha")
+        ok(quest and tostring(quest.tooltip):find("in every Quest Title Color mode", 1, true),
+           "its tooltip says it wins in every mode: " .. tostring(quest and quest.tooltip))
+        local box = t.byKey["Quest Colors/Use title color for completed quests"]
+        ok(box and tostring(box.tooltip):find("A picked Finished Quest Color or Finished Objective Color wins over it.", 1, true),
+           "the completed box's tooltip names both colors that win over it: " .. tostring(box and box.tooltip))
+        local dd = t.byKey["Quest Colors/Quest Title Color"]
+        ok(dd and tostring(dd.tooltip):find("or a Finished Quest Color is picked.", 1, true),
+           "and Quest Title Color's no longer promises green regardless: " .. tostring(dd and dd.tooltip))
+        local newTag = t.byKey["Quest Colors/NEW Tag Color"]
+        ok(newTag and tostring(newTag.tooltip):find("on the Tracker tab", 1, true),
+           "the NEW tag color says where the tag is switched: " .. tostring(newTag and newTag.tooltip))
     end)
     ok(good, "the objective colors raised: " .. tostring(err))
 end
@@ -1261,6 +1413,29 @@ do
            .. tostring(dd.getter()) .. "/" .. tostring(t.cfg.titleColorMode))
     end)
     ok(good, "the title color dropdown raised: " .. tostring(err))
+end
+
+print("== each bar texture list draws its swatches through the media module")
+do
+    local good, err = pcall(function()
+        local t = appearanceTab(true)
+        for _, key in ipairs({ "Progress Bars/Bar Texture", "Zone Progress Bar/Bar Texture" }) do
+            local dd = t.byKey[key]
+            ok(dd and type(dd.decorate) == "function", key .. " decorates its rows")
+            if dd and dd.decorate then
+                local sw = {}
+                function sw.SetTexture(self, p) self.path = p end
+                function sw.SetVertexColor(self, r, g, b) self.rgb = { r, g, b } end
+                dd.decorate({ swatch = sw }, "Smooth")
+                ok(sw.path == "bar:Smooth" and sw.rgb and sw.rgb[1] == 0.26 and sw.rgb[2] == 0.42 and sw.rgb[3] == 1.0,
+                   key .. " paints the swatch with that row's own file, tinted: " .. tostring(sw.path))
+                dd.decorate({ swatch = sw }, "Blizzard")
+                ok(sw.path == "bar:Blizzard", key .. " and another row with its own: " .. tostring(sw.path))
+                ok(pcall(dd.decorate, {}, "Blizzard"), key .. " passes over a row with no swatch")
+            end
+        end
+    end)
+    ok(good, "the bar texture swatches raised: " .. tostring(err))
 end
 
 print(("test_appearance: %d passed, %d failed"):format(pass, fail))

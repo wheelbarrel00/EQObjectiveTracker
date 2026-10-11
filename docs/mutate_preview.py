@@ -105,10 +105,32 @@ MUTANTS = [
     # --------------------------------------------------------------------------- the zone headers
     ("the samples sit in one zone", [
         (P, "                addedAt = time(), zone = \"Ashwood Glen\",", "                addedAt = time(), zone = \"Northern Vale\",")]),
-    ("the preview draws zone headers with the option off", [
-        (P, "    local Zones   = cfg.zoneHeaders and ns:GetModule(\"ZoneHeaders\") or nil", "    local Zones   = ns:GetModule(\"ZoneHeaders\")")]),
+    # Since the Dungeons header the samples are keyed by ZoneGroups:RunKey, which puts every one in a
+    # single unnamed run while both switches are off, and an unnamed run draws no header.
+    ("EQUIVALENT: the preview groups its samples with both switches off", [
+        (P, "    local Zones   = (cfg.zoneHeaders or cfg.dungeonHeader) and ns:GetModule(\"ZoneHeaders\") or nil",
+            "    local Zones   = ns:GetModule(\"ZoneHeaders\")")]),
     ("every sample quest gets a zone of its own", [
-        (P, "        local run = byZone[e.zone]\n", "        local run = nil\n")]),
+        (P, "        local run = byZone[key]\n", "        local run = nil\n")]),
+    # ---------------------------------------------- the Dungeons header (2026-10-10, for Andreon)
+    ("the preview draws no header for the dungeon header alone", [
+        (P, "    local Zones   = (cfg.zoneHeaders or cfg.dungeonHeader) and ns:GetModule(\"ZoneHeaders\") or nil",
+            "    local Zones   = cfg.zoneHeaders and ns:GetModule(\"ZoneHeaders\") or nil")]),
+    ("the preview keys its samples by zone, so the dungeon sample never joins Dungeons", [
+        (P, "        local key = ZoneGroups:RunKey(e, cfg)\n", "        local key = e.zone or \"\"\n")]),
+    ("the preview groups its samples without the settings", [
+        (P, "self:Runs(list, cfg)", "self:Runs(list)")]),
+    ("the preview draws a header for the unnamed run", [
+        (P, "                if run.zone and run.zone ~= \"\" then\n", "                if run.zone then\n")]),
+    ("the dungeon sample is not tagged", [
+        (P, "                tags = { dungeon = true }, level = level + 1, zone = \"The Sunken Halls\",\n",
+            "                tags = {}, level = level + 1, zone = \"The Sunken Halls\",\n")]),
+    ("the dungeon sample shares the scout's zone", [
+        (P, "zone = \"The Sunken Halls\",\n", "zone = \"Northern Vale\",\n")]),
+    ("the dungeon sample has no zone tag, so the preview never shows one kept under Dungeons", [
+        (P, "                subtitle = \"The Sunken Halls\",\n", "")]),
+    ("the dungeon sample's zone tag names another zone", [
+        (P, "                subtitle = \"The Sunken Halls\",\n", "                subtitle = \"Northern Vale\",\n")]),
     ("a preview zone header collapses a zone on a click", [
         (P, "    h:EnableMouse(false)\n    self.zoneHeads[key] = h\n", "    self.zoneHeads[key] = h\n")]),
     ("preview zone headers are made afresh every refresh", [

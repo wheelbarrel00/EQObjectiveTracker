@@ -68,7 +68,8 @@ end
 
 -- A quest cannot move between Campaign and Quests, so only the dragged row's own section
 -- takes part. Including the other one would draw a drop line promising a move that the
--- commit cannot make. Under zone headers it cannot leave its zone either, so zone narrows it.
+-- commit cannot make. Under zone headers or the dungeon header it cannot leave its run either, so
+-- the run's key narrows it.
 local function collectScope(groupID, zone)
     local Tracker = ns:GetModule("Tracker")
     local rows = Tracker and Tracker.DragRows and Tracker:DragRows()
@@ -76,11 +77,13 @@ local function collectScope(groupID, zone)
     wipe(_scope)
     if not rows then return 0 end
 
+    local ZoneGroups = ns:GetModule("ZoneGroups")
+    local cfg = ns:GetModule("DB"):Tracker()
     local n = 0
     for i = 1, #rows do
         local row = rows[i]
         local e   = row._entry
-        if e and e.groupID == groupID and (zone == nil or (e.zone or "") == zone) then
+        if e and e.groupID == groupID and (zone == nil or ZoneGroups:RunKey(e, cfg) == zone) then
             n = n + 1
             _scope[n] = row
         end
@@ -114,9 +117,10 @@ function DragDrop:OnDragStart(row)
 
     self.dragID    = e.id
     self.dragGroup = e.groupID
-    -- nil means the whole section, which is what it is while zone headers are off.
+    -- nil means the whole section, which is what it is while nothing groups it.
     local cfg = ns:GetModule("DB"):Tracker()
-    self.dragZone  = (cfg and cfg.zoneHeaders) and (e.zone or "") or nil
+    local ZoneGroups = ns:GetModule("ZoneGroups")
+    self.dragZone  = ZoneGroups:Grouping(cfg) and ZoneGroups:RunKey(e, cfg) or nil
     self.dragRow   = row
     self.dropIndex = nil
 

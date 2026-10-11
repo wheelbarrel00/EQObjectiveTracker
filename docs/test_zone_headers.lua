@@ -26,11 +26,22 @@
 -- with its two callers. The DB module is Core/DB.lua's own accessors, sliced, and the tracker
 -- stub's Render must be called as a method, so a dot call raises here as it does in game.
 --
+-- Since 2026-10-10 also the Dungeons header (requested by Andreon): with zone headers off the
+-- other quests keep one unnamed run and the dungeon quests gather last, with them on dungeon quests
+-- leave their zones, Current zone first brings Dungeons to the top only while one of its quests is
+-- in your zone, Alphabetical never does, each section keys its own, a later pass follows the
+-- switch, RunKey and Grouping as the drag and the preview read them, the status line, Feed, the
+-- indent, the drag scope, Keep Dungeons at the bottom, the Heroic tag in both quest providers, the
+-- band leaving Dungeons in the list with zone headers off and taking it like any zone with them
+-- on, the zone label kept on a quest in the Dungeons header (as drawn, and as both providers write
+-- it), and the order Build sorts with checked as a consistent ordering over every pair and triple
+-- of runs, with and without the client's compare.
+--
 -- OUT OF SCOPE BY CONSTRUCTION: the rest of Render is too large to drive, so its share (the pool
 -- reset and sweep, the indent and the zone tops read once per pass) is pinned by comment-stripped
--- whole statements at the end, with the zone label in Row (the statement and a count of its
--- writes), the status line, the defaults and the TOC lines. How the headers look on screen is an
--- in-game question.
+-- whole statements at the end, with the status line, the defaults and the TOC lines. The zone label
+-- in Row is sliced there and driven, with a count of its writes. How the headers look on screen is
+-- an in-game question.
 
 local function repoFile(rel)
     local f = io.open(rel, "r")
@@ -110,6 +121,15 @@ end
 -- through self, so a call written DB.Char() raises here as it does in game. st.cfg and st.char
 -- are read at every call, so a case may swap either table.
 local accessors
+-- Core/DB.lua's own tracker defaults, read by running the file.
+local function shippedDefaults()
+    local got
+    local chunk = assert(loadfile(repoFile("Core/DB.lua")))
+    setfenv(chunk, setmetatable({}, { __index = _G }))
+    chunk("EQObjectiveTracker", { RegisterModule = function(_, _, m) got = m return m end, Has = {} })
+    return got.defaults.profile.tracker
+end
+
 local function realDB(st)
     if not accessors then
         local src = readFile("Core/DB.lua")
@@ -165,6 +185,8 @@ local function zoneRig(cfg, current, opts)
         Feed = { Group = function(_, id) return st.feedGroups[id] end },
     }
     local ns = newNS(mods)
+    -- Marks every lookup, so a name typed in English cannot pass for one read through the table.
+    if opts.markL then ns.L = setmetatable({}, { __index = function(_, k) return "<" .. k .. ">" end }) end
     local env = { wipe = wipe }
     if opts.cmp then
         env.strcmputf8i = function(a, b)
@@ -180,7 +202,7 @@ end
 -- One Feed pass by hand: every emitted entry noted in log order, the visible ones in the order the
 -- sort left them, then the grouping.
 local function zonePass(st, groups)
-    st.Z:Begin()
+    st.Z:Begin(st.cfg)
     local byGroup = {}
     for id, spec in pairs(groups) do
         for _, e in ipairs(spec.log) do st.Z:Note(id, e) end
@@ -473,6 +495,389 @@ case("the status line", function()
     ok(nowhere.Z:DebugLine():find("current: none", 1, true) ~= nil, "and says when no heading is current")
 end)
 
+-- -------------------------------------- the Dungeons header (2026-10-10, requested by Andreon)
+
+-- A quest tagged as a dungeon quest (quest tag 81 or 85), as both quest providers set it.
+local function dq(id, zone, title, groupID)
+    local e = entry(id, zone, title, "quests", groupID)
+    e.tags = { dungeon = true }
+    return e
+end
+
+-- The log lists Zeta, the Deadmines, Alpha, the Stockade, Mid. The sort puts a dungeon quest first,
+-- so a Dungeons run that kept the sort's place would lead. One more dungeon quest is filtered.
+local function dungeonFixture()
+    local z1, a1, m1 = entry(1, "Zeta", "c"), entry(3, "Alpha", "e"), entry(5, "Mid", "b")
+    local d1, d2, d3 = dq(2, "The Deadmines", "d"), dq(4, "The Stockade", "a"), dq(6, "The Stockade", "f")
+    a1.tags = { dungeon = false }
+    return { log = { z1, d1, a1, d2, m1, d3 }, shown = { d2, m1, z1, d1, a1 } },
+           { z1 = z1, a1 = a1, m1 = m1, d1 = d1, d2 = d2, d3 = d3 }
+end
+
+case("the dungeon header alone: the other quests stay as they are, the dungeon quests gather last", function()
+    local st = zoneRig({ dungeonHeader = true }, {})
+    local g = zonePass(st, { quests = dungeonFixture() }).quests
+    ok(zonesOf(g) == ",Dungeons", "one run with no header, then Dungeons: " .. zonesOf(g))
+    ok(idsOf(g) == "5,1,3,4,2", "each keeps the sort's order inside it: " .. idsOf(g))
+    local r = g.zoneRuns
+    ok(r[1].count == 3 and r[1].first == 1 and r[1].last == 3 and r[1].dungeon == false,
+       "the other three quests run first, unflagged")
+    ok(r[2].count == 2 and r[2].total == 3 and r[2].first == 4 and r[2].last == 5 and r[2].dungeon == true,
+       "Dungeons holds two of the three dungeon quests the log had, the third filtered: "
+       .. r[2].count .. "/" .. r[2].total)
+    ok(r[1].total == 3, "and the ungrouped run counts its own three")
+    local here = zoneRig({ dungeonHeader = true }, { ["The Deadmines"] = true })
+    local h = zonePass(here, { quests = dungeonFixture() }).quests
+    ok(zonesOf(h) == ",Dungeons", "with zone headers off, being in a dungeon does not move it: " .. zonesOf(h))
+    ok(h.zoneRuns[2].current == true, "though its current flag is still worked out")
+end)
+
+case("with zone headers on too, dungeon quests leave their zones and Dungeons comes last", function()
+    local st = zoneRig({ zoneHeaders = true, dungeonHeader = true }, {})
+    local fx, q = dungeonFixture()
+    local g = zonePass(st, { quests = fx }).quests
+    ok(zonesOf(g) == "Zeta,Alpha,Mid,Dungeons", "the zones in log order, then Dungeons: " .. zonesOf(g))
+    ok(idsOf(g) == "1,3,5,4,2", "each zone's quests, then the dungeon quests in sort order: " .. idsOf(g))
+    ok(g.zoneRuns[2].entries[1] == q.a1, "a quest tagged false stays in its zone")
+    local d4 = dq(7, "Alpha", "g")
+    local mixed = zoneRig({ zoneHeaders = true, dungeonHeader = true }, {})
+    local mg = zonePass(mixed, { quests = { log = { q.a1, d4 }, shown = { d4, q.a1 } } }).quests
+    ok(zonesOf(mg) == "Alpha,Dungeons" and mg.zoneRuns[1].count == 1 and mg.zoneRuns[1].total == 1,
+       "a dungeon quest under an ordinary heading leaves it, and that zone counts what is left: "
+       .. zonesOf(mg) .. " " .. mg.zoneRuns[1].total)
+    local off = zoneRig({ zoneHeaders = true, dungeonHeader = false }, {})
+    local og = zonePass(off, { quests = dungeonFixture() }).quests
+    ok(zonesOf(og) == "Zeta,The Deadmines,Alpha,The Stockade,Mid",
+       "with the dungeon header off, every dungeon keeps its own heading in log order: " .. zonesOf(og))
+end)
+
+case("under current zone first, Dungeons comes to the top while one of its quests is in your zone", function()
+    local st = zoneRig({ zoneHeaders = true, dungeonHeader = true }, { ["The Stockade"] = true })
+    local g = zonePass(st, { quests = dungeonFixture() }).quests
+    ok(zonesOf(g) == "Dungeons,Zeta,Alpha,Mid", "first, ahead of every zone: " .. zonesOf(g))
+    local both = zoneRig({ zoneHeaders = true, dungeonHeader = true }, { ["The Stockade"] = true, Mid = true })
+    local b = zonePass(both, { quests = dungeonFixture() }).quests
+    ok(zonesOf(b) == "Dungeons,Mid,Zeta,Alpha", "ahead of a current zone too: " .. zonesOf(b))
+    local zoneOnly = zoneRig({ zoneHeaders = true, dungeonHeader = true }, { Mid = true })
+    local zo = zonePass(zoneOnly, { quests = dungeonFixture() }).quests
+    ok(zonesOf(zo) == "Mid,Zeta,Alpha,Dungeons", "and last again while none of its quests is here: " .. zonesOf(zo))
+end)
+
+-- The author's request of 2026-10-11, after Dungeons sat at the top for a dungeon quest the game
+-- showed on the Wetlands map.
+case("Keep Dungeons at the bottom holds it last under current zone first", function()
+    local here = { ["The Stockade"] = true, Mid = true }
+    local st = zoneRig({ zoneHeaders = true, dungeonHeader = true, dungeonHeaderLast = true }, here)
+    local g = zonePass(st, { quests = dungeonFixture() }).quests
+    ok(zonesOf(g) == "Mid,Zeta,Alpha,Dungeons", "the current zone first, Dungeons last: " .. zonesOf(g))
+    ok(g.zoneRuns[4].current == true, "though it is still worked out as current")
+    local off = zoneRig({ zoneHeaders = true, dungeonHeader = true, dungeonHeaderLast = false }, here)
+    ok(zonesOf(zonePass(off, { quests = dungeonFixture() }).quests) == "Dungeons,Mid,Zeta,Alpha",
+       "with it off, Dungeons leads as before")
+    local truthy = zoneRig({ zoneHeaders = true, dungeonHeader = true, dungeonHeaderLast = 1 }, here)
+    ok(zonesOf(zonePass(truthy, { quests = dungeonFixture() }).quests) == "Dungeons,Mid,Zeta,Alpha",
+       "only a real true keeps it down")
+    local cfg = { zoneHeaders = true, dungeonHeader = true, dungeonHeaderLast = true }
+    local again = zoneRig(cfg, here)
+    zonePass(again, { quests = dungeonFixture() })
+    cfg.dungeonHeaderLast = false
+    ok(zonesOf(zonePass(again, { quests = dungeonFixture() }).quests) == "Dungeons,Mid,Zeta,Alpha",
+       "and a later pass on the same module follows it being switched off")
+    local alone = zoneRig({ dungeonHeader = true, dungeonHeaderLast = true }, here)
+    ok(zonesOf(zonePass(alone, { quests = dungeonFixture() }).quests) == ",Dungeons",
+       "with zone headers off it was last already, and stays so")
+end)
+
+case("alphabetical keeps Dungeons last, even while you are in one", function()
+    local st = zoneRig({ zoneHeaders = true, dungeonHeader = true, zoneHeaderOrder = "alpha" },
+                       { ["The Deadmines"] = true })
+    local g = zonePass(st, { quests = dungeonFixture() }).quests
+    ok(zonesOf(g) == "Alpha,Mid,Zeta,Dungeons", "A to Z, which would put Dungeons before Mid, then Dungeons: "
+       .. zonesOf(g))
+end)
+
+case("with no dungeon quest shown there is no Dungeons header", function()
+    local z1, a1 = entry(1, "Zeta"), entry(2, "Alpha")
+    local st = zoneRig({ dungeonHeader = true }, {})
+    local g = zonePass(st, { quests = { log = { z1, a1 }, shown = { z1, a1 } } }).quests
+    ok(g.zoneCount == 1 and g.zoneRuns[1].zone == "" and idsOf(g) == "1,2",
+       "one unnamed run, so the section draws as it always did: " .. zonesOf(g))
+    local both = zoneRig({ zoneHeaders = true, dungeonHeader = true }, {})
+    local b = zonePass(both, { quests = { log = { z1, a1 }, shown = { z1, a1 } } }).quests
+    ok(zonesOf(b) == "Zeta,Alpha", "and with zone headers on, only the zones: " .. zonesOf(b))
+    local d = dq(3, "The Deadmines")
+    local all = zoneRig({ dungeonHeader = true }, {})
+    local a = zonePass(all, { quests = { log = { d }, shown = { d } } }).quests
+    ok(zonesOf(a) == "Dungeons", "a section of dungeon quests alone is one Dungeons run: " .. zonesOf(a))
+end)
+
+case("each section keys its own Dungeons header", function()
+    local c1, c2 = dq(21, "The Deadmines", "a", "campaign"), entry(22, "Camp", "b", "quests", "campaign")
+    local st = zoneRig({ dungeonHeader = true }, {})
+    local byGroup = zonePass(st, { quests = dungeonFixture(), campaign = { log = { c2, c1 }, shown = { c1, c2 } } })
+    ok(zonesOf(byGroup.campaign) == ",Dungeons" and byGroup.campaign.zoneRuns[2].total == 1,
+       "Campaign gets one of its own, counting its own quest: " .. zonesOf(byGroup.campaign))
+    ok(byGroup.quests.zoneRuns[2].total == 3, "and the Quests section's still counts its three")
+    local wq = { id = "worldquests", entries = {} }
+    local w1 = dq(31, "The Deadmines", "w", "worldquests")
+    local g = zonePass(st, { worldquests = { log = { w1 }, shown = { w1 }, g = wq } }).worldquests
+    ok(g.zoneCount == 0, "a section ZoneGroups does not split is left alone")
+end)
+
+case("a second pass on the same module follows the switch", function()
+    local cfg = { zoneHeaders = true, dungeonHeader = true }
+    local st = zoneRig(cfg, {})
+    zonePass(st, { quests = dungeonFixture() })
+    cfg.dungeonHeader = false
+    local g = zonePass(st, { quests = dungeonFixture() }).quests
+    ok(zonesOf(g) == "Zeta,The Deadmines,Alpha,The Stockade,Mid",
+       "switched off, the dungeons are back in their own places: " .. zonesOf(g))
+    local stock
+    for r = 1, g.zoneCount do if g.zoneRuns[r].zone == "The Stockade" then stock = g.zoneRuns[r] end end
+    ok(stock and stock.total == 2 and stock.dungeon == false, "counted afresh and no longer flagged: "
+       .. tostring(stock and stock.total))
+    cfg.dungeonHeader = true
+    local again = zonePass(st, { quests = dungeonFixture() }).quests
+    ok(zonesOf(again) == "Zeta,Alpha,Mid,Dungeons" and again.zoneRuns[4].total == 3,
+       "and back on, Dungeons is counted from scratch: " .. zonesOf(again))
+end)
+
+case("RunKey and Grouping, the rule the drag and the preview share", function()
+    local st = zoneRig({}, {})
+    local Z = st.Z
+    local d, plain, bare = dq(1, "The Deadmines"), entry(2, "Alpha"), entry(3, nil)
+    local marked = zoneRig({ dungeonHeader = true }, {}, { markL = true })
+    ok(marked.Z.DUNGEONS == "<Dungeons>" and marked.Z:RunKey(d, marked.cfg) == "<Dungeons>",
+       "the run is named through the locale table: " .. tostring(marked.Z.DUNGEONS))
+    ok(Z:RunKey(d, { dungeonHeader = true }) == "Dungeons", "a dungeon quest under the dungeon header")
+    ok(Z:RunKey(d, { zoneHeaders = true }) == "The Deadmines", "under zone headers alone, its own heading")
+    ok(Z:RunKey(d, {}) == "" and Z:RunKey(d, nil) == "", "with neither, the unnamed run")
+    ok(Z:RunKey(plain, { dungeonHeader = true }) == "", "an ordinary quest under the dungeon header alone")
+    ok(Z:RunKey(plain, { zoneHeaders = true, dungeonHeader = true }) == "Alpha", "and its zone with both")
+    ok(Z:RunKey(bare, { zoneHeaders = true }) == "", "a quest with no heading")
+    ok(Z:RunKey(d, { dungeonHeader = 1 }) == "" and Z:RunKey(plain, { zoneHeaders = 1 }) == "",
+       "only a real true switches either on")
+    ok(Z:Grouping({ dungeonHeader = true }) == true and Z:Grouping({ zoneHeaders = true }) == true,
+       "either switch groups")
+    ok(Z:Grouping({}) == false and Z:Grouping(nil) == false and Z:Grouping({ zoneHeaders = 1 }) == false,
+       "and nothing else does")
+    -- In game AceDB hands both switches over as false, never nil, so a test against nil passes {}
+    -- and fails every real profile.
+    local stored = { zoneHeaders = false, dungeonHeader = false, dungeonHeaderLast = false }
+    ok(Z:Grouping(stored) == false, "a profile holding the shipped defaults groups nothing")
+    ok(Z:RunKey(d, stored) == "" and Z:RunKey(plain, stored) == "", "and keys every quest into the unnamed run")
+    ok(Z:Grouping({ zoneHeaders = false, dungeonHeader = true }) == true
+       and Z:Grouping({ zoneHeaders = true, dungeonHeader = false }) == true,
+       "either switch on beside the other stored off still groups")
+    local off = zoneRig(stored, { ["The Stockade"] = true })
+    local og = zonePass(off, { quests = dungeonFixture() }).quests
+    ok(og.zoneCount == 0 and idsOf(og) == "4,5,1,2,3", "and a pass over it leaves the sorted order whole: " .. idsOf(og))
+end)
+
+-- The comparison Build sorts with, sliced and driven over every pair and triple of runs, since a
+-- comparison that contradicts itself can still sort a given fixture right.
+local beforeSrc
+do
+    local good, err = pcall(function()
+        beforeSrc = slice("Data/ZoneGroups.lua", "local function before(a, b)", "function ZoneGroups:Begin(cfg)")
+    end)
+    ok(good, "before slices out of ZoneGroups: " .. tostring(err))
+end
+
+case("the run order is a consistent ordering in every mode", function()
+    assert(beforeSrc, "no comparison to drive")
+    local function runsWith(dungeonCurrent)
+        return {
+            { zone = "Zeta", rank = 1, current = false, dungeon = false },
+            { zone = "Mid", rank = 2, current = true, dungeon = false },
+            { zone = "Alpha", rank = 3, current = false, dungeon = false },
+            { zone = "Beta", rank = 4, current = true, dungeon = false },
+            { zone = "Dungeons", rank = 5, current = dungeonCurrent, dungeon = true },
+        }
+    end
+    local broken = {}
+    -- The client's compare, which Alphabetical uses where it exists. Without it the fallback runs.
+    local function cmp(a, b)
+        local x, y = a:lower(), b:lower()
+        if x == y then return 0 end
+        return x < y and -1 or 1
+    end
+    -- Build's three modes (current zone first, Alphabetical, zone headers off), each with and
+    -- without the client's compare.
+    local modes = {}
+    for _, client in ipairs({ false, cmp }) do
+        for _, m in ipairs({ { false, true }, { true, false }, { false, false } }) do
+            modes[#modes + 1] = { m[1], m[2], client }
+        end
+    end
+    for _, mode in ipairs(modes) do
+        for _, last in ipairs({ false, true }) do
+            local chunk = assert(loadstring("local sortAlpha, currentFirst, dungeonsLast = ...\n" .. beforeSrc
+                                            .. "\nreturn before", "before"))
+            setfenv(chunk, setmetatable({ strcmputf8i = mode[3] or nil }, { __index = _G }))
+            local before = chunk(mode[1], mode[2], last)
+            for _, here in ipairs({ false, true }) do
+                local runs = runsWith(here)
+                local where = ("alpha=%s currentFirst=%s last=%s dungeon current=%s compare=%s")
+                              :format(tostring(mode[1]), tostring(mode[2]), tostring(last), tostring(here),
+                                      mode[3] and "client" or "fallback")
+                for _, a in ipairs(runs) do
+                    if before(a, a) then broken[#broken + 1] = where .. ": " .. a.zone .. " before itself" end
+                    for _, b in ipairs(runs) do
+                        if a ~= b and before(a, b) and before(b, a) then
+                            broken[#broken + 1] = where .. ": " .. a.zone .. " and " .. b.zone .. " each first"
+                        end
+                        for _, c in ipairs(runs) do
+                            if before(a, b) and before(b, c) and not before(a, c) then
+                                broken[#broken + 1] = where .. ": " .. a.zone .. " < " .. b.zone .. " < " .. c.zone
+                                                      .. " but not " .. a.zone .. " < " .. c.zone
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    ok(#broken == 0, "no run comes before itself, no two each come first, and the order chains: "
+       .. table.concat(broken, "; ", 1, math.min(#broken, 3)))
+end)
+
+case("a quest log heading named Dungeons is an ordinary zone while the Dungeons header is off", function()
+    local q1, q2 = entry(1, "Dungeons", "a"), entry(2, "Alpha", "b")
+    local st = zoneRig({ zoneHeaders = true, dungeonHeader = false }, {})
+    local g = zonePass(st, { quests = { log = { q1, q2 }, shown = { q2, q1 } } }).quests
+    ok(zonesOf(g) == "Dungeons,Alpha", "it keeps its place in the log: " .. zonesOf(g))
+    ok(g.zoneRuns[1].dungeon == false, "and is not the Dungeons run")
+end)
+
+case("a current zone and a Dungeons run that is not current, in either log order", function()
+    local m1, d1 = entry(1, "Mid", "a"), dq(2, "The Stockade", "b")
+    local cfg = { zoneHeaders = true, dungeonHeader = true, dungeonHeaderLast = false }
+    local st = zoneRig(cfg, { Mid = true })
+    local g = zonePass(st, { quests = { log = { m1, d1 }, shown = { d1, m1 } } }).quests
+    ok(zonesOf(g) == "Mid,Dungeons", "your zone first, then Dungeons: " .. zonesOf(g))
+    local rev = zoneRig(cfg, { Mid = true })
+    local r = zonePass(rev, { quests = { log = { d1, m1 }, shown = { m1, d1 } } }).quests
+    ok(zonesOf(r) == "Mid,Dungeons", "and the same with Dungeons first in the log: " .. zonesOf(r))
+end)
+
+case("the status line names the dungeon header", function()
+    local alone = zoneRig({ dungeonHeader = true }, {})
+    alone.feedGroups = zonePass(alone, { quests = dungeonFixture() })
+    local line = alone.Z:DebugLine()
+    ok(line == "zone headers: off, dungeon header on, 0 collapsed | quests 1 zone(s), current: none",
+       "the dungeon header alone, which counts only the run that draws a header: " .. line)
+    -- The other quests' run has no name and draws no header, so it is never listed as current.
+    local here = zoneRig({ dungeonHeader = true }, { Zeta = true })
+    here.feedGroups = zonePass(here, { quests = dungeonFixture() })
+    ok(here.Z:DebugLine() == "zone headers: off, dungeon header on, 0 collapsed | quests 1 zone(s), current: none",
+       "an ordinary quest on your map leaves no blank name: " .. here.Z:DebugLine())
+    local mixed = zoneRig({ dungeonHeader = true }, { Zeta = true, ["The Stockade"] = true })
+    mixed.feedGroups = zonePass(mixed, { quests = dungeonFixture() })
+    ok(mixed.Z:DebugLine():sub(-37) == "| quests 1 zone(s), current: Dungeons",
+       "and with a dungeon quest there too, Dungeons alone: " .. mixed.Z:DebugLine())
+    local plainOnly = zoneRig({ dungeonHeader = true }, {})
+    local z1 = entry(1, "Zeta")
+    plainOnly.feedGroups = zonePass(plainOnly, { quests = { log = { z1 }, shown = { z1 } } })
+    ok(plainOnly.Z:DebugLine() == "zone headers: off, dungeon header on, 0 collapsed | nothing grouped",
+       "a section with only the unnamed run is not listed: " .. plainOnly.Z:DebugLine())
+    local headless = zoneRig({ zoneHeaders = true }, { Alpha = true })
+    local h1, h2 = entry(1, "Alpha"), entry(2, nil)
+    headless.feedGroups = zonePass(headless, { quests = { log = { h1, h2 }, shown = { h1, h2 } } })
+    ok(headless.Z:DebugLine():sub(-34) == "| quests 1 zone(s), current: Alpha",
+       "under zone headers a quest with no heading is not counted as a zone: " .. headless.Z:DebugLine())
+    local both = zoneRig({ zoneHeaders = true, dungeonHeader = true }, { Mid = true })
+    both.char.zonesCollapsed = { ["quests:Dungeons"] = true }
+    both.feedGroups = zonePass(both, { quests = dungeonFixture() })
+    local two = both.Z:DebugLine()
+    ok(two == "zone headers: on, order current zone first, dungeon header on, 1 collapsed | quests 4 zone(s), current: Mid",
+       "both: " .. two)
+    both.cfg.dungeonHeaderLast = true
+    local kept = both.Z:DebugLine()
+    ok(kept:find("zone headers: on, order current zone first, dungeon header on, kept at the bottom, 1 collapsed |", 1, true) == 1,
+       "and it says when Dungeons is kept at the bottom: " .. kept)
+    both.cfg.dungeonHeaderLast = 1
+    ok(both.Z:DebugLine() == two, "only a real true is reported as kept there")
+end)
+
+case("the status line lists every current zone, forgets an emptied section, and reads stored defaults", function()
+    local two = zoneRig({ zoneHeaders = true }, { Alpha = true, Mid = true })
+    two.feedGroups = zonePass(two, { quests = fixture() })
+    ok(two.Z:DebugLine() == "zone headers: on, order current zone first, 0 collapsed | quests 3 zone(s), current: Alpha, Mid",
+       "two current zones, both named in log order: " .. two.Z:DebugLine())
+    -- A section emptied on a later pass keeps its old run tables, which must not be listed.
+    local again = zoneRig({ zoneHeaders = true }, { Alpha = true })
+    local g = zonePass(again, { quests = fixture() }).quests
+    again.feedGroups = zonePass(again, { quests = { log = {}, shown = {}, g = g } })
+    ok(again.Z:DebugLine() == "zone headers: on, order current zone first, 0 collapsed | nothing grouped",
+       "a section emptied since is not listed: " .. again.Z:DebugLine())
+    -- AceDB hands both switches over as false.
+    local stored = zoneRig({ zoneHeaders = false, dungeonHeader = false, dungeonHeaderLast = false }, {})
+    ok(stored.Z:DebugLine() == "zone headers: off", "the shipped defaults read off: " .. stored.Z:DebugLine())
+    local keptAlone = zoneRig({ dungeonHeader = true, dungeonHeaderLast = true }, {})
+    keptAlone.feedGroups = zonePass(keptAlone, { quests = dungeonFixture() })
+    ok(keptAlone.Z:DebugLine() == "zone headers: off, dungeon header on, kept at the bottom, 0 collapsed | quests 1 zone(s), current: none",
+       "Keep at the bottom is reported with zone headers off too: " .. keptAlone.Z:DebugLine())
+    local zonesOnly = zoneRig({ zoneHeaders = true, dungeonHeader = false, dungeonHeaderLast = false }, {})
+    zonesOnly.feedGroups = zonePass(zonesOnly, { quests = fixture() })
+    ok(not zonesOnly.Z:DebugLine():find("dungeon", 1, true),
+       "and the dungeon header stored off is never reported on: " .. zonesOnly.Z:DebugLine())
+end)
+
+-- Which quests count as dungeon quests, in both quest providers. The constants and fillTags are
+-- sliced and driven with the client's Enum absent (the fallback numbers) and present with numbers
+-- unlike them (so the Enum is seen to be read). TBC's heroic dungeon dailies carry Heroic, 85, in
+-- place of Dungeon, and the author ruled they belong under Dungeons too (2026-10-11).
+local function tagRig(rel, constFrom, constTo, fnFrom, fnTo, enum)
+    local src = slice(rel, constFrom, constTo) .. "\n" .. slice(rel, fnFrom, fnTo) .. "\nreturn fillTags"
+    local tagFor = {}
+    local chunk = assert(loadstring(src, rel .. " tags"))
+    setfenv(chunk, setmetatable({
+        Enum = enum, wipe = wipe, CLASS_LEGENDARY = nil,
+        isWorldQuest = function() return false end,
+        isCampaign = function() return false end,
+        getTagID = function(id) return tagFor[id] end,
+    }, { __index = _G }))
+    return chunk(), tagFor
+end
+
+local PROVIDERS = {
+    { "Data/Providers/Quests.lua", "local DAILY_FREQ  = (Enum", "local CLASS_LEGENDARY",
+      "local function fillTags(e, id, info)", "local function superTrackedID()" },
+    { "Data/Providers/QuestsClassic.lua", "local DAILY_FREQ, WEEKLY_FREQ = 2, 3", "local store = Entry.NewStore({",
+      "local function fillTags(e, id, frequency)", "-- Quest-log headers ARE zone names on Classic" },
+}
+
+case("a heroic dungeon quest counts as a dungeon quest, in both quest providers", function()
+    for _, p in ipairs(PROVIDERS) do
+        local name = p[1]:match("([%w]+)%.lua$")
+        local fill, tagFor = tagRig(p[1], p[2], p[3], p[4], p[5], nil)
+        local function tagsOf(tagID)
+            tagFor[1] = tagID
+            local e = { tags = { stale = true }, icon = {} }
+            fill(e, 1, nil)
+            return e.tags
+        end
+        ok(tagsOf(81).dungeon == true and not tagsOf(81).raid, name .. ": Dungeon, 81, is a dungeon quest")
+        ok(tagsOf(85).dungeon == true and not tagsOf(85).raid, name .. ": Heroic, 85, is one too")
+        for _, raid in ipairs({ 62, 88, 89 }) do
+            ok(tagsOf(raid).raid == true and not tagsOf(raid).dungeon, name .. ": " .. raid .. " is a raid quest, not a dungeon one")
+        end
+        ok(not tagsOf(nil).dungeon and not tagsOf(41).dungeon, name .. ": an untagged or PvP quest is not")
+        ok(tagsOf(85).stale == nil, name .. ": and the tags are rebuilt, not added to")
+        local alt, altFor = tagRig(p[1], p[2], p[3], p[4], p[5],
+                                   { QuestTag = { Dungeon = 181, Heroic = 185, Raid = 162, Raid10 = 188, Raid25 = 189 } })
+        altFor[1] = 185
+        local e = { tags = {}, icon = {} }
+        alt(e, 1, nil)
+        ok(e.tags.dungeon == true, name .. ": the client's own Heroic number is read where it has one")
+        altFor[1] = 85
+        e = { tags = {}, icon = {} }
+        alt(e, 1, nil)
+        ok(not e.tags.dungeon, name .. ": and the fallback is not used then")
+    end
+end)
+
 -- ------------------------------------------------------------------- Data/Feed.lua, whole
 
 -- opts.wq is a world quest list from a provider ahead of the quests one in the same id space, so a
@@ -557,6 +962,21 @@ case("a quest another provider already shows is not tallied again", function()
     ok(q.totalCount == 1 and q.visibleCount == 1, "the duplicate is not the section's either: " .. q.totalCount)
     ok(q.zoneCount == 1 and q.zoneRuns[1].total == 1,
        "and Alpha counts the one quest it shows: " .. tostring(q.zoneRuns[1] and q.zoneRuns[1].total))
+end)
+
+case("Feed groups for the dungeon header alone, and counts a filtered dungeon quest", function()
+    local z1, d1, d2 = entry(1, "Zeta", "b"), dq(2, "The Deadmines", "a"), dq(3, "The Deadmines", "c")
+    d2.filtered = true
+    local st = feedRig({ dungeonHeader = true }, { list = { z1, d1, d2 } })
+    local g = st.Feed:Build().quests
+    ok(zonesOf(g) == ",Dungeons", "the other quests, then Dungeons, though the sort put the dungeon quest first: "
+       .. zonesOf(g))
+    ok(g.zoneRuns[2] and g.zoneRuns[2].count == 1 and g.zoneRuns[2].total == 2,
+       "Dungeons shows one of its two, the other filtered: "
+       .. tostring(g.zoneRuns[2] and g.zoneRuns[2].total))
+    ok(g.zoneRuns[1].total == 1, "and the unnamed run counts its own one")
+    st.cfg.dungeonHeader = false
+    ok(st.Feed:Build().quests.zoneCount == 0, "with both switches off, Feed groups nothing")
 end)
 
 -- ------------------------------------------------------------------- UI/ZoneHeaders.lua
@@ -964,6 +1384,10 @@ case("the indent", function()
     ok(st.H:Indent({ zoneHeaders = true, zoneHeaderIndent = 0 }) == 0, "a saved 0, the slider's low end, is kept")
     ok(st.H:Indent({ zoneHeaders = true, zoneHeaderIndent = -5 }) == 0, "never negative")
     ok(st.H:Indent(nil) == 0, "and nothing with no profile")
+    ok(st.H:Indent({ dungeonHeader = true }) == 8, "the Dungeons header indents with zone headers off")
+    ok(st.H:Indent({ dungeonHeader = true, zoneHeaderIndent = 17 }) == 17, "by the same saved indent")
+    ok(st.H:Indent({ dungeonHeader = false, zoneHeaders = false, zoneHeaderIndent = 17 }) == 0,
+       "and nothing with both off")
     ok(st.H:Key("quests", "Mid") == "quests:Mid", "a zone is keyed by section and heading")
 end)
 
@@ -1005,6 +1429,8 @@ local function dragRig(cfg, rows, cursorY)
     }
     local ns = newNS(mods)
     function ns:SafeMode() return false end
+    -- The real one, whose RunKey decides which run a drag stays in.
+    load("Data/ZoneGroups.lua", ns, { wipe = wipe })
     load("UI/DragDrop.lua", ns, {
         wipe = wipe, UIParent = loose(),
         CreateFrame = function() return loose() end,
@@ -1066,6 +1492,38 @@ case("a Campaign drag stays inside its zone too", function()
        .. tostring(st.commits[1] and st.commits[1].ids))
 end)
 
+case("under the dungeon header a drag stays in its own run", function()
+    local function dungeonRow(id, zone, top)
+        local r = dragRow(id, "quests", zone, top)
+        r._entry.tags = { dungeon = true }
+        return r
+    end
+    local q1, d1, q2, d2 = dragRow(1, "quests", "Alpha", 100), dungeonRow(2, "Alpha", 90),
+                           dragRow(3, "quests", "Mid", 80), dungeonRow(4, "The Deadmines", 70)
+    local rows = { q1, d1, q2, d2 }
+    local alone = dragRig({ sortMode = "manual", dungeonHeader = true }, rows, 0)
+    ok(alone.D:OnDragStart(q1) == true and alone.D.dragZone == "",
+       "zone headers off, an ordinary quest drags in the unnamed run: " .. tostring(alone.D.dragZone))
+    alone.D.dropIndex = 2
+    alone.D:OnDragStop()
+    ok(alone.commits[1] and alone.commits[1].ids == "1,3", "with the other ordinary quests, both zones: "
+       .. tostring(alone.commits[1] and alone.commits[1].ids))
+    local dg = dragRig({ sortMode = "manual", dungeonHeader = true }, rows, 0)
+    dg.D:OnDragStart(d1)
+    ok(dg.D.dragZone == "Dungeons", "a dungeon quest drags inside Dungeons: " .. tostring(dg.D.dragZone))
+    dg.D.dropIndex = 2
+    dg.D:OnDragStop()
+    ok(dg.commits[1] and dg.commits[1].ids == "2,4", "with the other dungeon quests alone: "
+       .. tostring(dg.commits[1] and dg.commits[1].ids))
+    local both = dragRig({ sortMode = "manual", zoneHeaders = true, dungeonHeader = true }, rows, 0)
+    both.D:OnDragStart(q1)
+    ok(both.D.dragZone == "Alpha", "with zone headers on too, an ordinary quest drags in its zone")
+    both.D.dropIndex = 1
+    both.D:OnDragStop()
+    ok(both.commits[1] and both.commits[1].ids == "1", "which no longer holds the dungeon quest that left it: "
+       .. tostring(both.commits[1] and both.commits[1].ids))
+end)
+
 -- ------------------------------------------------- the row loop, sliced out of Render
 
 -- Starts at the popup boxes, ahead of the zone loop's setup, so a mutant of its first lines is
@@ -1090,7 +1548,8 @@ local function loopRig(group, folded, o)
     o = o or {}
     local env = {
         group = group, groupID = o.groupID or "quests", content = {}, width = 200, gap = 3, indent = 13,
-        y = o.y or 10, cfg = {}, zoneTops = {}, dragProvider = "quests", _dragRows = {}, _dragCount = 0,
+        y = o.y or 10, cfg = o.cfg or { zoneHeaders = true }, zoneTops = {}, dragProvider = "quests",
+        _dragRows = {}, _dragCount = 0,
         hasTimed = false, _buildRow = function() end, placed = {}, drawn = {}, focused = {},
         popupCount = o.popupCount or 0,
         PopupBoxes = { Render = o.popupRender or function() error("no popup box is drawn in these cases") end },
@@ -1259,6 +1718,68 @@ case("with sticky headers, the first section's first zone joins its header in th
     ok(env.zoneTops["quests:Alpha"] == 0, "and it still scrolls into view at the top")
 end)
 
+-- With zone headers off, the band's zone row would sit empty over the quests above Dungeons, so the
+-- Dungeons header scrolls with the list and the band stays one row.
+case("with only the dungeon header on, its header stays in the list and the band records no zone", function()
+    local d1, d2, e3 = dq(1, "The Deadmines"), dq(2, "The Stockade"), entry(3, "Alpha")
+    local group = loopGroup({ d1, d2, e3 }, { { zone = "Dungeons", first = 1, last = 2 },
+                                             { zone = "", first = 3, last = 3 } })
+    local env = loopRig(group, {}, { sticky = true, stickyN = 1, y = 0, cfg = { dungeonHeader = true } })
+    ok(#env.hidden == 0, "at the very top it is not moved into the band: " .. table.concat(env.hidden, ","))
+    ok(table.concat(env.placed, " ") == "quests:Dungeons@0", "it is drawn in the list where it sits: "
+       .. table.concat(env.placed, " "))
+    ok(env.stickyZ == 0 and next(env.zKeys) == nil and next(env.zTops) == nil,
+       "and nothing is recorded for the band's zone row: " .. tostring(env.stickyZ))
+    ok(env.zFirst[1] == nil and env.zLast[1] == nil, "so the section owns no zones there")
+    ok(table.concat(env.drawn, " ") == "1@13,-23 w187/187 2@13,-56 w187/187 3@0,-89 w200/200",
+       "its quests indented under it, the other quest after them at the full width: " .. table.concat(env.drawn, " "))
+    local unset = loopRig(group, {}, { sticky = true, stickyN = 1, y = 0, cfg = { dungeonHeader = true, zoneHeaders = 1 } })
+    ok(unset.stickyZ == 0, "only a real true for zone headers lets a zone into the band")
+end)
+
+-- With zone headers on as well, Dungeons is one more zone to the band: led by Current zone first,
+-- it joins the first section's header there like any zone at the top.
+case("with both switches on, a Dungeons header at the top joins the band like any zone", function()
+    local d1, e2 = dq(1, "The Deadmines"), entry(2, "Alpha")
+    local group = loopGroup({ d1, e2 }, { { zone = "Dungeons", first = 1, last = 1, dungeon = true },
+                                         { zone = "Alpha", first = 2, last = 2, dungeon = false } })
+    local env = loopRig(group, {}, { sticky = true, stickyN = 1, y = 0,
+                                     cfg = { zoneHeaders = true, dungeonHeader = true } })
+    ok(env.stickyZ == 2 and env.zKeys[1] == "quests:Dungeons" and env.zKeys[2] == "quests:Alpha",
+       "both recorded for the band: " .. tostring(env.zKeys[1]) .. ", " .. tostring(env.zKeys[2]))
+    ok(table.concat(env.hidden, ",") == "Dungeons", "the Dungeons header is hidden in the list, the band shows it: "
+       .. table.concat(env.hidden, ","))
+    ok(table.concat(env.placed, " ") == "quests:Dungeons@0 quests:Alpha@33",
+       "and takes no room, so Alpha's header follows its one quest: " .. table.concat(env.placed, " "))
+    ok(env.zTops[1] == -23 and env.zTops[2] == 33, "one a row above the list, the other where it sits: "
+       .. tostring(env.zTops[1]) .. ", " .. tostring(env.zTops[2]))
+    ok(table.concat(env.drawn, " ") == "1@13,0 w187/187 2@13,-56 w187/187",
+       "each zone's quest indented under it: " .. table.concat(env.drawn, " "))
+    ok(env.zFirst[1] == 1 and env.zLast[1] == 2, "the section owns both")
+    ok(env.zoneTops["quests:Dungeons"] == 0, "and Dungeons scrolls into view at the top")
+    local kept = loopRig(group, {}, { sticky = true, stickyN = 1, y = 0,
+                                      cfg = { zoneHeaders = true, dungeonHeader = true, dungeonHeaderLast = true,
+                                              zoneHeaderOrder = "alpha" } })
+    ok(table.concat(kept.hidden, ",") == "Dungeons" and kept.zTops[1] == -23,
+       "Keep at the bottom and the zone order change nothing here: " .. table.concat(kept.hidden, ","))
+end)
+
+case("with both switches on, a Dungeons header below the top is recorded for the band where it sits", function()
+    local e1, d2 = entry(1, "Alpha"), dq(2, "The Deadmines")
+    local group = loopGroup({ e1, d2 }, { { zone = "Alpha", first = 1, last = 1, dungeon = false },
+                                         { zone = "Dungeons", first = 2, last = 2, dungeon = true } })
+    local env = loopRig(group, {}, { sticky = true, stickyN = 1, y = 0,
+                                     cfg = { zoneHeaders = true, dungeonHeader = true } })
+    ok(env.stickyZ == 2 and env.zKeys[1] == "quests:Alpha" and env.zKeys[2] == "quests:Dungeons",
+       "both recorded, so the band can hand over to Dungeons: " .. tostring(env.zKeys[2]))
+    ok(table.concat(env.hidden, ",") == "Alpha", "only the zone at the top is hidden: " .. table.concat(env.hidden, ","))
+    ok(env.zTops[1] == -23 and env.zTops[2] == 33, "Dungeons recorded at its place in the list: " .. tostring(env.zTops[2]))
+    ok(table.concat(env.placed, " ") == "quests:Alpha@0 quests:Dungeons@33",
+       "and drawn there: " .. table.concat(env.placed, " "))
+    ok(env.zoneTops["quests:Dungeons"] == 33, "and scrolls into view there: " .. tostring(env.zoneTops["quests:Dungeons"]))
+    ok(env.zFirst[1] == 1 and env.zLast[1] == 2, "the section owns both")
+end)
+
 case("any other section keeps its zone headers in the list, and records where they are", function()
     local env = loopRig(zoneRuns3(), {}, { sticky = true, stickyN = 2, y = 120, stickyZ = 3 })
     ok(#env.hidden == 0, "nothing hidden")
@@ -1379,19 +1900,138 @@ has(renderSrc, [[
     local indent = ZoneHeaders:Indent(cfg)
 ]], "the zone tops are cleared and the indent read once per pass")
 
--- The whole statement to its line end, and the only write to subtitle in Row:Render, so nothing
--- appended to it or written after it can bring the label back.
+-- The zone label's two statements, sliced out of Row:Render and driven. Each local is written once
+-- there, so nothing written after them can bring the label back or take it away.
 do
     local good, err = pcall(function()
-        local rowSrc = stripComments(readFile("UI/Row.lua"))
-        local at = rowSrc:find("function Row:Render(row, entry, width, cfg)", 1, true)
+        local raw = readFile("UI/Row.lua")
+        local src = slice("UI/Row.lua", "    local headed = cfg and cfg.zoneHeaders", "    -- Fills the shared block arrays.")
+        local at = raw:find("function Row:Render(row, entry, width, cfg)", 1, true)
         assert(at, "Row:Render is not found")
-        local body = rowSrc:sub(at)
-        has(body, "\n    local subtitle = (cfg and cfg.showZoneTag ~= false and not cfg.zoneHeaders)"
-                  .. " and entry.subtitle or nil\n", "the zone label is dropped while zone headers are on")
-        local writes = 0
+        ok(count(raw:sub(at), src) == 1, "the two statements sit in Row:Render")
+        local stripped = stripComments(raw)
+        local from = stripped:find("function Row:Render(row, entry, width, cfg)", 1, true)
+        local body = stripped:sub(from)
+        local writes, heads = 0, 0
         for _ in body:gmatch("subtitle%s*=[^=]") do writes = writes + 1 end
-        ok(writes == 1, "and Row:Render writes subtitle nowhere else: " .. writes)
+        for _ in body:gmatch("headed%s*=[^=]") do heads = heads + 1 end
+        ok(writes == 1 and heads == 1, "and Row:Render writes neither anywhere else: " .. writes .. ", " .. heads)
+        -- Every spelling of a write or a read, so a multiple assignment, a bracketed field, or the
+        -- entry's own field read where the local belongs shows too.
+        local bare, field, bracket = 0, 0, 0
+        for _ in body:gmatch("[^%w_.]subtitle%f[^%w_]") do bare = bare + 1 end
+        for _ in body:gmatch("entry%s*%.%s*subtitle%f[^%w_]") do field = field + 1 end
+        for _ in body:gmatch("%[%s*[\"']subtitle[\"']%s*%]") do bracket = bracket + 1 end
+        ok(bare == 6 and field == 1 and bracket == 0, "the local is named six times, the entry's field read once "
+           .. "and never by brackets: " .. bare .. ", " .. field .. ", " .. bracket)
+        has(body, "\n       and row._sSub   == subtitle\n", "the repaint gate compares the label worked out above")
+        has(body, "\n    if subtitle and subtitle ~= \"\" then\n        row.subtitle:SetText(subtitle)\n"
+                  .. "        row.subtitle:Show()\n        anchor = row.subtitle\n    else\n"
+                  .. "        row.subtitle:SetText(\"\")\n        row.subtitle:Hide()\n        anchor = row.title\n    end\n",
+            "and the label drawn is that one, shown when there is one and hidden when not")
+        -- Those two are the only calls in Render that show, hide or fade the label.
+        local renderEnd = body:find("\nend\n", 1, true)
+        local render = renderEnd and body:sub(1, renderEnd) or body
+        local vis = {}
+        for m in render:gmatch("row%.subtitle%s*:%s*([%a_]+)%s*%(") do vis[m] = (vis[m] or 0) + 1 end
+        ok((vis.Show or 0) == 1 and (vis.Hide or 0) == 1 and (vis.SetShown or 0) == 0 and (vis.SetAlpha or 0) == 0,
+           ("Render shows and hides the label once each and fades it never: %d, %d, %d, %d")
+               :format(vis.Show or 0, vis.Hide or 0, vis.SetShown or 0, vis.SetAlpha or 0))
+        -- Both quest providers write the label from the same quest log heading as the zone.
+        for _, rel in ipairs({ "Data/Providers/Quests.lua", "Data/Providers/QuestsClassic.lua" }) do
+            local p = stripComments(readFile(rel))
+            has(p, "\n                e.subtitle  = currentHeader\n                e.zone      = currentHeader\n",
+                rel .. " writes the label and the zone from the same heading")
+            local n = 0
+            for _ in p:gmatch("%f[%w_]subtitle%f[^%w_]") do n = n + 1 end
+            ok(n == 1, rel .. " names the label nowhere else, in any spelling: " .. n)
+        end
+
+        local chunk = assert(loadstring("local cfg, entry = ...\n" .. src .. "\nreturn subtitle", "zone-label"))
+        local function label(cfg, e) return chunk(cfg, e) end
+        -- As the quest provider builds one: the label and the zone are the same quest log heading.
+        local function quest(sub, tags)
+            return { id = 1, title = "t", providerID = "quests", groupID = "quests", zone = sub, subtitle = sub,
+                     tags = tags }
+        end
+        local plain, dungeon = quest("Elwynn Forest", {}), quest("The Deadmines", { dungeon = true })
+        local ON, HEADS, BOTH = { showZoneTag = true }, { showZoneTag = true, zoneHeaders = true },
+                                { showZoneTag = true, zoneHeaders = true, dungeonHeader = true }
+        local ROWS = {
+            { ON, plain, "Elwynn Forest", "zone headers off: the label shows" },
+            { {}, plain, "Elwynn Forest", "and unset reads as shown, as it always did" },
+            { HEADS, plain, nil, "zone headers on: the header names the heading, so no label" },
+            { HEADS, dungeon, nil, "a dungeon quest too, while the Dungeons header is off" },
+            { BOTH, dungeon, "The Deadmines", "under the Dungeons header a dungeon quest keeps its label" },
+            { BOTH, plain, nil, "an ordinary quest beside it still has its zone's header" },
+            { BOTH, quest("Elwynn Forest", { dungeon = false }), nil, "and so does one tagged false" },
+            { BOTH, quest("Elwynn Forest"), nil, "and one with no tags at all, without raising" },
+            { BOTH, quest("Dungeons", {}), nil, "and an untagged quest under a heading named Dungeons" },
+            { BOTH, quest(nil, { dungeon = true }), nil, "a dungeon quest with no heading has none to show" },
+            { { showZoneTag = true, zoneHeaders = true, dungeonHeader = 1 }, dungeon, nil,
+              "only a real true for the Dungeons header keeps it" },
+            { { showZoneTag = true, zoneHeaders = true, dungeonHeader = false }, dungeon, nil,
+              "and the shipped default does not" },
+            { { showZoneTag = true, dungeonHeader = true }, dungeon, "The Deadmines",
+              "the Dungeons header alone: shown, as everywhere with zone headers off" },
+            { { showZoneTag = true, dungeonHeader = true }, plain, "Elwynn Forest",
+              "and an ordinary quest beside it keeps its label too" },
+            { { showZoneTag = false, zoneHeaders = true, dungeonHeader = true }, dungeon, nil,
+              "the label switched off hides it under Dungeons too" },
+            { { showZoneTag = false }, plain, nil, "and everywhere else" },
+            { nil, plain, nil, "no settings, no label" },
+        }
+        -- Each case in both sections, beside every other switch Core/DB.lua ships set on and
+        -- then off (with each zone order), and with the quest finished, failed, followed or
+        -- carrying other tags, so a rule that reads a neighbor, the section or another field of
+        -- the quest shows. The case's own keys win.
+        local onAll, offAll = { zoneHeaderOrder = "alpha" }, { zoneHeaderOrder = "current" }
+        for k, v in pairs(shippedDefaults()) do
+            if type(v) == "boolean" and k ~= "showZoneTag" and k ~= "zoneHeaders" and k ~= "dungeonHeader" then
+                onAll[k], offAll[k] = true, false
+            end
+        end
+        ok(onAll.dungeonHeaderLast == true and onAll.showObjectiveNumbers == true,
+           "the neighbors are read off the shipped defaults")
+        local function with(cfg, extra)
+            if cfg == nil then return nil end
+            local out = {}
+            for k, v in pairs(extra or {}) do out[k] = v end
+            for k, v in pairs(cfg) do out[k] = v end
+            return out
+        end
+        local function varied(e, v)
+            local out = {}
+            for k, val in pairs(e) do out[k] = val end
+            for k, val in pairs(v) do
+                if k == "tags" then
+                    local tags = {}
+                    for tk, tv in pairs(e.tags or {}) do tags[tk] = tv end
+                    for tk, tv in pairs(val) do tags[tk] = tv end
+                    out.tags = tags
+                else
+                    out[k] = val
+                end
+            end
+            return out
+        end
+        local VARIANTS = { {}, { state = "complete" }, { state = "failed" }, { isFocused = true },
+                           { tags = { raid = true, daily = true, campaign = true } } }
+        for _, row in ipairs(ROWS) do
+            for _, groupID in ipairs({ "quests", "campaign" }) do
+                row[2].groupID = groupID
+                for i, extra in ipairs({ false, onAll, offAll }) do
+                    for vi, v in ipairs(VARIANTS) do
+                        -- A tagless quest stays so, since adding tags would change the case.
+                        if not (v.tags and row[2].tags == nil) then
+                            local got = label(with(row[1], extra or nil), varied(row[2], v))
+                            ok(got == row[3], ("%s (%s, neighbors %s, variant %d): %s"):format(row[4], groupID,
+                               ({ "unset", "on", "off" })[i], vi, tostring(got)))
+                        end
+                    end
+                end
+            end
+        end
     end)
     ok(good, "Row:Render slices out of the row: " .. tostring(err))
 end
@@ -1401,6 +2041,8 @@ local db = readFile("Core/DB.lua")
 for _, line in ipairs({
     "            zoneHeaders             = false,\n",
     '            zoneHeaderOrder         = "current",\n',
+    "            dungeonHeader           = false,\n",
+    "            dungeonHeaderLast       = false,\n",
     "            zoneHeaderSizeDelta     = 2,\n",
     "            zoneHeaderColor         = { r = 1, g = 0.82, b = 0, a = 1 },\n",
     "            zoneHeaderColorUseClass = false,\n",
@@ -1423,8 +2065,9 @@ if keys then
                          "zoneHeaderBarColor", "zoneHeaderDivider", "zoneHeaderDividerColor", "zoneHeaderIndent" }) do
         ok(count(keys, '"' .. k .. '"') == 1, "Reset to Defaults clears " .. k)
     end
-    ok(count(keys, '"zoneHeaders"') == 0 and count(keys, '"zoneHeaderOrder"') == 0,
-       "but never the switch or the order")
+    ok(count(keys, '"zoneHeaders"') == 0 and count(keys, '"zoneHeaderOrder"') == 0
+       and count(keys, '"dungeonHeader"') == 0 and count(keys, '"dungeonHeaderLast"') == 0,
+       "but never the two switches or the two orders")
 end
 
 local BS = string.char(92)

@@ -12,6 +12,13 @@ harness that never builds the other client.
 Every mutation reintroduces a defect the harness is supposed to stand guard over. Any that still
 reports "0 failed" is an assertion that does not discriminate, and the run exits 1 naming it.
 
+Since 2026-10-10 it also breaks the two colors added beside it: Finished Quest Color (read only
+for a finished title, in every mode, never lit, never reaching the finished lines, unset by
+default) and the NEW tag's color (its cache, its default blue, the reset, and the tag's old window,
+switch, provider and order around a pin), and the status line reporting both. A picked Finished
+Objective Color must never reach a title, nor may any color with an AceDB default (Count Color: Done,
+the objective text, the NEW tag), which the old-profile grid checks over Core/DB.lua's own defaults.
+
 Equivalent mutant left out on purpose: dropping "and ObjectiveTrackerFrame == nil" from the watch
 frame test. No client defines both frames, so no real client shows the difference.
 
@@ -165,6 +172,182 @@ MUTANTS = [
     ("the status line reads the saved key, so an upgraded profile reports By difficulty", [
         (R, "        :format(Util.TitleColorMode(cfg), r, g, b, cr, cg, cb,",
             "        :format(cfg.titleColorMode or \"difficulty\", r, g, b, cr, cg, cb,")]),
+
+    ("the status line never reports the finished quest color", [
+        (R, "                picked(cfg and cfg.finishedQuestColor), picked(cfg and cfg.newTagColor))\n",
+            "                \"unset\", picked(cfg and cfg.newTagColor))\n")]),
+
+    ("the status line swaps the two picked colors", [
+        (R, "                picked(cfg and cfg.finishedQuestColor), picked(cfg and cfg.newTagColor))\n",
+            "                picked(cfg and cfg.newTagColor), picked(cfg and cfg.finishedQuestColor))\n")]),
+
+    ("the status line prints a picked color's channels out of order", [
+        (R, '        return ("%.2f %.2f %.2f"):format(c.r, c.g, c.b)\n', '        return ("%.2f %.2f %.2f"):format(c.r, c.b, c.g)\n')]),
+
+    ("an empty color in the status line reads as picked", [
+        (R, '        if not (c and c.r) then return "unset" end\n', '        if not c then return "unset" end\n')]),
+
+    # ------------------------------------------------------- Finished Quest Color (2026-10-10)
+    ("the finished quest color is never read", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n"
+            "    if fq and fq.r then return fq.r, fq.g, fq.b, false end\n", "")]),
+
+    ("the finished quest color colors every title, finished or not", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n",
+            "    local fq = cfg and cfg.finishedQuestColor\n")]),
+
+    ("a picked finished objective color recolors finished titles too", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n",
+            "    local fq = complete and cfg and (cfg.finishedQuestColor or cfg.finishedObjectiveColor)\n")]),
+
+    ("a picked finished objective color wins over a picked finished quest color", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n",
+            "    local fq = complete and cfg and (cfg.finishedObjectiveColor or cfg.finishedQuestColor)\n")]),
+
+    # Each of these has an AceDB default, so in game it recolors every finished title.
+    ("an unset finished quest color falls back to Count Color: Done", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n",
+            "    local fq = complete and cfg and (cfg.finishedQuestColor or cfg.countColorDone)\n")]),
+
+    ("an unset finished quest color falls back to the objective text color", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n",
+            "    local fq = complete and cfg and (cfg.finishedQuestColor or cfg.objectiveColor)\n")]),
+
+    ("an unset finished quest color falls back to the NEW tag color", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n",
+            "    local fq = complete and cfg and (cfg.finishedQuestColor or cfg.newTagColor)\n")]),
+
+    ("the status line reports the finished objective color for an unset finished quest color", [
+        (R, "picked(cfg and cfg.finishedQuestColor)", "picked(cfg and (cfg.finishedQuestColor or cfg.finishedObjectiveColor))")]),
+
+    ("the status line reports the custom title color for an unset NEW tag color", [
+        (R, "picked(cfg and cfg.newTagColor))", "picked(cfg and (cfg.titleColorOverride or cfg.newTagColor)))")]),
+
+    ("the status line reports the NEW tag color for an unset finished quest color", [
+        (R, "picked(cfg and cfg.finishedQuestColor)", "picked(cfg and (cfg.finishedQuestColor or cfg.newTagColor))")]),
+
+    ("the status line raises with no profile loaded", [
+        (R, "picked(cfg and cfg.finishedQuestColor), picked(cfg and cfg.newTagColor))",
+            "picked(cfg.finishedQuestColor), picked(cfg.newTagColor))")]),
+
+    ("an empty color table counts as a picked finished quest color", [
+        (R, "    if fq and fq.r then return fq.r, fq.g, fq.b, false end\n",
+            "    if fq then return fq.r, fq.g, fq.b, false end\n")]),
+
+    ("a picked finished quest color is lit by a hover", [
+        (R, "    if fq and fq.r then return fq.r, fq.g, fq.b, false end\n",
+            "    if fq and fq.r then return fq.r, fq.g, fq.b, true end\n")]),
+
+    ("the finished quest color's green and blue are swapped", [
+        (R, "    if fq and fq.r then return fq.r, fq.g, fq.b, false end\n",
+            "    if fq and fq.r then return fq.r, fq.b, fq.g, false end\n")]),
+
+    ("the finished quest color applies only with the completed box on", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n",
+            "    local fq = complete and cfg and cfg.overrideCompleteGreen ~= false and cfg.finishedQuestColor\n")]),
+
+    ("the finished quest color only replaces green, so a mode's title color beats it", [
+        (R, "    local fq = complete and cfg and cfg.finishedQuestColor\n"
+            "    if fq and fq.r then return fq.r, fq.g, fq.b, false end\n", ""),
+        (R, "    if complete and not (r and (not cfg or cfg.overrideCompleteGreen ~= false)) then\n"
+            "        return 0.27, 0.85, 0.27, false\n",
+            "    if complete and not (r and (not cfg or cfg.overrideCompleteGreen ~= false)) then\n"
+            "        local fq = cfg and cfg.finishedQuestColor\n"
+            "        if fq and fq.r then return fq.r, fq.g, fq.b, false end\n"
+            "        return 0.27, 0.85, 0.27, false\n")]),
+
+    ("the finished quest color beats the Classic focus tint", [
+        (R, "local function titleColor(entry, cfg)\n    if FOCUS_TINT and entry.isFocused then\n",
+            "local function titleColor(entry, cfg)\n"
+            "    local fq0 = entry.state == STATE.COMPLETE and cfg and cfg.finishedQuestColor\n"
+            "    if fq0 and fq0.r then return fq0.r, fq0.g, fq0.b, false end\n"
+            "    if FOCUS_TINT and entry.isFocused then\n")]),
+
+    ("finished objective lines follow the finished quest color", [
+        (R, "    if f and f.r then return Util.Hex(f.r, f.g, f.b) end\n",
+            "    if f and f.r then return Util.Hex(f.r, f.g, f.b) end\n"
+            "    local q = cfg and cfg.finishedQuestColor\n"
+            "    if q and q.r then return Util.Hex(q.r, q.g, q.b) end\n")]),
+
+    ("the finished quest color gets an AceDB default, so every finished title changes on upgrade", [
+        (D, "            newTagColor        = { r = 107 / 255, g = 175 / 255, b = 1 },\n",
+            "            newTagColor        = { r = 107 / 255, g = 175 / 255, b = 1 },\n"
+            "            finishedQuestColor = { r = 0.27, g = 0.85, b = 0.27 },\n")]),
+
+    ("Reset to Defaults keeps the finished quest color", [
+        (D, '    "finishedQuestColor", "newTagColor",\n', '    "newTagColor",\n')]),
+
+    # ------------------------------------------------------------- the NEW tag's color (2026-10-10)
+    ("the NEW tag ignores the picked color", [
+        (R, "        text = newTagFor(cfg) .. text\n", "        text = NEW_TAG .. text\n")]),
+
+    ("the tag's cache never notices red moving", [
+        (R, "    elseif newRGB.r ~= c.r or newRGB.g ~= c.g or newRGB.b ~= c.b then\n",
+            "    elseif newRGB.g ~= c.g or newRGB.b ~= c.b then\n")]),
+
+    ("the tag's cache never notices green moving", [
+        (R, "    elseif newRGB.r ~= c.r or newRGB.g ~= c.g or newRGB.b ~= c.b then\n",
+            "    elseif newRGB.r ~= c.r or newRGB.b ~= c.b then\n")]),
+
+    ("the tag's cache never notices blue moving", [
+        (R, "    elseif newRGB.r ~= c.r or newRGB.g ~= c.g or newRGB.b ~= c.b then\n",
+            "    elseif newRGB.r ~= c.r or newRGB.g ~= c.g then\n")]),
+
+    ("the tag's cache outlives an unset, so the same pick after it is never taken", [
+        (R, "        newTag, newRGB.r = NEW_TAG, nil\n", "        newTag = NEW_TAG\n")]),
+
+    ("the tag's cache stores green as blue, so green moved onto blue's value is never seen", [
+        (R, "        newRGB.r, newRGB.g, newRGB.b = c.r, c.g, c.b\n", "        newRGB.r, newRGB.g, newRGB.b = c.r, c.b, c.b\n")]),
+
+    ("an empty color table counts as a picked tag color", [
+        (R, "    local c = cfg.newTagColor\n    if not (c and c.r) then\n",
+            "    local c = cfg.newTagColor\n    if not c then\n")]),
+
+    ("the tag's red and blue are swapped", [
+        (R, '        newTag = "|cff" .. Util.Hex(c.r, c.g, c.b) .. "NEW|r "\n',
+            '        newTag = "|cff" .. Util.Hex(c.b, c.g, c.r) .. "NEW|r "\n')]),
+
+    ("a picked tag loses the space before the title", [
+        (R, '        newTag = "|cff" .. Util.Hex(c.r, c.g, c.b) .. "NEW|r "\n',
+            '        newTag = "|cff" .. Util.Hex(c.r, c.g, c.b) .. "NEW|r"\n')]),
+
+    ("the fallback blue drifts", [
+        (R, 'local NEW_TAG    = "|cff6bafffNEW|r "\n', 'local NEW_TAG    = "|cff6bafeeNEW|r "\n')]),
+
+    ("the shipped default blue drifts", [
+        (D, "            newTagColor        = { r = 107 / 255, g = 175 / 255, b = 1 },\n",
+            "            newTagColor        = { r = 107 / 255, g = 175 / 255, b = 0.9 },\n")]),
+
+    ("Reset to Defaults keeps the NEW tag color", [
+        (D, '    "finishedQuestColor", "newTagColor",\n', '    "finishedQuestColor",\n')]),
+
+    ("the NEW tag lasts a second longer", [
+        (R, "local NEW_WINDOW = 3600\n", "local NEW_WINDOW = 3601\n")]),
+
+    ("the NEW tag still shows at exactly an hour", [
+        (R, "       and (time() - entry.addedAt) < NEW_WINDOW then\n",
+            "       and (time() - entry.addedAt) <= NEW_WINDOW then\n")]),
+
+    ("the NEW tag ignores the Tracker tab's switch", [
+        (R, "    if cfg.showRecentlyAddedTag ~= false and entry.addedAt and entry.addedAt > 0\n",
+            "    if entry.addedAt and entry.addedAt > 0\n")]),
+
+    ("titles are decorated on every provider's rows", [
+        (R, "    if not cfg or entry.providerID ~= TITLE_META_PROVIDER then return text end\n",
+            "    if not cfg then return text end\n")]),
+
+    ("a pin's star comes before the NEW tag", [
+        (R, "    if ns:GetModule(\"Filter\"):IsPinned(entry) then\n        text = PIN_TAG .. text\n    end\n", ""),
+        (R, "        text = newTagFor(cfg) .. text\n    end\n    return text\n",
+            "        text = newTagFor(cfg) .. text\n    end\n"
+            "    if ns:GetModule(\"Filter\"):IsPinned(entry) then text = PIN_TAG .. text end\n    return text\n")]),
+
+    ("the pin test is called with a dot, which raises in game", [
+        (R, "    if ns:GetModule(\"Filter\"):IsPinned(entry) then\n",
+            "    if ns:GetModule(\"Filter\").IsPinned(entry) then\n")]),
+
+    ("Render draws the bare title, so no tag or level is ever seen", [
+        (R, "    row.title:SetText(titleText)\n", "    row.title:SetText(entry.title or \"\")\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_title_color: (\d+) passed, (\d+) failed$")

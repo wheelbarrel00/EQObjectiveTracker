@@ -29,9 +29,10 @@ local WEEKLY_FREQ = (Enum and Enum.QuestFrequency and Enum.QuestFrequency.Weekly
 -- Midnight meta quest, which had no tag at all and so filtered as normal quests.
 local SCHED_FREQ  = (Enum and Enum.QuestFrequency and Enum.QuestFrequency.ResetByScheduler) or 3
 
--- Fallback ids read off Enum.QuestTag on 1.15.9: Dungeon 81, Raid 62, Raid10 88, Raid25 89.
+-- Fallback ids read off Enum.QuestTag on 1.15.9: Dungeon 81, Heroic 85, Raid 62, Raid10 88, Raid25 89.
 -- Raid10 used to read 85, which is Heroic, and Raid25 used to read 88, which is Raid10.
 local TAG_DUNGEON = (Enum and Enum.QuestTag and Enum.QuestTag.Dungeon) or 81
+local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 85
 local TAG_RAID    = (Enum and Enum.QuestTag and Enum.QuestTag.Raid)    or 62
 local TAG_RAID10  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid10)  or 88
 local TAG_RAID25  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid25)  or 89
@@ -207,7 +208,8 @@ local function fillTags(e, id, info)
         if info.frequency == SCHED_FREQ  then tags.scheduled = true end
     end
     local tagID = getTagID(id)
-    if tagID == TAG_DUNGEON then
+    -- Heroic counts as Dungeon too, the same rule QuestsClassic applies to TBC's heroic dailies.
+    if tagID == TAG_DUNGEON or tagID == TAG_HEROIC then
         tags.dungeon = true
     elseif tagID == TAG_RAID or tagID == TAG_RAID10 or tagID == TAG_RAID25 then
         tags.raid = true

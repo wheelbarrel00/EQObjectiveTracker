@@ -28,7 +28,8 @@ function API:AddHeaderIcon(spec)
     self.headerIcons[slotFor(self.headerIcons, spec.id)] = {
         id      = spec.id,
         texture = spec.texture,
-        tooltip = spec.tooltip,
+        -- A string only, since the header icon would call a function on every hover, unprotected.
+        tooltip = type(spec.tooltip) == "string" and spec.tooltip or nil,
         onClick = spec.onClick,
         dbKey   = spec.dbKey,
         order   = tonumber(spec.order) or 999,

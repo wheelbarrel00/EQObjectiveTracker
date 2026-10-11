@@ -23,6 +23,8 @@ local SORT_OPTIONS = {
     { value = "manual",   label = L["Manual"],
       tip = L["Your own order. Drag quests up and down in the tracker to set it."] },
 }
+-- The tracker's sort button offers this same list.
+Options.SORT_OPTIONS = SORT_OPTIONS
 
 -- EQ's own screen order, which is not Filter.CATEGORIES order - that one encodes match
 -- precedence and must not be reshuffled for display.
@@ -166,6 +168,8 @@ Options:RegisterTab({
             L["Drag and drop the quests in the tracker to reorder them however you like."], "hint")
         onScreen:Add(manualHint, { dependent = true, fill = true })
         syncManualHint(DB().sortMode)
+        -- The tracker's sort button can change the order after this tab is built.
+        content._syncManualHint = function() syncManualHint(DB().sortMode) end
 
         local filters = self:CreateGroup(content, L["Filters"])
         filters:SetPoint("TOPLEFT", onScreen, "BOTTOMLEFT", 0, -gap)
@@ -379,9 +383,9 @@ Options:RegisterTab({
             rowSetting("showZoneTag"))
         display:Add(zoneCheck)
         self:AttachTooltip(zoneCheck, L["Show zone label under quest titles"],
-            L["Adds the quest log heading each quest came from as a small line under its title. Not shown while Show zone headers is on, on the Appearance tab."])
-        -- Its master is on another tab, so its dimming is set again each time this tab is shown.
-        content._syncZoneTag = function() self:SetDependent(zoneCheck, not DB().zoneHeaders) end
+            L["Adds the quest log heading each quest came from as a small line under its title. While Show zone headers is on, on the Appearance tab, only quests in the Dungeons header show it."])
+        -- Its masters are on another tab, so its dimming is set again each time this tab is shown.
+        content._syncZoneTag = function() self:SetDependent(zoneCheck, not DB().zoneHeaders or DB().dungeonHeader == true) end
         content._syncZoneTag()
 
         local objCheck = self:CreateCheckbox(content, L["Show objective progress numbers"],
@@ -437,6 +441,14 @@ Options:RegisterTab({
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
             L["A small cogwheel at the top-right of the tracker that opens the options panel."]))
+
+        display:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],
+            function() return DB().showSortButton == true end,
+            function(v)
+                DB().showSortButton = v
+                ns:GetModule("Tracker"):ApplyHeaderIcons()
+            end,
+            L["A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default."]))
 
         -- EQ has Show Chain Guide icon after this one. Deliberately not ported: it opens
         -- EQ's Chain Guide, which EQOT does not have.
@@ -534,5 +546,6 @@ Options:RegisterTab({
 
     refresh = function(_, content)
         if content._syncZoneTag then content._syncZoneTag() end
+        if content._syncManualHint then content._syncManualHint() end
     end,
 })

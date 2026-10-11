@@ -47,8 +47,8 @@ function Feed:Build()
     for _, s in pairs(spaces) do wipe(s) end
     Filter:BeginPass()
     local ZoneGroups = ns:GetModule("ZoneGroups")
-    local zoned = ZoneGroups and cfg and cfg.zoneHeaders == true
-    if zoned then ZoneGroups:Begin() end
+    local zoned = ZoneGroups and ZoneGroups:Grouping(cfg)
+    if zoned then ZoneGroups:Begin(cfg) end
 
     for _, p in ipairs(Registry:Active()) do
         if p._available then

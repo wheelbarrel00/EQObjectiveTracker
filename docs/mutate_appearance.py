@@ -59,13 +59,87 @@ MUTANTS = [
     ("the zone header color is not indented under the class color switch", [
         (A, "        zoneHeads:Add(w.zoneColor, DEPENDENT)\n", "        zoneHeads:Add(w.zoneColor)\n")]),
     ("the zone header color stays lit under the class color", [
-        (A, "            dim(w.zoneColor,      zh and not cfg.zoneHeaderColorUseClass)\n", "            dim(w.zoneColor,      zh)\n")]),
+        (A, "            dim(w.zoneColor,      headed and not cfg.zoneHeaderColorUseClass)\n", "            dim(w.zoneColor,      headed)\n")]),
     ("the zone bar color stays lit with its bar off", [
-        (A, "            dim(w.zoneBarPicker,  zh and cfg.zoneHeaderBar)\n", "            dim(w.zoneBarPicker,  zh)\n")]),
+        (A, "            dim(w.zoneBarPicker,  headed and cfg.zoneHeaderBar)\n", "            dim(w.zoneBarPicker,  headed)\n")]),
     ("the zone divider color stays lit with its divider off", [
-        (A, "            dim(w.zoneLinePicker, zh and cfg.zoneHeaderDivider)\n", "            dim(w.zoneLinePicker, zh)\n")]),
+        (A, "            dim(w.zoneLinePicker, headed and cfg.zoneHeaderDivider)\n", "            dim(w.zoneLinePicker, headed)\n")]),
     ("the indent stays lit with zone headers off", [
-        (A, "            dim(w.zoneIndent,     zh)\n", "")]),
+        (A, "            dim(w.zoneIndent,     headed)\n", "")]),
+    # ----------------------------------------- the dungeon header box (2026-10-10, for Andreon)
+    ("the zone look stays dimmed for the dungeon header alone", [
+        (A, "            local headed = zh or cfg.dungeonHeader\n", "            local headed = zh\n")]),
+    ("Zone Order lights up for the dungeon header alone", [
+        (A, "            dim(w.zoneOrder,      zh)\n", "            dim(w.zoneOrder,      headed)\n")]),
+    ("the dungeon box reads any stored value as on", [
+        (A, "            function() return DB().dungeonHeader == true end,\n",
+            "            function() return DB().dungeonHeader end,\n")]),
+    ("the dungeon box writes Show zone headers", [
+        (A, "            function(v) relayout(\"dungeonHeader\", v); syncDependents() end,\n",
+            "            function(v) relayout(\"zoneHeaders\", v); syncDependents() end,\n")]),
+    ("the dungeon box never re-runs the sweep", [
+        (A, "            function(v) relayout(\"dungeonHeader\", v); syncDependents() end,\n",
+            "            function(v) relayout(\"dungeonHeader\", v) end,\n")]),
+    ("the dungeon box invalidates the rows as well", [
+        (A, "            function(v) relayout(\"dungeonHeader\", v); syncDependents() end,\n",
+            "            function(v) restyle(\"dungeonHeader\", v); syncDependents() end,\n")]),
+    ("the dungeon box is indented under Show zone headers", [
+        (A, "comes to the top while one of its quests is in your zone. Off by default.\"]))\n",
+            "comes to the top while one of its quests is in your zone. Off by default.\"]), DEPENDENT)\n")]),
+    ("the dungeon box sits above Zone Order", [
+        (A, "        zoneHeads:Add(w.zoneOrder)\n", ""),
+        (A, "comes to the top while one of its quests is in your zone. Off by default.\"]))\n",
+            "comes to the top while one of its quests is in your zone. Off by default.\"]))\n"
+            "        zoneHeads:Add(w.zoneOrder)\n")]),
+    ("the dungeon box's tooltip no longer says what it does with zone headers off", [
+        (A, "With Show zone headers off, every other quest stays as it is and Dungeons comes last. ", "")]),
+    ("Keep Dungeons at the bottom reads any stored value as on", [
+        (A, "            function() return DB().dungeonHeaderLast == true end,\n",
+            "            function() return DB().dungeonHeaderLast end,\n")]),
+    ("Keep Dungeons at the bottom writes the dungeon box's key", [
+        (A, "            function(v) relayout(\"dungeonHeaderLast\", v) end,\n",
+            "            function(v) relayout(\"dungeonHeader\", v) end,\n")]),
+    ("Keep Dungeons at the bottom invalidates the rows as well", [
+        (A, "            function(v) relayout(\"dungeonHeaderLast\", v) end,\n",
+            "            function(v) restyle(\"dungeonHeaderLast\", v) end,\n")]),
+    ("Keep Dungeons at the bottom re-runs the sweep for nothing", [
+        (A, "            function(v) relayout(\"dungeonHeaderLast\", v) end,\n",
+            "            function(v) relayout(\"dungeonHeaderLast\", v); syncDependents() end,\n")]),
+    ("Keep Dungeons at the bottom is not indented under the dungeon box", [
+        (A, "        zoneHeads:Add(w.dungeonLast, DEPENDENT)\n", "        zoneHeads:Add(w.dungeonLast)\n")]),
+    ("Keep Dungeons at the bottom is never dimmed", [
+        (A, "            dim(w.dungeonLast,    cfg.dungeonHeader)\n", "")]),
+    ("Keep Dungeons at the bottom dims with zone headers instead of the dungeon box", [
+        (A, "            dim(w.dungeonLast,    cfg.dungeonHeader)\n", "            dim(w.dungeonLast,    zh)\n")]),
+    ("Keep Dungeons at the bottom's label is typed in English", [
+        (A, "L[\"Keep Dungeons at the bottom\"]", "\"Keep Dungeons at the bottom\"")]),
+    # The sweep's own scan, and each box read beside its neighbors on and off.
+    ("the dungeon box dims for the old value, re-running the sweep before it stores", [
+        (A, "            function(v) relayout(\"dungeonHeader\", v); syncDependents() end,\n",
+            "            function(v) syncDependents(); relayout(\"dungeonHeader\", v) end,\n")]),
+    ("the dungeon box reads ticked whenever Show zone headers is on", [
+        (A, "            function() return DB().dungeonHeader == true end,\n",
+            "            function() return DB().dungeonHeader == true or DB().zoneHeaders == true end,\n")]),
+    ("Keep Dungeons at the bottom reads ticked whenever the dungeon box is", [
+        (A, "            function() return DB().dungeonHeaderLast == true end,\n",
+            "            function() return DB().dungeonHeaderLast == true or DB().dungeonHeader == true end,\n")]),
+    ("an unset Finished Quest Color shows the done count's green", [
+        (A, "            function() return DB().finishedQuestColor end,\n",
+            "            function() return DB().finishedQuestColor or DB().countColorDone end,\n")]),
+    ("an unset Finished Quest Color shows the finished objective color", [
+        (A, "            function() return DB().finishedQuestColor end,\n",
+            "            function() return DB().finishedQuestColor or DB().finishedObjectiveColor end,\n")]),
+    # The stub modules check self, as the real ones read it.
+    ("a restyle repaints the rows with a dot, which raises in game", [
+        (A, "    DB()[key] = v\n    ns:GetModule(\"Row\"):Invalidate()\n    ns:GetModule(\"Tracker\"):Render()\n    refreshPreview()\n",
+            "    DB()[key] = v\n    ns:GetModule(\"Row\").Invalidate()\n    ns:GetModule(\"Tracker\"):Render()\n    refreshPreview()\n")]),
+    ("a relayout redraws the tracker with a dot, which raises in game", [
+        (A, "local function relayout(key, v)\n    DB()[key] = v\n    ns:GetModule(\"Tracker\"):Render()\n",
+            "local function relayout(key, v)\n    DB()[key] = v\n    ns:GetModule(\"Tracker\").Render()\n")]),
+    ("Keep Dungeons at the bottom's tooltip no longer names Current zone first", [
+        (A, "Without this, Current zone first brings it to the top", "Without this, it can come to the top")]),
+    ("the dungeon box's label is typed in English", [
+        (A, "L[\"Group dungeon quests under one header\"]", "\"Group dungeon quests under one header\"")]),
 
     # --------------------------------------------------------------------------- the cards
     ("a card is built but never anchored, so it draws at the top of the tab", [
@@ -475,7 +549,7 @@ MUTANTS = [
         (A, '    if not name or name == "" then return nil end\n', '    if not name then return nil end\n')]),
     # Which tooltip sits on which class color box. Both keys stay valid, so the locale gate cannot see a swap.
     ("Quest Title Color carries the custom picker's tooltip", [
-        (A, '            L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on."]))', '            L["The color every title takes while Quest Title Color is set to Custom color. Until one is picked they are gold."]))')]),
+        (A, '            L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on or a Finished Quest Color is picked."]))', '            L["The color every title takes while Quest Title Color is set to Custom color. Until one is picked they are gold."]))')]),
 
     ("the headers box carries the titles tooltip", [
         (A, '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', '            L["Colors quest, achievement, and endeavor titles with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))')]),
@@ -516,6 +590,58 @@ MUTANTS = [
     ("the objective text color takes alpha", [
         (A, 'L["Color of the objective lines under each title. The count at the start of a line has its own three colors below."]))',
             'L["Color of the objective lines under each title. The count at the start of a line has its own three colors below."], true))')]),
+
+    # ------------------------------------------- Finished Quest Color and the NEW tag's color (2026-10-10)
+    ("the finished quest color writes the finished objective key", [
+        (A, '            function(v) restyle("finishedQuestColor", v) end,',
+            '            function(v) restyle("finishedObjectiveColor", v) end,')]),
+    ("the finished quest color reads the finished objective key", [
+        (A, '            function() return DB().finishedQuestColor end,',
+            '            function() return DB().finishedObjectiveColor end,')]),
+    ("the finished quest color loses its Clear, so the old finished title can never come back", [
+        (A, '            function() restyle("finishedQuestColor", nil) end))', '            nil))')]),
+    ("the finished quest color's Clear clears the finished objective color", [
+        (A, '            function() restyle("finishedQuestColor", nil) end))',
+            '            function() restyle("finishedObjectiveColor", nil) end))')]),
+    ("the finished quest color only relays out, so rows already drawn keep the old color", [
+        (A, '            function(v) restyle("finishedQuestColor", v) end,',
+            '            function(v) relayout("finishedQuestColor", v) end,')]),
+    ("the finished quest color takes alpha", [
+        (A, 'gives one."],\n            false,\n            function() restyle("finishedQuestColor", nil) end))',
+            'gives one."],\n            true,\n            function() restyle("finishedQuestColor", nil) end))')]),
+    ("the finished quest color is indented under the completed box", [
+        (A, '            function() restyle("finishedQuestColor", nil) end))',
+            '            function() restyle("finishedQuestColor", nil) end), DEPENDENT)')]),
+    ("the finished quest color's label is typed in English", [
+        (A, 'self:CreateColorPicker(content, L["Finished Quest Color"],', 'self:CreateColorPicker(content, "Finished Quest Color",')]),
+    ("the finished quest color's tooltip no longer says it wins in every mode", [
+        (A, 'L["Color of a quest\'s title once all of its objectives are done, in every Quest Title Color mode. While unset',
+            'L["Color of a quest\'s title once all of its objectives are done. While unset')]),
+    ("the completed box keeps its old tooltip, which says nothing of the finished quest color", [
+        (A, 'L["A finished quest\'s title takes the title color instead of green, and so do its finished objectives. A picked Finished Quest Color or Finished Objective Color wins over it. Only Class color, Custom color and Original Style give a title color."]',
+            'L["A finished quest\'s title takes the title color instead of green, and so do its finished objectives unless a Finished Objective Color is picked. Only Class color, Custom color and Original Style give a title color."]')]),
+    ("Quest Title Color keeps promising green whatever is picked", [
+        (A, 'and finished ones green unless Use title color for completed quests is on or a Finished Quest Color is picked."]',
+            'and finished ones green unless Use title color for completed quests is on."]')]),
+    ("the NEW tag color writes the done count's key", [
+        (A, '            function(v) restyle("newTagColor", v) end,', '            function(v) restyle("countColorDone", v) end,')]),
+    ("the NEW tag color reads another key", [
+        (A, '            function() return DB().newTagColor end,', '            function() return DB().objectiveColor end,')]),
+    ("the NEW tag color only relays out, so rows already drawn keep the old tag", [
+        (A, '            function(v) restyle("newTagColor", v) end,', '            function(v) relayout("newTagColor", v) end,')]),
+    ("the NEW tag color gets a Clear although it has a default", [
+        (A, 'switched on and off on the Tracker tab."]))',
+            'switched on and off on the Tracker tab."], false, function() restyle("newTagColor", nil) end))')]),
+    ("the NEW tag color takes alpha", [
+        (A, 'switched on and off on the Tracker tab."]))', 'switched on and off on the Tracker tab."], true))')]),
+    ("the NEW tag color is built but never added to the card", [
+        (A, '        questColors:Add(self:CreateColorPicker(content, L["NEW Tag Color"],',
+            '        (self:CreateColorPicker(content, L["NEW Tag Color"],')]),
+    ("the NEW tag color's tooltip no longer says where the tag is switched", [
+        (A, 'The tag is switched on and off on the Tracker tab."]', 'The tag can be switched off."]')]),
+    ("the NEW tag color's tooltip is typed in English", [
+        (A, 'L["Color of the NEW tag on quests accepted in the last hour. The tag is switched on and off on the Tracker tab."]',
+            '"Color of the NEW tag on quests accepted in the last hour. The tag is switched on and off on the Tracker tab."')]),
 
     # ------------------------------------------- strings drawn bare, which only a marked build sees
     ("Quest Title Color's own label is typed in English, its tooltip title still wrapped", [
@@ -561,6 +687,39 @@ MUTANTS = [
     ("Quest Title Color loses Original Style", [
         (A, "    { value = \"original\",   label = L[\"Original Style\"],\n"
             "      tip = L[\"Titles colored the way Blizzard's own tracker colors them on this version of the game.\"] },\n", "")]),
+
+    # Each dungeon box read in all four states of box and neighbors, and at each zone order, after
+    # the second and third 2.3.0 scans.
+    ("the dungeon box reads unticked while Keep Dungeons at the bottom is on", [
+        (A, "            function() return DB().dungeonHeader == true end,\n",
+            "            function() return DB().dungeonHeader == true and DB().dungeonHeaderLast ~= true end,\n")]),
+    ("Keep Dungeons at the bottom reads unticked while zone header bars are on", [
+        (A, "            function() return DB().dungeonHeaderLast == true end,\n",
+            "            function() return DB().dungeonHeaderLast == true and DB().zoneHeaderBar ~= true end,\n")]),
+    ("the dungeon box reads ticked under Current zone first, the shipped order", [
+        (A, "            function() return DB().dungeonHeader == true end,\n",
+            "            function() return DB().dungeonHeader == true or DB().zoneHeaderOrder == \"current\" end,\n")]),
+    ("Keep Dungeons at the bottom reads unticked under Current zone first, the shipped order", [
+        (A, "            function() return DB().dungeonHeaderLast == true end,\n",
+            "            function() return DB().dungeonHeaderLast == true and DB().zoneHeaderOrder ~= \"current\" end,\n")]),
+
+    ("the dungeon box reads unticked under Manual sort", [
+        (A, "            function() return DB().dungeonHeader == true end,\n",
+            "            function() return DB().dungeonHeader == true and DB().sortMode ~= \"manual\" end,\n")]),
+    ("Keep Dungeons at the bottom reads unticked with a negative zone header size", [
+        (A, "            function() return DB().dungeonHeaderLast == true end,\n",
+            "            function() return DB().dungeonHeaderLast == true and (DB().zoneHeaderSizeDelta or 2) >= 0 end,\n")]),
+
+    # The two Bar Texture lists' swatch decorator.
+    ("the bar texture swatch reads its file with a dot, so every swatch shows the default texture", [
+        (A, "    frame.swatch:SetTexture(ns:GetModule(\"Media\"):GetStatusBarFile(name))\n",
+            "    frame.swatch:SetTexture(ns:GetModule('Media').GetStatusBarFile(name))\n")]),
+    ("every bar texture swatch shows the same texture", [
+        (A, "GetStatusBarFile(name))\n", "GetStatusBarFile(\"Blizzard\"))\n")]),
+    ("the bar texture swatch is never tinted", [
+        (A, "    frame.swatch:SetVertexColor(0.26, 0.42, 1.0)\n", "")]),
+    ("the bar texture swatch raises on a row with no swatch", [
+        (A, "    if not frame.swatch then return end\n    frame.swatch:SetTexture(", "    frame.swatch:SetTexture(")]),
 
     ("the headers tooltip points at the picker above again", [
         (A, '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color above while it is on. Off by default."]))')]),

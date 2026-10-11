@@ -195,8 +195,9 @@ function ZoneHeaders:Sweep()
     for i = used + 1, #self.frames do self.frames[i]:Hide() end
 end
 
+-- The Dungeons header indents its quests the way a zone's does, zone headers on or off.
 function ZoneHeaders:Indent(cfg)
-    if not (cfg and cfg.zoneHeaders) then return 0 end
+    if not (cfg and (cfg.zoneHeaders or cfg.dungeonHeader)) then return 0 end
     return math.max(0, cfg.zoneHeaderIndent or 8)
 end
 

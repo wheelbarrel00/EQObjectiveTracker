@@ -146,6 +146,15 @@ MUTANTS = [
     ("the CurseForge link at the foot of the changelog goes", [
         (A, '        changelog:Add(self:CreateButton(content, L["Older versions are on CurseForge"], nil,\n'
             '            function() ns:ShowURL(CURSEFORGE_URL) end, nil, "ghost"))\n', '')]),
+
+    # The stub modules check self, so each of these dot calls raises here as it does in game.
+    ("the providers card lists the providers with a dot", [
+        (A, '        content._providerRows = {}\n        for _, p in ipairs(ns:GetModule("Registry"):Active()) do\n',
+            '        content._providerRows = {}\n        for _, p in ipairs(ns:GetModule("Registry").Active()) do\n')]),
+
+    ("the per-view pass reads the providers with a dot", [
+        (A, '        local muted = colorCode(self, "muted")\n        for _, p in ipairs(ns:GetModule("Registry"):Active()) do\n',
+            '        local muted = colorCode(self, "muted")\n        for _, p in ipairs(ns:GetModule("Registry").Active()) do\n')]),
 ]
 
 SUMMARY = re.compile(r"^test_about: (\d+) passed, (\d+) failed$")

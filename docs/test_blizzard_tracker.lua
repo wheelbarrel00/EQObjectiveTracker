@@ -1036,6 +1036,119 @@ case("no file calls a DB accessor with a dot", function()
     ok(#dots == 0, "and none reaches a DB accessor with a dot: " .. table.concat(dots, ", "))
 end)
 
+-- A dot call hands a module method its first argument as self, which raises or misreads in game
+-- wherever the method reads self or takes arguments, and a stub module that ignores self passes it.
+-- Read straight off GetModule with either quote, through brackets, through a module's own variable,
+-- a local alias (one name or several on a line), or a helper that returns a module. A function a
+-- module declares with a dot (Entry's line helpers) is called that way on purpose, so the module's
+-- own source is the list, and a colon call to one of those, straight off GetModule or through a
+-- name holding the module, is the same mistake turned around.
+case("no file calls a module method with a dot", function()
+    local order, seen = {}, {}
+    for _, toc in ipairs({ "EQObjectiveTracker.toc", "EQObjectiveTracker_Mainline.toc",
+                           "EQObjectiveTracker_Camelot.toc", "EQObjectiveTracker_Vanilla.toc",
+                           "EQObjectiveTracker_TBC.toc" }) do
+        for line in (readFile(toc) .. "\n"):gmatch("([^\n]*)\n") do
+            local rel = line:match("^([CDUO][%w]*\\.-%.lua)%s*$")
+            if rel and not seen[rel] then
+                seen[rel] = true
+                order[#order + 1] = (rel:gsub("\\", "/"))
+            end
+        end
+    end
+    local Q, M = "[\"']", "[%u_][%w_]*"
+    local GM = "ns:GetModule%(%s*" .. Q .. "([%w_]+)" .. Q .. "%s*%)"
+    local REG = "local%s+([%w_]+)%s*=%s*ns:RegisterModule%(%s*" .. Q .. "([%w_]+)" .. Q
+    local srcs, plain, plainCount = {}, {}, 0
+    for _, rel in ipairs(order) do
+        local src = "\n" .. code(rel)
+        srcs[rel] = src
+        for var, mod in src:gmatch(REG) do
+            plain[mod] = plain[mod] or {}
+            for name in src:gmatch("function%s+" .. var .. "%.(" .. M .. ")%s*%(") do
+                plain[mod][name] = true
+                plainCount = plainCount + 1
+            end
+        end
+    end
+    local function allowed(mod, name) return plain[mod] ~= nil and plain[mod][name] == true end
+    local counts = { colon = 0, own = 0, alias = 0, multi = 0, getter = 0 }
+    local perFile, dots = {}, {}
+    local function flag(rel, what) dots[#dots + 1] = rel .. " " .. what end
+    -- Every name in a file that holds a module, with that module. An alias is a whole statement of
+    -- GetModule calls, so "local p = ns:GetModule("Registry"):Get(id)" holds no module.
+    local function holders(src)
+        local out = {}
+        for var, mod in src:gmatch(REG) do
+            out[#out + 1] = { var, mod }
+            counts.own = counts.own + 1
+        end
+        for line in src:gmatch("\n([^\n]*)") do
+            local names, rhs = line:match("^%s*local%s+([%w_][%w_%s,]*)=%s*(.-)%s*;?%s*$")
+            if names then
+                local mods, list = {}, {}
+                for mod in rhs:gmatch(GM) do mods[#mods + 1] = mod end
+                for n in names:gmatch("[%w_]+") do list[#list + 1] = n end
+                local rest = rhs:gsub(GM, ""):gsub("[%s,]", "")
+                if rest == "" and #mods > 0 and #mods == #list then
+                    for i, n in ipairs(list) do out[#out + 1] = { n, mods[i] } end
+                    if #list == 1 then counts.alias = counts.alias + 1 else counts.multi = counts.multi + #list end
+                end
+            end
+        end
+        return out
+    end
+    for _, rel in ipairs(order) do
+        local src = srcs[rel]
+        perFile[rel] = 0
+        for mod, name in src:gmatch("GetModule%(%s*" .. Q .. "([%w_]+)" .. Q .. "%s*%)%s*:%s*(" .. M .. ")%s*%(") do
+            counts.colon = counts.colon + 1
+            perFile[rel] = perFile[rel] + 1
+            if allowed(mod, name) then flag(rel, mod .. ":" .. name .. ", which is declared with a dot") end
+        end
+        for mod, name in src:gmatch("GetModule%(%s*" .. Q .. "([%w_]+)" .. Q .. "%s*%)%s*%.%s*(" .. M .. ")%s*%(") do
+            if not allowed(mod, name) then flag(rel, mod .. "." .. name) end
+        end
+        for mod, name in src:gmatch("GetModule%(%s*" .. Q .. "([%w_]+)" .. Q .. "%s*%)%s*%[%s*" .. Q
+                                    .. "(" .. M .. ")" .. Q .. "%s*%]%s*%(") do
+            if not allowed(mod, name) then flag(rel, mod .. "[" .. name .. "]") end
+        end
+        for _, h in ipairs(holders(src)) do
+            local var, mod = h[1], h[2]
+            for name in src:gmatch("[^%w_.:]" .. var .. "%s*%.%s*(" .. M .. ")%s*%(") do
+                if not allowed(mod, name) then flag(rel, var .. "." .. name) end
+            end
+            for name in src:gmatch("[^%w_.:]" .. var .. "%s*%[%s*" .. Q .. "(" .. M .. ")" .. Q .. "%s*%]%s*%(") do
+                if not allowed(mod, name) then flag(rel, var .. "[" .. name .. "]") end
+            end
+            for name in src:gmatch("[^%w_.:]" .. var .. "%s*:%s*(" .. M .. ")%s*%(") do
+                if allowed(mod, name) then flag(rel, var .. ":" .. name .. ", which is declared with a dot") end
+            end
+        end
+        for fn, mod in src:gmatch("local%s+function%s+([%w_]+)%(%)%s*return%s+" .. GM .. "%s*end") do
+            counts.getter = counts.getter + 1
+            for name in src:gmatch("[^%w_.:]" .. fn .. "%(%)%s*%.%s*(" .. M .. ")%s*%(") do
+                if not allowed(mod, name) then flag(rel, fn .. "()." .. name) end
+            end
+            for name in src:gmatch("[^%w_.:]" .. fn .. "%(%)%s*%[%s*" .. Q .. "(" .. M .. ")" .. Q .. "%s*%]%s*%(") do
+                if not allowed(mod, name) then flag(rel, fn .. "()[" .. name .. "]") end
+            end
+        end
+    end
+    ok(#order >= 70 and counts.colon >= 120 and counts.own >= 40 and counts.alias >= 150 and counts.multi >= 4
+       and counts.getter >= 1 and plainCount >= 4,
+       ("every loaded file is read: %d files, %d colon calls, %d own module names, %d aliases, %d in multi-name"
+        .. " lines, %d getters, %d dot-declared functions"):format(#order, counts.colon, counts.own, counts.alias,
+                                                                  counts.multi, counts.getter, plainCount))
+    local unread = {}
+    for _, rel in ipairs({ "UI/Tracker.lua", "UI/Commands.lua", "Options/TabTracker.lua",
+                           "Options/TabAppearance.lua", "Options/TabGeneral.lua", "Options/TabAbout.lua" }) do
+        if (perFile[rel] or 0) == 0 then unread[#unread + 1] = rel end
+    end
+    ok(#unread == 0, "the files that call modules most are each read: " .. table.concat(unread, ", "))
+    ok(#dots == 0, "and none calls a module method with a dot: " .. table.concat(dots, ", "))
+end)
+
 case("seams", function()
     local init = code("Core/Init.lua")
     local list = init:match("\nlocal STAND_DOWN = {(.-)\n}")

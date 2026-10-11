@@ -43,6 +43,22 @@ DOWN_CLICK = ("                r.down:SetScript(\"OnClick\", function()\n"
               "                    renderOrderRows()\n"
               "                    ns.Util.Tooltip():Hide()\n")
 
+COG_BOX = ('        display:Add(self:CreateCheckbox(content, L["Show the options cogwheel on the tracker"],\n'
+           '            function() return DB().showOptionsIcon ~= false end,\n'
+           '            function(v)\n'
+           '                DB().showOptionsIcon = v\n'
+           '                ns:GetModule("Tracker"):ApplyHeaderIcons()\n'
+           '            end,\n'
+           '            L["A small cogwheel at the top-right of the tracker that opens the options panel."]))\n')
+SORT_BOX = ('        display:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n'
+            '            function() return DB().showSortButton == true end,\n'
+            '            function(v)\n'
+            '                DB().showSortButton = v\n'
+            '                ns:GetModule("Tracker"):ApplyHeaderIcons()\n'
+            '            end,\n'
+            '            L["A small button at the top-left of the tracker that opens a list of the sort orders, so you'
+            ' can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card.'
+            ' Off by default."]))\n')
 UNFOCUS_OPEN = '            display:Add(self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],\n'
 ACCEPT_OPEN = '            display:Add(self:CreateCheckbox(content, L["Focus newly accepted quests"],\n'
 ST_GUARD = '        if ns.Has.SuperTrack then\n' + UNFOCUS_OPEN
@@ -56,7 +72,7 @@ ACCEPT_BOX = (ACCEPT_OPEN +
               '                L["While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused."]))\n')
 SPLIT_BOX = ('        local splitCheck = self:CreateCheckbox(content, L["Split quest click"],\n'
              '            trackerSetting("splitQuestClick"))\n')
-ZONE_SYNC = ("        content._syncZoneTag = function() self:SetDependent(zoneCheck, not DB().zoneHeaders) end\n"
+ZONE_SYNC = ("        content._syncZoneTag = function() self:SetDependent(zoneCheck, not DB().zoneHeaders or DB().dungeonHeader == true) end\n"
              "        content._syncZoneTag()\n")
 
 MUTANTS = [
@@ -130,13 +146,40 @@ MUTANTS = [
         (T, "        if content._syncZoneTag then content._syncZoneTag() end\n", "")]),
 
     ("the zone label box is dimmed the wrong way round", [
-        (T, "self:SetDependent(zoneCheck, not DB().zoneHeaders)", "self:SetDependent(zoneCheck, DB().zoneHeaders)")]),
+        (T, "self:SetDependent(zoneCheck, not DB().zoneHeaders or", "self:SetDependent(zoneCheck, DB().zoneHeaders or")]),
 
     ("the zone label box is not dimmed until the tab is shown again", [
         (T, "        content._syncZoneTag()\n", "")]),
 
     ("the zone label tooltip loses its zone headers sentence", [
-        (T, " Not shown while Show zone headers is on, on the Appearance tab.\"])", "\"])")]),
+        (T, " While Show zone headers is on, on the Appearance tab, only quests in the Dungeons header show it.\"])", "\"])")]),
+
+    # Since 2.3.0 a quest in the Dungeons header keeps its label under zone headers, so the box
+    # stays lit while that header is on.
+    ("the Dungeons header no longer lights the zone label box", [
+        (T, "not DB().zoneHeaders or DB().dungeonHeader == true)", "not DB().zoneHeaders)")]),
+
+    ("any stored Dungeons value lights the zone label box", [
+        (T, "or DB().dungeonHeader == true)", "or DB().dungeonHeader)")]),
+
+    ("the zone label box is lit only with the Dungeons header on and zone headers off", [
+        (T, "not DB().zoneHeaders or DB().dungeonHeader == true)", "not DB().zoneHeaders and DB().dungeonHeader == true)")]),
+
+    # The stub modules check self, as the real ones read it.
+    ("the sort box applies the header icons with a dot, which raises in game", [
+        (T, "                DB().showSortButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                DB().showSortButton = v\n                ns:GetModule(\"Tracker\").ApplyHeaderIcons()\n")]),
+
+    ("the cogwheel box applies the header icons with a dot, which raises in game", [
+        (T, "                DB().showOptionsIcon = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                DB().showOptionsIcon = v\n                ns:GetModule(\"Tracker\").ApplyHeaderIcons()\n")]),
+
+    ("the tab redraws the tracker with a dot, which raises in game", [
+        (T, 'local function render() ns:GetModule("Tracker"):Render() end\n',
+            'local function render() ns:GetModule("Tracker").Render() end\n')]),
+
+    ("a row setting repaints the rows with a dot, which raises in game", [
+        (T, '               ns:GetModule("Row"):Invalidate()\n', '               ns:GetModule("Row").Invalidate()\n')]),
 
     ("Keep section headers in view redraws before it re-anchors", [
         (T, "                DB().stickySectionHeaders = v\n"
@@ -160,7 +203,8 @@ MUTANTS = [
             "            L[\"The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. With zone headers on, the header of the zone you are scrolled into stays just under it. On by default.\"]), { dependent = true })\n")]),
 
     ("the cogwheel box is stored but never applied", [
-        (T, '                ns:GetModule("Tracker"):ApplyHeaderIcons()\n', "")]),
+        (T, '                DB().showOptionsIcon = v\n                ns:GetModule("Tracker"):ApplyHeaderIcons()\n',
+            '                DB().showOptionsIcon = v\n')]),
 
     ("the cogwheel box goes back to the label nobody could find", [
         (T, 'L["Show the options cogwheel on the tracker"]', 'L["Show Options icon on the tracker"]')]),
@@ -458,8 +502,8 @@ MUTANTS = [
             "local function DB() return ns:GetModule(\"DB\").Tracker() end\n")]),
 
     ("the header pass calls DB.Tracker with a dot", [
-        (TR, "    local cfg = DB and DB:Tracker()\n\n    local prev\n",
-             "    local cfg = DB and DB.Tracker()\n\n    local prev\n")]),
+        (TR, "    local cfg = DB and DB:Tracker()\n\n    if f.sortButton then",
+             "    local cfg = DB and DB.Tracker()\n\n    if f.sortButton then")]),
 
     # ------------------------------------- found by the 2.2.0 fix pass's second scan (T1 to T10)
     # The library appends a checkbox to its parent's _controls, which only the content carries,
@@ -533,6 +577,105 @@ MUTANTS = [
         (T, "            trackerSetting(\"simplifyMode\"))\n",
             "            function() return DB().simplifyMode or DB().showOnlyWatched end,\n"
             "            function(v) DB().simplifyMode = v; render() end)\n")]),
+
+    # ----------------------------------------------- the sort button box (2026-10-10, for Andreon)
+    ("the sort button box reads on while unset, so the button ships on", [
+        (T, "            function() return DB().showSortButton == true end,\n",
+            "            function() return DB().showSortButton ~= false end,\n")]),
+
+    ("the sort button box reads a neighbor's key", [
+        (T, "            function() return DB().showSortButton == true end,\n",
+            "            function() return DB().showOptionsIcon == true end,\n")]),
+
+    ("the sort button box writes the cogwheel's key", [
+        (T, "                DB().showSortButton = v\n", "                DB().showOptionsIcon = v\n")]),
+
+    ("the sort button box never asks the header pass to show or hide the button", [
+        (T, "                DB().showSortButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                DB().showSortButton = v\n")]),
+
+    ("the sort button box asks the header pass before it stores", [
+        (T, "                DB().showSortButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n                DB().showSortButton = v\n")]),
+
+    ("the sort button box also redraws the whole list", [
+        (T, "                DB().showSortButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                DB().showSortButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n"
+            "                render()\n")]),
+
+    ("the sort button box is built but never added to the Options card", [
+        (T, '        display:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n',
+            '        (self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n')]),
+
+    ("the sort button box sits above the cogwheel's", [
+        (T, COG_BOX + "\n" + SORT_BOX, SORT_BOX + "\n" + COG_BOX)]),
+
+    ("the sort button box loses its tooltip", [
+        (T, 'the On-Screen Tracker card. Off by default."]))\n', 'the On-Screen Tracker card. Off by default."] and nil))\n')]),
+
+    ("the Tracker tab no longer hands its list to the sort button", [
+        (T, "Options.SORT_OPTIONS = SORT_OPTIONS\n", "")]),
+
+    ("the sort button gets a copy of the list, which drifts from the dropdown's", [
+        (T, "Options.SORT_OPTIONS = SORT_OPTIONS\n", "Options.SORT_OPTIONS = { unpack(SORT_OPTIONS) }\n")]),
+
+    ("a view no longer follows an order picked on the tracker", [
+        (T, "        if content._syncManualHint then content._syncManualHint() end\n", "")]),
+
+    ("the Manual hint's per-view pass is never set up", [
+        (T, "        content._syncManualHint = function() syncManualHint(DB().sortMode) end\n", "")]),
+
+    ("the per-view pass reads the order the tab was built with", [
+        (T, "        content._syncManualHint = function() syncManualHint(DB().sortMode) end\n",
+            "        local builtOrder = DB().sortMode\n"
+            "        content._syncManualHint = function() syncManualHint(builtOrder) end\n")]),
+
+    ("every view of the tab redraws the tracker", [
+        (T, "        content._syncManualHint = function() syncManualHint(DB().sortMode) end\n",
+            "        content._syncManualHint = function() syncManualHint(DB().sortMode); render() end\n")]),
+
+    ("Keep Dungeons at the bottom lights the zone label box", [
+        (T, "or DB().dungeonHeader == true) end\n", "or DB().dungeonHeader == true or DB().dungeonHeaderLast == true) end\n")]),
+
+    ("the box lights for the Dungeons header only under Current zone first", [
+        (T, "or DB().dungeonHeader == true) end\n",
+            "or DB().dungeonHeader == true and DB().zoneHeaderOrder ~= \"alpha\") end\n")]),
+
+    # Read beside every switch the defaults ship, the box's own included, after the third scan.
+    ("the zone label box dims while it is unticked under both headers", [
+        (T, "or DB().dungeonHeader == true) end\n", "or DB().dungeonHeader == true and DB().showZoneTag ~= false) end\n")]),
+
+    ("the zone label box lights while zone header dividers are on", [
+        (T, "or DB().dungeonHeader == true) end\n", "or DB().dungeonHeader == true or DB().zoneHeaderDivider == true) end\n")]),
+
+    # Another addon's header icons, each built from the spec it registered.
+    ("another addon's header icon loses its tooltip", [
+        (TR, "b = makeHeaderIcon(f, spec.texture, spec.tooltip, function() spec.onClick() end)",
+             "b = makeHeaderIcon(f, spec.texture, nil, function() spec.onClick() end)")]),
+
+    ("another addon's header icon gets another icon's texture", [
+        (TR, "b = makeHeaderIcon(f, spec.texture, spec.tooltip, function() spec.onClick() end)",
+             "b = makeHeaderIcon(f, specs[1].texture, spec.tooltip, function() spec.onClick() end)")]),
+
+    ("another addon's header icon never runs its click", [
+        (TR, "b = makeHeaderIcon(f, spec.texture, spec.tooltip, function() spec.onClick() end)",
+             "b = makeHeaderIcon(f, spec.texture, spec.tooltip, function() end)")]),
+
+    ("with two addons' icons, clicking either runs the last one's handler", [
+        (TR, "b = makeHeaderIcon(f, spec.texture, spec.tooltip, function() spec.onClick() end)",
+             "b = makeHeaderIcon(f, spec.texture, spec.tooltip, function() specs[#specs].onClick() end)")]),
+
+    ("an id registered again with a new texture or handler keeps its old button", [
+        (TR, "        if b and b._apiSpec ~= spec then\n", "        if b and b._apiSpec.id ~= spec.id then\n")]),
+
+    ("another addon's icon ignores its show and hide key", [
+        (TR, "        b._dbKey = spec.dbKey\n", "        b._dbKey = nil\n")]),
+
+    # The final check's sort-order neighbor.
+    ("the zone label box dims under Sort by level", [
+        (T, "self:SetDependent(zoneCheck, not DB().zoneHeaders or DB().dungeonHeader == true) end\n",
+            "self:SetDependent(zoneCheck, (not DB().zoneHeaders or DB().dungeonHeader == true)"
+            " and DB().sortMode ~= \"level\") end\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_tracker_tab: (\d+) passed, (\d+) failed$")

@@ -7,9 +7,10 @@ Why this exists: the zone headers live in seven places that each fail quietly. Z
 the runs and their order, Feed hands it every quest in quest log order and asks it to group after
 the sort, ZoneHeaders draws and collapses each header, Render's row loop places and indents the
 rows under them, DragDrop keeps a drag inside its zone, Row drops the zone label, and the defaults,
-the reset list and the TOC lines decide whether any of it loads. A wrong comparison or a dropped
-line in any of them draws the zones in the wrong order, or the rows under the wrong header, with
-every gate green.
+the reset list and the TOC lines decide whether any of it loads. Since 2026-10-10 the Dungeons
+header rides on the same seven (Row keeps the label for its quests), and the two quest providers
+decide which quests join it. A wrong comparison or a dropped line in any of them draws the zones
+in the wrong order, or the rows under the wrong header, with every gate green.
 
 Every mutation reintroduces a defect the harness is supposed to stand guard over. Any that still
 reports "0 failed" is an assertion that does not discriminate, and the run exits 1 naming it.
@@ -44,8 +45,12 @@ G = "UI/DragDrop.lua"
 R = "UI/Row.lua"
 C = "UI/Commands.lua"
 D = "Core/DB.lua"
+Q = "Data/Providers/Quests.lua"
+QC = "Data/Providers/QuestsClassic.lua"
 TOC_V = "EQObjectiveTracker_Vanilla.toc"
 TOC_M = "EQObjectiveTracker_Mainline.toc"
+HEADED = ("    local headed = cfg and cfg.zoneHeaders and not (cfg.dungeonHeader == true and entry.tags"
+          " and entry.tags.dungeon)\n")
 TOC_T = "EQObjectiveTracker_TBC.toc"
 
 MUTANTS = [
@@ -54,8 +59,8 @@ MUTANTS = [
         (Z, "ZoneGroups.GROUPS = { quests = true, campaign = true }", "ZoneGroups.GROUPS = { quests = true }")]),
 
     ("every section is grouped", [
-        (Z, "        if on and self.GROUPS[id] and g.visibleCount > 0 then\n",
-            "        if on and g.visibleCount > 0 then\n")]),
+        (Z, "        if (zones or dungeons) and self.GROUPS[id] and g.visibleCount > 0 then\n",
+            "        if (zones or dungeons) and g.visibleCount > 0 then\n")]),
 
     # ------------------------------------------------------------------- ZoneGroups: order
     ("alphabetical runs Z to A", [
@@ -84,11 +89,11 @@ MUTANTS = [
         (Z, "strcmputf8i(a.zone, b.zone) or 0\n", "strcmputf8i(a.zone, b.zone) or 1\n")]),
 
     ("alphabetical is never chosen", [
-        (Z, "    sortAlpha = on and cfg.zoneHeaderOrder == \"alpha\"\n", "    sortAlpha = false\n")]),
+        (Z, "    sortAlpha    = zones and cfg.zoneHeaderOrder == \"alpha\"\n", "    sortAlpha    = false\n")]),
 
     ("alphabetical is chosen for any order but current", [
-        (Z, "    sortAlpha = on and cfg.zoneHeaderOrder == \"alpha\"\n",
-            "    sortAlpha = on and cfg.zoneHeaderOrder ~= \"current\"\n")]),
+        (Z, "    sortAlpha    = zones and cfg.zoneHeaderOrder == \"alpha\"\n",
+            "    sortAlpha    = zones and cfg.zoneHeaderOrder ~= \"current\"\n")]),
 
     ("the current zone goes last", [
         (Z, "    if a.current ~= b.current then return a.current end\n",
@@ -164,8 +169,25 @@ MUTANTS = [
         (Z, "        if v then folded = folded + 1 end\n", "        folded = folded + 1\n")]),
 
     ("the status line names every heading as current", [
-        (Z, "                if g.zoneRuns[r].current then here[#here + 1] = g.zoneRuns[r].zone end\n",
-            "                here[#here + 1] = g.zoneRuns[r].zone\n")]),
+        (Z, "                if run.current then here[#here + 1] = run.zone end\n",
+            "                here[#here + 1] = run.zone\n")]),
+
+    ("the status line counts the unnamed run as a zone", [
+        (Z, "            if run.zone ~= \"\" then\n                named = named + 1\n",
+            "            named = named + 1\n            if run.zone ~= \"\" then\n")]),
+
+    ("the status line names the unnamed run as current, a blank name", [
+        (Z, "            if run.zone ~= \"\" then\n"
+            "                named = named + 1\n"
+            "                if run.current then here[#here + 1] = run.zone end\n"
+            "            end\n",
+            "            if run.current then here[#here + 1] = run.zone end\n"
+            "            if run.zone ~= \"\" then\n"
+            "                named = named + 1\n"
+            "            end\n")]),
+
+    ("the status line counts every run, the unnamed one included", [
+        (Z, ":format(id, named,", ":format(id, g.zoneCount,")]),
 
     ("the status line names the orders the wrong way round", [
         (Z, "cfg.zoneHeaderOrder == \"alpha\" and \"alphabetical\" or \"current zone first\"",
@@ -189,7 +211,7 @@ MUTANTS = [
         (F, "                    if zoned then ZoneGroups:Note(e.groupID, e) end\n", "")]),
 
     ("the tally is never reset", [
-        (F, "    if zoned then ZoneGroups:Begin() end\n", "")]),
+        (F, "    if zoned then ZoneGroups:Begin(cfg) end\n", "")]),
 
     ("the grouping runs before the sort", [
         (F, "    for _, g in pairs(self.byGroup) do\n"
@@ -242,9 +264,15 @@ MUTANTS = [
 
     # ------------------------------------------------------------------- the row loop, for the band
     ("a section never says where its zones start", [
-        (T, "                    if sticky then zFirst[stickyN] = stickyZ + 1 end\n", "")]),
+        (T, "                    if zoneSticky then zFirst[stickyN] = stickyZ + 1 end\n", "")]),
     ("a section never says where its zones end", [
-        (T, "                    if sticky then zLast[stickyN] = stickyZ end\n", "")]),
+        (T, "                    if zoneSticky then zLast[stickyN] = stickyZ end\n", "")]),
+    ("the Dungeons header alone pins in the band, over an empty zone row", [
+        (T, "                    local zoneSticky = sticky and cfg and cfg.zoneHeaders == true\n",
+            "                    local zoneSticky = sticky\n")]),
+    ("any stored zone headers value lets a zone into the band", [
+        (T, "                    local zoneSticky = sticky and cfg and cfg.zoneHeaders == true\n",
+            "                    local zoneSticky = sticky and cfg and cfg.zoneHeaders\n")]),
     ("the band's zones are never counted", [
         (T, "                                stickyZ = stickyZ + 1\n", "")]),
     ("the band's zones are never named", [
@@ -254,11 +282,11 @@ MUTANTS = [
     ("the band's own zone is recorded at the top of the list", [
         (T, "                                zTops[stickyZ] = -(zoneH + gap)\n", "                                zTops[stickyZ] = 0\n")]),
     ("a zone below the top is never placed for the band", [
-        (T, "                                if sticky then zTops[stickyZ] = y end\n", "")]),
+        (T, "                                if zoneSticky then zTops[stickyZ] = y end\n", "")]),
     ("a zone joins the band with something above it in the list", [
-        (T, "if sticky and y == 0 and stickyZ == zFirst[stickyN] then", "if sticky and stickyZ == zFirst[stickyN] then")]),
+        (T, "if zoneSticky and y == 0 and stickyZ == zFirst[stickyN] then", "if zoneSticky and stickyZ == zFirst[stickyN] then")]),
     ("every zone at the top joins the band, not only the first", [
-        (T, "if sticky and y == 0 and stickyZ == zFirst[stickyN] then", "if sticky and y == 0 then")]),
+        (T, "if zoneSticky and y == 0 and stickyZ == zFirst[stickyN] then", "if zoneSticky and y == 0 then")]),
 
     ("a zone is keyed by heading alone", [
         (H, "    return groupID .. \":\" .. zone\n", "    return zone\n")]),
@@ -409,7 +437,7 @@ MUTANTS = [
 
     # ------------------------------------------------------------------- ZoneHeaders: indent
     ("rows are indented with the option off", [
-        (H, "    if not (cfg and cfg.zoneHeaders) then return 0 end\n", "    if not cfg then return 0 end\n")]),
+        (H, "    if not (cfg and (cfg.zoneHeaders or cfg.dungeonHeader)) then return 0 end\n", "    if not cfg then return 0 end\n")]),
 
     ("a negative indent is let through", [
         (H, "    return math.max(0, cfg.zoneHeaderIndent or 8)\n", "    return cfg.zoneHeaderIndent or 8\n")]),
@@ -510,16 +538,17 @@ MUTANTS = [
 
     # ------------------------------------------------------------------- DragDrop
     ("a drag ignores its zone", [
-        (G, "(zone == nil or (e.zone or \"\") == zone)", "true")]),
+        (G, "(zone == nil or ZoneGroups:RunKey(e, cfg) == zone)", "true")]),
 
     ("a drag never remembers its zone", [
-        (G, "self.dragZone  = (cfg and cfg.zoneHeaders) and (e.zone or \"\") or nil", "self.dragZone  = nil")]),
+        (G, "self.dragZone  = ZoneGroups:Grouping(cfg) and ZoneGroups:RunKey(e, cfg) or nil", "self.dragZone  = nil")]),
 
     ("a drag keeps to a zone with zone headers off", [
-        (G, "self.dragZone  = (cfg and cfg.zoneHeaders) and (e.zone or \"\") or nil", "self.dragZone  = e.zone or \"\"")]),
+        (G, "self.dragZone  = ZoneGroups:Grouping(cfg) and ZoneGroups:RunKey(e, cfg) or nil",
+            "self.dragZone  = ZoneGroups:RunKey(e, cfg)")]),
 
     ("a quest with no heading is not matched to the empty zone", [
-        (G, "(zone == nil or (e.zone or \"\") == zone)", "(zone == nil or e.zone == zone)")]),
+        (Z, "    if zones then return e.zone or \"\" end\n", "    if zones then return e.zone end\n")]),
 
     ("the drop line counts the whole section", [
         (G, "local n = collectScope(self.dragGroup, self.dragZone)", "local n = collectScope(self.dragGroup)")]),
@@ -533,7 +562,24 @@ MUTANTS = [
 
     # ------------------------------------------------------------------- Row, Commands
     ("the zone label still draws under zone headers", [
-        (R, "cfg.showZoneTag ~= false and not cfg.zoneHeaders)", "cfg.showZoneTag ~= false)")]),
+        (R, "cfg.showZoneTag ~= false and not headed)", "cfg.showZoneTag ~= false)")]),
+
+    ("a quest in the Dungeons header loses its label too", [
+        (R, "    local headed = cfg and cfg.zoneHeaders and not (cfg.dungeonHeader == true and entry.tags and entry.tags.dungeon)\n",
+            "    local headed = cfg and cfg.zoneHeaders\n")]),
+
+    ("any stored Dungeons value keeps the label", [
+        (R, "not (cfg.dungeonHeader == true and entry.tags", "not (cfg.dungeonHeader and entry.tags")]),
+
+    ("every quest keeps its label while the Dungeons header is on", [
+        (R, "not (cfg.dungeonHeader == true and entry.tags and entry.tags.dungeon)", "not (cfg.dungeonHeader == true)")]),
+
+    ("a quest with no tags raises under zone headers and the Dungeons header", [
+        (R, "and entry.tags and entry.tags.dungeon)", "and entry.tags.dungeon)")]),
+
+    ("the label is hidden with zone headers off unless the quest is a dungeon quest", [
+        (R, "    local headed = cfg and cfg.zoneHeaders and not (",
+            "    local headed = cfg and not (")]),
 
     ("the zone label comes back through a trailing or", [
         (R, "and entry.subtitle or nil\n", "and entry.subtitle or nil or entry.subtitle\n")]),
@@ -612,7 +658,7 @@ MUTANTS = [
         (Z, "    local char  = DB:Char()\n", "    local char  = DB.Char()\n")]),
 
     ("the status line lists a section that grouped nothing", [
-        (Z, "        if g and (g.zoneCount or 0) > 0 then\n", "        if g then\n")]),
+        (Z, "        if named > 0 then\n", "        if g then\n")]),
 
     ("a header reads the collapsed zones with a dot call, which raises on every render", [
         (H, "    local char = DB and DB:Char()\n    local t    = char and char.zonesCollapsed\n",
@@ -666,11 +712,16 @@ MUTANTS = [
             "    h:SetPoint(\"TOPRIGHT\", content, \"TOPRIGHT\", -8, -y)\n")]),
 
     ("a drag reads the profile with a dot call, which raises on every drag in game", [
-        (G, "    local cfg = ns:GetModule(\"DB\"):Tracker()\n", "    local cfg = ns:GetModule(\"DB\").Tracker()\n")]),
+        (G, "    local cfg = ns:GetModule(\"DB\"):Tracker()\n    local ZoneGroups = ns:GetModule(\"ZoneGroups\")\n    self.dragZone",
+            "    local cfg = ns:GetModule(\"DB\").Tracker()\n    local ZoneGroups = ns:GetModule(\"ZoneGroups\")\n    self.dragZone")]),
+
+    ("the drop scope reads the profile with a dot call, which raises on every drag in game", [
+        (G, "    local ZoneGroups = ns:GetModule(\"ZoneGroups\")\n    local cfg = ns:GetModule(\"DB\"):Tracker()\n    local n = 0\n",
+            "    local ZoneGroups = ns:GetModule(\"ZoneGroups\")\n    local cfg = ns:GetModule(\"DB\").Tracker()\n    local n = 0\n")]),
 
     ("a Campaign drag ignores its zone", [
-        (G, "    self.dragZone  = (cfg and cfg.zoneHeaders) and (e.zone or \"\") or nil\n",
-            "    self.dragZone  = (cfg and cfg.zoneHeaders and e.groupID == \"quests\") and (e.zone or \"\") or nil\n")]),
+        (G, "    self.dragZone  = ZoneGroups:Grouping(cfg) and ZoneGroups:RunKey(e, cfg) or nil\n",
+            "    self.dragZone  = (ZoneGroups:Grouping(cfg) and e.groupID == \"quests\") and ZoneGroups:RunKey(e, cfg) or nil\n")]),
 
     ("a row is acquired with no builder, which raises on an empty pool", [
         (T, "local row = RowPool:Acquire(content, entry.providerID, entry.id, _buildRow)",
@@ -745,6 +796,250 @@ MUTANTS = [
     ("Reset all settings leaves the providers switched off by /eqot disable", [
         (D, "        g.safeMode, g.disabledModules, g.disabledProviders = nil, nil, nil\n",
             "        g.safeMode, g.disabledModules = nil, nil\n")]),
+
+    # ----------------------------------------- the Dungeons header (2026-10-10, requested by Andreon)
+    ("dungeon quests never leave their zones", [
+        (Z, "    if dungeons and e.tags and e.tags.dungeon then return DUNGEONS end\n", "")]),
+    ("every quest counts as a dungeon quest under the dungeon header", [
+        (Z, "    if dungeons and e.tags and e.tags.dungeon then return DUNGEONS end\n",
+            "    if dungeons then return DUNGEONS end\n")]),
+    ("a quest with no tags raises under the dungeon header", [
+        (Z, "    if dungeons and e.tags and e.tags.dungeon then return DUNGEONS end\n",
+            "    if dungeons and e.tags.dungeon then return DUNGEONS end\n")]),
+    ("with zone headers off, every quest is keyed by its zone", [
+        (Z, "    if zones then return e.zone or \"\" end\n    return \"\"\nend\n", "    return e.zone or \"\"\nend\n")]),
+    ("the run key reads a truthy switch as on", [
+        (Z, "    return runKey(e, cfg ~= nil and cfg.zoneHeaders == true, cfg ~= nil and cfg.dungeonHeader == true)\n",
+            "    return runKey(e, cfg ~= nil and cfg.zoneHeaders, cfg ~= nil and cfg.dungeonHeader)\n")]),
+    ("the run key never sees the dungeon switch", [
+        (Z, "    return runKey(e, cfg ~= nil and cfg.zoneHeaders == true, cfg ~= nil and cfg.dungeonHeader == true)\n",
+            "    return runKey(e, cfg ~= nil and cfg.zoneHeaders == true, false)\n")]),
+    ("Grouping leaves the dungeon header out", [
+        (Z, "    return cfg ~= nil and (cfg.zoneHeaders == true or cfg.dungeonHeader == true)\n",
+            "    return cfg ~= nil and cfg.zoneHeaders == true\n")]),
+    ("Grouping reads a truthy switch as on", [
+        (Z, "    return cfg ~= nil and (cfg.zoneHeaders == true or cfg.dungeonHeader == true)\n",
+            "    return cfg ~= nil and (cfg.zoneHeaders or cfg.dungeonHeader) and true or false\n")]),
+    # AceDB hands a switch over as false, never nil, so a test against nil is always true in game.
+    ("Grouping reads a dungeon switch stored off as on", [
+        (Z, "(cfg.zoneHeaders == true or cfg.dungeonHeader == true)", "(cfg.zoneHeaders == true or cfg.dungeonHeader ~= nil)")]),
+    ("Grouping reads a zone switch stored off as on", [
+        (Z, "(cfg.zoneHeaders == true or cfg.dungeonHeader == true)", "(cfg.zoneHeaders ~= nil or cfg.dungeonHeader == true)")]),
+    ("the run key reads a dungeon switch stored off as on", [
+        (Z, "    return runKey(e, cfg ~= nil and cfg.zoneHeaders == true, cfg ~= nil and cfg.dungeonHeader == true)\n",
+            "    return runKey(e, cfg ~= nil and cfg.zoneHeaders == true, cfg ~= nil and cfg.dungeonHeader ~= nil)\n")]),
+    ("Build groups for a dungeon switch stored off", [
+        (Z, "    local dungeons = cfg ~= nil and cfg.dungeonHeader == true\n    sortAlpha",
+            "    local dungeons = cfg ~= nil and cfg.dungeonHeader ~= nil\n    sortAlpha")]),
+    ("Begin tallies for a dungeon switch stored off", [
+        (Z, "    noteDungeons = cfg ~= nil and cfg.dungeonHeader == true\n",
+            "    noteDungeons = cfg ~= nil and cfg.dungeonHeader ~= nil\n")]),
+    # A comparison that contradicts itself, which a fixture of several runs can still sort right.
+    ("Dungeons leads whenever any current zone is in the pair", [
+        (Z, "        local lead = currentFirst and not dungeonsLast and d.current\n",
+            "        local lead = currentFirst and not dungeonsLast and (a.current or b.current)\n")]),
+    # The sticky band with both switches on.
+    ("the band drops the zone row whenever the Dungeons header is on", [
+        (T, "                    local zoneSticky = sticky and cfg and cfg.zoneHeaders == true\n",
+            "                    local zoneSticky = sticky and cfg and cfg.zoneHeaders == true and not cfg.dungeonHeader\n")]),
+    ("Dungeons at the top is drawn in the list as well as in the band", [
+        (T, "if zoneSticky and y == 0 and stickyZ == zFirst[stickyN] then",
+            "if zoneSticky and y == 0 and stickyZ == zFirst[stickyN] and not run.dungeon then")]),
+    ("Dungeons keeps the place the sort gave it", [
+        (Z, "    if a.dungeon ~= b.dungeon then\n", "    if false then\n")]),
+    ("Dungeons always goes last", [
+        (Z, "        local lead = currentFirst and not dungeonsLast and d.current\n", "        local lead = false\n")]),
+    ("Dungeons leads while none of its quests is here", [
+        (Z, "        local lead = currentFirst and not dungeonsLast and d.current\n",
+            "        local lead = currentFirst and not dungeonsLast and not d.current\n")]),
+    ("Keep Dungeons at the bottom is ignored", [
+        (Z, "        local lead = currentFirst and not dungeonsLast and d.current\n",
+            "        local lead = currentFirst and d.current\n")]),
+    ("Build never reads Keep Dungeons at the bottom", [
+        (Z, "    dungeonsLast = cfg ~= nil and cfg.dungeonHeaderLast == true\n", "    dungeonsLast = false\n")]),
+    ("Keep Dungeons at the bottom reads any stored value as on", [
+        (Z, "    dungeonsLast = cfg ~= nil and cfg.dungeonHeaderLast == true\n",
+            "    dungeonsLast = cfg ~= nil and cfg.dungeonHeaderLast and true or false\n")]),
+    ("a later pass keeps Keep Dungeons at the bottom on after it is switched off", [
+        (Z, "    dungeonsLast = cfg ~= nil and cfg.dungeonHeaderLast == true\n",
+            "    if cfg ~= nil and cfg.dungeonHeaderLast == true then dungeonsLast = true end\n")]),
+    ("the status line never says Dungeons is kept at the bottom", [
+        (Z, "(cfg.dungeonHeaderLast == true and \", dungeon header on, kept at the bottom\" or \", dungeon header on\")",
+            "\", dungeon header on\"")]),
+    ("the status line reports any stored value as kept at the bottom", [
+        (Z, "(cfg.dungeonHeaderLast == true and \", dungeon header on, kept at the bottom\"",
+            "(cfg.dungeonHeaderLast and \", dungeon header on, kept at the bottom\"")]),
+    ("Keep Dungeons at the bottom ships on", [
+        (D, "            dungeonHeaderLast       = false,\n", "            dungeonHeaderLast       = true,\n")]),
+    ("Reset to Defaults clears Keep Dungeons at the bottom", [
+        (D, "    \"zoneHeaderSizeDelta\", \"zoneHeaderColor\", \"zoneHeaderColorUseClass\", \"zoneHeaderBar\",\n",
+            "    \"dungeonHeaderLast\", \"zoneHeaderSizeDelta\", \"zoneHeaderColor\", \"zoneHeaderColorUseClass\", \"zoneHeaderBar\",\n")]),
+    ("Dungeons always goes first", [
+        (Z, "        if a.dungeon then return lead end\n        return not lead\n",
+            "        if a.dungeon then return true end\n        return false\n")]),
+    ("Dungeons comes to the top under Alphabetical too", [
+        (Z, "    currentFirst = zones and not sortAlpha\n", "    currentFirst = zones\n")]),
+    ("Dungeons comes to the top with zone headers off", [
+        (Z, "    currentFirst = zones and not sortAlpha\n", "    currentFirst = not sortAlpha\n")]),
+    ("any run counts as Dungeons under the dungeon header", [
+        (Z, "            run.dungeon = dungeons and z == DUNGEONS\n", "            run.dungeon = dungeons\n")]),
+    ("a reused run keeps its Dungeons flag", [
+        (Z, "            run.dungeon = dungeons and z == DUNGEONS\n",
+            "            if dungeons and z == DUNGEONS then run.dungeon = true end\n")]),
+    ("the tally keys every quest by its zone, so Dungeons counts nothing", [
+        (Z, "    local z = runKey(entry, noteZones, noteDungeons)\n", "    local z = entry.zone or \"\"\n")]),
+    ("Begin never learns the dungeon switch", [
+        (Z, "    noteDungeons = cfg ~= nil and cfg.dungeonHeader == true\n", "    noteDungeons = false\n")]),
+    ("Begin never learns the zone switch", [
+        (Z, "    noteZones    = cfg ~= nil and cfg.zoneHeaders == true\n", "    noteZones    = false\n")]),
+    ("Build splits nothing for the dungeon header alone", [
+        (Z, "        if (zones or dungeons) and self.GROUPS[id] and g.visibleCount > 0 then\n",
+            "        if zones and self.GROUPS[id] and g.visibleCount > 0 then\n")]),
+    ("Build hands the runs no dungeon switch", [
+        (Z, "            build(stateFor(id), g, Registry, zones, dungeons)\n",
+            "            build(stateFor(id), g, Registry, zones, false)\n")]),
+    ("Build reads the dungeon switch as the zone switch", [
+        (Z, "    local dungeons = cfg ~= nil and cfg.dungeonHeader == true\n    sortAlpha",
+            "    local dungeons = cfg ~= nil and cfg.zoneHeaders == true\n    sortAlpha")]),
+    ("the status line reads off for the dungeon header alone", [
+        (Z, "    if not (zones or dungeons) then return \"zone headers: off\" end\n",
+            "    if not zones then return \"zone headers: off\" end\n")]),
+    ("the status line never names the dungeon header", [
+        (Z, "    if dungeons then\n        head = head .. (cfg.dungeonHeaderLast == true and \", dungeon header on, kept at the bottom\""
+            " or \", dungeon header on\")\n    end\n", "")]),
+    ("the Dungeons run is named in English on every client", [
+        (Z, "local DUNGEONS = L[\"Dungeons\"]\n", "local DUNGEONS = \"Dungeons\"\n")]),
+    ("Feed tallies nothing for the dungeon header alone", [
+        (F, "    local zoned = ZoneGroups and ZoneGroups:Grouping(cfg)\n",
+            "    local zoned = ZoneGroups and cfg and cfg.zoneHeaders == true\n")]),
+    ("Feed starts the tally without the settings", [
+        (F, "    if zoned then ZoneGroups:Begin(cfg) end\n", "    if zoned then ZoneGroups:Begin() end\n")]),
+    ("the Dungeons header does not indent its quests with zone headers off", [
+        (H, "    if not (cfg and (cfg.zoneHeaders or cfg.dungeonHeader)) then return 0 end\n",
+            "    if not (cfg and cfg.zoneHeaders) then return 0 end\n")]),
+    ("a drag under the dungeon header alone spans the whole section", [
+        (G, "    self.dragZone  = ZoneGroups:Grouping(cfg) and ZoneGroups:RunKey(e, cfg) or nil\n",
+            "    self.dragZone  = (cfg and cfg.zoneHeaders) and ZoneGroups:RunKey(e, cfg) or nil\n")]),
+    ("a drag remembers the quest's zone rather than its run", [
+        (G, "    self.dragZone  = ZoneGroups:Grouping(cfg) and ZoneGroups:RunKey(e, cfg) or nil\n",
+            "    self.dragZone  = ZoneGroups:Grouping(cfg) and (e.zone or \"\") or nil\n")]),
+    ("the drop scope compares each row's zone rather than its run", [
+        (G, "(zone == nil or ZoneGroups:RunKey(e, cfg) == zone)", "(zone == nil or (e.zone or \"\") == zone)")]),
+    ("the dungeon header ships on", [
+        (D, "            dungeonHeader           = false,\n", "            dungeonHeader           = true,\n")]),
+    # Heroic dungeon quests (TBC's dailies) count as dungeon quests (the author, 2026-10-11).
+    ("retail: a heroic dungeon quest is not a dungeon quest", [
+        (Q, "    if tagID == TAG_DUNGEON or tagID == TAG_HEROIC then\n", "    if tagID == TAG_DUNGEON then\n")]),
+    ("retail: Heroic's fallback number is wrong", [
+        (Q, "local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 85\n",
+            "local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 88\n")]),
+    ("retail: the client's own Heroic number is never read", [
+        (Q, "local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 85\n",
+            "local TAG_HEROIC  = 85\n")]),
+    ("retail: a heroic quest counts as a raid quest", [
+        (Q, "    if tagID == TAG_DUNGEON or tagID == TAG_HEROIC then\n", "    if tagID == TAG_DUNGEON then\n"),
+        (Q, "    elseif tagID == TAG_RAID or tagID == TAG_RAID10 or tagID == TAG_RAID25 then\n",
+            "    elseif tagID == TAG_RAID or tagID == TAG_RAID10 or tagID == TAG_RAID25 or tagID == TAG_HEROIC then\n")]),
+    ("Classic: a heroic dungeon quest is not a dungeon quest", [
+        (QC, "    if tagID == TAG_DUNGEON or tagID == TAG_HEROIC then\n", "    if tagID == TAG_DUNGEON then\n")]),
+    ("Classic: Heroic's fallback number is wrong", [
+        (QC, "local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 85\n",
+             "local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 88\n")]),
+    ("Classic: the client's own Heroic number is never read", [
+        (QC, "local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 85\n",
+             "local TAG_HEROIC  = 85\n")]),
+    ("Classic: a heroic quest counts as a raid quest", [
+        (QC, "    if tagID == TAG_DUNGEON or tagID == TAG_HEROIC then\n", "    if tagID == TAG_DUNGEON then\n"),
+        (QC, "    elseif tagID == TAG_RAID or tagID == TAG_RAID10 or tagID == TAG_RAID25 then\n",
+             "    elseif tagID == TAG_RAID or tagID == TAG_RAID10 or tagID == TAG_RAID25 or tagID == TAG_HEROIC then\n")]),
+    ("Reset to Defaults switches the dungeon header off", [
+        (D, "    \"zoneHeaderSizeDelta\", \"zoneHeaderColor\", \"zoneHeaderColorUseClass\", \"zoneHeaderBar\",\n",
+            "    \"dungeonHeader\", \"zoneHeaderSizeDelta\", \"zoneHeaderColor\", \"zoneHeaderColorUseClass\", \"zoneHeaderBar\",\n")]),
+
+    # ---- after the second 2.3.0 scan: the zone label under Dungeons, the band, the client's
+    # compare under Alphabetical, and the status line
+    ("with the Dungeons header alone every ordinary quest loses its label", [
+        (R, HEADED, HEADED[:-1] + " or (cfg and cfg.dungeonHeader == true and not (entry.tags and entry.tags.dungeon))\n")]),
+    ("Keep Dungeons at the bottom drops the dungeon quests' label", [
+        (R, "entry.tags.dungeon)\n    local subtitle", "entry.tags.dungeon and not cfg.dungeonHeaderLast)\n    local subtitle")]),
+    ("Alphabetical zone order drops the dungeon quests' label", [
+        (R, "(cfg.dungeonHeader == true and entry.tags", "(cfg.dungeonHeader == true and cfg.zoneHeaderOrder ~= \"alpha\" and entry.tags")]),
+    ("the label is kept only for a dungeon quest with no heading", [
+        (R, "entry.tags.dungeon)\n    local subtitle", "entry.tags.dungeon and not entry.zone)\n    local subtitle")]),
+    ("Campaign dungeon quests lose the label", [
+        (R, "entry.tags.dungeon)\n    local subtitle", "entry.tags.dungeon and entry.groupID ~= \"campaign\")\n    local subtitle")]),
+    ("a later multiple assignment brings the label back", [
+        (R, "    buildBlocks(entry, cfg)\n    local lineText = blocksKey()\n",
+            "    buildBlocks(entry, cfg)\n    local lineText = blocksKey()\n    subtitle, lineText = entry.subtitle, lineText\n")]),
+    ("a bracketed write ahead of the rule clears the label under zone headers", [
+        (R, HEADED, "    if cfg and cfg.zoneHeaders then entry[\"subtitle\"] = nil end\n" + HEADED)]),
+    ("the label is drawn from the entry, not the one worked out", [
+        (R, "    if subtitle and subtitle ~= \"\" then\n        row.subtitle:SetText(subtitle)\n",
+            "    if entry.subtitle and entry.subtitle ~= \"\" then\n        row.subtitle:SetText(entry.subtitle)\n")]),
+    ("the repaint gate compares the entry's label, so a label switched off lingers", [
+        (R, "       and row._sSub   == subtitle\n", "       and row._sSub   == entry.subtitle\n")]),
+    ("a Dungeons run below the top is left out of the band", [
+        (T, "                            if zoneSticky then\n                                stickyZ = stickyZ + 1\n",
+            "                            if zoneSticky and (y == 0 or not run.dungeon) then\n                                stickyZ = stickyZ + 1\n")]),
+    ("the client's compare puts a current zone first under Alphabetical", [
+        (Z, "        if c ~= 0 then return c < 0 end\n", "        if c ~= 0 then return c < 0 or a.current end\n")]),
+    ("the client's compare answers true for a tie", [
+        (Z, "        if c ~= 0 then return c < 0 end\n        return a.zone < b.zone\n",
+            "        if c ~= 0 then return c < 0 end\n        return a.zone <= b.zone\n")]),
+    ("the status line lists only the last current zone", [
+        (Z, "                if run.current then here[#here + 1] = run.zone end\n",
+            "                if run.current then here[1] = run.zone end\n")]),
+    ("the status line joins the current zones with a space", [
+        (Z, "#here > 0 and table.concat(here, \", \") or \"none\")", "#here > 0 and table.concat(here, \" \") or \"none\")")]),
+    ("the status line walks the whole run table, so an emptied section's old zones are listed", [
+        (Z, "        for r = 1, g and g.zoneCount or 0 do\n", "        for r = 1, g and #g.zoneRuns or 0 do\n")]),
+    ("the status line reports the dungeon header on for a switch stored off", [
+        (Z, "    local dungeons = cfg ~= nil and cfg.dungeonHeader == true\n    if not (zones or dungeons) then return",
+            "    local dungeons = cfg ~= nil and cfg.dungeonHeader ~= nil\n    if not (zones or dungeons) then return")]),
+
+    # ---- after the third scan: how the label is drawn and written, what else of the quest or the
+    # profile its rule may not read, the band's scroll position and Keep at the bottom, a heading
+    # named Dungeons, and the status line
+    ("the kept label is hidden under zone headers by the draw branch", [
+        (R, "        row.subtitle:SetText(subtitle)\n        row.subtitle:Show()\n",
+            "        row.subtitle:SetText(subtitle)\n        row.subtitle:SetShown(not (cfg and cfg.zoneHeaders))\n")]),
+    ("a label switched off leaves its line shown, blank", [
+        (R, "        row.subtitle:SetText(\"\")\n        row.subtitle:Hide()\n", "        row.subtitle:SetText(\"\")\n")]),
+    ("a finished dungeon quest loses its label under the Dungeons header", [
+        (R, "entry.tags.dungeon)\n    local subtitle", "entry.tags.dungeon and entry.state ~= \"complete\")\n    local subtitle")]),
+    ("raid quests keep their label under zone headers with the Dungeons header on", [
+        (R, "and entry.tags.dungeon)\n    local subtitle", "and (entry.tags.dungeon or entry.tags.raid))\n    local subtitle")]),
+    ("the followed quest keeps its label under zone headers", [
+        (R, "not (cfg.dungeonHeader == true and entry.tags", "not (entry.isFocused or cfg.dungeonHeader == true and entry.tags")]),
+    ("the label hides with the objective numbers switch", [
+        (R, "cfg.showZoneTag ~= false and not headed", "cfg.showZoneTag ~= false and cfg.showObjectiveNumbers ~= false and not headed")]),
+    ("retail quests carry no zone label", [
+        (Q, "                e.subtitle  = currentHeader\n", "                e.subtitle  = nil\n")]),
+    ("Classic quests carry no zone label", [
+        (QC, "                e.subtitle  = currentHeader\n", "                e.subtitle  = nil\n")]),
+    ("the Dungeons header never records where it sits for scroll-into-view", [
+        (T, "                            zoneTops[zoneKey] = y\n",
+            "                            if not run.dungeon then zoneTops[zoneKey] = y end\n")]),
+    ("with Keep at the bottom on, a Dungeons header at the top stays in the list", [
+        (T, "if zoneSticky and y == 0 and stickyZ == zFirst[stickyN] then",
+            "if zoneSticky and y == 0 and stickyZ == zFirst[stickyN] and not (run.dungeon and cfg.dungeonHeaderLast) then")]),
+    ("a heading named Dungeons sorts last with the Dungeons header off", [
+        (Z, "            run.dungeon = dungeons and z == DUNGEONS\n", "            run.dungeon = z == DUNGEONS\n")]),
+    ("the status line forgets Keep at the bottom with zone headers off", [
+        (Z, "    if dungeons then\n        head = head .. (cfg.dungeonHeaderLast == true",
+            "    if dungeons then\n        head = head .. (zones and cfg.dungeonHeaderLast == true")]),
+
+    # The final check's spellings, after the bounded round.
+    ("a line after the draw branch hides the kept label under zone headers", [
+        (R, "        row.subtitle:Hide()\n        anchor = row.title\n    end\n",
+            "        row.subtitle:Hide()\n        anchor = row.title\n    end\n"
+            "    if cfg and cfg.zoneHeaders then row.subtitle:Hide() end\n")]),
+    ("retail clears the label in a multiple assignment", [
+        (Q, "                e.level     = info.level\n", "                e.subtitle, e.level = nil, info.level\n")]),
+    ("Classic clears the label through a bracketed field", [
+        (QC, "                e.zone      = currentHeader\n                e.level     = t[T_LEVEL]\n",
+             "                e.zone      = currentHeader\n                e[\"subtitle\"] = nil\n"
+             "                e.level     = t[T_LEVEL]\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_zone_headers: (\d+) passed, (\d+) failed$")

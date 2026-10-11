@@ -196,6 +196,20 @@ MUTANTS = [
     ("the overwrite question is titled in English", [
         (G, '                            title    = L["Overwrite profile?"],',
             '                            title    = "Overwrite profile?",')]),
+
+    # The stub modules check self, so each of these dot calls raises here. The two Tracker calls
+    # raise in game too, reading self.frame with self nil (ResetPosition only out of combat).
+    # Visibility:Apply never reads self and takes no arguments, so its dot
+    # call breaks only the colon-call rule.
+    ("Reset position and size calls the tracker with a dot", [
+        (G, 'nil, function()\n            ns:GetModule("Tracker"):ResetPosition()\n',
+            'nil, function()\n            ns:GetModule("Tracker").ResetPosition()\n')]),
+
+    ("Lock tracker applies the lock state with a dot", [
+        (G, '                ns:GetModule("Tracker"):ApplyLockState()\n', '                ns:GetModule("Tracker").ApplyLockState()\n')]),
+
+    ("a hide rule applies the visibility rules with a dot", [
+        (G, '                    ns:GetModule("Visibility"):Apply()\n', '                    ns:GetModule("Visibility").Apply()\n')]),
 ]
 
 SUMMARY = re.compile(r"^test_general_tab: (\d+) passed, (\d+) failed$")

@@ -61,8 +61,9 @@ local function secureLocked()
     return (IB and IB.Locked and IB:Locked()) and true or false
 end
 
--- Above the drag handle's frame level so the handle does not eat the click.
-local function makeHeaderIcon(f, texture, tooltip, onClick)
+-- Above the drag handle's frame level so the handle does not eat the click. A tooltip given as a
+-- function is read on each hover, for text that names a setting's current value.
+local function makeHeaderIcon(f, texture, tooltip, onClick, anchor)
     local b = CreateFrame("Button", nil, f)
     b:SetSize(HEADER_ICON_SZ, HEADER_ICON_SZ)
     b:SetFrameLevel(f:GetFrameLevel() + 10)
@@ -73,21 +74,58 @@ local function makeHeaderIcon(f, texture, tooltip, onClick)
     b:SetScript("OnEnter", function(btn)
         if Tracker:IsClickThrough() then return end
         tex:SetAlpha(1)
-        if not tooltip then return end
+        local text = tooltip
+        if type(text) == "function" then text = text() end
+        if not text then return end
         local tip = ns.Util.Tooltip()
-        tip:SetOwner(btn, "ANCHOR_BOTTOMLEFT")
-        tip:AddLine(tooltip)
+        tip:SetOwner(btn, anchor or "ANCHOR_BOTTOMLEFT")
+        tip:AddLine(text)
         tip:Show()
     end)
     b:SetScript("OnLeave", function()
         tex:SetAlpha(0.85)
         ns.Util.Tooltip():Hide()
     end)
-    b:SetScript("OnClick", function()
+    b:SetScript("OnClick", function(btn)
         if Tracker:IsClickThrough() then return end
-        onClick()
+        onClick(btn)
     end)
     return b
+end
+
+-- The Tracker tab's own list, so the button's menu and the Sort Order dropdown offer the same
+-- orders in the same words.
+local function sortOptions()
+    local Options = ns:GetModule("Options")
+    return Options and Options.SORT_OPTIONS
+end
+
+function Tracker:SortLine()
+    local cfg  = ns:GetModule("DB"):Tracker()
+    local mode = cfg and cfg.sortMode or "zone"
+    local name = mode
+    for _, o in ipairs(sortOptions() or {}) do
+        if o.value == mode then name = o.label end
+    end
+    return L["Sort Order: %s"]:format(name)
+end
+
+function Tracker:OpenSortMenu(owner)
+    local Options = ns:GetModule("Options")
+    local options = sortOptions()
+    if not (options and Options.ui) then return end
+    local items = { { kind = "title", text = self:SortLine() } }
+    for _, o in ipairs(options) do
+        local value = o.value
+        items[#items + 1] = { text = o.label, onClick = function()
+            local cfg = ns:GetModule("DB"):Tracker()
+            if not cfg then return end
+            cfg.sortMode = value
+            Tracker:Render()
+            Options:RefreshIfShown("tracker")
+        end }
+    end
+    Options.ui:ShowMenu(items, owner)
 end
 
 -- Icons registered through ns:GetModule("API") are built lazily here, so an addon that registers
@@ -147,6 +185,8 @@ function Tracker:ApplyHeaderIcons()
     if not (f and f.headerIcons) then return end
     local DB  = ns:GetModule("DB")
     local cfg = DB and DB:Tracker()
+
+    if f.sortButton then f.sortButton:SetShown(cfg ~= nil and cfg.showSortButton == true) end
 
     local prev
     for i = 1, #f.headerIcons do
@@ -357,6 +397,12 @@ function Tracker:BuildFrame()
         L["Open the options panel"], function() ns:GetModule("Options"):Toggle() end)
     cog._dbKey = "showOptionsIcon"
     f.headerIcons = { cog }
+    -- Kept out of the cogwheel's right-to-left run, at the left end.
+    local sort = makeHeaderIcon(f, "Interface\\AddOns\\EQObjectiveTracker\\Media\\Textures\\sort.tga",
+        function() return Tracker:SortLine() end, function(b) Tracker:OpenSortMenu(b) end,
+        "ANCHOR_BOTTOMRIGHT")
+    sort:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -1)
+    f.sortButton = sort
     self:RebuildHeaderIcons()
 
     -- Only PersistPositionAndSize makes the protected SetPoint, so only it has to wait for
@@ -1426,7 +1472,11 @@ function Tracker:Render()
                     if popupCount > 0 then
                         y = y + PopupBoxes:Render(content, width, y, groupID)
                     end
-                    if sticky then zFirst[stickyN] = stickyZ + 1 end
+                    -- The band's zone row follows zone headers only. With the Dungeons header on by
+                    -- itself it scrolls with the list, or the row would sit empty over the ungrouped
+                    -- quests above it.
+                    local zoneSticky = sticky and cfg and cfg.zoneHeaders == true
+                    if zoneSticky then zFirst[stickyN] = stickyZ + 1 end
                     -- One pass over the whole section when it has no zone runs.
                     local runs = (group.zoneCount or 0) > 0 and group.zoneRuns or nil
                     for r = 1, (runs and group.zoneCount or 1) do
@@ -1437,17 +1487,17 @@ function Tracker:Render()
                             local zoneKey = ZoneHeaders:Key(groupID, run.zone)
                             zoneTops[zoneKey] = y
                             local zoneH, zoneCollapsed, zoneHead = ZoneHeaders:Place(content, groupID, run, y, cfg)
-                            if sticky then
+                            if zoneSticky then
                                 stickyZ = stickyZ + 1
                                 zKeys[stickyZ] = zoneKey
                             end
                             -- At the top of the list it joins the first section's header in the
                             -- band. The first zone only, since a collapsed one leaves the next at 0 too.
-                            if sticky and y == 0 and stickyZ == zFirst[stickyN] then
+                            if zoneSticky and y == 0 and stickyZ == zFirst[stickyN] then
                                 zoneHead:Hide()
                                 zTops[stickyZ] = -(zoneH + gap)
                             else
-                                if sticky then zTops[stickyZ] = y end
+                                if zoneSticky then zTops[stickyZ] = y end
                                 y = y + zoneH + gap
                             end
                             left = indent
@@ -1471,7 +1521,7 @@ function Tracker:Render()
                             end
                         end
                     end
-                    if sticky then zLast[stickyN] = stickyZ end
+                    if zoneSticky then zLast[stickyN] = stickyZ end
                 end
             end
         end

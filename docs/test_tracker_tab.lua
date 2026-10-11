@@ -4,14 +4,17 @@
 --     "C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe" docs/test_tracker_tab.lua
 --
 -- The tab loads WHOLE over a stub context that records every control, and stub modules that
--- record the calls these cases check. As the library does, the context appends each checkbox,
--- slider, dropdown and radio group to its parent's _controls, which only the tab's content
--- carries, so a control built on a card raises. The Filters card has its own cases in
+-- record the calls these cases check and raise on a call written with a dot (in game the first
+-- argument becomes self, which raises or misreads wherever the method reads self or takes
+-- arguments). As the library does, the context appends each checkbox, slider, dropdown and radio
+-- group to its parent's _controls, which only the tab's content carries, so a control built on a
+-- card raises. The Filters card has its own cases in
 -- test_filter.lua. This file covers the rest: Sort Order and its Manual hint, Simplify tracked
 -- achievements, the section show boxes, the World Quests height controls, World Quests Position,
 -- the Section Order rows and their chevrons, the difficulty box staying gone, the display boxes
 -- (each writing and reading only its own key), Keep section headers in view, the two focus boxes
--- (on clients with super-track only) and the three sounds.
+-- (on clients with super-track only), the three sounds, and since 2026-10-10 the sort button's box,
+-- the list the button shares with Sort Order, and the Manual hint following an order picked there.
 --
 -- Every lookup in the locale table reads "<key>", so a hard-coded English string cannot pass for
 -- a translated one. The DB module is Core/DB.lua's own accessors, sliced, over a stub profile, so
@@ -64,6 +67,15 @@ local function realDB(profile)
     local db = { db = { profile = profile } }
     for name, fn in pairs(accessors) do db[name] = fn end
     return db
+end
+
+-- Core/DB.lua's own tracker defaults, read by running the file.
+local function shippedDefaults()
+    local got
+    local chunk = assert(loadfile(repoFile("Core/DB.lua")))
+    setfenv(chunk, setmetatable({}, { __index = _G }))
+    chunk("EQObjectiveTracker", { RegisterModule = function(_, _, m) got = m return m end, Has = {} })
+    return got.defaults.profile.tracker
 end
 
 -- Every key that differs between two shallow copies of the saved settings.
@@ -120,7 +132,10 @@ local function trackerTab(o)
     modules.Tracker = {
         Render = function() st.render = st.render + 1; st.seq[#st.seq + 1] = "render" end,
         ApplyWorldQuestsPosition = function() st.seq[#st.seq + 1] = "anchor" end,
-        ApplyHeaderIcons = function() st.icons = st.icons + 1; st.iconsSaw = st.cfg.showOptionsIcon end,
+        ApplyHeaderIcons = function()
+            st.icons = st.icons + 1
+            st.iconsSaw, st.sortSaw = st.cfg.showOptionsIcon, st.cfg.showSortButton
+        end,
         SetWorldQuestsPosition = function(_, v) st.wqPositions[#st.wqPositions + 1] = v end,
     }
     modules.Row = { Invalidate = function() st.invalidate = st.invalidate + 1 end }
@@ -152,6 +167,21 @@ local function trackerTab(o)
     modules.Filter = { CATEGORIES = { { key = "showNormal", label = "Normal" } } }
     local tags = o.tags or { worldquest = true }
     modules.Registry = { HasTag = function(_, tag) return tags[tag] == true end }
+    -- Every stub method checks self, so a call written with a dot raises here. In game the first
+    -- argument becomes self, which raises or misreads wherever the method reads self or takes
+    -- arguments.
+    for name, m in pairs(modules) do
+        if name ~= "DB" then
+            for k, fn in pairs(m) do
+                if type(fn) == "function" then
+                    m[k] = function(self, ...)
+                        if self ~= m then error(name .. ":" .. k .. " called without self", 2) end
+                        return fn(self, ...)
+                    end
+                end
+            end
+        end
+    end
 
     local ui = { boxes = {}, dropdowns = {}, cards = {}, sliders = {}, radios = {} }
     -- The library appends each of these controls to its parent's _controls, which only the tab's
@@ -220,7 +250,7 @@ local function trackerTab(o)
     assert(loadfile(repoFile("Options/TabTracker.lua")))("EQObjectiveTracker", ns)
     st.content = { _controls = {} }
     spec.build(ui, st.content)
-    st.ui, st.spec = ui, spec
+    st.ui, st.spec, st.options = ui, spec, modules.Options
     return st
 end
 
@@ -483,19 +513,74 @@ case("the zone label box dims while zone headers are on, and each view dims it a
     local st  = trackerTab()
     local box = st.ui.boxes[K"Show zone label under quest titles"]
     ok(box ~= nil and st.dims[box] == true, "lit at build while zone headers are off")
-    ok(box and box.tipBody == K"Adds the quest log heading each quest came from as a small line under its title. Not shown while Show zone headers is on, on the Appearance tab.",
-       "and its tooltip says when it is not shown")
+    ok(box and box.tipBody == K"Adds the quest log heading each quest came from as a small line under its title. While Show zone headers is on, on the Appearance tab, only quests in the Dungeons header show it.",
+       "and its tooltip says where it still shows under zone headers")
     ok(type(st.spec.refresh) == "function", "the tab has a per-view pass")
     st.cfg.zoneHeaders = true
     if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
     ok(st.dims[box] == false, "a view with zone headers on dims it")
+    -- A quest in the Dungeons header keeps its label under zone headers, so the box has work then.
+    st.cfg.dungeonHeader = true
+    if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
+    ok(st.dims[box] == true, "a view with the Dungeons header on as well lights it")
+    st.cfg.dungeonHeader = 1
+    if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
+    ok(st.dims[box] == false, "only a real true for the Dungeons header does")
+    st.cfg.dungeonHeader = false
+    if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
+    ok(st.dims[box] == false, "and with it off again the box dims again")
     st.cfg.zoneHeaders = false
     if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
     ok(st.dims[box] == true, "and a view with them off lights it again")
+    st.cfg.dungeonHeader = true
+    if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
+    ok(st.dims[box] == true, "as it does with the Dungeons header alone")
+    st.cfg.dungeonHeader = false
+    -- Every state again beside every other switch Core/DB.lua ships, set on and then off, and both
+    -- zone orders, so a rule reading a neighbor shows. The box's own key is one of them.
+    local onAll, offAll = { zoneHeaderOrder = "alpha" }, { zoneHeaderOrder = "current" }
+    for k, v in pairs(shippedDefaults()) do
+        if type(v) == "boolean" and k ~= "zoneHeaders" and k ~= "dungeonHeader" then
+            onAll[k], offAll[k] = true, false
+        end
+    end
+    ok(onAll.showZoneTag == true and onAll.dungeonHeaderLast == true and onAll.zoneHeaderDivider == true,
+       "the neighbors are read off the shipped defaults")
+    -- And every other default moved to another value of its type, and each sort order.
+    local extras, neg, zero = { onAll, offAll }, {}, {}
+    for k, v in pairs(shippedDefaults()) do
+        if type(v) == "number" then
+            neg[k], zero[k] = -1, 0
+        elseif type(v) == "table" then
+            neg[k], zero[k] = {}, {}
+        elseif type(v) == "string" and k ~= "zoneHeaderOrder" then
+            neg[k], zero[k] = "", ""
+        end
+    end
+    extras[#extras + 1], extras[#extras + 2] = neg, zero
+    for _, mode in ipairs({ "zone", "title", "status", "type", "level", "distance", "recent", "manual" }) do
+        extras[#extras + 1] = { sortMode = mode }
+    end
+    for ei, extra in ipairs(extras) do
+        local saved = {}
+        for k, v in pairs(extra) do saved[k] = st.cfg[k]; st.cfg[k] = v end
+        for _, s in ipairs({ { false, false, true }, { true, false, false }, { true, true, true }, { false, true, true } }) do
+            st.cfg.zoneHeaders, st.cfg.dungeonHeader = s[1], s[2]
+            if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
+            ok(st.dims[box] == s[3], ("neighbors %d: zone headers %s, Dungeons header %s: lit %s")
+               :format(ei, tostring(s[1]), tostring(s[2]), tostring(st.dims[box])))
+        end
+        for k in pairs(extra) do st.cfg[k] = saved[k] end
+    end
+    st.cfg.zoneHeaders, st.cfg.dungeonHeader = false, false
+    if st.spec.refresh then st.spec.refresh(st.ui, st.content) end
     box.setter(true)
     ok(st.cfg.showZoneTag == true, "dimmed or not, it still stores the choice")
     local on = trackerTab({ cfg = { filters = {}, zoneHeaders = true } })
     ok(on.dims[on.ui.boxes[K"Show zone label under quest titles"]] == false, "built with zone headers on, it starts dimmed")
+    local both = trackerTab({ cfg = { filters = {}, zoneHeaders = true, dungeonHeader = true } })
+    ok(both.dims[both.ui.boxes[K"Show zone label under quest titles"]] == true,
+       "built with the Dungeons header on too, it starts lit")
 
     -- Zone headers group the Quests section on Classic too, so the box dims there the same way.
     local classic = trackerTab({ has = { SuperTrack = false } })
@@ -544,8 +629,9 @@ case("the tracker hides the cogwheel on the key this box writes", function()
     }
     local ns = { GetModule = function(_, n) return mods[n] end }
     local chunk = assert(loadstring(src:sub(a, b + 4), "header-icons"))
-    setfenv(chunk, setmetatable({ Tracker = T, ns = ns, makeHeaderIcon = function()
+    setfenv(chunk, setmetatable({ Tracker = T, ns = ns, makeHeaderIcon = function(parent, texture, tooltip, onClick)
         local m = icon(nil)
+        m.parent, m.texture, m.tooltip, m.onClick = parent, texture, tooltip, onClick
         made[#made + 1] = m
         return m
     end }, { __index = _G }))
@@ -553,10 +639,16 @@ case("the tracker hides the cogwheel on the key this box writes", function()
 
     local cog = icon("showOptionsIcon")
     T.frame = { headerIcons = { cog } }
-    specs[1] = { id = "chain", onClick = function() end }
+    local clicks = 0
+    specs[1] = { id = "chain", texture = "path/chain.tga", tooltip = "Chain Guide",
+                 onClick = function() clicks = clicks + 1 end }
     T:RebuildHeaderIcons()
     local icons, chain = T.frame.headerIcons, made[1]
     ok(#icons == 2 and icons[1] == cog and icons[2] == chain, "rebuilt, the cogwheel stays first and the API icon follows")
+    ok(chain and chain.parent == T.frame and chain.texture == "path/chain.tga" and chain.tooltip == "Chain Guide",
+       "the other addon's icon is built on the tracker with its own texture and tooltip")
+    if chain and chain.onClick then chain.onClick() end
+    ok(clicks == 1, "and its click reaches the other addon's handler")
     ok(cog.shown and chain and chain.shown, "with the key unset both show")
     ok(cog.points[1] and cog.points[1][1] == "TOPRIGHT" and cog.points[1][4] == -4 and cog.points[1][5] == -1,
        "the cogwheel takes the corner")
@@ -572,6 +664,37 @@ case("the tracker hides the cogwheel on the key this box writes", function()
     T:RebuildHeaderIcons()
     ok(#T.frame.headerIcons == 1 and T.frame.headerIcons[1] == cog and not chain.shown,
        "an icon no longer registered is dropped and hidden, the cogwheel kept")
+    local hits = {}
+    specs[1] = { id = "a", texture = "path/a.tga", tooltip = "A", onClick = function() hits[#hits + 1] = "a" end }
+    specs[2] = { id = "b", texture = "path/b.tga", tooltip = "B", onClick = function() hits[#hits + 1] = "b" end }
+    local built = #made
+    T:RebuildHeaderIcons()
+    local ia, ib = made[built + 1], made[built + 2]
+    ok(ia and ib and ia.texture == "path/a.tga" and ib.texture == "path/b.tga" and ia.tooltip == "A"
+       and ib.tooltip == "B", "two icons each get their own texture and tooltip")
+    if ia and ib then ia.onClick() ib.onClick() end
+    ok(table.concat(hits, ",") == "a,b", "and each click reaches its own addon's handler: " .. table.concat(hits, ","))
+    -- Registered again under the same id, an icon is a new spec, so it gets a new button.
+    specs[1] = { id = "a", texture = "path/a2.tga", tooltip = "A2", onClick = function() hits[#hits + 1] = "a2" end }
+    built = #made
+    T:RebuildHeaderIcons()
+    local ia2 = made[built + 1]
+    ok(ia2 and ia2 ~= ia and ia2.texture == "path/a2.tga" and ia2.tooltip == "A2" and ia and not ia.shown,
+       "an id registered again with a new texture is rebuilt, its old button hidden")
+    if ia2 then ia2.onClick() end
+    ok(hits[#hits] == "a2", "and its click reaches the new handler: " .. tostring(hits[#hits]))
+    -- An icon whose own key is stored off drops out of the run.
+    cfg.showOptionsIcon = nil
+    cfg.showChainIcon = false
+    specs[1] = { id = "c", texture = "path/c.tga", dbKey = "showChainIcon", onClick = function() end }
+    specs[2] = { id = "d", texture = "path/d.tga", onClick = function() end }
+    built = #made
+    T:RebuildHeaderIcons()
+    local ic, idd = made[built + 1], made[built + 2]
+    ok(ic and idd and not ic.shown and idd.shown, "an icon whose key is stored off is hidden")
+    ok(idd and idd.points[1] and idd.points[1][1] == "RIGHT" and idd.points[1][2] == cog,
+       "and the next icon takes its place beside the cogwheel")
+    specs[1], specs[2], cfg.showChainIcon = nil, nil, nil
 
     local build = {}
     for line in src:gmatch("[^\n]+") do
@@ -639,7 +762,7 @@ end
 -- getter or setter that reads or writes a neighbor fails when they are all set one way.
 local TRACKER_KEYS = { "showOnlyWatched", "simplifyMode", "splitQuestClick", "clickToUnfocus",
                        "focusAcceptedQuests", "autoListZoneWorldQuests", "showQuestTotal",
-                       "showQuestPopups", "stickySectionHeaders", "showOptionsIcon", "trackerAlphaFocus",
+                       "showQuestPopups", "stickySectionHeaders", "showOptionsIcon", "showSortButton", "trackerAlphaFocus",
                        "trackerAlphaHover", "showLevelInTracker", "showZoneTag", "showObjectiveNumbers",
                        "showTrackerWidgets", "showQuestID", "showItemButtons", "showRecentlyAddedTag" }
 local GENERAL_KEYS = { "autoTrackAccepted", "restoreSuperTrackOnLogin", "useBlizzardTracker" }
@@ -799,6 +922,58 @@ case("a box that changes only what is listed redraws without invalidating", func
         end
     end
     ownKeyOnly(PLAIN_BOXES)
+end)
+
+-- Requested by Andreon (2026-10-10). The button itself is test_sort_button.lua's: this box only
+-- stores the key and asks the tracker's header pass to show or hide it.
+case("the sort button box sits under the cogwheel's, reads off while unset, and applies at once", function()
+    local st = trackerTab()
+    local box = st.ui.boxes[K"Show the sort button on the tracker"]
+    ok(box ~= nil, "the box is built")
+    if not box then return end
+    local at = {}
+    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    local cog = at[st.ui.boxes[K"Show the options cogwheel on the tracker"]]
+    ok(cog ~= nil and at[box] == cog + 1, "on the Options card straight under the cogwheel box: "
+       .. tostring(cog) .. ", " .. tostring(at[box]))
+    ok(box.dependent == false and box.fill == false, "neither indented nor full width")
+    ok(box.tooltip == K"A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default.",
+       "with its own tooltip: " .. tostring(box.tooltip))
+    ok(st.dims[box] == nil, "never dimmed")
+    ok(box.getter() == false, "off while unset")
+    local icons, ren, inv = st.icons, st.render, st.invalidate
+    setOnly(st, box, true, "showSortButton")
+    ok(st.icons == icons + 1 and st.sortSaw == true, "ticked, it stores on before the header pass shows the button")
+    ok(st.render == ren and st.invalidate == inv, "and neither redraws the list nor invalidates the rows")
+    ok(box.getter() == true, "and reads back on")
+    setOnly(st, box, false, "showSortButton")
+    ok(st.icons == icons + 2 and st.sortSaw == false and box.getter() == false, "unticked, the same the other way")
+    ok(allSet(true, "showSortButton", nil).ui.boxes[K"Show the sort button on the tracker"].getter() == false,
+       "unset beside neighbors all on, it still reads off")
+    ok(allSet(false, "showSortButton", true).ui.boxes[K"Show the sort button on the tracker"].getter() == true,
+       "and on beside neighbors all off")
+end)
+
+case("the tracker's sort button offers the dropdown's own list, and a view follows its pick", function()
+    local st = trackerTab()
+    local sort = st.ui.radios[K"Sort Order"]
+    ok(st.options.SORT_OPTIONS ~= nil and st.options.SORT_OPTIONS == sort.options,
+       "the list handed to the tracker is the very table Sort Order offers")
+    local onScreen = st.ui.cards[K"On-Screen Tracker"]
+    local hint = onScreen.rows[#onScreen.rows]
+    ok(hint.shown == false, "the Manual hint starts hidden")
+    -- The button stores the order itself, with no setter of this tab involved.
+    st.cfg.sortMode = "manual"
+    local layouts, measures, renders = onScreen.layouts, #st.measured, st.render
+    st.spec.refresh(st.ui, st.content)
+    ok(hint.shown == true, "the next view shows the hint for an order picked on the tracker")
+    ok(onScreen.layouts == layouts + 1 and #st.measured == measures + 1,
+       "laying the card out and measuring the tab again for it")
+    ok(st.render == renders, "without redrawing the tracker, which the button already did")
+    st.cfg.sortMode = "distance"
+    st.spec.refresh(st.ui, st.content)
+    ok(hint.shown == false, "and hides it again for any other order")
+    ok(sort.getter() == "distance", "while the dropdown reads the order stored")
 end)
 
 print(("test_tracker_tab: %d passed, %d failed"):format(pass, fail))

@@ -139,7 +139,7 @@ L["Options"] = true
 L["Show quest level prefix"] = true
 L["For example, [60] Title."] = true
 L["Show zone label under quest titles"] = true
-L["Adds the quest log heading each quest came from as a small line under its title. Not shown while Show zone headers is on, on the Appearance tab."] = true
+L["Adds the quest log heading each quest came from as a small line under its title. While Show zone headers is on, on the Appearance tab, only quests in the Dungeons header show it."] = true
 L["Show objective progress numbers"] = true
 L["For example, 0/4, 1/1, etc."] = true
 L["Show event and scenario widgets"] = true
@@ -154,6 +154,8 @@ L["Show usable quest item buttons"] = true
 L["Puts a button on the tracker row of any quest that carries a usable item, so you can use it without opening your bags."] = true
 L["Show the options cogwheel on the tracker"] = true
 L["A small cogwheel at the top-right of the tracker that opens the options panel."] = true
+L["Show the sort button on the tracker"] = true
+L["A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default."] = true
 L["Show Quest Discovered popups"] = true
 L["Boxes for newly discovered / completed quests."] = true
 L["Show NEW tag on recently accepted quests"] = true
@@ -229,11 +231,15 @@ L["Shadow Size"] = true
 L["How far the text drop-shadow is cast behind the letters. Higher values give a larger, more pronounced shadow. Lower values keep it tight. Only applies while Text Shadow is on."] = true
 L["Quest Colors"] = true
 L["Quest Title Color"] = true
-L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on."] = true
+L["How quest, achievement and endeavor titles are colored. Failed quests are always red, and finished ones green unless Use title color for completed quests is on or a Finished Quest Color is picked."] = true
 L["Custom Title Color"] = true
 L["The color every title takes while Quest Title Color is set to Custom color. Until one is picked they are gold."] = true
 L["Use title color for completed quests"] = true
-L["A finished quest's title takes the title color instead of green, and so do its finished objectives unless a Finished Objective Color is picked. Only Class color, Custom color and Original Style give a title color."] = true
+L["A finished quest's title takes the title color instead of green, and so do its finished objectives. A picked Finished Quest Color or Finished Objective Color wins over it. Only Class color, Custom color and Original Style give a title color."] = true
+L["Finished Quest Color"] = true
+L["Color of a quest's title once all of its objectives are done, in every Quest Title Color mode. While unset, finished quests are green, or keep the title color when Use title color for completed quests gives one."] = true
+L["NEW Tag Color"] = true
+L["Color of the NEW tag on quests accepted in the last hour. The tag is switched on and off on the Tracker tab."] = true
 L["Objective Text Color"] = true
 L["Color of the objective lines under each title. The count at the start of a line has its own three colors below."] = true
 L["Count Color: None Done"] = true
@@ -286,6 +292,10 @@ L["Show zone headers"] = true
 L["Groups the quests in the Quests and Campaign sections under the quest log heading each one sits under, which is its zone for most quests. Each zone collapses on its own. Off by default."] = true
 L["Zone Order"] = true
 L["The order of the zones inside each section. Quests inside a zone still follow Sort Order on the Tracker tab."] = true
+L["Group dungeon quests under one header"] = true
+L["Moves every quest the game marks as a dungeon quest into one Dungeons header in the Quests and Campaign sections, drawn like the zone headers below. With Show zone headers off, every other quest stays as it is and Dungeons comes last. With it on, dungeon quests leave their zones for it, and under Current zone first it comes to the top while one of its quests is in your zone. Off by default."] = true
+L["Keep Dungeons at the bottom"] = true
+L["Keeps the Dungeons header last in its section. Without this, Current zone first brings it to the top while the game shows one of its quests on the map you are in. Off by default."] = true
 L["Zone Header Size Offset"] = true
 L["Sizes the zone headers, added on top of the Font Size on the Text card. The default 2 sits between the quest titles and the section headers."] = true
 L["Use class color for zone headers"] = true
@@ -487,6 +497,9 @@ L["Lives:"] = true
 -- Data/Widgets.lua
 L["Tier %d"] = true
 
+-- Data/ZoneGroups.lua
+L["Dungeons"] = true
+
 -- UI/AutoQuestPopup.lua
 L["Click to view quest"] = true
 L["Quest Complete!"] = true
@@ -561,6 +574,7 @@ L["Endeavors"] = true
 L["Profession"] = true
 
 -- UI/Tracker.lua
+L["Sort Order: %s"] = true
 L["Tracker locked"] = true
 L["Use /eqot unlock to move it."] = true
 L["Drag to move, corner grip to resize."] = true
