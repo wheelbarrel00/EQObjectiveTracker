@@ -676,6 +676,47 @@ MUTANTS = [
         (T, "self:SetDependent(zoneCheck, not DB().zoneHeaders or DB().dungeonHeader == true) end\n",
             "self:SetDependent(zoneCheck, (not DB().zoneHeaders or DB().dungeonHeader == true)"
             " and DB().sortMode ~= \"level\") end\n")]),
+
+    # The Mythic+ timer box (2026-10-11).
+    ("the Mythic+ timer box is built on every client", [
+        (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            local mplusCheck', "        do\n            local mplusCheck")]),
+    ("the Mythic+ timer box is built only where there is no key", [
+        (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            local mplusCheck',
+            '        if not (ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios")) then\n            local mplusCheck')]),
+    ("the Mythic+ timer box reads unset as off", [
+        (T, '                rowSetting("showMythicPlusTimer", true))\n', '                rowSetting("showMythicPlusTimer"))\n')]),
+    ("the Mythic+ timer box writes the widgets key", [
+        (T, '                rowSetting("showMythicPlusTimer", true))\n', '                rowSetting("showTrackerWidgets", true))\n')]),
+    ("the Mythic+ timer box only redraws, leaving the rows' gate shut", [
+        (T, '                rowSetting("showMythicPlusTimer", true))\n',
+            '                function() return DB().showMythicPlusTimer ~= false end,\n'
+            '                function(v) DB().showMythicPlusTimer = v; render() end)\n')]),
+    ("the Mythic+ timer box is never added to the card", [
+        (T, "            display:Add(mplusCheck)\n", "")]),
+    ("the Mythic+ timer box goes under Show quest ID", [
+        (T, "            display:Add(mplusCheck)\n", ""),
+        (T, "        display:Add(qidCheck)\n", "        display:Add(qidCheck)\n        if mplusCheck then display:Add(mplusCheck) end\n"),
+        (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            local mplusCheck', '        local mplusCheck\n        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            mplusCheck')]),
+    ("the Mythic+ timer box borrows the widgets box's tooltip", [
+        (T, '                L["During a Mythic+ run, draws the keystone level',
+            '                L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event\'s progress bar or a delve\'s tier. This tracker replaces the default one, so without this those are not shown anywhere."] or L["During a Mythic+ run, draws the keystone level')]),
+    ("the Mythic+ timer box has no tooltip title", [
+        (T, '            self:AttachTooltip(mplusCheck, L["Show the Mythic+ timer"],\n', "            self:AttachTooltip(mplusCheck, nil,\n")]),
+    ("the Mythic+ timer box is indented", [
+        (T, "            display:Add(mplusCheck)\n", "            display:Add(mplusCheck, { dependent = true })\n")]),
+    ("the Mythic+ timer box is added full width", [
+        (T, "            display:Add(mplusCheck)\n", "            display:Add(mplusCheck, { fill = true })\n")]),
+    ("the Mythic+ timer box is built with no scenario provider", [
+        (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n',
+            '        if ns.Has.ChallengeTimer then\n')]),
+    ("the Mythic+ timer box asks the Registry for a provider that does not exist", [
+        (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n',
+            '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenario") then\n')]),
+    ("the Mythic+ timer box asks the Registry with a dot call", [
+        (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n',
+            '        if ns.Has.ChallengeTimer and ns:GetModule("Registry").Get("scenarios") then\n')]),
+    ("the Mythic+ timer ships off while its box reads on", [
+        ("Core/DB.lua", "            showMythicPlusTimer  = true,\n", "            showMythicPlusTimer  = false,\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_tracker_tab: (\d+) passed, (\d+) failed$")

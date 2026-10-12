@@ -292,6 +292,9 @@ function Scenario:_Clear()
     self.widgetH = 0
     local SS = ns:GetModule("ScenarioSpells")
     if SS then SS:Clear() end
+    local MP = ns:GetModule("MythicPlus")
+    if MP then MP:Clear() end
+    self.headH = BANNER_H
     if self.subHeader then self.subHeader:Hide() end
     local banner = self.banner
     if banner then
@@ -397,7 +400,8 @@ function Scenario:_DrawCriteria(container, cfg, lines)
     local rowWidth = math.max(1, width - 16)
     local barH     = Media:ProgressBarHeight()
     local firstRowY = (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H)
-                      + BANNER_GAP + BANNER_H + (self.widgetH or 0) + CRITERIA_LINE_GAP
+                      + BANNER_GAP + (self.headH or BANNER_H) + (self.widgetH or 0)
+                      + CRITERIA_LINE_GAP
 
     local prev, prevBar
     for i = 1, #lines do
@@ -537,20 +541,33 @@ function Scenario:Render(container, cfg, info, entry, topOffset)
     self.subHeader:Show()
     self:ApplyHeaderLabels(info.category, info.name)
     self:ApplyHeaderFont(cfg)
-    self.banner:Show()
 
-    self:_DrawBanner(info, cfg)
+    -- In a key the key block takes the banner's place, as Blizzard's does, and headH is
+    -- whichever of the two is drawn
+    local headTop = (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H) + BANNER_GAP
+    local MP  = ns:GetModule("MythicPlus")
+    local key = info.keystone
+    local off = cfg and cfg.showMythicPlusTimer == false
+    if key and MP and not off then
+        self.banner:Hide()
+        self.headH = MP:Render(container, cfg, key, headTop)
+    else
+        if MP then MP:Clear(off and "switched off" or nil) end
+        self.banner:Show()
+        self:_DrawBanner(info, cfg)
+        self.headH = BANNER_H
+    end
 
-    -- Between the banner and the criteria, which is where the stage block draws it. The
-    -- scenario's countdown belongs to the scenario, not to the top of the tracker.
+    -- Between the banner and the criteria, where Blizzard's stage block draws it. In a key it goes
+    -- under the key block instead. The scenario's countdown belongs to the scenario, not to the
+    -- top of the tracker.
     local WB = ns:GetModule("WidgetBlock")
-    self.widgetH = WB and WB:RenderScenario(container, cfg,
-        (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + BANNER_H) or 0
+    self.widgetH = WB and WB:RenderScenario(container, cfg, headTop + self.headH) or 0
 
     self:ReleaseCriteria()
     self:_DrawCriteria(container, cfg, (entry and entry.lines) or {})
 
-    local h = (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + BANNER_H + self.widgetH
+    local h = (self.subHeaderH or SUBHEADER_H) + BANNER_GAP + self.headH + self.widgetH
     for i = 1, #self.activeCriteria do
         local row = self.activeCriteria[i]
         h = h + (row._gapAbove or CRITERIA_LINE_GAP) + row:GetHeight()

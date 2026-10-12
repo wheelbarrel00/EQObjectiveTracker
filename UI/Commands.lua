@@ -38,7 +38,8 @@ handlers.debug = function()
     tracker():Render()
 end
 
-local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true }
+local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true,
+                      Keystone = true, MythicPlus = true }
 
 -- One module raising must not take the rest of the report
 -- with it: this is the tool for diagnosing a broken subsystem, so it has to outlive one, and
@@ -167,6 +168,10 @@ handlers.status = function()
 
     debugLine("ItemButtons")
     debugLine("ScenarioSpells")
+    if Registry:Get("scenarios") then
+        debugLine("Keystone")
+        debugLine("MythicPlus")
+    end
     debugLine("ManualOrder")
     debugLine("Distance")
     debugLine("Migrate")
@@ -350,6 +355,39 @@ function Commands:OnEnable()
             else
                 BH:Dump()
             end
+        elseif cmd == "mplus" then
+            -- Diagnostic output, English like /eqot status. The sample key is how the panel can
+            -- be seen at all without running one.
+            local SC  = ns:GetModule("Registry"):Get("scenarios")
+            local arg = strtrim(rest or ""):lower()
+            if not (SC and SC.ToggleKeystoneTest and ns.Has.ChallengeTimer) then
+                ns:Print("mythic+: not available on this client")
+            elseif ns:UsesBlizzardTracker() then
+                ns:Print("mythic+: off, Blizzard's tracker in use")
+            elseif arg == "test" or arg == "late" then
+                local on, why = SC:ToggleKeystoneTest(arg)
+                if why == "off" then
+                    ns:Print("mythic+: the scenarios provider is switched off (/eqot modules).")
+                elseif why == "scenario" then
+                    ns:Print("mythic+: a scenario is running, so no sample key until it ends.")
+                elseif on then
+                    ns:Print(("mythic+ %s: on. A sample key is drawn while no scenario is running. "
+                        .. "Type /eqot mplus %s again to clear it."):format(arg, arg)
+                        .. (why == "switched off" and " Show the Mythic+ timer is off, so the "
+                            .. "stage banner shows in its place." or ""))
+                else
+                    ns:Print(("mythic+ %s: off."):format(arg))
+                end
+            else
+                -- Read fresh, as /eqot status is. Render skips a hidden tracker, so the feed is
+                -- built directly too, and the visibility line says when the block line is the
+                -- last paint.
+                tracker():Render()
+                ns:GetModule("Feed"):Build()
+                debugLine("Keystone")
+                debugLine("MythicPlus")
+                debugLine("Visibility")
+            end
         elseif cmd == "importeq" then
             importEQ()
         elseif cmd == "flavorprobe" then
@@ -404,7 +442,7 @@ function Commands:OnEnable()
             -- The subcommands are literals the dispatcher matches, so they stay outside
             -- L. Only the word introducing them is translated.
             ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, status, debug, "
-                .. "bonushud [test], importeq, modules, disable <m>, enable <m>")
+                .. "bonushud [test], mplus [test|late], importeq, modules, disable <m>, enable <m>")
         end
     end
 end

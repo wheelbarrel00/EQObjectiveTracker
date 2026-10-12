@@ -158,8 +158,8 @@ MUTANTS = [
      "    local barH     = BAR_H"),
 
     ("the first row stops paying for the widget block above it, so the two overlap",
-     "                      + BANNER_GAP + BANNER_H + (self.widgetH or 0) + CRITERIA_LINE_GAP",
-     "                      + BANNER_GAP + BANNER_H + CRITERIA_LINE_GAP"),
+     "                      + BANNER_GAP + (self.headH or BANNER_H) + (self.widgetH or 0)\n",
+     "                      + BANNER_GAP + (self.headH or BANNER_H)\n"),
 
     ("the first row stops paying for the offset the widget block was anchored from",
      "    local firstRowY = (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H)",

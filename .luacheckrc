@@ -59,6 +59,9 @@ read_globals = {
     "C_Scenario", "C_ScenarioInfo", "GetInstanceInfo", "C_Texture", "C_AddOns", "Enum",
     "C_VignetteInfo", "C_UnitAuras", "C_UIWidgetManager",
     "IsInInstance", "C_ChallengeMode", "WorldMapFrame",
+    -- The Mythic+ key timer: the world timer it runs on, the current affixes for the sample
+    -- key, and the leader check that picks the time's-up tooltip line
+    "GetWorldElapsedTimers", "GetWorldElapsedTime", "C_MythicPlus", "UnitIsGroupLeader",
     "C_TradeSkillUI", "C_CurrencyInfo", "C_Item", "C_FactionInfo", "ProfessionsUtil", "QuestUtil",
     "C_LFGList", "LFGListUtil_FindQuestGroup", "C_TaxiMap", "FlightMapFrame",
     "PlaySoundFile", "ERR_QUEST_COMPLETE_S", "C_QuestLine",

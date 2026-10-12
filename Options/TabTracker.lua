@@ -403,6 +403,15 @@ Options:RegisterTab({
         self:AttachTooltip(widgetCheck, L["Show event and scenario widgets"],
             L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."])
 
+        -- Only the scenario provider reads a key, and the Classic TOCs do not load it
+        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then
+            local mplusCheck = self:CreateCheckbox(content, L["Show the Mythic+ timer"],
+                rowSetting("showMythicPlusTimer", true))
+            display:Add(mplusCheck)
+            self:AttachTooltip(mplusCheck, L["Show the Mythic+ timer"],
+                L["During a Mythic+ run, draws the keystone level, the affixes, the time left with the +2 and +3 times, and the deaths in place of the stage banner. This tracker replaces the default one, so without this they are not shown anywhere."])
+        end
+
         local qidCheck = self:CreateCheckbox(content, L["Show quest ID"],
             rowSetting("showQuestID"))
         display:Add(qidCheck)

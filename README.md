@@ -119,6 +119,11 @@ back.
   filter, so you can turn them off without touching world quests
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
   delve tier, and a clickable button for any spell the stage hands you
+- **Mythic+ keys**, with the key's own panel in the stage banner's place: the keystone level,
+  the affixes, the time left with the +3 and +2 times, and the deaths. It has a switch on the
+  Tracker tab for anyone using a separate timer addon, and `/eqot mplus test` draws a sample key.
+  It could not be tested in a real key before release, so please report anything that looks
+  wrong, with what `/eqot mplus` prints during the key
 - **The bonus objectives HUD**, a separate movable readout rather than a tracker section,
   covering the bonus loot mechanics inside a delve and a lives and deaths readout for the run.
   Its background and its border are yours to recolor, or to switch off entirely and leave the
@@ -151,6 +156,7 @@ events, which would otherwise not appear anywhere.
 | `/eqot toggle` | Show or hide the tracker |
 | `/eqot status` | Print what each provider emitted and what reached the screen |
 | `/eqot bonushud` | Print what the bonus objectives HUD can see, or `test` to place it |
+| `/eqot mplus` | Print what the tracker read for the current Mythic+ key, or `test` or `late` to draw a sample key |
 | `/eqot importeq` | Replace this profile with your Everything Quests tracker settings |
 | `/eqot modules` | List the optional parts, and which are switched off |
 | `/eqot disable <name>` | Switch off one part, or `all`, to narrow down a fault |

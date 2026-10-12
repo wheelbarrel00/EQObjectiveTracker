@@ -309,12 +309,31 @@ MUTANTS = [
                                            "WINDOW_ONLY[name]"))]),
 
     ("/eqot status prints the item buttons' line, which reads as a fault with no window", [
-        (C, "local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true }\n",
-            "local WINDOW_ONLY = { Tracker = true, ZoneGroups = true }\n")]),
+        (C, "local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true,\n",
+            "local WINDOW_ONLY = { Tracker = true, ZoneGroups = true,\n")]),
 
     ("/eqot status prints the zone headers' line, which reads as nothing grouped with no feed", [
-        (C, "local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true }\n",
-            "local WINDOW_ONLY = { Tracker = true, ItemButtons = true }\n")]),
+        (C, "local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true,\n",
+            "local WINDOW_ONLY = { Tracker = true, ItemButtons = true,\n")]),
+
+    # The Mythic+ key read and block (2026-10-11): printed only where a scenario provider is
+    # registered, and named as off under Blizzard's tracker like the window's other parts.
+    ("/eqot status prints the Mythic+ key read's line under Blizzard's tracker, with no provider reading it", [
+        (C, "                      Keystone = true, MythicPlus = true }\n", "                      MythicPlus = true }\n")]),
+    ("/eqot status prints the Mythic+ block's line under Blizzard's tracker, with no window to draw it", [
+        (C, "                      Keystone = true, MythicPlus = true }\n", "                      Keystone = true }\n")]),
+    ("/eqot status prints both Mythic+ lines on Classic, which loads no scenario provider", [
+        (C, '    if Registry:Get("scenarios") then\n', "    if true then\n")]),
+    ("/eqot status asks the Registry for a provider that does not exist, so neither Mythic+ line prints", [
+        (C, '    if Registry:Get("scenarios") then\n', '    if Registry:Get("scenario") then\n')]),
+    ("/eqot status asks the Registry with a dot call", [
+        (C, '    if Registry:Get("scenarios") then\n', '    if Registry.Get("scenarios") then\n')]),
+    ("/eqot status leaves out the Mythic+ key read", [
+        (C, '    if Registry:Get("scenarios") then\n        debugLine("Keystone")\n',
+            '    if Registry:Get("scenarios") then\n')]),
+    ("/eqot status leaves out the Mythic+ block", [
+        (C, '        debugLine("Keystone")\n        debugLine("MythicPlus")\n    end\n',
+            '        debugLine("Keystone")\n    end\n')]),
 
     ("/eqot status never says whether Blizzard's frame is shown", [
         (C, "        ns.stoodDown or 0, frameState))\n", "        ns.stoodDown or 0, \"\"))\n")]),

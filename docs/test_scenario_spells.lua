@@ -21,7 +21,9 @@ local function repoFile(rel)
     return "../" .. rel
 end
 
-local ns = { L = setmetatable({}, { __index = function(_, k) return k end }) }
+-- Has is Core/Compat.lua's table, which every flavor carries. Empty, so Data/Keystone.lua's key
+-- read answers "not on this client" and this delve carries no key.
+local ns = { L = setmetatable({}, { __index = function(_, k) return k end }), Has = {} }
 local mods = {}
 function ns:RegisterModule(n, t) mods[n] = t return t end
 function ns:GetModule(n) return mods[n] end
@@ -57,6 +59,8 @@ C_ScenarioInfo = {
 GetInstanceInfo = function() return "The Ring of Glory", "scenario", 0 end
 
 assert(loadfile(repoFile("Data/Entry.lua")))("EQObjectiveTracker", ns)
+-- Before the provider, as every TOC that loads the provider does: it captures the module at load
+assert(loadfile(repoFile("Data/Keystone.lua")))("EQObjectiveTracker", ns)
 
 -- The provider registers itself and is never put in ns.modules, so this is how it escapes
 local provider

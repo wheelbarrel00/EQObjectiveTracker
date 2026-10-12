@@ -36,6 +36,7 @@ The tracker shows your quests on Forever, and with Everything Quests and TomTom 
 *   Fonts, sizes, spacing, colors, progress bars, the card layout and borders are all yours to change
 *   Color quest titles by difficulty, in gold, in your class color, in a color you pick, or the way the game's own tracker does, and give the objective text, progress counts, finished objectives, finished quest titles and the NEW tag their own colors
 *   Fade the tracker down to as little as 10% opacity, with it coming back to full under the mouse and the quest you are following kept solid
+*   Shows a Mythic+ key's timer, keystone level, affixes and deaths, with the time left for +3 and +2, though it is not yet tested in a real key
 *   Hides itself in combat, in instances, on Mythic+ runs, while the world map is open, or when you have no quests showing, each optional
 *   Reads in German, French, Russian, Korean, Simplified Chinese and Traditional Chinese as well as English, picked up from your game client automatically
 *   Needs no other addon. Everything it uses is bundled.
@@ -86,6 +87,8 @@ On Retail and Forever both trackers use the game's own list of tracked quests. O
 
 **Scenarios and delves** draw the stage banner and its criteria, including weighted progress bars, along with the stage countdown, the delve tier, and a clickable button for any spell the stage hands you.
 
+**Mythic+ keys** get the key's own panel in the stage banner's place, the way the default tracker draws it: the keystone level, the affixes with their descriptions on hover, the time left with a bar that runs down, and the deaths, with the time they cost on hover. Under the bar it lists the time left for +3 and +2, and the bar is marked where each one runs out. The boss and Enemy Forces lines stay under it. Show the Mythic+ timer on the Tracker tab turns it off if you use a separate timer addon, and `/eqot mplus test` draws a sample key so you can see it without running one. **This could not be tested in a real key before release**, so please report anything that looks wrong, with what `/eqot mplus` prints during the key.
+
 **The bonus objectives HUD** is a separate movable readout covering the bonus loot mechanics inside a delve, with a lives and deaths readout for the run. Its background and border can be recolored, or switched off to leave the text floating. Off by default.
 
 **Achievements, professions and endeavors** each get a section. Professions count the reagents you have across every quality tier, and endeavors cover both the Traveler's Log monthly activities and the neighborhood tasks you have tracked.
@@ -135,6 +138,7 @@ Everything the tracker is actually for works on Classic: quests with zone subtit
 *   `/eqot status` prints what each section produced and what reached the screen
 *   `/eqot debug` toggles entry validation warnings
 *   `/eqot bonushud` prints what the bonus objectives HUD can see, or `test` to place it
+*   `/eqot mplus` prints what the tracker read for the current Mythic+ key, or `test` or `late` to draw a sample key
 *   `/eqot importeq` replaces this profile with your Everything Quests tracker settings
 *   `/eqot modules` lists the optional parts and which are switched off
 *   `/eqot disable <name>` switches off one part, or `all`, to narrow down a fault
@@ -147,7 +151,7 @@ Everything the tracker is actually for works on Classic: quests with zone subtit
 *   **Retail, Classic Era, TBC Anniversary and WoW Forever.** Retail, Classic Era and TBC Anniversary are supported, and what Classic lacks is listed above. Forever is a work in progress, see the note at the top. Mists of Pandaria Classic is not supported yet.
 *   **No dependencies.** Every library it needs is bundled.
 *   **Profiles** are supported and shared across all your characters, so you can keep different setups and switch between them.
-*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 505 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
+*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 507 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
 *   **World quests sit in their own pinned area** above or below the quest list rather than in the reorderable run, so a long world quest list can never push your quests off screen.
 *   Drag the strip along the top to move the tracker, and the corner grip to resize it.
 

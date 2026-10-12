@@ -5,6 +5,33 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-10-11
+
+### New Features
+
+- Mythic+ runs show the key's own panel at the top of the tracker, the way the default tracker does: the
+  keystone level, the affix icons with each affix's name and description when you hover one, the time
+  left, which turns red when time is up, with a bar that runs down under it, and the deaths, with the
+  time they cost when you hover the count. It marks a key that started depleted, and once time runs out
+  it marks whether the run still gets its loot. Beyond what the default tracker shows, the time left for
+  +3 and +2 is listed under the bar, each turning gray once it has passed, and the bar is marked where
+  each one runs out, worked out the usual way at 60 and 80 percent of the time limit. The panel takes the
+  stage banner's place during a key, with the boss and Enemy Forces lines under it as before. Until now
+  this tracker showed only the stage banner and those lines, because the timer, the affixes and the
+  deaths are drawn by the default tracker, which this one replaces. It is on by default, and Show the
+  Mythic+ timer on the Tracker tab turns it off for anyone using a separate timer addon. This could not
+  be tested in a real key before release, so please report anything that looks wrong, ideally with what
+  /eqot mplus prints during the key. Reported by Hermonii.
+- /eqot mplus prints what the tracker read for the current key. /eqot mplus test draws a sample key in
+  the tracker while no scenario is running, so the panel can be seen without running a key, and /eqot
+  mplus late draws a depleted one starting fifteen seconds before time runs out. The same command again
+  clears it, and a real scenario starting ends it. /eqot status carries the same two lines.
+
+### Improvements
+
+- Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and
+  Traditional Chinese cover the new Show the Mythic+ timer option.
+
 ## [2.3.0] - 2026-10-11
 
 ### New Features

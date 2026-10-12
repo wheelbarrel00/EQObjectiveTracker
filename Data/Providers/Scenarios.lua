@@ -2,6 +2,7 @@ local _, ns = ...
 
 local Entry    = ns:GetModule("Entry")
 local Registry = ns:GetModule("Registry")
+local Keystone = ns:GetModule("Keystone")
 local L        = ns.L
 
 local STATE, LINE, ICON = Entry.STATE, Entry.LINE, Entry.ICON
@@ -241,17 +242,72 @@ function Scenarios:IsAvailable()
     return ns.Has.Scenario and ns.Has.ScenarioCriteria
 end
 
+local function running(name, stage, numStages)
+    return name and numStages and numStages > 0 and stage and stage > 0
+end
+
+-- The switch stops the reads as well as the drawing, so it is a real off switch inside a key
+local function timerWanted()
+    local DB  = ns:GetModule("DB")
+    local cfg = DB and DB:Tracker()
+    return not (cfg and cfg.showMythicPlusTimer == false)
+end
+
+-- A real scenario ends a test, or the sample would come back after it with its clock long past
+-- time's up. Checked on the events too, since a hidden tracker skips the render, possibly until
+-- the scenario is over.
+local function endTest()
+    if Keystone:IsTesting() and running(readScenario()) then Keystone:SetTest(nil) end
+end
+
+-- /eqot mplus test, with no scenario running: a key panel drawn from Keystone's sample, with
+-- one Enemy Forces style bar under it. The bar carries no text, so the sample adds no phrase
+-- to translate.
+local TEST_FORCES = 63
+
+local function fillTest()
+    local key = Keystone:ReadTest()
+    local e = store:Acquire(ENTRY_ID)
+    e.title = key.mapName or L["Mythic+"]
+
+    Entry.BeginLines(e)
+    local ln = Entry.PushLine(e)
+    ln.text, ln.completed = "", false
+    ln.kind, ln.current, ln.required = LINE.WEIGHTED, TEST_FORCES, 100
+    Entry.EndLines(e)
+    e.state = STATE.ACTIVE
+
+    clearStepSpells()
+    facts.active       = true
+    facts.category     = L["Mythic+"]
+    facts.name         = key.mapName
+    facts.stageName    = key.mapName
+    facts.stage        = 1
+    facts.numStages    = 1
+    facts.scenarioType = MYTHIC_PLUS_TYPE
+    facts.textureKit   = nil
+    facts.widgetSetID  = nil
+    facts.criteria     = 1
+    facts.instType     = "party"
+    facts.diffID       = nil
+    facts.keystone     = key
+    return store:Finish()
+end
+
 function Scenarios:GetEntries()
     store:Begin()
 
     local scenarioName, currentStage, numStages, scenarioType, textureKit = readScenario()
-    local active = scenarioName and numStages and numStages > 0
-                   and currentStage and currentStage > 0
-    if not active then
+    if not running(scenarioName, currentStage, numStages) then
+        if Keystone:IsTesting() then return fillTest() end
+        Keystone:Idle("no scenario running")
         facts.active = false
         clearStepSpells()
         return store:Finish()
     end
+
+    -- endTest's render half
+    if Keystone:IsTesting() then Keystone:SetTest(nil) end
 
     local stageName, numCriteria, widgetSetID = readStep()
 
@@ -283,6 +339,7 @@ function Scenarios:GetEntries()
     facts.criteria     = total
     facts.instType     = instType
     facts.diffID       = diffID
+    facts.keystone     = timerWanted() and Keystone:Read() or Keystone:Idle("switched off")
 
     return store:Finish()
 end
@@ -304,6 +361,9 @@ function Scenarios:GetBanner()
     -- Provider owned and refilled by the next GetEntries, like the rest of this table
     banner.spells       = spellsOut
     banner.spellsN      = spellsN
+    -- Keystone's own reused table, valid until the next GetEntries like everything here
+    local key = facts.keystone
+    banner.keystone     = (key and key.active) and key or nil
 
     banner.themeR, banner.themeG, banner.themeB = nil, nil, nil
     if C_ScenarioInfo.GetDisplayInfo then
@@ -626,13 +686,60 @@ end
 -- timer here would only add latency.
 function Scenarios:Enable(notifyDirty)
     local Events = ns:GetModule("Events")
-    Events:On("SCENARIO_UPDATE",                     notifyDirty)
     Events:On("SCENARIO_CRITERIA_UPDATE",            notifyDirty)
     Events:On("SCENARIO_SPELL_UPDATE",               notifyDirty)
     Events:On("SCENARIO_CRITERIA_SHOW_STATE_UPDATE", notifyDirty)
     Events:On("SCENARIO_COMPLETED",                  notifyDirty)
     Events:On("ACTIVE_DELVE_DATA_UPDATE",            notifyDirty)
-    Events:On("PLAYER_ENTERING_WORLD",               notifyDirty)
+    Events:On("SCENARIO_UPDATE", function()
+        endTest()
+        notifyDirty()
+    end)
+
+    -- The events Blizzard's own key timer runs on, plus the end of a run. Between them the
+    -- panel counts down by itself, so none of these is needed for the clock to move.
+    Events:On("PLAYER_ENTERING_WORLD", function()
+        Keystone:Started()
+        endTest()
+        notifyDirty()
+    end)
+    Events:On("WORLD_STATE_TIMER_START", function(_, id)
+        Keystone:TimerStarted(id)
+        notifyDirty()
+    end)
+    Events:On("WORLD_STATE_TIMER_STOP", function(_, id)
+        Keystone:TimerStopped(id)
+        notifyDirty()
+    end)
+    Events:On("CHALLENGE_MODE_START", function()
+        Keystone:Started()
+        endTest()
+        notifyDirty()
+    end)
+    local function finished()
+        Keystone:Finished()
+        notifyDirty()
+    end
+    Events:On("CHALLENGE_MODE_COMPLETED",           finished)
+    Events:On("CHALLENGE_MODE_RESET",               finished)
+    Events:On("CHALLENGE_MODE_DEATH_COUNT_UPDATED", notifyDirty)
+end
+
+-- mode is "test" or "late". Asking for the mode already on clears it, and the other mode
+-- switches to that one. The second answer says why no sample key shows: "off" when this
+-- provider was never enabled, "scenario" while a real one is up (which ends any test), and
+-- "switched off" when the box hides the key panel and the banner shows instead.
+function Scenarios:ToggleKeystoneTest(mode)
+    if not self._notifyDirty then return false, "off" end
+    if running(readScenario()) then
+        Keystone:SetTest(nil)
+        return false, "scenario"
+    end
+    local on = Keystone:IsTesting() and Keystone:TestMode() == mode
+    local now = Keystone:SetTest(not on and mode or nil)
+    self._notifyDirty()
+    if now and not timerWanted() then return true, "switched off" end
+    return now, nil
 end
 
 Registry:Register(Scenarios)

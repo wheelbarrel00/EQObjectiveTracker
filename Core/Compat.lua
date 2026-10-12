@@ -75,6 +75,12 @@ Has.ScenarioBonus       = method(C_Scenario, "GetBonusSteps")
                           and method(C_ScenarioInfo, "GetCriteriaInfoByStep")
 Has.Map                 = method(C_Map, "GetBestMapForUnit")
 Has.MythicPlus          = method(C_ChallengeMode, "IsChallengeModeActive")
+-- The reads Blizzard's own key timer cannot do without. The death count and affix names are
+-- each pcalled where they are read, so a client lacking one still draws the timer.
+Has.ChallengeTimer      = method(C_ChallengeMode, "GetActiveChallengeMapID")
+                          and method(C_ChallengeMode, "GetMapUIInfo")
+                          and method(C_ChallengeMode, "GetActiveKeystoneInfo")
+                          and global("GetWorldElapsedTimers") and global("GetWorldElapsedTime")
 Has.Atlas               = method(C_Texture, "GetAtlasInfo")
 Has.AddOns              = method(C_AddOns, "IsAddOnLoaded")
 

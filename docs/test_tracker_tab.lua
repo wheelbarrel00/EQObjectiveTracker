@@ -117,7 +117,7 @@ local function trackerTab(o)
                  order = o.order or { "campaign", "quests", "achievements" } }
     local modules = {}
     local ns = {
-        Has = o.has or { SuperTrack = true },
+        Has = o.has or { SuperTrack = true, ChallengeTimer = true },
         L = setmetatable({}, { __index = function(_, k) return K(k) end }),
         Util = { Tooltip = function()
             return { Hide = function() st.tipHides = st.tipHides + 1 end, SetOwner = function() end,
@@ -166,7 +166,10 @@ local function trackerTab(o)
     }
     modules.Filter = { CATEGORIES = { { key = "showNormal", label = "Normal" } } }
     local tags = o.tags or { worldquest = true }
-    modules.Registry = { HasTag = function(_, tag) return tags[tag] == true end }
+    -- o.scenarios false is a client whose TOC loads no scenario provider (Era and TBC)
+    local providers = { scenarios = (o.scenarios ~= false) and { id = "scenarios" } or nil }
+    modules.Registry = { HasTag = function(_, tag) return tags[tag] == true end,
+                         Get = function(_, id) return providers[id] end }
     -- Every stub method checks self, so a call written with a dot raises here. In game the first
     -- argument becomes self, which raises or misreads wherever the method reads self or takes
     -- arguments.
@@ -764,7 +767,8 @@ local TRACKER_KEYS = { "showOnlyWatched", "simplifyMode", "splitQuestClick", "cl
                        "focusAcceptedQuests", "autoListZoneWorldQuests", "showQuestTotal",
                        "showQuestPopups", "stickySectionHeaders", "showOptionsIcon", "showSortButton", "trackerAlphaFocus",
                        "trackerAlphaHover", "showLevelInTracker", "showZoneTag", "showObjectiveNumbers",
-                       "showTrackerWidgets", "showQuestID", "showItemButtons", "showRecentlyAddedTag" }
+                       "showTrackerWidgets", "showMythicPlusTimer", "showQuestID", "showItemButtons",
+                       "showRecentlyAddedTag" }
 local GENERAL_KEYS = { "autoTrackAccepted", "restoreSuperTrackOnLogin", "useBlizzardTracker" }
 local function allSet(v, own, ownV)
     local cfg, gen = { filters = {} }, {}
@@ -854,10 +858,41 @@ local ROW_BOXES = {
     { "Show zone label under quest titles", "showZoneTag", false },
     { "Show objective progress numbers", "showObjectiveNumbers", true },
     { "Show event and scenario widgets", "showTrackerWidgets", true },
+    { "Show the Mythic+ timer", "showMythicPlusTimer", true },
     { "Show quest ID", "showQuestID", false },
     { "Show usable quest item buttons", "showItemButtons", true },
     { "Show NEW tag on recently accepted quests", "showRecentlyAddedTag", true },
 }
+
+-- Built only where the client has the challenge mode reads AND the TOC loaded the scenario
+-- provider: Classic carries some challenge mode functions and no provider to draw a key.
+-- Core/Compat.lua answers false, never nil, where a read is missing.
+case("the Mythic+ timer box sits under the widgets box, where the client can run a key", function()
+    local st = trackerTab()
+    local box = st.ui.boxes[K"Show the Mythic+ timer"]
+    ok(box ~= nil, "built on retail")
+    if not box then return end
+    local at = {}
+    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    local widgets = at[st.ui.boxes[K"Show event and scenario widgets"]]
+    ok(widgets ~= nil and at[box] == widgets + 1, "on the Options card straight under the widgets box: "
+       .. tostring(widgets) .. ", " .. tostring(at[box]))
+    ok(at[st.ui.boxes[K"Show quest ID"]] == at[box] + 1, "and above Show quest ID")
+    ok(box.dependent == false and box.fill == false, "neither indented nor full width")
+    ok(box.tipTitle == K"Show the Mythic+ timer", "its tooltip is titled as the box: " .. tostring(box.tipTitle))
+    ok(box.tipBody == K"During a Mythic+ run, draws the keystone level, the affixes, the time left with the +2 and +3 times, and the deaths in place of the stage banner. This tracker replaces the default one, so without this they are not shown anywhere.",
+       "and says what it draws: " .. tostring(box.tipBody))
+    ok(st.dims[box] == nil, "never dimmed")
+    for _, has in ipairs({ { SuperTrack = false, ChallengeTimer = false }, { SuperTrack = true, ChallengeTimer = false } }) do
+        local t = trackerTab({ has = has })
+        ok(t.ui.boxes[K"Show the Mythic+ timer"] == nil, "not built where the client cannot run a key")
+        ok(t.ui.boxes[K"Show event and scenario widgets"] ~= nil, "where the widgets box still is")
+    end
+    -- Era and TBC: the reads answer true from the stubs, and no scenario provider is loaded
+    local classic = trackerTab({ has = { SuperTrack = false, ChallengeTimer = true }, scenarios = false })
+    ok(classic.ui.boxes[K"Show the Mythic+ timer"] == nil, "not built with no scenario provider to draw a key")
+    ok(classic.ui.boxes[K"Show event and scenario widgets"] ~= nil, "while the widgets box still is")
+end)
 
 -- None changes a drawn row's look outside the text Row's repaint gate compares, so a redraw is enough.
 local PLAIN_BOXES = {
@@ -891,6 +926,11 @@ end
 
 case("a display box that changes how a row reads invalidates the rows before the redraw", function()
     local st = trackerTab()
+    -- A box whose unset reading is not the shipped default shows a tick the tracker does not follow
+    local shipped = shippedDefaults()
+    for _, r in ipairs(ROW_BOXES) do
+        ok(shipped[r[2]] == r[3], r[1] .. " reads unset as Core/DB.lua ships " .. r[2] .. ": " .. tostring(shipped[r[2]]))
+    end
     for _, r in ipairs(ROW_BOXES) do
         local box = st.ui.boxes[K(r[1])]
         ok(box ~= nil, r[1] .. " is built")

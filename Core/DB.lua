@@ -151,6 +151,9 @@ DB.defaults = {
             -- Also a NEW key. Blizzard shows these inside the tracker EQOT hides, so on
             -- is what restores what the stock tracker was already showing.
             showTrackerWidgets   = true,
+            -- A NEW key, on for the same reason: the key timer is Blizzard's too, and goes
+            -- with the tracker EQOT hides.
+            showMythicPlusTimer  = true,
             showQuestTotal       = true,
             stickySectionHeaders = true,
             showLevelInTracker   = false,

@@ -569,6 +569,12 @@ case("/eqot status names the tracker in use and the saved choice", function()
         m.AutoQuestPopups = { Refresh = function() built = built + 1 end }
         m.Feed = { Build = function() built = built + 1 end, stats = {}, byGroup = {} }
         m.Registry.Active = function() return { { id = "quests", _available = false } } end
+        -- Answers by id, as the real Registry does: a scenario provider only where a TOC loads one
+        m.Registry.Get = function(_, id)
+            if id == "scenarios" and not classic then return { id = "scenarios" } end
+        end
+        m.Keystone.DebugLine = function() return "mythic+: read" end
+        m.MythicPlus.DebugLine = function() return "mythic+ block: drawn" end
         m.Sections = { Order = function() return {} end, Known = function() return {} end }
         m.RowPool = { Count = function() return 0, 0 end }
         m.QuestieCoexist.DebugLine = function() return "questie coexist: hook missing" end
@@ -620,14 +626,20 @@ case("/eqot status names the tracker in use and the saved choice", function()
        "nor are the item buttons', which have no window to sit in")
     ok(count(t, "nothing grouped") == 0 and count(t, "ZoneGroups: off, Blizzard's tracker in use") == 1,
        "nor the zone headers', which have no feed to group")
+    ok(count(t, "mythic+: read") == 0 and count(t, "Keystone: off, Blizzard's tracker in use") == 1,
+       "nor the Mythic+ key read's, with no provider reading it")
+    ok(count(t, "mythic+ block: drawn") == 0 and count(t, "MythicPlus: off, Blizzard's tracker in use") == 1,
+       "nor the Mythic+ block's, with no window to draw it in")
     ok(built == 0, "and no feed is built for a tracker that is not there: " .. built)
     ok(provider:find("off, Blizzard's tracker in use", 1, true) ~= nil, "a provider says why it is off: " .. provider)
     ok(t.printed("QuestieCoexist: off, Blizzard's tracker in use") and not t.printed("hook missing"),
        "a stood-down module is named as off, not as broken")
     ok(t.printed("quest sound: ready"), "a kept module's own line still prints")
-    line = status(true, nil, true)
-    ok(line:find("| 11 module(s) standing down | Blizzard's frame hidden, 0 quest(s) watched", 1, true) ~= nil,
-       "Classic counts QuestLogChecks too, and an empty list explains a hidden frame: " .. line)
+    local classicLine, _, _, classicT = status(true, nil, true)
+    ok(classicLine:find("| 11 module(s) standing down | Blizzard's frame hidden, 0 quest(s) watched", 1, true) ~= nil,
+       "Classic counts QuestLogChecks too, and an empty list explains a hidden frame: " .. classicLine)
+    ok(count(classicT, "Keystone:") == 0 and count(classicT, "MythicPlus:") == 0 and count(classicT, "mythic+") == 0,
+       "Classic loads no scenario provider, so neither Mythic+ line prints at all")
     line = status(true, nil, true, function(env) env.QuestWatchFrame = nil; env.GetNumQuestWatches = nil end)
     ok(line:find("| Blizzard's frame absent, ? quest(s) watched", 1, true) ~= nil,
        "no frame and no count say so: " .. line)
@@ -649,6 +661,8 @@ case("/eqot status names the tracker in use and the saved choice", function()
        and count(t, "container none") == 1 and count(t, "ItemButtons: off") == 0,
        "EQOT's window: the tracker's and item buttons' own lines print as before")
     ok(built == 3, "EQOT's window: render, popups and the feed as before: " .. built)
+    ok(count(t, "mythic+: read") == 1 and count(t, "mythic+ block: drawn") == 1,
+       "EQOT's window: both Mythic+ lines print")
     ok(provider:find("unavailable on this client", 1, true) ~= nil, "and an unavailable provider reads so: " .. provider)
     ok(t.printed("questie coexist: hook missing"), "and every module's own line prints as before")
 end)
