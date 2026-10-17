@@ -32,6 +32,33 @@ F = "Options/Frame.lua"
 C = "Libs/EverythingUI/Context.lua"
 
 MUTANTS = [
+    # ------------------------------------------------------ the tracker's move mode window hooks
+    ("opening the window never tells the tracker", [
+        (F, '    self.frame:HookScript("OnShow", applyMoveMode)\n', "")]),
+
+    ("closing the window never tells the tracker, so the move bar stays up", [
+        (F, '    self.frame:HookScript("OnHide", applyMoveMode)\n', "")]),
+
+    ("the hooks replace the library's own scripts instead of following them", [
+        (F, '    self.frame:HookScript("OnShow", applyMoveMode)\n',
+            '    self.frame:SetScript("OnShow", applyMoveMode)\n')]),
+
+    ("the hook calls the tracker with a dot", [
+        (F, "        if Tracker and Tracker.ApplyMoveMode then Tracker:ApplyMoveMode() end\n",
+            "        if Tracker and Tracker.ApplyMoveMode then Tracker.ApplyMoveMode() end\n")]),
+
+    ("the hook raises with no tracker module", [
+        (F, "        if Tracker and Tracker.ApplyMoveMode then Tracker:ApplyMoveMode() end\n",
+            "        Tracker:ApplyMoveMode()\n")]),
+
+    ("the hook raises on a tracker module without the method", [
+        (F, "        if Tracker and Tracker.ApplyMoveMode then Tracker:ApplyMoveMode() end\n",
+            "        if Tracker then Tracker:ApplyMoveMode() end\n")]),
+
+    ("a second Build hooks the window again", [
+        (F, "    if self.frame then return end\n    self.frame = ui:BuildSettings(\"EQOTOptionsFrame\")\n",
+            "    self.frame = self.frame or ui:BuildSettings(\"EQOTOptionsFrame\")\n")]),
+
     # ------------------------------------------------------------ what each tab hands the library
     ("the tab's refresh is never passed on", [
         (F, "        refresh = def.refresh,\n", "")]),

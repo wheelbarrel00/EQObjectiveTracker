@@ -21,6 +21,7 @@ ns.CAT = {
     VOID_ACROPOLIS    = 1108,
     SUNSTRIDER_OMNIUM = 1109,
     COILED_ISLE       = 1110,
+    PROMISE_OF_TOMORROW = 1111,
 }
 
 -- Eversong Woods lists Silvermoon City (2393) on purpose so the city shows the zone's
@@ -37,6 +38,7 @@ ns.ZONE_CATEGORIES = {
     [ns.CAT.SUNSTRIDER_OMNIUM] = { name = "The Sunstrider Omnium",       mapIDs = {} },
     [ns.CAT.VOID_ACROPOLIS]    = { name = "Void Acropolis",              mapIDs = { 2599 } },
     [ns.CAT.COILED_ISLE]       = { name = "The Coiled Isle",             mapIDs = { 2512 } },
+    [ns.CAT.PROMISE_OF_TOMORROW] = { name = "The Promise of Tomorrow",   mapIDs = {},       campaignID = 349 },
 }
 
 ns.QUESTLINE_ROUTING = {
@@ -60,6 +62,7 @@ ns.QUESTLINE_ROUTING = {
     [5784] = { cat = ns.CAT.EVERSONG_WOODS, name = "The Drinking Debt" },
     [5804] = { cat = ns.CAT.EVERSONG_WOODS, name = "Theft Tracking" },
     [5958] = { cat = ns.CAT.EVERSONG_WOODS, name = "Daggerspine Landing" },
+    [6301] = { cat = ns.CAT.EVERSONG_WOODS, name = "Into the Labyrinth" },
     [5722] = { cat = ns.CAT.ZULAMAN, name = "Dis Was Our Land" },
     [5723] = { cat = ns.CAT.ZULAMAN, name = "Path of De Hashey" },
     [5938] = { cat = ns.CAT.ZULAMAN, name = "Where War Slumbers" },

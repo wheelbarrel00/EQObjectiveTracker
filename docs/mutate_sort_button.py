@@ -46,6 +46,18 @@ PICK = ('            local cfg = ns:GetModule("DB"):Tracker()\n'
         '            Options:RefreshIfShown("tracker")\n')
 
 MUTANTS = [
+    # ------------------------------------------------- the header pass and the tracker's move bar
+    ("the header pass never lays out the move bar", [
+        (TR, "    f._lastIcon = prev\n    self:LayoutMoveBar()\n", "    f._lastIcon = prev\n")]),
+
+    ("the header pass never tells the move bar which icon is leftmost", [
+        (TR, "    f._lastIcon = prev\n    self:LayoutMoveBar()\n", "    self:LayoutMoveBar()\n")]),
+
+    ("the move bar is laid out before the icons are placed", [
+        (TR, "    f._lastIcon = prev\n    self:LayoutMoveBar()\n", "    f._lastIcon = prev\n"),
+        (TR, "    local prev\n    for i = 1, #f.headerIcons do\n",
+             "    self:LayoutMoveBar()\n    local prev\n    for i = 1, #f.headerIcons do\n")]),
+
     # -------------------------------------------------------------- the header icon helper
     ("a function tooltip is shown as the function, never called", [
         (TR, '        if type(text) == "function" then text = text() end\n', "")]),
@@ -69,8 +81,8 @@ MUTANTS = [
         (TR, "        onClick(btn)\n", "        onClick()\n")]),
 
     ("a click on a click-through tracker still runs the handler", [
-        (TR, '    b:SetScript("OnClick", function(btn)\n        if Tracker:IsClickThrough() then return end\n',
-             '    b:SetScript("OnClick", function(btn)\n')]),
+        (TR, '    b:SetScript("OnClick", function(btn)\n        if Tracker:IsClickThrough() then return end\n        onClick(btn)\n',
+             '    b:SetScript("OnClick", function(btn)\n        onClick(btn)\n')]),
 
     ("a hover on a click-through tracker still lights the icon and opens the tooltip", [
         (TR, '    b:SetScript("OnEnter", function(btn)\n        if Tracker:IsClickThrough() then return end\n',
@@ -130,7 +142,7 @@ MUTANTS = [
              "    local items = { { text = self:SortLine() } }\n")]),
 
     ("the menu is opened with no owner, so it outlives a hidden tracker", [
-        (TR, "    Options.ui:ShowMenu(items, owner)\n", "    Options.ui:ShowMenu(items)\n")]),
+        (TR, "        end }\n    end\n    Options.ui:ShowMenu(items, owner)\n", "        end }\n    end\n    Options.ui:ShowMenu(items)\n")]),
 
     ("every row stores the last order in the list", [
         (TR, "            cfg.sortMode = value\n", "            cfg.sortMode = options[#options].value\n")]),
@@ -171,10 +183,10 @@ MUTANTS = [
 
     # -------------------------------------------------------------------- the header pass
     ("the sort button ships on", [
-        (TR, "cfg.showSortButton == true)", "cfg.showSortButton ~= false)")]),
+        (TR, "cfg ~= nil and cfg.showSortButton == true)", "cfg ~= nil and cfg.showSortButton ~= false)")]),
 
     ("any stored value that is not false shows the button", [
-        (TR, "cfg.showSortButton == true)", "cfg.showSortButton and true or false)")]),
+        (TR, "cfg ~= nil and cfg.showSortButton == true)", "cfg ~= nil and cfg.showSortButton and true or false)")]),
 
     ("the header pass never hides or shows the sort button", [
         (TR, "    if f.sortButton then f.sortButton:SetShown(cfg ~= nil and cfg.showSortButton == true) end\n", "")]),

@@ -75,6 +75,7 @@ lib.tokens = {
         groupLabel = { size = 12, weight = "SemiBold", color = "muted" },
         hint       = { size = 12, weight = "Regular",  color = "muted" },
         segment    = { size = 12, weight = "SemiBold", color = "navText" },
+        figure     = { size = 22, weight = "SemiBold", color = "text" },
     },
 
     spacing = {
@@ -87,6 +88,8 @@ lib.tokens = {
         navItemHeight      = 36,
         navItemPadding     = 12,
         navItemGap         = 2,
+        navChildHeight     = 28,
+        stripHeight        = 52,
         contentTop         = 20,
         contentSides       = 24,
         groupGap           = 22,

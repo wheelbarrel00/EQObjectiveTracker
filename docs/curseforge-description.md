@@ -30,6 +30,8 @@ The tracker shows your quests on Forever, and with Everything Quests and TomTom 
 *   Hover a quest to see its objectives and full rewards, with item level compared against what you have equipped
 *   Eight sort orders, including by distance and a manual order you drag into place, and an optional button on the tracker to switch between them in two clicks
 *   Filter by quest type, or show only the quests with an objective in your current zone, on Retail optionally keeping your campaign quests from every zone
+*   An optional filter button on the tracker lists the zone filter and every quest type in one menu, and turns gold while any of them is set to hide quests
+*   Split your sections across up to three tabs on Retail and Forever, switched from a strip at the top of the tracker
 *   Collapse, hide and reorder your sections, and keep a section's header in view while you scroll through it
 *   Group your quests under a header for each zone, each collapsing on its own, with the zones on your map first or in alphabetical order
 *   Gather your dungeon quests, heroic ones included, under one Dungeons header, with or without zone headers, and keep it at the bottom if you like
@@ -77,6 +79,10 @@ On Retail and Forever both trackers use the game's own list of tracked quests. O
 
 **A sort button**, off by default: tick **Show the sort button on the tracker** on the Tracker tab for a small button at the tracker's top left. It opens the list of sort orders with the current one named at the top, so switching between Level and Distance, or any two, takes two clicks.
 
+**A filter button**, off by default: turn on **Show the filter button on the tracker** on the Tracker tab for a funnel beside the sort button. Its list holds **Show only quests in current zone**, the quest types from the Filters card and **Reset filters to defaults**, and stays open while you check boxes, so several filters change in one go. The funnel turns gold while any of them is set to hide quests.
+
+**Section tabs**, on Retail and Forever, off by default: turn on **Show section tabs** on the Section Order card and the number beside each section, World Quests included, picks one of up to three tabs. Once two tabs hold a section, a strip under the top of the tracker switches between them, each tab named after its sections. The scenario panel shows on every tab, and each character keeps the tab it was on.
+
 **Quests you hand in from the tracker.** A finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt, shows a "click to complete" line, and left clicking it should open the reward window. That could not be tested on a finished hunt before release, so please report anything that looks wrong.
 
 **Hovering any quest** shows its objectives and everything it pays out: money, experience, currencies, and items with their item level set against what you are wearing.
@@ -103,7 +109,7 @@ On Retail and Forever both trackers use the game's own list of tracked quests. O
 
 **A zone progress bar** shows how far through a Midnight zone's questlines you are, either floating on its own or docked into the tracker as a section you can reorder.
 
-**Make it yours.** Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick, or in Original Style, the way the game's own tracker colors them on your version of the game. The objective text, a count like 0/5 as it goes from none done to in progress to done, finished objectives, the title of a finished quest and the NEW tag on quests you accepted in the last hour can each take a color of their own. There are 42 bundled fonts plus anything from LibSharedMedia, each shown in its own typeface in the picker, 7 status bar textures, and 31 sounds (27 voice lines and 4 chimes), plus a card layout with quest type tints, border thickness, header bars, section and zone headers that stay in view while you scroll, zone headers with a size, color, bar, divider and indent of their own, and scroll bar skinning. Settings live in profiles you can switch between.
+**Make it yours.** Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick, or in Original Style, the way the game's own tracker colors them on your version of the game. The objective text, a count like 0/5 as it goes from none done to in progress to done, finished objectives, the title of a finished quest and the NEW tag on quests you accepted in the last hour can each take a color of their own. There are 42 bundled fonts plus anything from LibSharedMedia, each shown in its own typeface in the picker, 7 status bar textures, and 31 sounds (27 voice lines and 4 chimes), plus a card layout with quest type tints, border thickness, header bars, section and zone headers that stay in view while you scroll, zone headers with a size, color, bar, divider and indent of their own, and scroll bar skinning and width. Settings live in profiles you can switch between.
 
 **Read the changelog in game.** The About tab carries the full release history, the commands, a Discord link, and a live view of what each section is currently producing.
 
@@ -151,9 +157,9 @@ Everything the tracker is actually for works on Classic: quests with zone subtit
 *   **Retail, Classic Era, TBC Anniversary and WoW Forever.** Retail, Classic Era and TBC Anniversary are supported, and what Classic lacks is listed above. Forever is a work in progress, see the note at the top. Mists of Pandaria Classic is not supported yet.
 *   **No dependencies.** Every library it needs is bundled.
 *   **Profiles** are supported and shared across all your characters, so you can keep different setups and switch between them.
-*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 507 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
+*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 514 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
 *   **World quests sit in their own pinned area** above or below the quest list rather than in the reorderable run, so a long world quest list can never push your quests off screen.
-*   Drag the strip along the top to move the tracker, and the corner grip to resize it.
+*   Unlock the tracker to move it: drag the strip along the top, which turns gold with a lock button while the options window is open or after an unlock, and the corner grip to resize it. Right click that strip or the cogwheel to unlock, lock or reset it.
 
 ***
 

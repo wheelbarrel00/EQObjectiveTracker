@@ -590,6 +590,10 @@ MUTANTS = [
         (D, '    "showProgressBars", "showQuestProgressBars", "showScenarioProgressBars",\n}\n',
             '    "showProgressBars", "showQuestProgressBars", "showScenarioProgressBars",\n}\n'
             'DB.FADE_KEYS = {\n    "trackerAlpha", "trackerAlphaHover", "trackerAlphaFocus",\n}\n')]),
+
+    # Scan 1 (2026-10-16). The tab strip is the newest drawn part.
+    ("hovering the section tab strip does not bring the tracker up", [
+        (V, "    if over(f.tabStrip) then return true end\n", "")]),
 ]
 
 SUMMARY = re.compile(r"^test_visibility: (\d+) passed, (\d+) failed$")

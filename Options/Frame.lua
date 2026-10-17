@@ -76,6 +76,13 @@ end
 function Options:Build()
     if self.frame then return end
     self.frame = ui:BuildSettings("EQOTOptionsFrame")
+    -- An unlocked tracker shows its move bar while this window is open.
+    local function applyMoveMode()
+        local Tracker = ns:GetModule("Tracker")
+        if Tracker and Tracker.ApplyMoveMode then Tracker:ApplyMoveMode() end
+    end
+    self.frame:HookScript("OnShow", applyMoveMode)
+    self.frame:HookScript("OnHide", applyMoveMode)
 end
 
 function Options:ApplyWindowScale()

@@ -169,10 +169,19 @@ cogwheel, untick Show the options cogwheel on the tracker on the Tracker tab, an
 opens the window. The Appearance tab
 draws a sample tracker beside its settings that changes as you adjust them.
 
-Drag the strip along the top to move the tracker, and the corner grip to resize it. Tick Show
-the sort button on the tracker, on the Tracker tab, for a small button at the tracker's top left
-that opens a list of the sort orders, so switching between Level and Distance, or any other two,
-takes two clicks.
+While the tracker is unlocked, drag the strip along the top to move it and the corner grip to
+resize it. With the options window open, or after an unlock, that strip turns gold with a check
+button that locks the tracker again, and a gold outline shows its edges. Right-click the strip or
+the cogwheel for Unlock or Lock position, Reset position and size, and Open the options panel. Tick
+Show the sort button on the tracker, on the Tracker tab, for a small button at the tracker's top
+left that opens a list of the sort orders, so switching between Level and Distance, or any other
+two, takes two clicks. Show the filter button on the tracker adds a funnel beside it whose list
+holds Show only quests in current zone, the quest types and Reset filters to defaults, and stays
+open while you change them. The funnel turns gold while any of them is set to hide quests.
+On retail and WoW Forever, Show section tabs on the Section Order card splits the tracker into up
+to three tabs. The number beside each section picks its tab, and once two tabs hold a section a
+strip under the top of the tracker switches between them. The scenario panel shows on every tab,
+and each character keeps the tab it was on.
 Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. On
 retail and WoW Forever two options on the Tracker tab change how focusing works: Click a focused quest
 to unfocus it makes a click on the quest you are following unfocus it, and turning off Focus newly
@@ -204,9 +213,9 @@ bar, and the delve or scenario panel.
 
 Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
 shown in its own typeface in the picker), sizes, spacing, colors, opacity (back to full under
-the mouse, with the quest you are following kept solid), the progress bars, a card
-layout that can wrap the delve and scenario panel as well as your quests, section order and
-visibility, filters by quest type, and eight sort modes including by distance and by hand.
+the mouse, with the quest you are following kept solid), the progress bars, the scroll bar's
+width, a card layout that can wrap the delve and scenario panel as well as your quests, section
+order, visibility and tabs, filters by quest type, and eight sort modes including by distance and by hand.
 The current-zone filter shows only quests with an objective on the map you are standing on.
 If that map lists none of its own, such as a building interior, a covenant sanctum or a
 dungeon, it asks the zone around it instead, so you still get that zone's quests rather

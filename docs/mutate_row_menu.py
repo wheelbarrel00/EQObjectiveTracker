@@ -342,7 +342,7 @@ MUTANTS = [
             '    combat      = "You cannot abandon a quest while in combat.",')]),
     # The fields the harness checks are read from the vendored library, so a change there is seen.
     ("the library stops taking danger, which Abandon carries", [
-        (M, 'local ITEM_FIELDS = { kind = "string", text = "string", danger = "boolean", onClick = "function" }', 'local ITEM_FIELDS = { kind = "string", text = "string", onClick = "function" }')]),
+        (M, 'local ITEM_FIELDS = { kind = "string", text = "string", danger = "boolean", onClick = "function",', 'local ITEM_FIELDS = { kind = "string", text = "string", onClick = "function",')]),
 ]
 
 SUMMARY = re.compile(r"^test_row_menu: (\d+) passed, (\d+) failed$")

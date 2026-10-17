@@ -94,7 +94,7 @@ end
 
 local function frame()
     local f = { shown = true, scripts = {}, enabled = true }
-    function f:SetPoint() end
+    function f:SetPoint(...) self.points = self.points or {} self.points[#self.points + 1] = { ... } end
     function f:Show() self.shown = true end
     function f:Hide() self.shown = false end
     function f:SetShown(v) self.shown = v and true or false end
@@ -103,7 +103,8 @@ local function frame()
     function f:SetText(s) self.text = s end
     function f:SetEnabled(v) self.enabled = v and true or false end
     function f:SetScript(e, fn) self.scripts[e] = fn end
-    function f:HookScript() end
+    function f:HookScript(e, fn) self.hooks = self.hooks or {} self.hooks[e] = fn end
+    function f:SetHeight(h) self.height = h end
     return f
 end
 
@@ -119,9 +120,19 @@ local function trackerTab(o)
     local ns = {
         Has = o.has or { SuperTrack = true, ChallengeTimer = true },
         L = setmetatable({}, { __index = function(_, k) return K(k) end }),
+        -- One tooltip for the whole tab, as Core/Util.lua's shared one is, recording each hover.
         Util = { Tooltip = function()
-            return { Hide = function() st.tipHides = st.tipHides + 1 end, SetOwner = function() end,
-                     SetText = function() end, AddLine = function() end, Show = function() end }
+            local tip = st.tip
+            if not tip then
+                tip = { lines = {} }
+                function tip.Hide() st.tipHides = st.tipHides + 1 tip.shown = false end
+                function tip.SetOwner(_, owner) tip.owner, tip.lines, tip.title, tip.alpha = owner, {}, nil, nil end
+                function tip.SetText(_, text, _, _, _, a) tip.title, tip.alpha = text, a end
+                function tip.AddLine(_, text) tip.lines[#tip.lines + 1] = text end
+                function tip.Show() tip.shown = true end
+                st.tip = tip
+            end
+            return tip
         end },
     }
     function ns:GetModule(name) return modules[name] end
@@ -130,13 +141,38 @@ local function trackerTab(o)
     modules.DB = realDB({ tracker = st.cfg, general = st.gen })
     st.seq = {}
     modules.Tracker = {
-        Render = function() st.render = st.render + 1; st.seq[#st.seq + 1] = "render" end,
+        Render = function()
+            st.render = st.render + 1
+            st.seq[#st.seq + 1] = "render"
+            st.tabsAtRender = st.cfg.showTabs
+        end,
         ApplyWorldQuestsPosition = function() st.seq[#st.seq + 1] = "anchor" end,
         ApplyHeaderIcons = function()
             st.icons = st.icons + 1
             st.iconsSaw, st.sortSaw = st.cfg.showOptionsIcon, st.cfg.showSortButton
+            st.filterSaw = st.cfg.showFilterButton
         end,
         SetWorldQuestsPosition = function(_, v) st.wqPositions[#st.wqPositions + 1] = v end,
+        MAX_TABS = 3,
+        -- Worked out here from the fixture rather than borrowed from UI/Tracker.lua, whose own rules
+        -- are test_tabs.lua's: two sections that are neither the zone bar nor the scenario panel,
+        -- and a section draws unless it is hidden or is the zone bar left undocked.
+        TabsOffered = function()
+            local n = 0
+            for _, id in ipairs(o.known or { "campaign", "quests", "achievements" }) do
+                if id ~= "zoneprogress" and id ~= "scenarios" then n = n + 1 end
+            end
+            return n >= 2
+        end,
+        DrawsOnTab = function(_, id)
+            if st.hidden[id] then return false end
+            return id ~= "zoneprogress" or st.docked == true
+        end,
+        -- The stored tab or 1, the shape the real one returns for any value it accepts.
+        SectionTab = function(_, id)
+            local t = st.cfg.sectionTab and st.cfg.sectionTab[id]
+            return (t == 2 or t == 3) and t or 1
+        end,
     }
     modules.Row = { Invalidate = function() st.invalidate = st.invalidate + 1 end }
     modules.Media = {
@@ -145,6 +181,8 @@ local function trackerTab(o)
     }
     modules.Sections = {
         Known = function() return o.known or { "campaign", "quests", "achievements" } end,
+        IsVirtual = function(_, id) return id == "zoneprogress" end,
+        IsContainer = function(_, id) return id == "scenarios" end,
         Order = function()
             local out = {}
             for i, id in ipairs(st.order) do out[i] = id end
@@ -200,7 +238,12 @@ local function trackerTab(o)
             c.rows[#c.rows + 1] = control
             control.dependent = opts and opts.dependent and true or false
             control.fill = opts and opts.fill and true or false
-            return frame()
+            -- The row frame the card hands back, kept so a control anchored to it can be checked.
+            local row = frame()
+            row.control = control
+            c.rowFrames = c.rowFrames or {}
+            c.rowFrames[#c.rowFrames + 1] = row
+            return row
         end
         card.layouts = 0
         card.Layout = function(c) c.layouts = c.layouts + 1 end
@@ -235,7 +278,13 @@ local function trackerTab(o)
         ui.radios[label] = f
         return f
     end
-    function ui:CreateButton(_, label, _, onClick) local f = frame() f.label, f.onClick = label, onClick return f end
+    function ui:CreateButton(_, label, width, onClick)
+        local f = frame()
+        f.label, f.width, f.onClick = label, width, onClick
+        st.buttons = st.buttons or {}
+        st.buttons[#st.buttons + 1] = f
+        return f
+    end
     function ui:CreateText(_, text, style) local f = frame() f.text, f.style = text, style return f end
     function ui:CreateIconButton(_, icon, size, flip)
         local f = frame()
@@ -248,7 +297,18 @@ local function trackerTab(o)
     end
     function ui:SetDependent(control, on) st.dims[control] = on and true or false end
     function ui:MeasureContent(content) st.measured[#st.measured + 1] = content end
-    function ui:Spacing() return 10 end
+    -- The library's own figures, read off its token file, and an unknown name raises as it does there.
+    local SPACING = {}
+    do
+        local fh = assert(io.open(repoFile("Libs/EverythingUI/Tokens.lua"), "r"))
+        local block = fh:read("*a"):match("\n    spacing = (%b{})")
+        fh:close()
+        assert(block, "Tokens.lua's spacing table is found")
+        for k, v in block:gmatch("(%w+)%s*=%s*(%d+)") do SPACING[k] = tonumber(v) end
+        assert(SPACING.rowPadding and SPACING.groupGap and SPACING.rowPadding ~= SPACING.groupGap,
+               "the two figures this tab reads are found, and differ")
+    end
+    function ui:Spacing(key) return SPACING[key] or error("no spacing named " .. tostring(key), 2) end
 
     assert(loadfile(repoFile("Options/TabTracker.lua")))("EQObjectiveTracker", ns)
     st.content = { _controls = {} }
@@ -257,12 +317,12 @@ local function trackerTab(o)
     return st
 end
 
--- The Section Order card's rows after the World Quests Position control, each with the chevrons
--- that carry its section id.
+-- The Section Order card's rows after the World Quests Position control and the Show section tabs
+-- box, each with the chevrons that carry its section id.
 local function orderRows(st)
     local out = {}
     local rows = st.ui.cards[K"Section Order"].rows
-    for i = 2, #rows do
+    for i = 3, #rows do
         local name = rows[i]
         local up, down
         for _, a in ipairs(st.arrows) do
@@ -276,10 +336,11 @@ local function orderRows(st)
 end
 
 -- Arrows are matched to their row by build order: each row builds its down chevron, then its up.
+-- The section rows start at the card's third row, after World Quests Position and Show section tabs.
 local function tagArrows(st)
     local rows = st.ui.cards[K"Section Order"].rows
-    for i = 2, #rows do
-        local down, up = st.arrows[(i - 2) * 2 + 1], st.arrows[(i - 2) * 2 + 2]
+    for i = 3, #rows do
+        local down, up = st.arrows[(i - 3) * 2 + 1], st.arrows[(i - 3) * 2 + 2]
         if down then down.row = rows[i] end
         if up then up.row = rows[i] end
     end
@@ -642,6 +703,7 @@ case("the tracker hides the cogwheel on the key this box writes", function()
 
     local cog = icon("showOptionsIcon")
     T.frame = { headerIcons = { cog } }
+    function T:LayoutMoveBar() end
     local clicks = 0
     specs[1] = { id = "chain", texture = "path/chain.tga", tooltip = "Chain Guide",
                  onClick = function() clicks = clicks + 1 end }
@@ -765,7 +827,8 @@ end
 -- getter or setter that reads or writes a neighbor fails when they are all set one way.
 local TRACKER_KEYS = { "showOnlyWatched", "simplifyMode", "splitQuestClick", "clickToUnfocus",
                        "focusAcceptedQuests", "autoListZoneWorldQuests", "showQuestTotal",
-                       "showQuestPopups", "stickySectionHeaders", "showOptionsIcon", "showSortButton", "trackerAlphaFocus",
+                       "showQuestPopups", "stickySectionHeaders", "showOptionsIcon", "showSortButton",
+                       "showFilterButton", "trackerAlphaFocus",
                        "trackerAlphaHover", "showLevelInTracker", "showZoneTag", "showObjectiveNumbers",
                        "showTrackerWidgets", "showMythicPlusTimer", "showQuestID", "showItemButtons",
                        "showRecentlyAddedTag" }
@@ -992,6 +1055,207 @@ case("the sort button box sits under the cogwheel's, reads off while unset, and 
        "unset beside neighbors all on, it still reads off")
     ok(allSet(false, "showSortButton", true).ui.boxes[K"Show the sort button on the tracker"].getter() == true,
        "and on beside neighbors all off")
+end)
+
+-- Requested by bramer26 (2026-10-15). The strip on the tracker is test_tabs.lua's: this card only
+-- stores which tab each section sits on, and whether tabs are on.
+case("Show section tabs sits under World Quests Position, and each row's button moves its section", function()
+    local st = trackerTab()
+    local box = st.ui.boxes[K"Show section tabs"]
+    ok(box ~= nil and st.ui.cards[K"Section Order"].rows[2] == box, "the second row of Section Order")
+    if not box then return end
+    ok(box.tooltip == K"Splits the tracker into up to three tabs. Use the number beside each section below to choose its tab, then click a tab at the top of the tracker to show only the sections on it. The scenario panel shows on every tab, and the tabs appear once two of them hold a section.",
+       "with its own tooltip: " .. tostring(box.tooltip))
+    ok(box.getter() == false, "off while unset")
+
+    local function tabButton(id)
+        for _, b in ipairs(st.buttons or {}) do
+            if b.sectionID == id then return b end
+        end
+    end
+    for _, id in ipairs({ "campaign", "quests", "achievements", "worldquests" }) do
+        local b = tabButton(id)
+        ok(b ~= nil, id .. " has a tab button")
+        ok(b and b.shown == false, id .. "'s is hidden while tabs are off")
+        ok(b and b.width == 24 and b.height == 24, id .. "'s is the arrows' 24 px square")
+        ok(b and tostring(b.text) == "1", id .. "'s reads 1 while unmoved: " .. tostring(b and b.text))
+    end
+
+    local ren = st.render
+    setOnly(st, box, true, "showTabs")
+    ok(st.render == ren + 1, "ticked, the tracker redraws")
+    ok(box.getter() == true, "and reads back on")
+    ok(tabButton("quests").shown and tabButton("campaign").shown and tabButton("worldquests").shown,
+       "and every tab button shows, World Quests' too")
+
+    local q = tabButton("quests")
+    q.onClick(q)
+    ok(st.cfg.sectionTab and st.cfg.sectionTab.quests == 2, "a click moves Quests to tab 2")
+    ok(st.render == ren + 2, "and redraws")
+    ok(tostring(tabButton("quests").text) == "2", "and its button reads 2: " .. tostring(tabButton("quests").text))
+    q.onClick(q)
+    ok(st.cfg.sectionTab.quests == 3, "the next click, tab 3")
+    q.onClick(q)
+    ok(st.cfg.sectionTab.quests == nil, "and round to 1, stored as nothing")
+    ok(st.cfg.sectionTab.campaign == nil and st.cfg.sectionTab.achievements == nil, "no other section moved")
+    local wq = tabButton("worldquests")
+    wq.onClick(wq)
+    ok(st.cfg.sectionTab.worldquests == 2, "World Quests' button moves World Quests")
+    ok(tostring(tabButton("worldquests").text) == "2", "and reads 2: " .. tostring(tabButton("worldquests").text))
+
+    -- Only a real true counts, as the tracker reads it: a stray value left in a profile shows nothing.
+    st.cfg.showTabs = 1
+    q.onClick(q)
+    ok(not tabButton("campaign").shown and not tabButton("worldquests").shown, "a stored 1 does not show the buttons")
+    st.cfg.showTabs = true
+
+    setOnly(st, box, false, "showTabs")
+    ok(not tabButton("quests").shown and not tabButton("worldquests").shown, "unticked, the buttons hide again")
+
+    local classic = trackerTab({ tags = {} })
+    local cb = classic.ui.boxes[K"Show section tabs"]
+    cb.setter(true)
+    local wqb
+    for _, b in ipairs(classic.buttons or {}) do if b.sectionID == "worldquests" then wqb = b end end
+    ok(wqb and wqb.shown == false, "with no world quests on the client, their button never shows")
+end)
+
+case("a tab button sits by its row's chevrons, names its section on hover, and follows a reorder", function()
+    local st = trackerTab({ cfg = { filters = {}, showTabs = true } })
+    tagArrows(st)
+    local rows = orderRows(st)
+    local function tabBeside(up)
+        for _, b in ipairs(st.buttons or {}) do
+            local p = b.points and b.points[1]
+            if p and p[2] == up then return b, p end
+        end
+    end
+    local first, p = tabBeside(rows[1].up)
+    ok(first and p[1] == "RIGHT" and p[3] == "LEFT" and p[4] == -4 and p[5] == 0,
+       "row 1's tab button sits 4 px left of that row's up chevron, the chevrons' own gap")
+    if not first then return end
+    ok(tabBeside(rows[2].up) ~= nil and tabBeside(rows[2].up) ~= first, "and row 2 has one of its own")
+
+    local wq
+    for _, b in ipairs(st.buttons or {}) do if b.sectionID == "worldquests" then wq = b end end
+    local wqRow
+    for _, r in ipairs(st.ui.cards[K"Section Order"].rowFrames or {}) do
+        if r.control == st.ui.radios[K"World Quests Position"] then wqRow = r end
+    end
+    local wp = wq and wq.points and wq.points[1]
+    ok(wp and wp[1] == "RIGHT" and wp[2] == wqRow and wp[3] == "RIGHT" and wp[4] == -14,
+       "World Quests' sits at the right end of the World Quests Position row, inside its padding")
+
+    first.hooks.OnEnter(first)
+    ok(st.tip.owner == first and st.tip.title == "title:campaign", "hovered, it names its section: " .. tostring(st.tip.title))
+    ok(st.tip.alpha == 1, "in a title drawn at full alpha: " .. tostring(st.tip.alpha))
+    ok(st.tip.lines[1] == K"Which tab this section sits on. Click to move it to the next tab." and st.tip.shown,
+       "with what the button does under it, and shown")
+    local hides = st.tipHides
+    first.hooks.OnLeave(first)
+    ok(st.tipHides == hides + 1 and not st.tip.shown, "and put away on leaving")
+
+    rows[2].up.scripts.OnClick()
+    rows = orderRows(st)
+    ok(tabBeside(rows[1].up) == first, "after Quests moves up, row 1 keeps its own tab button")
+    first.onClick(first)
+    ok(st.cfg.sectionTab and st.cfg.sectionTab.quests == 2 and st.cfg.sectionTab.campaign == nil,
+       "which now moves Quests, the section the row names")
+end)
+
+case("a tab button is dimmed while its section makes no tab, and lit again once it does", function()
+    local st = trackerTab({ known = { "zoneprogress", "campaign", "quests" }, order = { "zoneprogress", "campaign", "quests" },
+                            cfg = { filters = {}, showTabs = true } })
+    tagArrows(st)
+    local function tabBeside(up)
+        for _, b in ipairs(st.buttons or {}) do
+            local pt = b.points and b.points[1]
+            if pt and pt[2] == up then return b end
+        end
+    end
+    local rows = orderRows(st)
+    local zone, quests = tabBeside(rows[1].up), tabBeside(rows[3].up)
+    ok(zone and st.dims[zone] == false, "the zone bar left undocked: Zone Progress's button dimmed")
+    ok(quests and st.dims[quests] == true, "Quests' lit")
+    rows[2].up.scripts.OnClick()
+    rows = orderRows(st)
+    ok(st.dims[tabBeside(rows[1].up)] == true and st.dims[tabBeside(rows[2].up)] == false,
+       "after Campaign moves up, the dim follows Zone Progress to row 2")
+    rows[1].down.scripts.OnClick()
+    rows = orderRows(st)
+    ok(st.dims[tabBeside(rows[1].up)] == false and st.dims[tabBeside(rows[2].up)] == true,
+       "and back to row 1 when it moves back")
+    st.docked = true
+    st.spec.refresh(st.ui, st.content)
+    ok(st.dims[zone] == true, "docked from the Appearance tab: lit again when this tab is shown")
+    st.ui.boxes[K"Quests section"].setter(false)
+    ok(st.dims[quests] == false, "unchecking Quests section on this tab dims its button at once")
+    st.ui.boxes[K"Quests section"].setter(true)
+    ok(st.dims[quests] == true, "and checking it again lights it")
+    local wq
+    for _, b in ipairs(st.buttons or {}) do if b.sectionID == "worldquests" then wq = b end end
+    ok(wq and st.dims[wq] == true, "World Quests' own button lit while they show")
+    st.hidden.worldquests = true
+    st.spec.refresh(st.ui, st.content)
+    ok(wq and st.dims[wq] == false, "and dimmed while World Quests are hidden")
+end)
+
+case("Show section tabs stores the switch before the tracker redraws", function()
+    local st = trackerTab()
+    local box = st.ui.boxes[K"Show section tabs"]
+    box.setter(true)
+    ok(st.tabsAtRender == true, "the redraw sees tabs on")
+    box.setter(false)
+    ok(st.tabsAtRender == false, "and off")
+end)
+
+-- Classic Era and TBC load the one quests provider, so Zone Progress and Quests are all they know,
+-- plus the scenario panel this fixture adds.
+case("with only one section that can take a tab, there is no Show section tabs box", function()
+    local era = trackerTab({ known = { "zoneprogress", "quests", "scenarios" }, order = { "zoneprogress", "quests" },
+                             tags = {}, cfg = { filters = {}, showTabs = true, sectionTab = { quests = 2 } } })
+    ok(era.ui.boxes[K"Show section tabs"] == nil, "Zone Progress and Quests: no box")
+    local rows = era.ui.cards[K"Section Order"].rows
+    ok(#rows == 3, "so the card holds World Quests Position and the two section rows: " .. #rows)
+    local shown = 0
+    for _, b in ipairs(era.buttons or {}) do
+        if b.sectionID and b.shown then shown = shown + 1 end
+    end
+    ok(shown == 0, "and no tab button shows, whatever a profile says: " .. shown)
+    local two = trackerTab({ known = { "zoneprogress", "campaign", "quests" } })
+    ok(two.ui.boxes[K"Show section tabs"] ~= nil, "two that can: the box is built")
+end)
+
+-- Requested by Tyrial and bramer26 (2026-10-15). The button itself is test_filter_button.lua's: this
+-- box only stores the key and asks the tracker's header pass to show or hide it.
+case("the filter button box sits under the sort button's, reads off while unset, and applies at once", function()
+    local st = trackerTab()
+    local box = st.ui.boxes[K"Show the filter button on the tracker"]
+    ok(box ~= nil, "the box is built")
+    if not box then return end
+    local at = {}
+    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    local sortBox = at[st.ui.boxes[K"Show the sort button on the tracker"]]
+    ok(sortBox ~= nil and at[box] == sortBox + 1, "on the Options card straight under the sort button box: "
+       .. tostring(sortBox) .. ", " .. tostring(at[box]))
+    ok(box.dependent == false and box.fill == false, "neither indented nor full width")
+    ok(box.tooltip == K"A small funnel at the top-left of the tracker that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default.",
+       "with its own tooltip: " .. tostring(box.tooltip))
+    ok(st.dims[box] == nil, "never dimmed")
+    ok(box.getter() == false, "off while unset")
+    local icons, ren, inv = st.icons, st.render, st.invalidate
+    setOnly(st, box, true, "showFilterButton")
+    ok(st.icons == icons + 1 and st.filterSaw == true, "ticked, it stores on before the header pass shows the button")
+    ok(st.render == ren and st.invalidate == inv, "and neither redraws the list nor invalidates the rows")
+    ok(box.getter() == true, "and reads back on")
+    setOnly(st, box, false, "showFilterButton")
+    ok(st.icons == icons + 2 and st.filterSaw == false and box.getter() == false, "unticked, the same the other way")
+    ok(allSet(true, "showFilterButton", nil).ui.boxes[K"Show the filter button on the tracker"].getter() == false,
+       "unset beside neighbors all on, it still reads off")
+    ok(allSet(false, "showFilterButton", true).ui.boxes[K"Show the filter button on the tracker"].getter() == true,
+       "and on beside neighbors all off")
+    ok(shippedDefaults().showFilterButton == false, "and Core/DB.lua ships it off, as the box says: "
+       .. tostring(shippedDefaults().showFilterButton))
 end)
 
 case("the tracker's sort button offers the dropdown's own list, and a view follows its pick", function()

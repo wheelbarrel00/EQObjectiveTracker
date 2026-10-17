@@ -9,6 +9,26 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.5.0", date = "2026-10-16",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Pop Out Quest Details on a quest's right-click menu opened an empty window on WoW Forever. It now opens the quest's details through the game's own quest log code. Reported by DugFromTheEarth.",
+                "On Classic Era and TBC Anniversary with no color picker addon installed, the opacity slider in the color picker ran backwards for this addon's colors, so moving it toward opaque made a color more see-through. It now runs the same way as the game's own.",
+                "A font that another addon registered but whose file is missing no longer breaks the font list in the options window.",
+            } },
+            { head = "New Features", items = {
+                "A filter button at the top-left of the tracker, beside the sort button. A click opens a list with Show only quests in current zone at the top, then the quest types from the Filters card, then Reset filters to defaults, and the list stays open while you check boxes, so several filters can be changed in one go. The funnel turns gold while any filter in the list is set to hide quests. Show the filter button on the tracker on the Tracker tab turns it on, and it is off by default. Requested by Tyrial and bramer26.",
+                "Section tabs. Show section tabs on the Tracker tab's Section Order card splits the tracker into up to three tabs: the number beside each section, World Quests included, picks its tab, and once two tabs hold a section a strip under the top of the tracker switches between them. Each tab is named after its sections, and hovering one lists them in full. The scenario panel shows on every tab, a tab opens at its top, and the tab on screen is remembered for each character. Once a quest item or scenario spell button has been on the tracker since the last login or reload, a tab picked during a fight opens when the fight ends, since those buttons cannot move in combat. A section the tracker does not draw, such as a hidden one or a floating zone bar, has its number dimmed and keeps its tab for when it comes back. It is off by default, and appears on retail and WoW Forever, since Classic Era and TBC Anniversary have one quest section. Requested by bramer26.",
+                "Scroll Bar Width on the Appearance tab's Scroll Bar card sets how wide the tracker's scroll bar is, from 4 to 16. At 16, the default, it is the game's own bar. Narrower, it becomes a flat strip in the Thumb Color with no arrows, and the quest text gets the room it frees. Requested by Tyrial.",
+            } },
+            { head = "Improvements", items = {
+                "Moving the tracker is easier to find. While the tracker is unlocked, either with the options window open or after unlocking it, the strip along its top turns gold and reads \"Drag to move, corner grip to resize.\" beside a check button that locks it again, and a gold outline shows the tracker's edges. Right-clicking that strip or the cogwheel opens Unlock (allow moving) or Lock position, Reset position and size, and Open the options panel. The strip's hover highlight now shows only while the tracker is unlocked. Reported by boondox3906.",
+                "The zone progress bar in Eversong Woods counts the new Into the Labyrinth questline.",
+                "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover every new option, along with a few small wording fixes.",
+            } },
+        },
+    },
+    {
         version = "2.4.0", date = "2026-10-11",
         sections = {
             { head = "New Features", items = {

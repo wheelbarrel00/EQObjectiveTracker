@@ -46,7 +46,12 @@ local function load(o)
     function ctx:BuildSettings(name)
         st.built[#st.built + 1] = name
         st.order[#st.order + 1] = "build"
-        return { name = name }
+        local window = { name = name, hooks = {} }
+        window.HookScript = function(w, script, fn)
+            w.hooks[script] = w.hooks[script] or {}
+            table.insert(w.hooks[script], fn)
+        end
+        return window
     end
     function ctx:ApplyWindowScale() st.scales = st.scales + 1 end
     function ctx:ToggleSettings()
@@ -80,7 +85,7 @@ local function load(o)
     local chunk = assert(loadfile(repoFile("Options/Frame.lua")))
     setfenv(chunk, env)
     chunk("EQObjectiveTracker", ns)
-    st.ctx, st.ns, st.Options = ctx, ns, modules.Options
+    st.ctx, st.ns, st.Options, st.modules = ctx, ns, modules.Options, modules
     st.opts = st.contexts[1] or {}
     return st
 end
@@ -208,6 +213,35 @@ case("the forwarders reach the context", function()
     local enabled = load()
     enabled.Options:OnEnable()
     ok(#enabled.built == 1 and enabled.toggles == 0, "OnEnable builds the window at login and leaves it closed")
+end)
+
+-- The tracker's move bar shows while this window is open, so opening and closing it has to tell
+-- the tracker. Hooked rather than set, so the library's own show and hide scripts still run.
+case("the window's show and hide re-apply the tracker's move mode", function()
+    local st = load()
+    st.Options:Build()
+    local hooks = st.Options.frame and st.Options.frame.hooks or {}
+    ok(hooks.OnShow and #hooks.OnShow == 1, "one OnShow hook")
+    ok(hooks.OnHide and #hooks.OnHide == 1, "one OnHide hook")
+    local applied = 0
+    st.modules.Tracker = { ApplyMoveMode = function(self)
+        ok(self == st.modules.Tracker, "called with a colon")
+        applied = applied + 1
+    end }
+    if hooks.OnShow then hooks.OnShow[1]() end
+    ok(applied == 1, "opening applies it once: " .. applied)
+    if hooks.OnHide then hooks.OnHide[1]() end
+    ok(applied == 2, "closing applies it again: " .. applied)
+    st.modules.Tracker = nil
+    ok(pcall(function()
+        if hooks.OnShow then hooks.OnShow[1]() end
+        if hooks.OnHide then hooks.OnHide[1]() end
+    end), "with no tracker module (Blizzard's tracker in use) the hooks do nothing")
+    st.modules.Tracker = {}
+    ok(pcall(function() if hooks.OnShow then hooks.OnShow[1]() end end),
+       "and a tracker module without the method is passed over")
+    st.Options:Build()
+    ok(#hooks.OnShow == 1 and #hooks.OnHide == 1, "a second Build hooks nothing more")
 end)
 
 -- Read from the vendored library rather than copied, so a key it stops taking, or one it starts

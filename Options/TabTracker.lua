@@ -32,6 +32,8 @@ local FILTER_ORDER = {
     "showNormal", "showDaily", "showWeekly", "showScheduled", "showCampaign", "showWorld",
     "showBonus",
 }
+-- The tracker's filter button offers the same rows in the same order.
+Options.FILTER_ORDER = FILTER_ORDER
 
 -- Most of these say what they are in the label. Scheduled is the one nothing in the game
 -- names out loud, so the generic line below leaves the player guessing.
@@ -86,6 +88,17 @@ local function filterSetting(key)
            function(v) DB().filters[key] = v; render() end
 end
 
+-- The Filters card's Reset button and the tracker's filter button both reset through this.
+-- Walked rather than listed, so a category added to Filter.CATEGORIES is reset without anyone
+-- remembering to come back for it.
+function Options:ResetFilters()
+    local f = DB().filters
+    local cats = ns:GetModule("Filter").CATEGORIES
+    for i = 1, #cats do f[cats[i].key] = true end
+    f.onlyCurrentZone = false
+    f.campaignAnyZone = false
+end
+
 local function sectionLabel(id)
     return ns:GetModule("Sections"):Title(id)
 end
@@ -103,6 +116,35 @@ local function makeOrderArrow(ui, parent, isUp)
                     1, 1, 1, 1, true)
         tip:AddLine(L["Reorders where this section sits in the tracker. A section only shows while it has something in it, so empty sections won't visibly move."],
                     0.82, 0.82, 0.82, true)
+        tip:Show()
+    end)
+    b:HookScript("OnLeave", function() ns.Util.Tooltip():Hide() end)
+    return b
+end
+
+local function nextTab(id)
+    local cfg = DB()
+    cfg.sectionTab = cfg.sectionTab or {}
+    local Tracker = ns:GetModule("Tracker")
+    local t = Tracker:SectionTab(id) % Tracker.MAX_TABS + 1
+    -- Tab 1 is stored as nothing, so the map only ever holds the sections that were moved.
+    cfg.sectionTab[id] = (t ~= 1) and t or nil
+end
+
+-- A row can name a different section after a move, so the click reads the section off the button.
+local function makeTabButton(ui, parent, onMoved)
+    local b = ui:CreateButton(parent, "1", ARROW_SIZE, function(btn)
+        if not btn.sectionID then return end
+        nextTab(btn.sectionID)
+        onMoved()
+    end)
+    b:SetHeight(ARROW_SIZE)
+    b:HookScript("OnEnter", function(self)
+        local tip = ns.Util.Tooltip()
+        tip:SetOwner(self, "ANCHOR_RIGHT")
+        -- SetText arg 5 is alpha, not wrap. Pass 1 or the line renders invisible.
+        tip:SetText(self.sectionID and sectionLabel(self.sectionID) or "", 1, 1, 1, 1, true)
+        tip:AddLine(L["Which tab this section sits on. Click to move it to the next tab."], 0.82, 0.82, 0.82, true)
         tip:Show()
     end)
     b:HookScript("OnLeave", function() ns.Util.Tooltip():Hide() end)
@@ -216,12 +258,8 @@ Options:RegisterTab({
         -- on here hid quests with nothing connecting the two.
         local resetFilters = self:CreateButton(content, L["Reset filters to defaults"], nil,
             function()
+                Options:ResetFilters()
                 local f = DB().filters
-                -- Walked rather than listed, so a category added to Filter.CATEGORIES is
-                -- reset here without anyone remembering to come back for it.
-                for i = 1, #Filter.CATEGORIES do f[Filter.CATEGORIES[i].key] = true end
-                f.onlyCurrentZone = false
-                f.campaignAnyZone = false
                 -- Re-checked in place rather than by reloading the tab: these boxes only
                 -- read their getter on build and on a tab view.
                 zoneOnly:SetChecked(false)
@@ -253,7 +291,11 @@ Options:RegisterTab({
                 -- The box SHOWS the section, so the tooltip has to describe unchecking it.
                 visibility:Add(self:CreateCheckbox(content, row.label,
                     function() return not Sections:IsHidden(id) end,
-                    function(v) Sections:SetHidden(id, not v); render() end,
+                    function(v)
+                        Sections:SetHidden(id, not v)
+                        render()
+                        if content._renderOrderRows then content._renderOrderRows() end
+                    end,
                     L["Uncheck to hide this section from the tracker even while it has entries."]))
             end
         end
@@ -321,12 +363,44 @@ Options:RegisterTab({
             L["World Quests Position"],
             L["Where the World Quests panel sits on the tracker. |cffffffffTop|r puts it above your quests. |cffffffffBottom|r keeps it below your quests, which is the default. World Quests scroll in their own capped panel, which is why they can't be mixed in between the other sections."])
         if not hasWorldQuests then wqPos:Hide() end
-        order:Add(wqPos)
+        local wqRow = order:Add(wqPos)
+
+        local tabsOffered = ns:GetModule("Tracker"):TabsOffered()
+
+        local renderOrderRows
+        if tabsOffered then
+            local tabsBox = self:CreateCheckbox(content, L["Show section tabs"],
+                function() return DB().showTabs == true end,
+                function(v)
+                    DB().showTabs = v
+                    render()
+                    renderOrderRows()
+                end,
+                L["Splits the tracker into up to three tabs. Use the number beside each section below to choose its tab, then click a tab at the top of the tracker to show only the sections on it. The scenario panel shows on every tab, and the tabs appear once two of them hold a section."])
+            order:Add(tabsBox)
+        end
+
+        local function tabMoved()
+            render()
+            renderOrderRows()
+        end
+
+        -- World Quests sit in their own panel rather than in the order, so their tab is chosen here.
+        local wqTab = makeTabButton(self, content, tabMoved)
+        wqTab:SetPoint("RIGHT", wqRow, "RIGHT", -self:Spacing("rowPadding"), 0)
+        wqTab.sectionID = "worldquests"
 
         -- One row per place in the order, built the first time the list needs it and relabeled on
         -- every move, so a row keeps its place in the card while the section named on it changes.
         local orderRows = {}
-        local function renderOrderRows()
+        renderOrderRows = function()
+            local tabsOn = tabsOffered and DB().showTabs == true
+            local Tracker = ns:GetModule("Tracker")
+            wqTab:SetShown(tabsOn and hasWorldQuests)
+            wqTab:SetText(Tracker:SectionTab("worldquests"))
+            -- Dimmed where the section makes no tab (hidden, or the zone bar unless docked), as a
+            -- setting that is not in effect is dimmed. The move is still kept for when it is.
+            self:SetDependent(wqTab, Tracker:DrawsOnTab("worldquests"))
             local list = Sections:Order()
             for i, id in ipairs(list) do
                 local r = orderRows[i]
@@ -337,12 +411,18 @@ Options:RegisterTab({
                     r.down:SetPoint("RIGHT", row, "RIGHT", -self:Spacing("rowPadding"), 0)
                     r.up = makeOrderArrow(self, content, true)
                     r.up:SetPoint("RIGHT", r.down, "LEFT", -ARROW_GAP, 0)
+                    r.tab = makeTabButton(self, content, tabMoved)
+                    r.tab:SetPoint("RIGHT", r.up, "LEFT", -ARROW_GAP, 0)
                     orderRows[i] = r
                 end
                 r.name:SetText(sectionLabel(id))
                 r.name:Show()
                 r.up:Show()
                 r.down:Show()
+                r.tab.sectionID = id
+                r.tab:SetText(Tracker:SectionTab(id))
+                r.tab:SetShown(tabsOn)
+                self:SetDependent(r.tab, Tracker:DrawsOnTab(id))
                 r.up.sectionID, r.down.sectionID = id, id
                 r.up:SetEnabled(i > 1)
                 r.down:SetEnabled(i < #list)
@@ -365,10 +445,13 @@ Options:RegisterTab({
                 orderRows[i].name:Hide()
                 orderRows[i].up:Hide()
                 orderRows[i].down:Hide()
+                orderRows[i].tab:Hide()
             end
             order:Layout()
         end
         renderOrderRows()
+        -- Read again on each visit too, since the zone bar is docked from the Appearance tab.
+        content._renderOrderRows = renderOrderRows
 
         local display = self:CreateGroup(content, L["Options"])
         display:SetPoint("TOPLEFT", order, "BOTTOMLEFT", 0, -gap)
@@ -458,6 +541,14 @@ Options:RegisterTab({
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
             L["A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default."]))
+
+        display:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],
+            function() return DB().showFilterButton == true end,
+            function(v)
+                DB().showFilterButton = v
+                ns:GetModule("Tracker"):ApplyHeaderIcons()
+            end,
+            L["A small funnel at the top-left of the tracker that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default."]))
 
         -- EQ has Show Chain Guide icon after this one. Deliberately not ported: it opens
         -- EQ's Chain Guide, which EQOT does not have.
@@ -556,5 +647,6 @@ Options:RegisterTab({
     refresh = function(_, content)
         if content._syncZoneTag then content._syncZoneTag() end
         if content._syncManualHint then content._syncManualHint() end
+        if content._renderOrderRows then content._renderOrderRows() end
     end,
 })

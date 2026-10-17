@@ -137,6 +137,7 @@ DB.defaults = {
             scrollBarThumbColor  = { r = 0.60, g = 0.60, b = 0.65, a = 0.90 },
             scrollBarThumbWidth  = 8,
             hideScrollArrows     = false,
+            scrollBarWidth       = 16,
             showZoneTag          = false,
             showObjectiveNumbers = true,
             -- A NEW key, so nobody has a stored value a default could silently revert.
@@ -161,6 +162,7 @@ DB.defaults = {
             showRecentlyAddedTag = true,
             showOptionsIcon      = true,
             showSortButton       = false,
+            showFilterButton     = false,
             splitQuestClick      = false,
             clickToUnfocus       = false,
             -- On is the game's own behavior: it focuses a quest accepted while nothing is focused.
@@ -208,6 +210,10 @@ DB.defaults = {
             -- saved order returns as a sparse fragment and any later change to the default's
             -- shape silently reinterprets it. Sections.DEFAULT_ORDER holds it instead.
             sectionsHidden = {},
+            -- Every section on tab 1 until moved. The map's default must stay empty: tab 1 is
+            -- stored as nothing, so a default entry would come back over a player's tab 1.
+            showTabs       = false,
+            sectionTab     = {},
 
             showZoneProgressBar  = false,
             zoneProgressLocation = "floating",
@@ -302,7 +308,7 @@ local APPEARANCE_KEYS = {
     "scenarioCard",
     "showBackground", "backgroundColor", "showBorder", "borderColor", "borderSize",
     "scrollBarBg", "scrollBarBgColor", "skinScrollBar",
-    "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows",
+    "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows", "scrollBarWidth",
     -- showZoneProgressBar and zoneProgressLocation belong on this tab but must NOT be here:
     -- they default to off and floating, so clearing them switches a configured bar off and
     -- undocks it. hideScrollBar defaults to false, so clearing it restores the bar.

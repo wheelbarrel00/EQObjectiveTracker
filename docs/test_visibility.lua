@@ -94,9 +94,10 @@ frame.drag, frame.scenarioContainer, frame.eventsRegion = region(), region(), re
 frame.scroll, frame.content, frame.grip = region(), region(), region()
 frame.eventsScroll = region()
 frame.scroll.ScrollBar, frame.eventsScroll.ScrollBar = region(), region()
+frame.tabStrip = region()
 local REGIONS = { frame.drag, frame.scenarioContainer, frame.eventsRegion, frame.scroll,
                   frame.content, frame.grip, frame.eventsScroll, frame.scroll.ScrollBar,
-                  frame.eventsScroll.ScrollBar }
+                  frame.eventsScroll.ScrollBar, frame.tabStrip }
 -- Present so FadeLine can report the client supports the call, and counted so a case can prove
 -- nothing ever exempts the tracker frame itself.
 local frameIgnoreCalls = 0
@@ -415,6 +416,9 @@ local drawn = {
     { "the quest scroll bar", function() frame.scroll.ScrollBar.mouse = true end, true },
     { "the world quest scroll bar", function() frame.eventsScroll.ScrollBar.mouse = true end, true },
     { "the resize grip while unlocked", function() frame.grip.mouse = true end, true },
+    { "the section tab strip", function() frame.tabStrip.mouse = true end, true },
+    { "a hidden section tab strip",
+      function() frame.tabStrip.mouse = true; frame.tabStrip.visible = false end, false },
     { "the resize grip while locked",
       function() frame.grip.mouse = true; trackerLocked = true end, false },
     { "a hidden world quest region",

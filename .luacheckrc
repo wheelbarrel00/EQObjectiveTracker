@@ -116,7 +116,7 @@ read_globals = {
     "QuestUtils_IsQuestWorldQuest", "QuestUtils_GetQuestName",
     "QuestMapFrame_OpenToQuestDetails", "ToggleQuestLog", "GetQuestLogQuestText",
     "ObjectiveTrackerFrame",
-    "QuestMapQuestOptions_OpenQuestDetails", "QuestMapFrame_UpdateQuestDetailsButtons",
+    "QuestMapFrame_UpdateQuestDetailsButtons",
     "QuestLogPopupDetailFrame_Update",
     "StaticPopup_Show", "StaticPopup_Hide", "StaticPopupDialogs",
 

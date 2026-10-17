@@ -615,12 +615,15 @@ end
 local function openQuestDetailsPopup(id)
     if C_AddOns and C_AddOns.LoadAddOn then C_AddOns.LoadAddOn("Blizzard_QuestLog") end
 
-    if QuestMapQuestOptions_OpenQuestDetails then
-        QuestMapQuestOptions_OpenQuestDetails(id)
-        return
-    end
     if not QuestLogPopupDetailFrame then return end
     if not (C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(id)) then return end
+
+    -- Forever 70425 moved the window's fill into frame methods (the 12.1.7 PTR source does too),
+    -- and the sequence below drew an empty window there. Blizzard's wrapper, where it exists, fills it.
+    if QuestUtil and QuestUtil.OpenQuestDetails then
+        QuestUtil.OpenQuestDetails(id)
+        return
+    end
 
     QuestLogPopupDetailFrame.questID = id
     if C_QuestLog.SetSelectedQuest then C_QuestLog.SetSelectedQuest(id) end

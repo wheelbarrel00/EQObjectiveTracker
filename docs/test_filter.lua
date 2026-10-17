@@ -436,11 +436,14 @@ local function trackerTab(campaign)
     local spec
     modules.Options = { RegisterTab = function(_, s) spec = s end }
     modules.DB = realDB({ tracker = cfg })
-    modules.Tracker = { Render = function() end }
+    modules.Tracker = { Render = function() end, SectionTab = function() return 1 end, MAX_TABS = 3,
+                        TabsOffered = function() return false end, DrawsOnTab = function() return true end }
     modules.Row = { Invalidate = function() end }
     modules.Media = { Play = function() end, GetSoundList = function() return {}, {} end }
     modules.Sections = {
         Known = function() return { "quests" } end, Order = function() return { "quests", "campaign" } end,
+        IsVirtual = function(_, id) return id == "zoneprogress" end,
+        IsContainer = function(_, id) return id == "scenarios" end,
         IsHidden = function() return false end, SetHidden = function() end,
         Title = function(_, id) return id end, Move = function() end,
     }
@@ -459,6 +462,7 @@ local function trackerTab(campaign)
         function f:SetEnabled() end
         function f:SetScript() end
         function f:HookScript() end
+        function f:SetHeight(h) self.height = h end
         return f
     end
     local cards, dimmed, ui = {}, {}, {}
@@ -521,11 +525,16 @@ do
         ok(t.cfg.filters.campaignAnyZone == false, "and writes it")
         t.cfg.filters.campaignAnyZone = true
         box.checked = true
+        -- Both categories off first, so a reset that stops short of either shows.
+        t.cfg.filters.showNormal, t.cfg.filters.showDaily = false, false
+        t.cfg.showOnlyWatched = true
         reset.onClick()
         ok(t.cfg.filters.campaignAnyZone == false and box.checked == false,
            "Reset filters clears the switch and unticks the box on screen")
         ok(t.cfg.filters.onlyCurrentZone == false and zone.checked == false, "and the zone filter")
-        ok(t.cfg.filters.showNormal == true and rows[1].checked == true, "and turns the categories back on")
+        ok(t.cfg.filters.showNormal == true and t.cfg.filters.showDaily == true and rows[1].checked == true,
+           "and turns every category back on")
+        ok(t.cfg.showOnlyWatched == true, "and leaves Show only tracked quests as the player set it")
         ok(reset.tooltip:find(CAMPAIGN_LABEL, 1, true) ~= nil, "its tooltip names the box it clears")
         local grayed = false
         for _, d in ipairs(t.dimmed) do if d.control == box then grayed = true end end

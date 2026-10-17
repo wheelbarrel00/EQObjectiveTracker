@@ -1873,7 +1873,7 @@ local function has(src, stmt, msg) ok(count(src, stmt) == 1, msg .. " (" .. coun
 
 has(renderSrc, '    local ZoneHeaders = ns:GetModule("ZoneHeaders")\n', "Render resolves the zone header module")
 local hideAt  = renderSrc:find("    Sections:HideAll()\n    ZoneHeaders:Begin()\n", 1, true)
-local loopAt  = renderSrc:find("for _, groupID in ipairs(Sections:Order()) do", 1, true)
+local loopAt  = renderSrc:find("for _, groupID in ipairs(self:_OrderOnTab(Sections:Order(), activeTab)) do", 1, true)
 local sweepAt = renderSrc:find("    ZoneHeaders:Sweep()\n", 1, true)
 local dragAt  = renderSrc:find("    for i = _dragCount + 1, #_dragRows do _dragRows[i] = nil end\n", 1, true)
 ok(count(renderSrc, "ZoneHeaders:Begin()") == 1 and hideAt and loopAt and hideAt < loopAt,

@@ -6,9 +6,13 @@ local L       = ns.L
 local CONTENT_PAD      = 4
 local SCROLLBAR_GUTTER = 26
 local DRAG_HANDLE_H    = 14
+local TAB_STRIP_H      = 18
+local MAX_TABS         = 3
 local GRIP_SIZE        = 14
+local GOLD_R, GOLD_G, GOLD_B = 0.92, 0.72, 0.02
 local HEADER_ICON_SZ   = 13
 local REFRESH_THROTTLE = 0.25
+Tracker.MAX_TABS = MAX_TABS
 
 local WQ_PIN_FRACTION  = 0.40
 local PINNED_GROUP     = "worldquests"
@@ -18,10 +22,22 @@ local CONTAINER_GROUP  = "scenarios"
 -- other. Never a hardcoded pair here.
 local QUEST_PROVIDER   = "quests"
 
+-- The template's bar is 16 px wide. Scroll Bar Width below that draws a slim bar of its own size.
+local STOCK_BAR_W = 16
+local SLIM_GAP    = 2
+
+local function slimBarWidth(cfg)
+    local w = tonumber(cfg and cfg.scrollBarWidth)
+    if not w or w >= STOCK_BAR_W then return nil end
+    return math.max(2, math.floor(w + 0.5))
+end
+
 -- Hiding the bar reclaims its gutter for text, so the inset is a function of the
 -- setting rather than a constant.
 local function scrollGutter(cfg)
     if cfg and cfg.hideScrollBar == true then return CONTENT_PAD * 2 end
+    local slim = slimBarWidth(cfg)
+    if slim then return SLIM_GAP + slim + CONTENT_PAD end
     return SCROLLBAR_GUTTER
 end
 
@@ -61,6 +77,16 @@ local function secureLocked()
     return (IB and IB.Locked and IB:Locked()) and true or false
 end
 
+-- The sort button sits 4 px in from the left edge and the filter button after it, each with a 3 px
+-- gap. The x for the filter button, or with pastFilter the x just past both, where the move bar's
+-- check button goes.
+local function leftButtonX(cfg, pastFilter)
+    local x = 4
+    if cfg and cfg.showSortButton == true then x = x + HEADER_ICON_SZ + 3 end
+    if pastFilter and cfg and cfg.showFilterButton == true then x = x + HEADER_ICON_SZ + 3 end
+    return x
+end
+
 -- Above the drag handle's frame level so the handle does not eat the click. A tooltip given as a
 -- function is read on each hover, for text that names a setting's current value.
 local function makeHeaderIcon(f, texture, tooltip, onClick, anchor)
@@ -71,6 +97,7 @@ local function makeHeaderIcon(f, texture, tooltip, onClick, anchor)
     tex:SetAllPoints()
     tex:SetTexture(texture)
     tex:SetAlpha(0.85)
+    b.icon = tex
     b:SetScript("OnEnter", function(btn)
         if Tracker:IsClickThrough() then return end
         tex:SetAlpha(1)
@@ -126,6 +153,265 @@ function Tracker:OpenSortMenu(owner)
         end }
     end
     Options.ui:ShowMenu(items, owner)
+end
+
+-- Counts only the categories the menu offers, so the funnel never lights for a box the player
+-- cannot see. Walked without building a table, since every render asks.
+function Tracker:FilterActive()
+    local cfg = ns:GetModule("DB"):Tracker()
+    local f = cfg and cfg.filters
+    if not f then return false end
+    if f.onlyCurrentZone == true then return true end
+    local Filter, Registry = ns:GetModule("Filter"), ns:GetModule("Registry")
+    if not (Filter and Registry) then return false end
+    for _, c in ipairs(Filter.CATEGORIES) do
+        if f[c.key] == false and ((not c.tag) or Registry:HasTag(c.tag)) then return true end
+    end
+    return false
+end
+
+function Tracker:PaintFilterButton()
+    local b = self.frame and self.frame.filterButton
+    if not (b and b.icon) then return end
+    local active = self:FilterActive()
+    if b._active == active then return end
+    b._active = active
+    if active then b.icon:SetVertexColor(GOLD_R, GOLD_G, GOLD_B) else b.icon:SetVertexColor(1, 1, 1) end
+end
+
+function Tracker:OpenFilterMenu(owner)
+    local Options = ns:GetModule("Options")
+    local cfg = ns:GetModule("DB"):Tracker()
+    local Filter, Registry = ns:GetModule("Filter"), ns:GetModule("Registry")
+    if not (Options and Options.ui and Options.FILTER_ORDER and cfg and cfg.filters and Filter and Registry) then
+        return
+    end
+    local f = cfg.filters
+    local function changed()
+        Tracker:PaintFilterButton()
+        Tracker:Render()
+        Options:RefreshIfShown("tracker")
+    end
+    local items = {
+        { kind = "title", text = L["Filters"] },
+        { kind = "check", text = L["Show only quests in current zone"], checked = f.onlyCurrentZone == true,
+          onClick = function(on) f.onlyCurrentZone = on; changed() end },
+        { kind = "divider" },
+    }
+    local byKey = {}
+    for _, c in ipairs(Filter.CATEGORIES) do byKey[c.key] = c end
+    for _, key in ipairs(Options.FILTER_ORDER) do
+        local c = byKey[key]
+        if c and ((not c.tag) or Registry:HasTag(c.tag)) then
+            items[#items + 1] = { kind = "check", text = c.label, checked = f[key] ~= false,
+                                  onClick = function(on) f[key] = on; changed() end }
+        end
+    end
+    items[#items + 1] = { kind = "divider" }
+    items[#items + 1] = { text = L["Reset filters to defaults"], onClick = function()
+        Options:ResetFilters()
+        changed()
+    end }
+    Options.ui:ShowMenu(items, owner)
+end
+
+-- Every section sits on tab 1 until moved, and the strip shows only once two tabs hold a section
+-- that draws, so switching tabs on with nothing moved changes nothing on screen. The scenario
+-- panel is on every tab.
+function Tracker:SectionTab(groupID)
+    local cfg = ns:GetModule("DB"):Tracker()
+    local t = cfg and cfg.sectionTab and tonumber(cfg.sectionTab[groupID])
+    if t and t >= 1 and t <= MAX_TABS then return math.floor(t) end
+    return 1
+end
+
+-- A hidden section, or the zone bar unless docked, never draws, so it neither earns a tab nor
+-- names one.
+local function drawsOnTab(Sections, id)
+    if Sections:IsContainer(id) or Sections:IsHidden(id) then return false end
+    if Sections:IsVirtual(id) then
+        local ZoneBar = ns:GetModule("ZoneProgressBar")
+        return (ZoneBar and ZoneBar:IsDocked()) and true or false
+    end
+    return true
+end
+
+-- The Tracker tab dims a section's tab button by this.
+function Tracker:DrawsOnTab(groupID)
+    return drawsOnTab(ns:GetModule("Sections"), groupID)
+end
+
+-- Era and TBC have one quest section, so a second tab could hold only the zone bar. The Tracker
+-- tab offers its box by this too, so a profile with tabs on cannot show a strip nothing turns off.
+function Tracker:TabsOffered()
+    local Sections = ns:GetModule("Sections")
+    local n = 0
+    for _, id in ipairs(Sections:Known()) do
+        if not (Sections:IsVirtual(id) or Sections:IsContainer(id)) then n = n + 1 end
+    end
+    return n >= 2
+end
+
+-- Filled in place rather than returned new, since every render asks.
+local usedTabs = {}
+function Tracker:TabsInUse()
+    local cfg = ns:GetModule("DB"):Tracker()
+    if not (cfg and cfg.showTabs == true) or not self:TabsOffered() then return nil end
+    local Sections = ns:GetModule("Sections")
+    for i = 1, MAX_TABS do usedTabs[i] = false end
+    local n = 0
+    for _, id in ipairs(Sections:Known()) do
+        if drawsOnTab(Sections, id) then
+            local t = self:SectionTab(id)
+            if not usedTabs[t] then
+                usedTabs[t] = true
+                n = n + 1
+            end
+        end
+    end
+    if n < 2 then return nil end
+    return usedTabs
+end
+
+-- Kept per character. A tab that no longer holds anything falls back to the first that does.
+function Tracker:ActiveTab()
+    local used = self:TabsInUse()
+    if not used then return nil end
+    local char = ns:GetModule("DB"):Char()
+    local t = char and tonumber(char.activeTab)
+    if t and used[t] then return t end
+    for i = 1, MAX_TABS do
+        if used[i] then return i end
+    end
+end
+
+local function applyPendingTab()
+    local t = Tracker._pendingTab
+    Tracker._pendingTab = nil
+    if t then Tracker:SetActiveTab(t) end
+end
+
+-- Held until the fight ends once a secure item button exists: the buttons cannot follow their
+-- rows in combat. A new tab opens at its top.
+function Tracker:SetActiveTab(t)
+    if secureLocked() then
+        self._pendingTab = t
+        ns:GetModule("Events"):RunWhenOutOfCombat("eqot.activeTab", applyPendingTab)
+        return
+    end
+    local char = ns:GetModule("DB"):Char()
+    if not char then return end
+    local before = self:ActiveTab()
+    char.activeTab = t
+    -- Read again rather than compared with t: a tab no longer in use falls back to the first in use.
+    if self:ActiveTab() ~= before and self.frame and self.frame.scroll then self.frame.scroll:SetVerticalScroll(0) end
+    self:Render()
+end
+
+local function paintTab(b, active)
+    if active then
+        b.bg:SetColorTexture(0, 0, 0, 0.35)
+        b.line:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 1)
+        b.text:SetTextColor(1, 1, 1)
+    else
+        b.bg:SetColorTexture(0, 0, 0, 0.15)
+        b.line:SetColorTexture(1, 1, 1, 0.15)
+        b.text:SetTextColor(0.6, 0.6, 0.6)
+    end
+end
+
+local function newTabButton(strip)
+    local b = CreateFrame("Button", nil, strip)
+    b:SetHeight(TAB_STRIP_H - 2)
+    b.bg = b:CreateTexture(nil, "BACKGROUND")
+    b.bg:SetAllPoints()
+    b.line = b:CreateTexture(nil, "ARTWORK")
+    b.line:SetPoint("BOTTOMLEFT")
+    b.line:SetPoint("BOTTOMRIGHT")
+    b.line:SetHeight(2)
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.text:SetPoint("LEFT", 4, 1)
+    b.text:SetPoint("RIGHT", -4, 1)
+    b.text:SetWordWrap(false)
+    b:SetScript("OnClick", function(btn)
+        if Tracker:IsClickThrough() then return end
+        Tracker:SetActiveTab(btn.tab)
+    end)
+    -- The label is cut short on a narrow tracker, so the tooltip names every section in full.
+    b:SetScript("OnEnter", function(btn)
+        if Tracker:IsClickThrough() or not btn._label then return end
+        local tip = ns.Util.Tooltip()
+        tip:SetOwner(btn, "ANCHOR_BOTTOM")
+        tip:SetText(btn._label, 1, 1, 1)
+        tip:Show()
+    end)
+    b:SetScript("OnLeave", function() ns.Util.Tooltip():Hide() end)
+    return b
+end
+
+local tabNames, tabSlots = {}, {}
+function Tracker:LayoutTabs(active)
+    local f = self.frame
+    local strip = f and f.tabStrip
+    if not strip then return end
+    local used = active and self:TabsInUse()
+    if not used then
+        strip:Hide()
+        return
+    end
+    local Sections = ns:GetModule("Sections")
+    local n = 0
+    for t = 1, MAX_TABS do
+        if used[t] then
+            n = n + 1
+            tabSlots[n] = t
+        end
+    end
+    local width = math.max(1, (f:GetWidth() or 0) - CONTENT_PAD * 2)
+    local w = (width - (n - 1) * 2) / n
+    for i = 1, MAX_TABS do
+        local b = strip.tabs[i]
+        if i > n then
+            if b then b:Hide() end
+        else
+            if not b then
+                b = newTabButton(strip)
+                strip.tabs[i] = b
+            end
+            local t = tabSlots[i]
+            wipe(tabNames)
+            for _, id in ipairs(Sections:Known()) do
+                if drawsOnTab(Sections, id) and self:SectionTab(id) == t then
+                    tabNames[#tabNames + 1] = Sections:Title(id)
+                end
+            end
+            local label = table.concat(tabNames, ", ")
+            if b._label ~= label then
+                b._label = label
+                b.text:SetText(label)
+            end
+            b.tab = t
+            b:SetWidth(w)
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * (w + 2), 0)
+            paintTab(b, t == active)
+            b:Show()
+        end
+    end
+    strip:Show()
+end
+
+local onTab = {}
+function Tracker:_OrderOnTab(order, active)
+    if not active then return order end
+    wipe(onTab)
+    for _, id in ipairs(order) do
+        if self:SectionTab(id) == active then onTab[#onTab + 1] = id end
+    end
+    return onTab
 end
 
 -- Icons registered through ns:GetModule("API") are built lazily here, so an addon that registers
@@ -187,6 +473,13 @@ function Tracker:ApplyHeaderIcons()
     local cfg = DB and DB:Tracker()
 
     if f.sortButton then f.sortButton:SetShown(cfg ~= nil and cfg.showSortButton == true) end
+    local filter = f.filterButton
+    if filter then
+        filter:SetShown(cfg ~= nil and cfg.showFilterButton == true)
+        filter:ClearAllPoints()
+        filter:SetPoint("TOPLEFT", f, "TOPLEFT", leftButtonX(cfg, false), -1)
+        self:PaintFilterButton()
+    end
 
     local prev
     for i = 1, #f.headerIcons do
@@ -204,6 +497,8 @@ function Tracker:ApplyHeaderIcons()
             prev = b
         end
     end
+    f._lastIcon = prev
+    self:LayoutMoveBar()
 end
 
 -- Blizzard's scroll bar keeps its own handlers, so a click in the invisible gutter scrolled
@@ -334,7 +629,7 @@ function Tracker:IsLocked()
     return (gen and gen.lockTracker) and true or false
 end
 
-function Tracker:ApplyLockState()
+function Tracker:ApplyLockState(startMove)
     local f = self.frame
     if not (f and f.grip) then return end
     local locked = self:IsLocked()
@@ -344,6 +639,97 @@ function Tracker:ApplyLockState()
     end
     f.grip:SetAlpha(locked and 0 or 1)
     f.grip:EnableMouse(not locked)
+    -- An unlock after load keeps move mode up until the next lock, options window or not.
+    if not locked and (startMove or f._wasLocked) then f._moveSession = true end
+    f._wasLocked = locked
+    self:ApplyMoveMode()
+end
+
+function Tracker:InMoveMode()
+    local f = self.frame
+    if not f or self:IsLocked() then return false end
+    if f._moveSession then return true end
+    local Options = ns:GetModule("Options")
+    return (Options and Options.frame and Options.frame:IsShown()) and true or false
+end
+
+local function paintDragHint(f)
+    local hint = f.dragHint
+    if not hint then return end
+    if Tracker:InMoveMode() then
+        hint:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, f._dragHover and 0.55 or 0.35)
+    elseif f._dragHover and not Tracker:IsLocked() then
+        hint:SetColorTexture(1, 1, 1, 0.15)
+    else
+        hint:SetColorTexture(1, 1, 1, 0)
+    end
+end
+
+function Tracker:ApplyMoveMode()
+    local f = self.frame
+    if not (f and f.moveBar) then return end
+    local on = self:InMoveMode()
+    f.moveBar:SetShown(on)
+    f.moveOutline:SetShown(on)
+    paintDragHint(f)
+end
+
+-- The done button and label sit between the left-end buttons and the cogwheel's run, so neither
+-- covers an icon. A narrow tracker truncates the label rather than wrapping it.
+function Tracker:LayoutMoveBar()
+    local f = self.frame
+    if not (f and f.moveBar) then return end
+    local done, label = f.moveDone, f.moveLabel
+    local left = leftButtonX(ns:GetModule("DB"):Tracker(), true)
+    done:ClearAllPoints()
+    done:SetPoint("LEFT", f.moveBar, "LEFT", left, 0)
+    label:ClearAllPoints()
+    label:SetPoint("LEFT", done, "RIGHT", 4, 0)
+    if f._lastIcon then
+        label:SetPoint("RIGHT", f._lastIcon, "LEFT", -4, 0)
+    else
+        label:SetPoint("RIGHT", f.moveBar, "RIGHT", -4, 0)
+    end
+end
+
+function Tracker:SetLocked(locked)
+    local gen = ns:GetModule("DB"):General()
+    if not gen then return end
+    gen.lockTracker = locked and true or false
+    self:ApplyLockState(not locked)
+    ns:Print(locked and L["tracker locked."] or L["tracker unlocked."])
+    local Options = ns:GetModule("Options")
+    if Options and Options.RefreshIfShown then Options:RefreshIfShown("general") end
+end
+
+function Tracker:OpenFrameMenu(owner)
+    local Options = ns:GetModule("Options")
+    if not (Options and Options.ui) then return end
+    local locked = self:IsLocked()
+    Options.ui:ShowMenu({
+        { kind = "title", text = "EQ Objective Tracker" },
+        { text = locked and L["Unlock (allow moving)"] or L["Lock position"], onClick = function()
+            Tracker:SetLocked(not locked)
+        end },
+        { text = L["Reset position and size"], onClick = function()
+            Tracker:ResetPosition()
+            ns:Print(L["position and size reset."])
+        end },
+        -- The menu shows over an open window too, where Toggle would close it. Not raised there
+        -- either: the window stays under Blizzard's color picker, which shares its strata.
+        { text = L["Open the options panel"], onClick = function()
+            if not (Options.frame and Options.frame:IsShown()) then Options:Toggle() end
+        end },
+        { kind = "divider" },
+        { text = L["Cancel"] },
+    }, owner)
+end
+
+-- Released over the frame it was pressed on, so a press dragged off and let go elsewhere does not
+-- open the menu.
+local function openFrameMenuOnRightUp(self, button)
+    if button ~= "RightButton" or Tracker:IsClickThrough() or not self:IsMouseOver() then return end
+    Tracker:OpenFrameMenu(self)
 end
 
 function Tracker:BuildFrame()
@@ -372,10 +758,12 @@ function Tracker:BuildFrame()
     local hint = drag:CreateTexture(nil, "OVERLAY")
     hint:SetAllPoints()
     hint:SetColorTexture(1, 1, 1, 0)
+    f.dragHint = hint
 
     drag:SetScript("OnEnter", function()
         if Tracker:IsClickThrough() then return end
-        hint:SetColorTexture(1, 1, 1, 0.15)
+        f._dragHover = true
+        paintDragHint(f)
         local tip = ns.Util.Tooltip()
         tip:SetOwner(drag, "ANCHOR_BOTTOM")
         tip:SetText("EQ Objective Tracker", 0.92, 0.72, 0.02)
@@ -389,13 +777,72 @@ function Tracker:BuildFrame()
         tip:Show()
     end)
     drag:SetScript("OnLeave", function()
-        hint:SetColorTexture(1, 1, 1, 0)
+        f._dragHover = nil
+        paintDragHint(f)
         ns.Util.Tooltip():Hide()
     end)
+    drag:SetScript("OnMouseUp", openFrameMenuOnRightUp)
+
+    -- Not mouse-enabled itself, so a drag on the label still reaches the strip below it.
+    local moveBar = CreateFrame("Frame", nil, f)
+    moveBar:SetFrameLevel(f:GetFrameLevel() + 11)
+    moveBar:SetPoint("TOPLEFT")
+    moveBar:SetPoint("TOPRIGHT")
+    moveBar:SetHeight(DRAG_HANDLE_H)
+    moveBar:Hide()
+    local done = CreateFrame("Button", nil, moveBar)
+    done:SetSize(HEADER_ICON_SZ, HEADER_ICON_SZ)
+    local doneTex = done:CreateTexture(nil, "ARTWORK")
+    doneTex:SetAllPoints()
+    local Options = ns:GetModule("Options")
+    if Options and Options.ui then doneTex:SetTexture(Options.ui:Texture("check")) end
+    doneTex:SetVertexColor(0.45, 0.85, 0.35)
+    doneTex:SetAlpha(0.85)
+    done:SetScript("OnEnter", function(btn)
+        if Tracker:IsClickThrough() then return end
+        doneTex:SetAlpha(1)
+        local tip = ns.Util.Tooltip()
+        tip:SetOwner(btn, "ANCHOR_BOTTOMRIGHT")
+        tip:AddLine(L["Lock tracker"])
+        tip:Show()
+    end)
+    done:SetScript("OnLeave", function()
+        doneTex:SetAlpha(0.85)
+        ns.Util.Tooltip():Hide()
+    end)
+    done:SetScript("OnClick", function()
+        if Tracker:IsClickThrough() then return end
+        Tracker:SetLocked(true)
+    end)
+    local label = moveBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetText(L["Drag to move, corner grip to resize."])
+    label:SetWordWrap(false)
+    label:SetJustifyH("CENTER")
+    f.moveBar, f.moveDone, f.moveLabel = moveBar, done, label
+
+    local outline = CreateFrame("Frame", nil, f)
+    outline:SetAllPoints(f)
+    outline:SetFrameLevel(f:GetFrameLevel() + 20)
+    outline:Hide()
+    for _, side in ipairs({ { "TOPLEFT", "TOPRIGHT", false }, { "BOTTOMLEFT", "BOTTOMRIGHT", false },
+                            { "TOPLEFT", "BOTTOMLEFT", true }, { "TOPRIGHT", "BOTTOMRIGHT", true } }) do
+        local edge = outline:CreateTexture(nil, "OVERLAY")
+        edge:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0.9)
+        edge:SetPoint(side[1])
+        edge:SetPoint(side[2])
+        if side[3] then edge:SetWidth(1) else edge:SetHeight(1) end
+    end
+    f.moveOutline = outline
+
+    -- Kept out of the cogwheel's run like the sort button, and placed after it by the header pass.
+    local filter = makeHeaderIcon(f, "Interface\\AddOns\\EQObjectiveTracker\\Media\\Textures\\filter.tga",
+        L["Filters"], function(b) Tracker:OpenFilterMenu(b) end, "ANCHOR_BOTTOMRIGHT")
+    f.filterButton = filter
 
     local cog = makeHeaderIcon(f, "Interface\\AddOns\\EQObjectiveTracker\\Media\\Textures\\cogwheel.tga",
         L["Open the options panel"], function() ns:GetModule("Options"):Toggle() end)
     cog._dbKey = "showOptionsIcon"
+    cog:SetScript("OnMouseUp", openFrameMenuOnRightUp)
     f.headerIcons = { cog }
     -- Kept out of the cogwheel's right-to-left run, at the left end.
     local sort = makeHeaderIcon(f, "Interface\\AddOns\\EQObjectiveTracker\\Media\\Textures\\sort.tga",
@@ -465,6 +912,15 @@ function Tracker:BuildFrame()
     scenarioContainer:SetHeight(1)
     f.scenarioContainer = scenarioContainer
     scenarioContainer:SetScript("OnSizeChanged", function() Tracker:Refresh() end)
+
+    -- Shown only while two tabs hold a section, when ApplyContentInset moves the content below it.
+    local tabStrip = CreateFrame("Frame", nil, f)
+    tabStrip:SetPoint("TOPLEFT", CONTENT_PAD, -DRAG_HANDLE_H)
+    tabStrip:SetPoint("TOPRIGHT", -CONTENT_PAD, -DRAG_HANDLE_H)
+    tabStrip:SetHeight(TAB_STRIP_H)
+    tabStrip:Hide()
+    tabStrip.tabs = {}
+    f.tabStrip = tabStrip
 
     local eventsRegion = CreateFrame("Frame", nil, f)
     eventsRegion:SetHeight(1)
@@ -591,6 +1047,28 @@ local function setArrowHidden(btn, hidden)
     end
 end
 
+-- The template hangs its bar 6 px off the list's right edge with room for an arrow at each end.
+-- A slim bar runs the list's full height just past its edge instead, and the template's own
+-- anchors and width are captured first so 16 puts them back exactly.
+local function sizeScrollBar(sf, bar, slim)
+    if bar._eqotSlimW == slim or secureLocked() then return end
+    if not bar._eqotStockPoints then
+        local points = {}
+        for i = 1, bar:GetNumPoints() do points[i] = { bar:GetPoint(i) } end
+        bar._eqotStockPoints, bar._eqotStockW = points, bar:GetWidth()
+    end
+    bar:ClearAllPoints()
+    if slim then
+        bar:SetPoint("TOPLEFT", sf, "TOPRIGHT", SLIM_GAP, 0)
+        bar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", SLIM_GAP, 0)
+        bar:SetWidth(slim)
+    else
+        for _, p in ipairs(bar._eqotStockPoints) do bar:SetPoint(unpack(p)) end
+        if bar._eqotStockW and bar._eqotStockW > 0 then bar:SetWidth(bar._eqotStockW) end
+    end
+    bar._eqotSlimW = slim
+end
+
 -- The thumb is a texture on the old slider-based bar and a frame on the newer one, so
 -- both shapes are handled. The stock look is captured before the first skin so turning
 -- it back off restores rather than guesses.
@@ -598,10 +1076,13 @@ local function applyScrollBarSkin(sf, cfg)
     if not (sf and cfg) then return end
     local bar = sf.ScrollBar or sf.scrollBar
     if not bar then return end
-    local on = cfg.skinScrollBar == true
+    local slim = slimBarWidth(cfg)
+    sizeScrollBar(sf, bar, slim)
+    -- A slim bar is always the flat thumb at the bar's own width, with no arrows.
+    local on = cfg.skinScrollBar == true or slim ~= nil
     local c  = cfg.scrollBarThumbColor or {}
     local r, g, b, a = c.r or 0.60, c.g or 0.60, c.b or 0.65, c.a or 0.90
-    local w  = cfg.scrollBarThumbWidth
+    local w  = slim or cfg.scrollBarThumbWidth
 
     local thumbTex = bar.GetThumbTexture and bar:GetThumbTexture()
     if thumbTex then
@@ -651,8 +1132,8 @@ local function applyScrollBarSkin(sf, cfg)
     end
 
     local up, down = scrollArrowButtons(bar)
-    setArrowHidden(up,   cfg.hideScrollArrows == true)
-    setArrowHidden(down, cfg.hideScrollArrows == true)
+    setArrowHidden(up,   cfg.hideScrollArrows == true or slim ~= nil)
+    setArrowHidden(down, cfg.hideScrollArrows == true or slim ~= nil)
 end
 
 -- The background and border, on any frame built like the tracker's: a backdrop frame and a
@@ -729,7 +1210,9 @@ function Tracker:ApplyContentInset()
     local f = self.frame
     if not (f and f.scenarioContainer) then return end
     local gutter = scrollGutter(ns:GetModule("DB"):Tracker())
-    if f._scrollGutter == gutter then return end
+    -- The tab strip, while it shows, sits between the drag strip and the content.
+    local top = DRAG_HANDLE_H + (self:TabsInUse() and TAB_STRIP_H or 0)
+    if f._scrollGutter == gutter and f._contentTop == top then return end
 
     -- The quest scroll anchors to this container, so re-anchoring it is a protected move once
     -- a secure button exists anywhere in the chain - a quest item button, or one of the
@@ -740,9 +1223,9 @@ function Tracker:ApplyContentInset()
         return
     end
 
-    f._scrollGutter = gutter
-    f.scenarioContainer:SetPoint("TOPLEFT",  CONTENT_PAD, -DRAG_HANDLE_H)
-    f.scenarioContainer:SetPoint("TOPRIGHT", -(gutter - CONTENT_PAD), -DRAG_HANDLE_H)
+    f._scrollGutter, f._contentTop = gutter, top
+    f.scenarioContainer:SetPoint("TOPLEFT",  CONTENT_PAD, -top)
+    f.scenarioContainer:SetPoint("TOPRIGHT", -(gutter - CONTENT_PAD), -top)
 end
 
 -- Everything hangs off the scenario container's bottom rather than off the frame top, so
@@ -854,6 +1337,8 @@ function Tracker:DebugScroll()
     out[#out + 1] = ("cfg hide=%s bg=%s skin=%s noArrows=%s"):format(
         tostring(cfg.hideScrollBar), tostring(cfg.scrollBarBg),
         tostring(cfg.skinScrollBar), tostring(cfg.hideScrollArrows))
+    out[#out + 1] = ("barWidth cfg=%s applied=%s"):format(
+        tostring(cfg.scrollBarWidth), tostring(bar and bar._eqotSlimW or "stock"))
 
     out[#out + 1] = ("wq %s pos=%s scrollH=%.0f regionH=%.0f contentH=%.0f"):format(
         shown(f.eventsRegion), tostring(cfg.worldQuestsPosition),
@@ -935,7 +1420,8 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
         region:Hide()
     end
 
-    if not group or group.visibleCount == 0 or Sections:IsHidden(PINNED_GROUP) then
+    if not group or group.visibleCount == 0 or Sections:IsHidden(PINNED_GROUP)
+       or (self._activeTab and self:SectionTab(PINNED_GROUP) ~= self._activeTab) then
         collapseRegion()
         return 0, false
     end
@@ -1200,6 +1686,24 @@ function Tracker:StickyLine()
                 f._stickyZoned and tostring(self._stickyZone) or "row off")
 end
 
+-- "showing nil" with tabs in use is the strip waiting for combat to end (content top short of the
+-- strip), or no render since tabs came on while the tracker was hidden.
+function Tracker:TabsLine()
+    local cfg = ns:GetModule("DB"):Tracker()
+    if not (cfg and cfg.showTabs == true) then return "tabs: off" end
+    if not self:TabsOffered() then return "tabs: on, not offered on this client" end
+    local used = self:TabsInUse()
+    if not used then return "tabs: on, one tab in use, strip hidden" end
+    local list = {}
+    for t = 1, MAX_TABS do
+        if used[t] then list[#list + 1] = t end
+    end
+    local char = ns:GetModule("DB"):Char()
+    return ("tabs: on, in use %s, showing %s, saved %s, queued %s, content top %s"):format(
+        table.concat(list, ","), tostring(self._activeTab), tostring(char and char.activeTab),
+        tostring(self._pendingTab), tostring(self.frame and self.frame._contentTop))
+end
+
 function Tracker:_RenderScenario(group, cfg)
     local f    = self.frame
     local scen = f.scenarioContainer
@@ -1334,6 +1838,7 @@ function Tracker:Render()
         return
     end
     f._eqotPendingRender = nil
+    self:PaintFilterButton()
     local content = f.content
     if not content then return end
 
@@ -1437,7 +1942,17 @@ function Tracker:Render()
     wipe(zLast)
     local stickyZ = 0
 
-    for _, groupID in ipairs(Sections:Order()) do
+    local activeTab = self:ActiveTab()
+    -- Combat defers moving the content down under the strip, and the tabs wait for it.
+    if activeTab and f._contentTop ~= DRAG_HANDLE_H + TAB_STRIP_H then activeTab = nil end
+    self._activeTab = activeTab
+    self:LayoutTabs(activeTab)
+    -- Only the zone section's own pass hides its docked bar, and a tab without it skips that pass.
+    if activeTab and self:SectionTab("zoneprogress") ~= activeTab then
+        local ZoneBar = ns:GetModule("ZoneProgressBar")
+        if ZoneBar then ZoneBar:HideDocked() end
+    end
+    for _, groupID in ipairs(self:_OrderOnTab(Sections:Order(), activeTab)) do
         if Sections:IsVirtual(groupID) then
             local top   = y
             local added, drawn = self:_RenderZoneSection(content, groupID, y, gap,
@@ -1551,7 +2066,7 @@ function Tracker:Render()
         end
     end
 
-    local available = math.max(1, (f:GetHeight() or 0) - DRAG_HANDLE_H - scenarioH - 2
+    local available = math.max(1, (f:GetHeight() or 0) - (f._contentTop or DRAG_HANDLE_H) - scenarioH - 2
                                   - (GRIP_SIZE + 2))
     local fraction  = (cfg and cfg.worldQuestsPinnedMaxFraction) or WQ_PIN_FRACTION
     local band      = headerBand()

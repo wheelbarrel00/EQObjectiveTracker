@@ -745,6 +745,12 @@ Options:RegisterTab({
             function(v) relayout("hideScrollBar", v); syncDependents() end,
             L["Removes the tracker's scroll bar entirely and scrolls with the mouse wheel instead. Everything else in this group styles that bar, so it all stops applying while this is on."]))
 
+        w.barWidthSlider = self:CreateSlider(content, L["Scroll Bar Width"], 4, 16, 1,
+            function() return DB().scrollBarWidth or 16 end,
+            function(v) relayout("scrollBarWidth", v); syncDependents() end,
+            L["How wide the scroll bar is. At 16 it is the game's own bar. Narrower, it becomes a flat strip in the Thumb Color with no arrows, and the quest text gets the room it frees."])
+        scrollBar:Add(w.barWidthSlider)
+
         w.sbCheck = self:CreateCheckbox(content, L["Scroll Bar Background"],
             function() return DB().scrollBarBg ~= false end,
             function(v) relayout("scrollBarBg", v); syncDependents() end,
@@ -766,7 +772,7 @@ Options:RegisterTab({
         w.thumbColorPicker = self:CreateColorPicker(content, L["Thumb Color"],
             function() return DB().scrollBarThumbColor end,
             function(v) relayout("scrollBarThumbColor", v) end,
-            L["Color and opacity of the draggable block. Only used while Solid color thumb is on."], true)
+            L["Color and opacity of the draggable block. Used while Solid color thumb is on, and always while Scroll Bar Width is below 16."], true)
         satellite(self, thumbRow, w.thumbColorPicker)
 
         w.thumbWidthSlider = self:CreateSlider(content, L["Thumb Width"], 4, 16, 0.5,
@@ -1007,6 +1013,15 @@ Options:RegisterTab({
             dim(w.sbPicker,         bar and cfg.scrollBarBg ~= false)
             dim(w.thumbColorPicker, bar and cfg.skinScrollBar)
             dim(w.thumbWidthSlider, bar and cfg.skinScrollBar)
+            -- Below 16 the bar is always the flat thumb at its own width with no arrows, so the
+            -- three controls it overrides go dim and the thumb color always applies.
+            dim(w.barWidthSlider, bar)
+            if bar and (cfg.scrollBarWidth or 16) < 16 then
+                dim(w.thumbSkinCheck,   false)
+                dim(w.thumbWidthSlider, false)
+                dim(w.hideArrowsCheck,  false)
+                dim(w.thumbColorPicker, true)
+            end
 
             dim(w.bgPicker,          cfg.showBackground)
             dim(w.borderPicker,      cfg.showBorder)

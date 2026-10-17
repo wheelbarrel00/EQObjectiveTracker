@@ -117,6 +117,7 @@ end
 -- the tracker up. The quest list is the scroll viewport clipped to the content laid out in it.
 local function mouseOverDrawn(f)
     if over(f.drag) or over(f.scenarioContainer) or over(f.eventsRegion) then return true end
+    if over(f.tabStrip) then return true end
     if over(f.scroll) and over(f.content) then return true end
     local heads = f.stickyBand and f.stickyBand.heads
     if heads and (over(heads[1]) or over(heads[2])) then return true end

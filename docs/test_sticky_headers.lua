@@ -771,7 +771,7 @@ end)
 -- Its block is sliced from the first read to the section loop and run twice on one frame.
 case("Render keeps the band's zone arrays on the frame, each under its own name", function()
     local src = trackerSlice("    local zKeys, zTops, zFirst, zLast = f._stickyZKeys",
-                             "    for _, groupID in ipairs(Sections:Order()) do")
+                             "    local activeTab = self:ActiveTab()\n")
     local chunk = assert(loadstring(src .. "\nreturn zKeys, zTops, zFirst, zLast", "zone-arrays"))
     local f = {}
     local function wipe(t) for k in pairs(t) do t[k] = nil end return t end

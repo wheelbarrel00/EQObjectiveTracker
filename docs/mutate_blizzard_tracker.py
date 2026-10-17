@@ -637,6 +637,20 @@ MUTANTS = [
     ("the section order takes the DB module on a line ending in a semicolon", [
         ("UI/Sections.lua", 'function Sections:Order()\n    local DB  = ns:GetModule("DB")\n    local cfg = DB and DB:Tracker()',
                             'function Sections:Order()\n    local db  = ns:GetModule("DB");\n    local cfg = db and db.Tracker()')]),
+
+    # Scan 2 (2026-10-16): the section tabs' status reading.
+    ("/eqot status never prints the tabs line", [(C, '    debugLine("Tracker", nil, "TabsLine")\n', "")]),
+    ("each section line names tab 1 whatever its tab", [
+        (C, '            tabsOn and ("  [tab %d]"):format(tracker():SectionTab(id)) or ""))\n',
+            '            tabsOn and ("  [tab %d]"):format(1) or ""))\n')]),
+    ("the tab tags print for any setting but a stored false", [
+        (C, "    local tabsOn = trackerCfg and trackerCfg.showTabs == true and tracker():TabsOffered()\n",
+            "    local tabsOn = trackerCfg and trackerCfg.showTabs ~= false and tracker():TabsOffered()\n")]),
+    ("the tab tags print on a client that offers no tabs", [
+        (C, "    local tabsOn = trackerCfg and trackerCfg.showTabs == true and tracker():TabsOffered()\n",
+            "    local tabsOn = trackerCfg and trackerCfg.showTabs == true\n")]),
+    ("the section lines carry no tab", [
+        (C, '            tabsOn and ("  [tab %d]"):format(tracker():SectionTab(id)) or ""))\n', '            ""))\n')]),
 ]
 
 SUMMARY = re.compile(r"^test_blizzard_tracker: (\d+) passed, (\d+) failed$")

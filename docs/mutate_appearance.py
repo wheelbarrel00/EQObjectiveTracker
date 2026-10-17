@@ -34,6 +34,56 @@ A = "Options/TabAppearance.lua"
 U = "Core/Util.lua"
 
 MUTANTS = [
+    # ---------------------------------------------------------------------- Scroll Bar Width
+    ("Scroll Bar Width writes Thumb Width", [
+        (A, '            function(v) relayout("scrollBarWidth", v); syncDependents() end,',
+            '            function(v) relayout("scrollBarThumbWidth", v); syncDependents() end,')]),
+
+    ("Scroll Bar Width never re-runs the sweep", [
+        (A, '            function(v) relayout("scrollBarWidth", v); syncDependents() end,',
+            '            function(v) relayout("scrollBarWidth", v) end,')]),
+
+    ("Scroll Bar Width reads 4 when unset", [
+        (A, "            function() return DB().scrollBarWidth or 16 end,",
+            "            function() return DB().scrollBarWidth or 4 end,")]),
+
+    ("Scroll Bar Width stays lit with the bar hidden", [
+        (A, "            dim(w.barWidthSlider, bar)\n", "")]),
+
+    ("a slim bar leaves Solid color thumb lit", [
+        (A, "                dim(w.thumbSkinCheck,   false)\n", "")]),
+
+    ("a slim bar leaves Thumb Width lit", [
+        (A, "                dim(w.thumbWidthSlider, false)\n", "")]),
+
+    ("a slim bar leaves Hide scroll bar arrows lit", [
+        (A, "                dim(w.hideArrowsCheck,  false)\n", "")]),
+
+    ("a slim bar leaves Thumb Color dim with Solid color thumb off", [
+        (A, "                dim(w.thumbColorPicker, true)\n", "")]),
+
+    ("16 counts as slim on the tab", [
+        (A, "            if bar and (cfg.scrollBarWidth or 16) < 16 then\n",
+            "            if bar and (cfg.scrollBarWidth or 16) <= 16 then\n")]),
+
+    ("Scroll Bar Width ships slim", [
+        ("Core/DB.lua", "            scrollBarWidth       = 16,\n", "            scrollBarWidth       = 4,\n")]),
+
+    ("Scroll Bar Width survives Reset to Defaults", [
+        ("Core/DB.lua", '"hideScrollArrows", "scrollBarWidth",\n', '"hideScrollArrows",\n')]),
+
+    ("Scroll Bar Width commented out of the reset list", [
+        ("Core/DB.lua", '"hideScrollArrows", "scrollBarWidth",\n', '"hideScrollArrows", --[=[\n    "scrollBarWidth", ]=]\n')]),
+
+    ("Scroll Bar Width moved past a hole in the reset list", [
+        ("Core/DB.lua", '"hideScrollArrows", "scrollBarWidth",\n', '"hideScrollArrows",\n'),
+        ("Core/DB.lua", '    "showProgressBars", "showQuestProgressBars", "showScenarioProgressBars",\n}\n',
+            '    "showProgressBars", "showQuestProgressBars", "showScenarioProgressBars", nil, "scrollBarWidth",\n}\n')]),
+
+    ("a hidden bar's slim width still lights Thumb Color", [
+        (A, "            if bar and (cfg.scrollBarWidth or 16) < 16 then\n",
+            "            if (cfg.scrollBarWidth or 16) < 16 then\n")]),
+
     # --------------------------------------------------------------------------- the zone headers card
     ("the zone header size slider writes the indent", [
         (A, '            function(v) relayout("zoneHeaderSizeDelta", v) end,',
@@ -723,6 +773,19 @@ MUTANTS = [
 
     ("the headers tooltip points at the picker above again", [
         (A, '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color below while it is on. Off by default."]))', '            L["Colors the section headers (Quests, Campaign, and so on) with the class color of the character you are currently logged in on. Overrides the color above while it is on. Off by default."]))')]),
+
+    # Scan 1 (2026-10-16): Scroll Bar Width's range, reset and dimming.
+    ("Scroll Bar Width stops at 15, short of the game's own bar", [
+        (A, 'L["Scroll Bar Width"], 4, 16, 1,', 'L["Scroll Bar Width"], 4, 15, 1,')]),
+    ("Scroll Bar Width goes down to 1", [(A, 'L["Scroll Bar Width"], 4, 16, 1,', 'L["Scroll Bar Width"], 1, 16, 1,')]),
+    ("Scroll Bar Width steps in half pixels", [(A, 'L["Scroll Bar Width"], 4, 16, 1,', 'L["Scroll Bar Width"], 4, 16, 0.5,')]),
+    ("Scroll Bar Width is commented out of the reset list", [
+        ("Core/DB.lua", '"hideScrollArrows", "scrollBarWidth",\n', '"hideScrollArrows", -- "scrollBarWidth",\n')]),
+    ("Scroll Bar Width is block-commented out of the reset list", [
+        ("Core/DB.lua", '"hideScrollArrows", "scrollBarWidth",\n', '"hideScrollArrows", --[[ "scrollBarWidth", ]]\n')]),
+    ("a 15 px bar leaves its three overridden controls lit", [
+        (A, "            if bar and (cfg.scrollBarWidth or 16) < 16 then\n",
+            "            if bar and (cfg.scrollBarWidth or 16) < 15 then\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_appearance: (\d+) passed, (\d+) failed$")

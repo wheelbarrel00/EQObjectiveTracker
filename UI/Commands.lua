@@ -15,7 +15,7 @@ end
 
 handlers.unlock = function()
     ns:GetModule("DB"):General().lockTracker = false
-    tracker():ApplyLockState()
+    tracker():ApplyLockState(true)
     ns:Print(L["tracker unlocked."])
 end
 
@@ -141,14 +141,17 @@ handlers.status = function()
     debugLine("Filter")
 
     ns:Print("sections (in render order):")
+    local trackerCfg = ns:GetModule("DB"):Tracker()
+    local tabsOn = trackerCfg and trackerCfg.showTabs == true and tracker():TabsOffered()
     local function sectionLine(id)
         local g = Feed.byGroup[id]
-        ns:Print(("  %-14s %d/%d visible%s%s%s%s"):format(id,
+        ns:Print(("  %-14s %d/%d visible%s%s%s%s%s"):format(id,
             g and g.visibleCount or 0, g and g.totalCount or 0,
             Sections:IsVirtual(id) and "  [virtual]" or "",
             Sections:IsPinned(id) and "  [pinned]" or "",
             Sections:IsHidden(id) and "  [hidden]" or "",
-            Sections:IsCollapsed(id) and "  [collapsed]" or ""))
+            Sections:IsCollapsed(id) and "  [collapsed]" or "",
+            tabsOn and ("  [tab %d]"):format(tracker():SectionTab(id)) or ""))
     end
     for _, id in ipairs(Sections:Order()) do sectionLine(id) end
     -- Order() excludes pinned groups, so without this a pinned region reports nothing
@@ -164,6 +167,7 @@ handlers.status = function()
     debugLine("Tracker", "scroll: ", "DebugScroll")
     debugLine("Tracker", nil, "HeightLine")
     debugLine("Tracker", nil, "StickyLine")
+    debugLine("Tracker", nil, "TabsLine")
     debugLine("ZoneGroups")
 
     debugLine("ItemButtons")

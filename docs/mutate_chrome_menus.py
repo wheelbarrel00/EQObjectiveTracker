@@ -140,8 +140,8 @@ MUTANTS = (menu_mutants("HUD", HUD, "HUD", "hudState", "Bonus Objectives", "DEFA
            + menu_mutants("zone bar", ZONE, "ZoneBar", "barState", "Zone Progress Bar", "220")
            # The fields the harness checks are read from the vendored library, so a change there is seen.
            + [("the library stops taking kind, which every title row carries", [
-               (MENU, 'local ITEM_FIELDS = { kind = "string", text = "string", danger = "boolean", onClick = "function" }',
-                'local ITEM_FIELDS = { text = "string", danger = "boolean", onClick = "function" }')])])
+               (MENU, 'local ITEM_FIELDS = { kind = "string", text = "string", danger = "boolean", onClick = "function",',
+                'local ITEM_FIELDS = { text = "string", danger = "boolean", onClick = "function",')])])
 
 SUMMARY = re.compile(r"^test_chrome_menus: (\d+) passed, (\d+) failed$")
 

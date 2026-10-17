@@ -132,7 +132,7 @@ MUTANTS = [
             "function() return DB().filters.campaignAnyZones end,")]),
 
     ("Reset filters leaves the exemption on", [
-        (O, "                f.campaignAnyZone = false\n", "")]),
+        (O, "    f.campaignAnyZone = false\n", "")]),
 
     # The author's call on 2026-09-27: the reset tooltip names the campaign option where its box
     # is built, and keeps the old, still true wording and its translations everywhere else.

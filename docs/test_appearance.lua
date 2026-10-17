@@ -26,13 +26,17 @@ end
 
 local pass, fail = 0, 0
 
--- Core/DB.lua's own tracker defaults, read by running the file.
-local function shippedDefaults()
+-- Core/DB.lua itself, run, for its own tracker defaults and its own reset.
+local function shippedDB()
     local got
     local chunk = assert(loadfile(repoFile("Core/DB.lua")))
     setfenv(chunk, setmetatable({}, { __index = _G }))
     chunk("EQObjectiveTracker", { RegisterModule = function(_, _, m) got = m return m end, Has = {} })
-    return got.defaults.profile.tracker
+    return got
+end
+
+local function shippedDefaults()
+    return shippedDB().defaults.profile.tracker
 end
 
 -- Core/DB.lua's accessors read self, so a module calling one with a dot raises in game. This
@@ -285,7 +289,7 @@ local ROWS = {
         { "Event Title Color", "picker" },
     },
     ["Scroll Bar"] = {
-        { "Hide scroll bar", "checkbox" },
+        { "Hide scroll bar", "checkbox" }, { "Scroll Bar Width", "slider" },
         { "Scroll Bar Background", "checkbox", false, "Scroll Bar Color" },
         { "Solid color thumb", "checkbox", false, "Thumb Color" }, { "Thumb Width", "slider", true },
         { "Hide scroll bar arrows", "checkbox" },
@@ -322,6 +326,8 @@ local ROWS = {
 local function zb(cfg) return cfg.zoneProgressBar or {} end
 local function pb(cfg) return cfg.progressBar or {} end
 local function noBar(cfg) return not cfg.hideScrollBar end
+-- Below 16 the bar is always the flat thumb at its own width with no arrows. 16 is the template's.
+local function slim(cfg) return (cfg.scrollBarWidth or 16) < 16 end
 local function card(cfg) return (cfg.blockLayout or "classic") == "card" end
 local function float(cfg)
     return cfg.showZoneProgressBar and (cfg.zoneProgressLocation or "floating") == "floating"
@@ -345,12 +351,13 @@ local SWEEP = {
     ["Text/Shadow Size"]    = function(c) return c.textShadow end,
     ["Scenario/Shadow Color"]     = function(c) return c.scenarioTextShadow ~= false end,
     ["Scenario/Shadow Size"]      = function(c) return c.scenarioTextShadow ~= false end,
+    ["Scroll Bar/Scroll Bar Width"]              = noBar,
     ["Scroll Bar/Scroll Bar Background"]  = noBar,
-    ["Scroll Bar/Hide scroll bar arrows"] = noBar,
-    ["Scroll Bar/Solid color thumb"]      = noBar,
+    ["Scroll Bar/Hide scroll bar arrows"] = function(c) return noBar(c) and not slim(c) end,
+    ["Scroll Bar/Solid color thumb"]      = function(c) return noBar(c) and not slim(c) end,
     ["Scroll Bar/Scroll Bar Color"] = function(c) return noBar(c) and c.scrollBarBg ~= false end,
-    ["Scroll Bar/Thumb Color"]      = function(c) return noBar(c) and c.skinScrollBar end,
-    ["Scroll Bar/Thumb Width"]      = function(c) return noBar(c) and c.skinScrollBar end,
+    ["Scroll Bar/Thumb Color"]      = function(c) return noBar(c) and (c.skinScrollBar or slim(c)) end,
+    ["Scroll Bar/Thumb Width"]      = function(c) return noBar(c) and c.skinScrollBar and not slim(c) end,
     ["Tracker/Background Color"] = function(c) return c.showBackground end,
     ["Tracker/Border Color"]     = function(c) return c.showBorder end,
     ["Tracker/Border Thickness"] = function(c) return c.showBorder end,
@@ -435,6 +442,7 @@ local DOMAIN = {
     showProgressBars = SWITCH, showQuestProgressBars = SWITCH, showScenarioProgressBars = SWITCH,
     zoneHeaders = SWITCH, zoneHeaderColorUseClass = SWITCH, zoneHeaderBar = SWITCH, zoneHeaderDivider = SWITCH,
     dungeonHeader = SWITCH,
+    scrollBarWidth = { ABSENT, 16, 4, 10, 15 },
 }
 
 -- A fixed generator rather than math.random, so a failing profile is the same on every run.
@@ -788,6 +796,9 @@ do
         }) do
             ok(sweeps(key, true), key .. " re-runs the sweep when it changes")
         end
+        ok(sweeps("Scroll Bar/Scroll Bar Width", 6), "Scroll Bar/Scroll Bar Width re-runs the sweep when it changes")
+        ok(t.cfg.scrollBarWidth == 6, "and stores the width it was handed")
+        ok(sweeps("Scroll Bar/Scroll Bar Width", 16), "and again on the way back to the stock 16")
         ok(sweeps("Quest Rows/Row Layout", "card"), "Quest Rows/Row Layout re-runs the sweep when it changes")
         ok(t.cfg.blockLayout == "card", "and stores the layout it was handed")
         ok(sweeps("Quest Colors/Quest Title Color", "custom"),
@@ -1004,7 +1015,7 @@ local PATH = {
     ["Scenario/Banner Alignment"] = LAY, ["Scenario/Banner Text Size"] = LAY,
     ["Scenario/Criteria Text Size"] = LAY, ["Scenario/Event Title Text Size"] = LAY,
     ["Scenario/Event Title Color"] = LAY,
-    ["Scroll Bar/Hide scroll bar"] = LAY, ["Scroll Bar/Scroll Bar Background"] = LAY,
+    ["Scroll Bar/Hide scroll bar"] = LAY, ["Scroll Bar/Scroll Bar Width"] = LAY, ["Scroll Bar/Scroll Bar Background"] = LAY,
     ["Scroll Bar/Scroll Bar Color"] = LAY, ["Scroll Bar/Solid color thumb"] = LAY,
     ["Scroll Bar/Thumb Color"] = LAY, ["Scroll Bar/Thumb Width"] = LAY, ["Scroll Bar/Hide scroll bar arrows"] = LAY,
     ["Tracker/Background"] = LAY, ["Tracker/Background Color"] = LAY, ["Tracker/Border"] = LAY,
@@ -1436,6 +1447,39 @@ do
         end
     end)
     ok(good, "the bar texture swatches raised: " .. tostring(err))
+end
+
+-- Any other shipped value would change every player's bar the moment they update, and a key left
+-- out of the reset list survives Reset to Defaults.
+print("== Scroll Bar Width ships at the template's 16, and Reset to Defaults puts it back")
+do
+    local good, err = pcall(function()
+        local d = shippedDefaults()
+        ok(d.scrollBarWidth == 16, "the shipped Scroll Bar Width is 16, the game's own bar: " .. tostring(d.scrollBarWidth))
+        local t = appearanceTab(true)
+        local slider = t.byKey["Scroll Bar/Scroll Bar Width"]
+        ok(slider and slider.getter() == 16, "unset, the slider reads 16, as the sweep and the tracker do")
+        ok(slider.min == 4 and slider.max == 16 and slider.step == 1,
+           "it runs from 4 to the game's own 16 in whole pixels: " .. tostring(slider.min) .. ".."
+           .. tostring(slider.max) .. " by " .. tostring(slider.step))
+        slider.setter(5)
+        ok(slider.getter() == 5 and t.cfg.scrollBarWidth == 5, "and reads back what it stored")
+        local fh = assert(io.open(repoFile("Core/DB.lua"), "r"))
+        local db = fh:read("*a")
+        fh:close()
+        -- Comments stripped first, block ones too, or a key commented out of the list still reads as in it.
+        local keys = (db:match("\nlocal APPEARANCE_KEYS = (%b{})") or ""):gsub("%-%-%[%[.-%]%]", "")
+        keys = keys:gsub("%-%-[^\n]*", "")
+        ok(keys:find('"scrollBarWidth"', 1, true) ~= nil, "and Reset to Defaults lists it")
+        -- And the reset itself, run on a profile, so no spelling of the list can hide the key from it.
+        local real = shippedDB()
+        local prof = { scrollBarWidth = 6, hideScrollBar = true, sectionTab = { quests = 2 }, showTabs = true }
+        real.ResetTrackerAppearance({ Tracker = function() return prof end })
+        ok(prof.scrollBarWidth == nil, "Reset to Defaults clears a slim width back to the game's own bar")
+        ok(prof.sectionTab and prof.sectionTab.quests == 2 and prof.showTabs == true,
+           "and leaves the section tabs alone, which live on the Tracker tab")
+    end)
+    ok(good, "the Scroll Bar Width defaults raised: " .. tostring(err))
 end
 
 print(("test_appearance: %d passed, %d failed"):format(pass, fail))

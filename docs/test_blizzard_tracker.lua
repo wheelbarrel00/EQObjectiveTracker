@@ -557,7 +557,8 @@ end)
 case("/eqot status names the tracker in use and the saved choice", function()
     -- A stood-down module's own line looks like a fault (it never enabled), and a kept one's must
     -- still print as it is.
-    local function status(useBlizzard, stored, classic, arrange)
+    -- arrange(env) sets the client up, and mods(modules) swaps module stubs after the defaults below.
+    local function status(useBlizzard, stored, classic, arrange, mods)
         local t = boot({ real = { "Commands" }, classic = classic,
                          profile = { general = { useBlizzardTracker = useBlizzard } } })
         t.env.SlashCmdList = {}
@@ -603,6 +604,7 @@ case("/eqot status names the tracker in use and the saved choice", function()
             t.env.GetNumQuestWatches = function() return 9 end
         end
         if arrange then arrange(t.env) end
+        if mods then mods(m) end
         if stored ~= nil then t.API:SetBlizzardTrackerSetting(stored) end
         t.env.SlashCmdList.EQOT("status")
         return printedLine(t, "tracker in use:"), built, printedLine(t, "  quests "), t
@@ -665,6 +667,43 @@ case("/eqot status names the tracker in use and the saved choice", function()
        "EQOT's window: both Mythic+ lines print")
     ok(provider:find("unavailable on this client", 1, true) ~= nil, "and an unavailable provider reads so: " .. provider)
     ok(t.printed("questie coexist: hook missing"), "and every module's own line prints as before")
+
+    -- Section tabs: each section line names its tab while they are on, and the tracker's tabs line prints.
+    local function withSections(tabsOn, offered)
+        return function(mods)
+            mods.Tracker.TabsOffered = function(self)
+                assert(self == mods.Tracker, "TabsOffered without self")
+                return offered ~= false
+            end
+            mods.Sections = { Order = function() return { "campaign", "quests" } end,
+                              Known = function() return { "campaign", "quests" } end,
+                              IsVirtual = function() return false end, IsPinned = function() return false end,
+                              IsHidden = function() return false end, IsCollapsed = function() return false end }
+            mods.Tracker.SectionTab = function(self, id)
+                assert(self == mods.Tracker, "SectionTab without self")
+                return id == "quests" and 2 or 1
+            end
+            mods.Tracker.TabsLine = function() return "tabs: as the tracker reads them" end
+            mods.DB:Tracker().showTabs = tabsOn
+        end
+    end
+    -- The provider list prints its own "  quests" line first, so a section line is found by its count.
+    local function sectionLine(tt, id)
+        for _, p in ipairs(tt.prints) do
+            if p:find("  " .. id .. " ", 1, true) and p:find(" visible", 1, true) then return p end
+        end
+        return ""
+    end
+    local _, _, _, on = status(false, nil, false, nil, withSections(true))
+    ok(count(on, "tabs: as the tracker reads them") == 1, "the tracker's tabs line prints")
+    local quests, campaign = sectionLine(on, "quests"), sectionLine(on, "campaign")
+    ok(quests:find("[tab 2]", 1, true) ~= nil and campaign:find("[tab 1]", 1, true) ~= nil,
+       "each section line names its own tab: " .. quests .. " / " .. campaign)
+    for _, setup in ipairs({ { nil, true, "with tabs off" }, { 1, true, "with a stray 1 in a profile" },
+                             { true, false, "on a client that does not offer tabs, as on Era" } }) do
+        local _, _, _, off = status(false, nil, false, nil, withSections(setup[1], setup[2]))
+        ok(count(off, "[tab ") == 0 and sectionLine(off, "quests") ~= "", setup[3] .. ", the section lines carry no tab")
+    end
 end)
 
 case("/eqot enable all says what stays off", function()

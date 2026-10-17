@@ -332,6 +332,8 @@ local function near(x, y) return type(x) == "number" and math.abs(x - y) < 0.005
 
 -- ------------------------------------------------------------------------------- cases
 
+-- Blizzard's Classic picker with no picker addon's box reads its slider as TRANSPARENCY, measured
+-- in game for the library's MINOR 38, so these slider readings are 1 minus the alpha.
 print("== a picker opened on a CLOSED frame commits its own alpha")
 do
     install(newClassicPicker(0))
@@ -339,7 +341,8 @@ do
     bar:Open()
     ok(picker:IsShown(), "the picker is up")
     ok(picker.slider:IsShown(), "an alpha picker shows its opacity slider")
-    ok(picker.slider:GetValue() == 0.85, "the slider carries the color's own alpha")
+    ok(near(picker.slider:GetValue(), 0.15), "the slider carries the color's own alpha, as transparency: "
+       .. tostring(picker.slider:GetValue()))
     picker:SetColorRGB(0.94, 0.54, 0.72)          -- the user picks a color off the wheel
     drive(picker, "ClickOkay")
     ok(A(bar) == 0.85, "the alpha survives the pick")
@@ -359,7 +362,8 @@ do
     local bar = swatch({ r = 0.80, g = 0.60, b = 0.20, a = 0.85 }, true)
     bar:Open()                                     -- re-seeded onto the OPEN picker
     ok(picker.slider:IsShown(), "the opacity slider must be shown for an alpha picker")
-    ok(picker.slider:GetValue() == 0.85, "and must carry THIS color's alpha, not the last one's")
+    ok(near(picker.slider:GetValue(), 0.15), "and must carry THIS color's alpha, not the last one's: "
+       .. tostring(picker.slider:GetValue()))
 
     picker:SetColorRGB(0.94, 0.54, 0.72)
     drive(picker, "ClickOkay")
@@ -372,7 +376,7 @@ do
     install(newClassicPicker(0))
     local first = swatch({ r = 0.1, g = 0.2, b = 0.3, a = 0.25 }, true)
     first:Open()
-    ok(picker.slider:GetValue() == 0.25, "the first picker loads its own alpha")
+    ok(near(picker.slider:GetValue(), 0.75), "the first picker loads its own alpha: " .. tostring(picker.slider:GetValue()))
 
     local second = swatch({ r = 0.8, g = 0.6, b = 0.2, a = 0.85 }, true)
     second:Open()
@@ -390,14 +394,14 @@ do
     local bar = swatch({ r = 0.8, g = 0.6, b = 0.2, a = 0.85 }, true)
     bar:Open()
     drive(picker, "DragOpacity", 0.40)
-    ok(A(bar) == 0.40, "dragging the opacity slider commits that alpha")
+    ok(near(A(bar), 0.60), "dragging the opacity slider commits that alpha: " .. tostring(A(bar)))
     picker:SetColorRGB(0.94, 0.54, 0.72)
     drive(picker, "ClickOkay")
-    ok(A(bar) == 0.40, "and it survives a later color pick")
+    ok(near(A(bar), 0.60), "and it survives a later color pick: " .. tostring(A(bar)))
 
     -- Zero is reachable on purpose. That is not the bug - the bug was reaching it without
     -- touching the control.
-    drive(picker, "DragOpacity", 0)
+    drive(picker, "DragOpacity", 1)
     ok(A(bar) == 0, "a deliberate 0 is still allowed")
 end
 
@@ -430,7 +434,7 @@ do
     install(newClassicPicker(0))
     local unset = swatch(nil, true)
     unset:Open()
-    ok(picker.slider:GetValue() == 1, "an unset color seeds a fully opaque picker")
+    ok(picker.slider:GetValue() == 0, "an unset color seeds a fully opaque picker, no transparency")
     picker:SetColorRGB(0.2, 0.4, 0.6)
     drive(picker, "ClickOkay")
     ok(A(unset) == 1, "and commits alpha 1 rather than 0")
@@ -700,14 +704,16 @@ do
     ok(fr:find("cp:SetupColorPickerAndShow", 1, true) ~= nil,
        "ShowColorPicker still prefers the modern entry point")
     -- The session state sits above the slice, so no case here can reach it. It starts empty
-    -- and is kept by every later copy, and the only LITERAL false written is the no-box latch
-    -- inside calibrate (a reading can still settle it false through `= inverted`). Latching
-    -- false at load is a wrong answer rather than an absent one, which is the whole of the
-    -- tri-state.
+    -- and is kept by every later copy, and the only LITERAL value written is the no-box latch
+    -- inside calibrate, true since MINOR 38 (a reading can still settle it either way through
+    -- `= inverted`). Latching at load is a wrong answer rather than an absent one, which is the
+    -- whole of the tri-state.
     ok(fr:find("local state = lib.shared.colorPicker or {}", 1, true) ~= nil,
        "the session state is still kept across copies and starts empty")
     local _, falses = fr:gsub("alphaInverted = false", "")
-    ok(falses == 1, "and the session flag is latched false in one place only: " .. falses)
+    local _, trues = fr:gsub("alphaInverted = true", "")
+    ok(falses == 0 and trues == 1, "and the session flag is latched in one place only, true: "
+       .. trues .. " true, " .. falses .. " false")
     -- Seeding is not a user gesture. A bare SetValue here commits a color nobody picked.
     ok(fr:find("setControl(controlValue(na))", 1, true) ~= nil,
        "the corrective write still goes through the commit-suppressing helper")

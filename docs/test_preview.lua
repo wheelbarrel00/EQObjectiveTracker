@@ -119,6 +119,13 @@ local function newCreateFrame(log)
             f.ScrollBar = region("Slider", f)
             f.ScrollBar.thumb = region("Texture", f.ScrollBar)
             function f.ScrollBar:GetThumbTexture() return self.thumb end
+            -- The template's own anchors: 6 px off the list's right edge, 16 px in from each end
+            -- for the arrows, 16 px wide.
+            f.ScrollBar:SetPoint("TOPLEFT", f, "TOPRIGHT", 6, -16)
+            f.ScrollBar:SetPoint("BOTTOMLEFT", f, "BOTTOMRIGHT", 6, 16)
+            f.ScrollBar:SetWidth(16)
+            function f.ScrollBar:GetNumPoints() return #self.points end
+            function f.ScrollBar:GetPoint(i) return unpack(self.points[i]) end
             f.ScrollBar.ScrollUpButton = region("Button", f.ScrollBar)
             f.ScrollBar.ScrollDownButton = region("Button", f.ScrollBar)
         end
@@ -718,11 +725,87 @@ case("Tracker:SkinScroll styles any scroll frame's bar and track", function()
     ok(good, "a scroll frame with no track texture is styled too")
 end)
 
+-- Below 16 the bar runs the list's full height 2 px past its edge at its own width, as the flat
+-- thumb in the thumb color with no arrows, whatever those three boxes say. 16 puts the template's
+-- anchors, width and look back.
+case("Scroll Bar Width below 16 draws a slim flat bar, and 16 puts the template's back", function()
+    local T, ns = trackerFile()
+    local sf = newCreateFrame()("ScrollFrame", nil, nil, "UIPanelScrollFrameTemplate")
+    local bar, thumb = sf.ScrollBar, sf.ScrollBar.thumb
+    thumb.w, thumb.texture = 16, "stock-thumb"
+    local function pointsText()
+        local out = {}
+        for i, p in ipairs(bar.points) do
+            out[i] = table.concat({ tostring(p[1]), p[2] == sf and "sf" or tostring(p[2]), tostring(p[3]),
+                                    tostring(p[4]), tostring(p[5]) }, " ")
+        end
+        return table.concat(out, " / ")
+    end
+    local stock = pointsText()
+    T:SkinScroll(sf, nil, {})
+    ok(pointsText() == stock and bar.w == 16, "16 by default leaves the template's bar alone: " .. pointsText())
+    ok(thumb.w == 16 and thumb.color == nil, "and its thumb")
+
+    local c = { scrollBarWidth = 4, skinScrollBar = false, hideScrollArrows = false,
+                scrollBarThumbColor = { r = 0.9, g = 0.8, b = 0.7, a = 1 }, scrollBarThumbWidth = 10 }
+    T:SkinScroll(sf, nil, c)
+    ok(pointsText() == "TOPLEFT sf TOPRIGHT 2 0 / BOTTOMLEFT sf BOTTOMRIGHT 2 0",
+       "4 px: the full height, 2 px past the list: " .. pointsText())
+    ok(bar.w == 4, "4 px wide: " .. tostring(bar.w))
+    ok(thumb.color and thumb.color[1] == 0.9 and thumb.color[4] == 1, "the thumb flat in its color, Solid color thumb off")
+    ok(thumb.w == 4, "at the bar's width, not Thumb Width: " .. tostring(thumb.w))
+    ok(not bar.ScrollUpButton.shown and not bar.ScrollDownButton.shown, "no arrows, Hide scroll bar arrows off")
+
+    c.scrollBarWidth = 9
+    T:SkinScroll(sf, nil, c)
+    ok(bar.w == 9 and thumb.w == 9 and #bar.points == 2, "moved to 9, the bar and thumb follow with no stray anchor")
+
+    c.scrollBarWidth = 16
+    T:SkinScroll(sf, nil, c)
+    ok(pointsText() == stock, "back to 16, the template's anchors exactly: " .. pointsText())
+    ok(bar.w == 16, "and its width: " .. tostring(bar.w))
+    ok(thumb.texture == "stock-thumb" and thumb.w == 16, "and its own thumb: " .. tostring(thumb.texture) .. " " .. tostring(thumb.w))
+    ok(bar.ScrollUpButton.shown and bar.ScrollDownButton.shown, "and its arrows")
+
+    c.scrollBarWidth = 6
+    ns.modules.ItemButtons = { Locked = function() return true end }
+    T:SkinScroll(sf, nil, c)
+    ok(pointsText() == stock and bar.w == 16, "in combat with a secure button, the bar is left where it is")
+    ns.modules.ItemButtons = { Locked = function() return false end }
+    T:SkinScroll(sf, nil, c)
+    ok(bar.w == 6 and #bar.points == 2, "and the next pass out of combat applies it")
+end)
+
+-- /eqot status's scroll line names the width the bar was last given, run here as it stands.
+case("/eqot status reads the Scroll Bar Width it set and the one it applied", function()
+    local fh = assert(io.open(repoFile("UI/Tracker.lua"), "r"))
+    local src = fh:read("*a")
+    fh:close()
+    local a = src:find('    out[#out + 1] = ("barWidth cfg=%s applied=%s"):format(\n', 1, true)
+    local b = a and src:find("\n\n", a, true)
+    ok(a and b, "the scroll line's width part is found")
+    if not (a and b) then return end
+    local chunk = assert(loadstring("local out, cfg, bar = {}, ...\n" .. src:sub(a, b) .. "return out[1]\n", "barwidth"))
+    ok(chunk({ scrollBarWidth = 6 }, { _eqotSlimW = 6 }) == "barWidth cfg=6 applied=6", "slim: the width applied")
+    ok(chunk({}, {}) == "barWidth cfg=nil applied=stock", "unset: the template's own bar")
+    ok(chunk({ scrollBarWidth = 6 }, {}) == "barWidth cfg=6 applied=stock", "set but not yet applied, as in combat")
+end)
+
 case("Tracker:ScrollGutter and Tracker:Insets give the tracker's own numbers", function()
     local T = trackerFile()
     ok(T:ScrollGutter({}) == 26 and T:ScrollGutter({ hideScrollBar = true }) == 8, "26 with the bar, 8 without")
+    ok(T:ScrollGutter({ scrollBarWidth = 16 }) == 26, "Scroll Bar Width 16 is the template's bar and its 26")
+    ok(T:ScrollGutter({ scrollBarWidth = 20 }) == 26, "and anything wider is too")
+    ok(T:ScrollGutter({ scrollBarWidth = 4 }) == 10, "a 4 px bar keeps 2 + 4 + 4 = 10: " .. T:ScrollGutter({ scrollBarWidth = 4 }))
+    ok(T:ScrollGutter({ scrollBarWidth = 15 }) == 21, "a 15 px bar keeps 21: " .. T:ScrollGutter({ scrollBarWidth = 15 }))
+    ok(T:ScrollGutter({ scrollBarWidth = 7.6 }) == 14, "a fractional width rounds, 8 here: " .. T:ScrollGutter({ scrollBarWidth = 7.6 }))
+    ok(T:ScrollGutter({ scrollBarWidth = 1 }) == 8, "nothing under 2 px: " .. T:ScrollGutter({ scrollBarWidth = 1 }))
+    ok(T:ScrollGutter({ scrollBarWidth = "x" }) == 26, "a value that is not a number is the template's bar")
+    ok(T:ScrollGutter({ hideScrollBar = true, scrollBarWidth = 4 }) == 8, "a hidden bar keeps 8 at any width")
     local pad, top, bottom = T:Insets()
     ok(pad == 4 and top == 14 and bottom == 16, "4 in, under the 14 drag handle, above the 14 grip and 2")
+    -- Read by the Tracker tab's tab buttons to cycle 1, 2, 3, so a missing one breaks every click there.
+    ok(T.MAX_TABS == 3, "the tracker hands the Tracker tab its 3 tabs: " .. tostring(T.MAX_TABS))
 end)
 
 case("the tracker's own frame still skins through the split methods", function()
@@ -740,6 +823,18 @@ case("the tracker's own frame still skins through the split methods", function()
     ok(f.background.shown and f.bgFrame.backdrop.edgeSize == 2, "the tracker's background and border")
     ok(f.scroll.ScrollBar._eqotHidden == true and f.eventsScroll.ScrollBar._eqotHidden == true and not f.scrollBarBG.shown,
        "both of its scroll bars, and the track")
+
+    ns.cfg = { scrollBarWidth = 6 }
+    T:ApplyFrameSkin(ns.cfg)
+    local eb = f.eventsScroll.ScrollBar
+    ok(f.scroll.ScrollBar.w == 6 and eb.w == 6, "a slim width reaches both bars, World Quests' too: " .. tostring(eb.w))
+    ok(not eb.ScrollUpButton.shown and not eb.ScrollDownButton.shown, "and World Quests' loses its arrows as well")
+    local right
+    for _, pt in ipairs(f.scenarioContainer.points or {}) do
+        if pt[1] == "TOPRIGHT" then right = pt end
+    end
+    ok(right and right[2] == -(2 + 6 + 4 - 4),
+       "and the scenario panel's right edge follows the narrower gutter: " .. tostring(right and right[2]))
 end)
 
 local function sectionsFile()

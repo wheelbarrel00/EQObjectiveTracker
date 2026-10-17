@@ -36,6 +36,75 @@ S = "UI/Sections.lua"
 Z = "UI/ZoneProgressBar.lua"
 
 MUTANTS = [
+    # ------------------------------------------------------------------ Scroll Bar Width
+    ("a slim bar keeps the template's 26 px gap", [
+        (T, "    if slim then return SLIM_GAP + slim + CONTENT_PAD end\n", "")]),
+
+    ("a slim bar's gap leaves out the 2 px it sits past the list", [
+        (T, "    if slim then return SLIM_GAP + slim + CONTENT_PAD end\n",
+            "    if slim then return slim + CONTENT_PAD end\n")]),
+
+    ("16 counts as slim", [
+        (T, "    if not w or w >= STOCK_BAR_W then return nil end\n",
+            "    if not w or w > STOCK_BAR_W then return nil end\n")]),
+
+    ("a fractional width is cut, not rounded", [
+        (T, "    return math.max(2, math.floor(w + 0.5))\n", "    return math.max(2, math.floor(w))\n")]),
+
+    ("there is no 2 px floor", [
+        (T, "    return math.max(2, math.floor(w + 0.5))\n", "    return math.floor(w + 0.5)\n")]),
+
+    ("a value that is not a number raises", [
+        (T, "    local w = tonumber(cfg and cfg.scrollBarWidth)\n", "    local w = cfg and cfg.scrollBarWidth\n")]),
+
+    ("the skin never sizes the bar", [
+        (T, "    sizeScrollBar(sf, bar, slim)\n", "")]),
+
+    ("a slim bar sits 6 px off the list, as the template's does", [
+        (T, '        bar:SetPoint("TOPLEFT", sf, "TOPRIGHT", SLIM_GAP, 0)\n',
+            '        bar:SetPoint("TOPLEFT", sf, "TOPRIGHT", 6, 0)\n')]),
+
+    ("a slim bar keeps the arrows' 16 px at the bottom", [
+        (T, '        bar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", SLIM_GAP, 0)\n',
+            '        bar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", SLIM_GAP, 16)\n')]),
+
+    ("a slim bar keeps the template's width", [
+        (T, "        bar:SetWidth(slim)\n", "")]),
+
+    ("the template's anchors are never cleared, so the slim ones pile on", [
+        (T, "    bar:ClearAllPoints()\n    if slim then\n", "    if slim then\n")]),
+
+    ("16 never puts the template's anchors back", [
+        (T, "        for _, p in ipairs(bar._eqotStockPoints) do bar:SetPoint(unpack(p)) end\n", "")]),
+
+    ("16 never puts the template's width back", [
+        (T, "        if bar._eqotStockW and bar._eqotStockW > 0 then bar:SetWidth(bar._eqotStockW) end\n", "")]),
+
+    ("the template's anchors are captured again on every change, so 16 restores a slim bar", [
+        (T, "    if not bar._eqotStockPoints then\n        local points = {}\n",
+            "    do\n        local points = {}\n")]),
+
+    ("the width last applied is never kept, so every pass re-anchors", [
+        (T, "    bar._eqotSlimW = slim\nend\n", "end\n")]),
+
+    ("a slim bar is re-anchored in combat with a secure button", [
+        (T, "    if bar._eqotSlimW == slim or secureLocked() then return end\n",
+            "    if bar._eqotSlimW == slim then return end\n")]),
+
+    ("a slim bar keeps the textured thumb", [
+        (T, "    local on = cfg.skinScrollBar == true or slim ~= nil\n", "    local on = cfg.skinScrollBar == true\n")]),
+
+    ("a slim bar's thumb takes Thumb Width", [
+        (T, "    local w  = slim or cfg.scrollBarThumbWidth\n", "    local w  = cfg.scrollBarThumbWidth\n")]),
+
+    ("a slim bar keeps its up arrow", [
+        (T, "    setArrowHidden(up,   cfg.hideScrollArrows == true or slim ~= nil)\n",
+            "    setArrowHidden(up,   cfg.hideScrollArrows == true)\n")]),
+
+    ("a slim bar keeps its down arrow", [
+        (T, "    setArrowHidden(down, cfg.hideScrollArrows == true or slim ~= nil)\n",
+            "    setArrowHidden(down, cfg.hideScrollArrows == true)\n")]),
+
     # --------------------------------------------------------------------------- the frame
     ("the preview builds again on every Build", [
         (P, "    if self.box then return end\n", "")]),
@@ -214,6 +283,10 @@ MUTANTS = [
         (T, "    setScrollBarHidden(sf, hideBar)\n    applyScrollBarSkin(sf, cfg)\nend", "    setScrollBarHidden(sf, hideBar)\nend")]),
     ("the tracker's own events scroll bar is no longer hidden", [
         (T, "    setScrollBarHidden(f.eventsScroll, cfg.hideScrollBar == true)\n", "")]),
+    ("the tracker never hands the Tracker tab its tab count", [
+        (T, "Tracker.MAX_TABS = MAX_TABS\n", "")]),
+    ("the tracker hands the Tracker tab two tabs", [
+        (T, "Tracker.MAX_TABS = MAX_TABS\n", "Tracker.MAX_TABS = 2\n")]),
     ("Insets forgets the grip", [
         (T, "    return CONTENT_PAD, DRAG_HANDLE_H, GRIP_SIZE + 2", "    return CONTENT_PAD, DRAG_HANDLE_H, GRIP_SIZE")]),
     ("NewHeader puts its header in the pool", [
@@ -252,6 +325,15 @@ MUTANTS = [
     ("the restore is skipped while the zone section is docked", [
         (P, "    Row._focusIcon, Row._focusIconAt, Sections._h = keepProbe, keepProbeAt, keepHeaderH\n",
             "    if not zoneDrawn then Row._focusIcon, Row._focusIconAt, Sections._h = keepProbe, keepProbeAt, keepHeaderH end\n")]),
+
+    # Scan 1 (2026-10-16): Scroll Bar Width beyond the lone scroll frame.
+    ("/eqot status always reads the template's bar", [
+        (T, 'tostring(bar and bar._eqotSlimW or "stock"))', 'tostring("stock"))')]),
+    ("the World Quests panel's bar is never skinned", [
+        (T, "    setScrollBarHidden(f.eventsScroll, cfg.hideScrollBar == true)\n    applyScrollBarSkin(f.eventsScroll, cfg)\n",
+            "    setScrollBarHidden(f.eventsScroll, cfg.hideScrollBar == true)\n")]),
+    ("the content inset ignores a slim or hidden bar", [
+        (T, '    local gutter = scrollGutter(ns:GetModule("DB"):Tracker())\n', "    local gutter = scrollGutter(nil)\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_preview: (\d+) passed, (\d+) failed$")

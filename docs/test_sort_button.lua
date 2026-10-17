@@ -413,9 +413,25 @@ local function header(cfg, noDB)
     end
     local sort, cog = icon(nil), icon("showOptionsIcon")
     T.frame = { headerIcons = { cog }, sortButton = sort }
+    T.layouts = 0
+    function T:LayoutMoveBar()
+        self.layouts = self.layouts + 1
+        self.lastIconAtLayout = self.frame._lastIcon
+    end
     T:ApplyHeaderIcons()
-    return sort, cog
+    return sort, cog, T
 end
+
+-- The move bar's label runs up to the leftmost icon the pass left showing, so each pass hands it
+-- that icon and lays the bar out again, after the run is placed.
+case("the header pass hands the move bar the leftmost icon it showed", function()
+    local _, cog, T = header({})
+    ok(T.layouts == 1, "one layout per pass: " .. T.layouts)
+    ok(T.lastIconAtLayout == cog, "with the cogwheel showing, the label stops at the cogwheel")
+    local _, _, hidden = header({ showOptionsIcon = false })
+    ok(hidden.layouts == 1 and hidden.lastIconAtLayout == nil,
+       "with every icon hidden, there is no icon to stop at")
+end)
 
 case("the header pass shows the sort button only while it is switched on", function()
     local sort, cog = header({})
@@ -439,6 +455,7 @@ case("the header pass shows the sort button only while it is switched on", funct
     end } }, { __index = _G }))
     chunk()
     T.frame = { headerIcons = {} }
+    function T:LayoutMoveBar() end
     ok(pcall(function() T:ApplyHeaderIcons() end), "a frame built without one is passed over")
 end)
 

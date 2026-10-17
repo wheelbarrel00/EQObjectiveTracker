@@ -112,17 +112,17 @@ MUTANTS = [
             "                    r.up = makeOrderArrow(self, content, false)")]),
 
     ("the card is not laid out again after a move", [
-        (T, "                orderRows[i].down:Hide()\n            end\n            order:Layout()\n",
-            "                orderRows[i].down:Hide()\n            end\n")]),
+        (T, "                orderRows[i].tab:Hide()\n            end\n            order:Layout()\n",
+            "                orderRows[i].tab:Hide()\n            end\n")]),
 
     # ------------------------------------------------------------------- Tracker Visibility
     ("a section show box stores the opposite of what it shows", [
-        (T, "                    function(v) Sections:SetHidden(id, not v); render() end,",
-            "                    function(v) Sections:SetHidden(id, v); render() end,")]),
+        (T, "                        Sections:SetHidden(id, not v)\n                        render()\n",
+            "                        Sections:SetHidden(id, v)\n                        render()\n")]),
 
     ("a section show box never redraws the tracker", [
-        (T, "                    function(v) Sections:SetHidden(id, not v); render() end,",
-            "                    function(v) Sections:SetHidden(id, not v) end,")]),
+        (T, "                        Sections:SetHidden(id, not v)\n                        render()\n",
+            "                        Sections:SetHidden(id, not v)\n")]),
 
     ("a section show box reads the hidden state as shown", [
         (T, "                    function() return not Sections:IsHidden(id) end,",
@@ -578,6 +578,147 @@ MUTANTS = [
             "            function() return DB().simplifyMode or DB().showOnlyWatched end,\n"
             "            function(v) DB().simplifyMode = v; render() end)\n")]),
 
+    # ----------------------------------------------- section tabs (2026-10-15, for bramer26)
+    ("Show section tabs reads on while unset, so tabs ship on", [
+        (T, "            function() return DB().showTabs == true end,\n",
+            "            function() return DB().showTabs ~= false end,\n")]),
+
+    ("Show section tabs writes the sort button's key", [
+        (T, "                DB().showTabs = v\n", "                DB().showSortButton = v\n")]),
+
+    ("Show section tabs never redraws the tracker", [
+        (T, "                    DB().showTabs = v\n                    render()\n", "                    DB().showTabs = v\n")]),
+
+    ("Show section tabs never shows the tab buttons", [
+        (T, "                    DB().showTabs = v\n                    render()\n                    renderOrderRows()\n",
+            "                    DB().showTabs = v\n                    render()\n")]),
+
+    # Which clients offer tabs is UI/Tracker.lua's TabsOffered, and mutate_tabs.py breaks its own count.
+    ("the box is offered whatever the tracker says", [
+        (T, '        local tabsOffered = ns:GetModule("Tracker"):TabsOffered()\n', "        local tabsOffered = true\n")]),
+
+    ("the box is never offered", [
+        (T, '        local tabsOffered = ns:GetModule("Tracker"):TabsOffered()\n', "        local tabsOffered = false\n")]),
+
+    ("the tab buttons show where no box is offered", [
+        (T, "            local tabsOn = tabsOffered and DB().showTabs == true\n",
+            "            local tabsOn = DB().showTabs == true\n")]),
+
+    ("Show section tabs is labeled in English", [
+        (T, '        local tabsBox = self:CreateCheckbox(content, L["Show section tabs"],\n',
+            '        local tabsBox = self:CreateCheckbox(content, "Show section tabs",\n')]),
+
+    ("a tab button cycles between two tabs only", [
+        (T, "    local t = Tracker:SectionTab(id) % Tracker.MAX_TABS + 1\n",
+            "    local t = Tracker:SectionTab(id) % 2 + 1\n")]),
+
+    ("a section that makes no tab keeps its button lit", [
+        (T, "                self:SetDependent(r.tab, Tracker:DrawsOnTab(id))\n", "")]),
+
+    ("a row's dim reads the section its button showed before a reorder", [
+        (T, ("                r.tab.sectionID = id\n"
+             "                r.tab:SetText(Tracker:SectionTab(id))\n"
+             "                r.tab:SetShown(tabsOn)\n"
+             "                self:SetDependent(r.tab, Tracker:DrawsOnTab(id))\n"),
+            ("                self:SetDependent(r.tab, Tracker:DrawsOnTab(r.tab.sectionID or id))\n"
+             "                r.tab.sectionID = id\n"
+             "                r.tab:SetText(Tracker:SectionTab(id))\n"
+             "                r.tab:SetShown(tabsOn)\n"))]),
+
+    ("World Quests' tab button sits a written-in 10 px from the row's edge", [
+        (T, '        wqTab:SetPoint("RIGHT", wqRow, "RIGHT", -self:Spacing("rowPadding"), 0)\n',
+            '        wqTab:SetPoint("RIGHT", wqRow, "RIGHT", -10, 0)\n')]),
+
+    ("World Quests' button stays lit while World Quests are hidden", [
+        (T, '            self:SetDependent(wqTab, Tracker:DrawsOnTab("worldquests"))\n', "")]),
+
+    ("a visit to the tab never re-reads the tab buttons", [
+        (T, "        if content._renderOrderRows then content._renderOrderRows() end\n    end,\n})",
+            "    end,\n})")]),
+
+    ("hiding a section leaves its tab button lit until the next visit", [
+        (T, "                        render()\n                        if content._renderOrderRows then content._renderOrderRows() end\n",
+            "                        render()\n")]),
+
+    ("World Quests' tab button reads the card's gap, not a row's padding", [
+        (T, '        wqTab:SetPoint("RIGHT", wqRow, "RIGHT", -self:Spacing("rowPadding"), 0)\n',
+            '        wqTab:SetPoint("RIGHT", wqRow, "RIGHT", -self:Spacing("groupGap"), 0)\n')]),
+
+    ("a row's tab button sits over its up chevron", [
+        (T, '                    r.tab:SetPoint("RIGHT", r.up, "LEFT", -ARROW_GAP, 0)\n',
+            '                    r.tab:SetPoint("RIGHT", r.up, "LEFT", ARROW_GAP, 0)\n')]),
+
+    ("tab 1 is stored as a 1, not as nothing", [
+        (T, "    cfg.sectionTab[id] = (t ~= 1) and t or nil\n", "    cfg.sectionTab[id] = t\n")]),
+
+    ("a tab button moves nothing", [
+        (T, "        if not btn.sectionID then return end\n        nextTab(btn.sectionID)\n",
+            "        if not btn.sectionID then return end\n")]),
+
+    ("a tab move never redraws or relabels", [
+        (T, "        nextTab(btn.sectionID)\n        onMoved()\n", "        nextTab(btn.sectionID)\n")]),
+
+    ("a tab button is taller than the arrows", [
+        (T, "    b:SetHeight(ARROW_SIZE)\n", "")]),
+
+    ("a tab move redraws without relabeling the rows", [
+        (T, "        local function tabMoved()\n            render()\n            renderOrderRows()\n",
+            "        local function tabMoved()\n            render()\n")]),
+
+    ("World Quests' tab button moves Quests", [
+        (T, '        wqTab.sectionID = "worldquests"\n', '        wqTab.sectionID = "quests"\n')]),
+
+    ("World Quests' tab button shows on a client with no world quests", [
+        (T, "            wqTab:SetShown(tabsOn and hasWorldQuests)\n", "            wqTab:SetShown(tabsOn)\n")]),
+
+    ("World Quests' tab button always reads 1", [
+        (T, '            wqTab:SetText(Tracker:SectionTab("worldquests"))\n', '            wqTab:SetText(1)\n')]),
+
+    ("a row's tab button carries no section", [
+        (T, "                r.tab.sectionID = id\n", "")]),
+
+    ("a row's tab button always reads 1", [
+        (T, "                r.tab:SetText(Tracker:SectionTab(id))\n", "                r.tab:SetText(1)\n")]),
+
+    ("a row's tab button shows with tabs off", [
+        (T, "                r.tab:SetShown(tabsOn)\n", "                r.tab:SetShown(true)\n")]),
+
+    ("tabs read on for any truthy value on the card", [
+        (T, "            local tabsOn = tabsOffered and DB().showTabs == true\n",
+            "            local tabsOn = tabsOffered and DB().showTabs and true or false\n")]),
+
+    # ------------------------------------- the filter button box (2026-10-15, for Tyrial and bramer26)
+    ("the filter button box reads on while unset, so the button ships on", [
+        (T, "            function() return DB().showFilterButton == true end,\n",
+            "            function() return DB().showFilterButton ~= false end,\n")]),
+
+    ("the filter button box reads the sort button's key", [
+        (T, "            function() return DB().showFilterButton == true end,\n",
+            "            function() return DB().showSortButton == true end,\n")]),
+
+    ("the filter button box writes the sort button's key", [
+        (T, "                DB().showFilterButton = v\n", "                DB().showSortButton = v\n")]),
+
+    ("the filter button box never asks the header pass to show or hide the button", [
+        (T, "                DB().showFilterButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                DB().showFilterButton = v\n")]),
+
+    ("the filter button box asks the header pass before it stores", [
+        (T, "                DB().showFilterButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n                DB().showFilterButton = v\n")]),
+
+    ("the filter button box redraws the whole tracker", [
+        (T, "                DB().showFilterButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n",
+            "                DB().showFilterButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n"
+            "                ns:GetModule(\"Tracker\"):Render()\n")]),
+
+    ("the filter button box is labeled in English", [
+        (T, '        display:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],\n',
+            '        display:Add(self:CreateCheckbox(content, "Show the filter button on the tracker",\n')]),
+
+    ("the filter button box ships on in Core/DB.lua", [
+        ("Core/DB.lua", "            showFilterButton     = false,\n", "            showFilterButton     = true,\n")]),
+
     # ----------------------------------------------- the sort button box (2026-10-10, for Andreon)
     ("the sort button box reads on while unset, so the button ships on", [
         (T, "            function() return DB().showSortButton == true end,\n",
@@ -717,6 +858,30 @@ MUTANTS = [
             '        if ns.Has.ChallengeTimer and ns:GetModule("Registry").Get("scenarios") then\n')]),
     ("the Mythic+ timer ships off while its box reads on", [
         ("Core/DB.lua", "            showMythicPlusTimer  = true,\n", "            showMythicPlusTimer  = false,\n")]),
+
+    # Scan 1 (2026-10-16): the tab buttons' anchors, tooltip and section after a move, and the box's
+    # store before its redraw.
+    ("a row's tab button keeps the section it was built for", [
+        (T, "                r.tab.sectionID = id\n                r.tab:SetText(Tracker:SectionTab(id))\n",
+            "                r.tab.sectionID = r.tab.sectionID or id\n                r.tab:SetText(Tracker:SectionTab(id))\n")]),
+    ("a row's tab button sits on its up chevron", [
+        (T, '                    r.tab:SetPoint("RIGHT", r.up, "LEFT", -ARROW_GAP, 0)\n',
+            '                    r.tab:SetPoint("RIGHT", r.down, "LEFT", -ARROW_GAP, 0)\n')]),
+    ("World Quests' tab button sits over its row's label", [
+        (T, '        wqTab:SetPoint("RIGHT", wqRow, "RIGHT", -self:Spacing("rowPadding"), 0)\n',
+            '        wqTab:SetPoint("LEFT", wqRow, "LEFT", self:Spacing("rowPadding"), 0)\n')]),
+    ("the tab button's tooltip title is drawn invisible", [
+        (T, '        tip:SetText(self.sectionID and sectionLabel(self.sectionID) or "", 1, 1, 1, 1, true)\n',
+            '        tip:SetText(self.sectionID and sectionLabel(self.sectionID) or "", 1, 1, 1, 0, true)\n')]),
+    ("the tab button's tooltip is never shown", [
+        (T, '        tip:AddLine(L["Which tab this section sits on. Click to move it to the next tab."], 0.82, 0.82, 0.82, true)\n        tip:Show()\n',
+            '        tip:AddLine(L["Which tab this section sits on. Click to move it to the next tab."], 0.82, 0.82, 0.82, true)\n')]),
+    ("the tab button's tooltip stays up on leaving", [
+        (T, '        tip:Show()\n    end)\n    b:HookScript("OnLeave", function() ns.Util.Tooltip():Hide() end)\n    return b\nend\n\nOptions:RegisterTab',
+            '        tip:Show()\n    end)\n    return b\nend\n\nOptions:RegisterTab')]),
+    ("Show section tabs redraws before storing", [
+        (T, "                    DB().showTabs = v\n                    render()\n                    renderOrderRows()\n",
+            "                    render()\n                    DB().showTabs = v\n                    renderOrderRows()\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_tracker_tab: (\d+) passed, (\d+) failed$")
