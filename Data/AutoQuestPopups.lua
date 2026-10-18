@@ -7,6 +7,10 @@ local count       = 0
 local completeSet = {}
 local byGroup     = { campaign = 0, quests = 0 }
 
+-- /eqot popup test. English like the rest of that command's output.
+local SAMPLE_TITLE = "Sample quest (/eqot popup test)"
+local sampleOn     = false
+
 local function questTitle(questID)
     if C_QuestLog.GetTitleForQuestID then
         local t = C_QuestLog.GetTitleForQuestID(questID)
@@ -64,7 +68,20 @@ function Popups:Refresh()
             if popUpType == "COMPLETE" then completeSet[questID] = true end
         end
     end
+    -- No quest ID, so the box's click does nothing and no row is suppressed for it.
+    if sampleOn then
+        count = count + 1
+        local p = list[count]
+        if not p then p = {}; list[count] = p end
+        p.questID, p.popUpType, p.groupID, p.title = nil, "OFFER", "quests", SAMPLE_TITLE
+        byGroup.quests = byGroup.quests + 1
+    end
     for i = #list, count + 1, -1 do list[i] = nil end
+end
+
+function Popups:ToggleSample()
+    sampleOn = not sampleOn
+    return sampleOn
 end
 
 function Popups:Count()
@@ -86,7 +103,7 @@ end
 function Popups:DebugLine()
     local suppressed = 0
     for _ in pairs(completeSet) do suppressed = suppressed + 1 end
-    return ("quest popups: %s | %d live, campaign %d, quests %d, suppressing %d rows")
+    return ("quest popups: %s | %d live, campaign %d, quests %d, suppressing %d rows | sample %s")
         :format(self:Available() and "available" or "no API",
-                count, byGroup.campaign, byGroup.quests, suppressed)
+                count, byGroup.campaign, byGroup.quests, suppressed, sampleOn and "on" or "off")
 end

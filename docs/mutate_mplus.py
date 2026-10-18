@@ -937,9 +937,11 @@ MUTANTS = [
     ("any word toggles the test", [
         (C, '            elseif arg == "test" or arg == "late" then\n', '            elseif arg ~= "" then\n')]),
     ("the argument's case matters", [
-        (C, '            local arg = strtrim(rest or ""):lower()\n', '            local arg = strtrim(rest or "")\n')]),
+        (C, '            local SC  = ns:GetModule("Registry"):Get("scenarios")\n            local arg = strtrim(rest or ""):lower()\n',
+            '            local SC  = ns:GetModule("Registry"):Get("scenarios")\n            local arg = strtrim(rest or "")\n')]),
     ("the test runs under Blizzard's tracker", [
-        (C, "            elseif ns:UsesBlizzardTracker() then\n", "            elseif false then\n")]),
+        (C, "            elseif ns:UsesBlizzardTracker() then\n                ns:Print(\"mythic+: off, Blizzard's tracker in use\")\n",
+            "            elseif false then\n                ns:Print(\"mythic+: off, Blizzard's tracker in use\")\n")]),
     ("no capability check on the command", [
         (C, "            if not (SC and SC.ToggleKeystoneTest and ns.Has.ChallengeTimer) then\n",
             "            if not (SC and SC.ToggleKeystoneTest) then\n")]),
@@ -950,7 +952,8 @@ MUTANTS = [
         (C, '                        .. (why == "switched off" and " Show the Mythic+ timer is off, so the "\n',
             '                        .. (false and " Show the Mythic+ timer is off, so the "\n')]),
     ("a provider that is off reads as on", [
-        (C, '                if why == "off" then\n', '                if false then\n')]),
+        (C, '                if why == "off" then\n                    ns:Print("mythic+: the scenarios provider',
+            '                if false then\n                    ns:Print("mythic+: the scenarios provider')]),
     ("a scenario running reads as on", [
         (C, '                elseif why == "scenario" then\n', '                elseif false then\n')]),
     ("off always names test", [
@@ -958,12 +961,14 @@ MUTANTS = [
     ("off is never said", [
         (C, '                    ns:Print(("mythic+ %s: off."):format(arg))\n', "")]),
     ("plain mplus prints the last paint", [
-        (C, '                tracker():Render()\n                ns:GetModule("Feed"):Build()\n', "")]),
+        (C, '                tracker():Render()\n                ns:GetModule("Feed"):Build()\n                debugLine("Keystone")\n',
+            '                debugLine("Keystone")\n')]),
     ("plain mplus skips the build a hidden tracker needs", [
-        (C, '                ns:GetModule("Feed"):Build()\n', "")]),
+        (C, '                ns:GetModule("Feed"):Build()\n                debugLine("Keystone")\n',
+            '                debugLine("Keystone")\n')]),
     ("plain mplus builds before it repaints", [
-        (C, '                tracker():Render()\n                ns:GetModule("Feed"):Build()\n',
-            '                ns:GetModule("Feed"):Build()\n                tracker():Render()\n')]),
+        (C, '                tracker():Render()\n                ns:GetModule("Feed"):Build()\n                debugLine("Keystone")\n',
+            '                ns:GetModule("Feed"):Build()\n                tracker():Render()\n                debugLine("Keystone")\n')]),
     ("plain mplus leaves out the block", [
         (C, '                debugLine("Keystone")\n                debugLine("MythicPlus")\n                debugLine("Visibility")\n',
             '                debugLine("Keystone")\n                debugLine("Visibility")\n')]),
@@ -983,10 +988,11 @@ MUTANTS = [
     ("under Blizzard's tracker the block prints as if live", [
         (C, "                      Keystone = true, MythicPlus = true }\n", "                      Keystone = true }\n")]),
     ("the usage line leaves it out", [
-        (C, '"bonushud [test], mplus [test|late], importeq', '"bonushud [test], importeq')]),
+        (C, '"bonushud [test], mplus [test|late], popup [test], timer [test], importeq',
+            '"bonushud [test], popup [test], timer [test], importeq')]),
     ("plain mplus under Blizzard's tracker builds the feed and prints the two module lines", [
-        (C, "            elseif ns:UsesBlizzardTracker() then\n",
-            '            elseif ns:UsesBlizzardTracker() and arg ~= "" then\n')]),
+        (C, "            elseif ns:UsesBlizzardTracker() then\n                ns:Print(\"mythic+: off, Blizzard's tracker in use\")\n",
+            "            elseif ns:UsesBlizzardTracker() and arg ~= \"\" then\n                ns:Print(\"mythic+: off, Blizzard's tracker in use\")\n")]),
     ("the command toggles the test with a dot call", [
         (C, "                local on, why = SC:ToggleKeystoneTest(arg)\n",
             "                local on, why = SC.ToggleKeystoneTest(arg)\n")]),

@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EQObjectiveTracker = ns
 ns.NAME    = addonName
-ns.VERSION = "2.5.0"
+ns.VERSION = "2.6.0"
 
 ns.modules     = {}
 ns.moduleOrder = {}
@@ -39,6 +39,8 @@ function ns:ShowURL(url)
         hasEditBox       = true,
         editBoxText      = url,
         highlightEditBox = true,
+        -- So a stray key cannot change the link before it is copied.
+        readOnly         = true,
     })
 end
 
@@ -58,6 +60,7 @@ function ns:ShowDiscord()
         hasEditBox       = true,
         editBoxText      = self.DISCORD_URL,
         highlightEditBox = true,
+        readOnly         = true,
     })
 end
 

@@ -221,6 +221,18 @@ MUTANTS = [
         (TT, "Options.SORT_OPTIONS = SORT_OPTIONS\n", "")]),
 
     # ------------------------------------------------------------------- RefreshIfShown
+    ("a tracker click ends an open search", [
+        (F, '    if search and search:GetText():match("%S") then return end\n', "")]),
+
+    ("an emptied search field still holds the tab back", [
+        (F, 'if search and search:GetText():match("%S") then return end', 'if search then return end')]),
+
+    ("spaces alone hold the tab back", [
+        (F, 'search:GetText():match("%S")', 'search:GetText() ~= ""')]),
+
+    ("a window from an older library, with no search field, raises", [
+        (F, '    if search and search:GetText()', '    if search:GetText()')]),
+
     ("a closed window is viewed again", [
         (F, "    if self.frame and self.frame:IsShown() and c and c.lastOptionsTab == id then ui:SelectTab(id) end\n",
             "    if self.frame and c and c.lastOptionsTab == id then ui:SelectTab(id) end\n")]),

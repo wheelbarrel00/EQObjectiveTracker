@@ -123,7 +123,11 @@ case("the library's own strings are this addon's translations", function()
     ok(lb.discordTip == "<Click to copy the invite link.>", "its tooltip text: " .. tostring(lb.discordTip))
     ok(lb.testSound == "<Plays the currently selected sound.>", "the speaker's tooltip: " .. tostring(lb.testSound))
     ok(lb.clear == "<Clear>", "the color picker's Clear: " .. tostring(lb.clear))
-    ok(sortedKeys(lb) == "clear,discord,discordTip,discordTipTitle,testSound", "exactly those five: " .. sortedKeys(lb))
+    ok(lb.search == "<Search settings>", "the search field's hint, which turns the search on: " .. tostring(lb.search))
+    ok(lb.searchEmpty == "<No settings match>", "the line for no match: " .. tostring(lb.searchEmpty))
+    ok(lb.searchTitle == "<Search results>", "the title over the results: " .. tostring(lb.searchTitle))
+    ok(sortedKeys(lb) == "clear,discord,discordTip,discordTipTitle,search,searchEmpty,searchTitle,testSound",
+       "exactly those eight: " .. sortedKeys(lb))
 end)
 
 case("the last tab is read and written per character", function()
@@ -285,6 +289,8 @@ case("every key handed to the library is one its Context.lua takes, of its kind"
         ok(LABELS[key] == true and type(v) == "string", "label " .. key .. " is one the library takes, as a string")
     end
     ok(o.discord == nil or (o.labels and o.labels.discord ~= nil), "a Discord action comes with its label")
+    local lb = o.labels or {}
+    ok(lb.search == nil or (lb.searchEmpty ~= nil and lb.searchTitle ~= nil), "a search comes with its other two labels")
 end)
 
 print(("test_options_frame: %d passed, %d failed"):format(pass, fail))

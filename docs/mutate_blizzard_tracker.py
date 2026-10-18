@@ -398,6 +398,22 @@ MUTANTS = [
     ("a field loses its letter limit", [
         (DLG, '        maxLetters       = opts.maxLetters,\n', '')]),
 
+    # Read-only link boxes (the author's call, 2026-10-16).
+    ("a read-only field is never handed on, so a stray key changes the link", [
+        (DLG, '        readOnly         = (opts.hasEditBox and opts.readOnly) and true or nil,\n', '')]),
+    ("read-only is handed on with no field, which makes the library raise", [
+        (DLG, '        readOnly         = (opts.hasEditBox and opts.readOnly) and true or nil,\n',
+              '        readOnly         = opts.readOnly and true or nil,\n')]),
+    ("read-only is handed on raw rather than as true", [
+        (DLG, '        readOnly         = (opts.hasEditBox and opts.readOnly) and true or nil,\n',
+              '        readOnly         = opts.hasEditBox and opts.readOnly or nil,\n')]),
+    ("a link box can be typed in again", [
+        (I, '        highlightEditBox = true,\n        -- So a stray key cannot change the link before it is copied.\n        readOnly         = true,\n',
+            '        highlightEditBox = true,\n')]),
+    ("the Discord invite can be typed in again", [
+        (I, '        editBoxText      = self.DISCORD_URL,\n        highlightEditBox = true,\n        readOnly         = true,\n',
+            '        editBoxText      = self.DISCORD_URL,\n        highlightEditBox = true,\n')]),
+
     ("the library's list picks after it hides, which blocks the profile switch's reload", [
         (DD, "            xpcall(function() onPick(opt.value) end, geterrorhandler())\n            p:Hide()\n",
              "            p:Hide()\n            xpcall(function() onPick(opt.value) end, geterrorhandler())\n")]),
@@ -585,8 +601,8 @@ MUTANTS = [
         ("Data/Providers/Achievements.lua", "    Entry.EndLines(e)\n", "    ns:GetModule(\"Entry\"):EndLines(e)\n")]),
 
     ("the reward tooltip colors Time Left through a colon call straight off GetModule", [
-        ("UI/RewardTooltip.lua", "                        Util.TimeColor(mins))",
-                                 "                        ns:GetModule(\"Util\"):TimeColor(mins))")]),
+        ("UI/RewardTooltip.lua", "                        Util.TimeColor(math.max(1, math.floor(secs / 60))))",
+                                 "                        ns:GetModule(\"Util\"):TimeColor(math.max(1, math.floor(secs / 60))))")]),
 
     ("Util calls its own dot-declared Hex with a colon", [
         ("Core/Util.lua", "        countEsc[i] = \"|cff\" .. Util.Hex(c.r, c.g, c.b)\n",

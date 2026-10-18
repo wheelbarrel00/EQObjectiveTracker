@@ -108,7 +108,9 @@ back.
   Group on any quest the game will form a group for, both as a button on the row and on the
   right-click menu. With zone headers on, both sections group their quests under a header for
   each quest log heading (the zone, for most quests), each header collapsing on its own. An
-  optional Dungeons header gathers every dungeon quest in one place, with or without zone headers
+  optional Dungeons header gathers every dungeon quest in one place, with or without zone headers.
+  A timed quest counts down on its row, in seconds through the last minute, and `/eqot timer test`
+  puts a two-minute sample on one so you can see it
 - **World quests** in their own capped area, with the quest type on the marker, a
   color-coded countdown, and the same Find Group button and menu item where the game allows
   one. Every world quest in your current zone is listed, not only the ones you have tracked,
@@ -118,7 +120,9 @@ back.
   They appear when you walk into one and go away when you leave, and they have their own
   filter, so you can turn them off without touching world quests
 - **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
-  delve tier, and a clickable button for any spell the stage hands you
+  delve tier, and a clickable button for any spell the stage hands you. Two switches, on by
+  default, put the lives left and the nemesis groups killed on the tier's row, from Tier 4 up,
+  with the game's own icons and tooltips
 - **Mythic+ keys**, with the key's own panel in the stage banner's place: the keystone level,
   the affixes, the time left with the +3 and +2 times, and the deaths. It has a switch on the
   Tracker tab for anyone using a separate timer addon, and `/eqot mplus test` draws a sample key.
@@ -138,8 +142,8 @@ back.
 - **Quest items**, as a button on the row of any quest that carries one
 - **Quest popups** for newly discovered quests and ones ready to hand in remotely
 - **Hover any quest** for its objectives and full rewards, including item level
-  comparisons against what you have equipped. World quests also show their faction and
-  how long is left
+  comparisons against what you have equipped. World quests and timed quests also show their
+  faction and how long is left
 
 Also included: a zone progress bar, three optional sounds (when you accept a quest, when its
 last objective falls, and when you hand it in), a highlight on the flight point nearest your
@@ -157,6 +161,8 @@ events, which would otherwise not appear anywhere.
 | `/eqot status` | Print what each provider emitted and what reached the screen |
 | `/eqot bonushud` | Print what the bonus objectives HUD can see, or `test` to place it |
 | `/eqot mplus` | Print what the tracker read for the current Mythic+ key, or `test` or `late` to draw a sample key |
+| `/eqot popup` | Print the quest popups the tracker read, or `test` to draw a sample Quest Discovered box |
+| `/eqot timer` | Print the quest timers the tracker read, or `test` to put a two-minute sample on a quest (Retail and WoW Forever) |
 | `/eqot importeq` | Replace this profile with your Everything Quests tracker settings |
 | `/eqot modules` | List the optional parts, and which are switched off |
 | `/eqot disable <name>` | Switch off one part, or `all`, to narrow down a fault |
@@ -167,7 +173,9 @@ The options window, opened with `/eqot` or the cogwheel on the tracker's header,
 with four tabs, General, Tracker, Appearance and About, each laid out in cards. To hide the
 cogwheel, untick Show the options cogwheel on the tracker on the Tracker tab, and `/eqot` still
 opens the window. The Appearance tab
-draws a sample tracker beside its settings that changes as you adjust them.
+draws a sample tracker beside its settings that changes as you adjust them. A search field at the
+top of the sidebar finds any setting as you type: each match shows its tab and card, and clicking
+one opens that tab, scrolls to the setting and flashes it.
 
 While the tracker is unlocked, drag the strip along the top to move it and the corner grip to
 resize it. With the options window open, or after an unlock, that strip turns gold with a check
@@ -178,10 +186,11 @@ left that opens a list of the sort orders, so switching between Level and Distan
 two, takes two clicks. Show the filter button on the tracker adds a funnel beside it whose list
 holds Show only quests in current zone, the quest types and Reset filters to defaults, and stays
 open while you change them. The funnel turns gold while any of them is set to hide quests.
-On retail and WoW Forever, Show section tabs on the Section Order card splits the tracker into up
+On retail, Show section tabs on the Section Order card splits the tracker into up
 to three tabs. The number beside each section picks its tab, and once two tabs hold a section a
 strip under the top of the tracker switches between them. The scenario panel shows on every tab,
-and each character keeps the tab it was on.
+and so does a quest popup box, under its own section's header, and each character keeps the tab it
+was on.
 Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. On
 retail and WoW Forever two options on the Tracker tab change how focusing works: Click a focused quest
 to unfocus it makes a click on the quest you are following unfocus it, and turning off Focus newly

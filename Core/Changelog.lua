@@ -9,6 +9,27 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.6.0", date = "2026-10-17",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "On retail and WoW Forever, dragging the opacity bar in a color picker now changes the color as you drag. Before, the new opacity applied only when you pressed Okay. Cancel still puts back the color you started with, and Classic Era and TBC Anniversary already worked this way.",
+                "The settings window's scroll bar no longer jumps to the far end when you press its thumb. The thumb now stays under the cursor from wherever you grab it, so dragging moves the list the way you drag.",
+                "On WoW Forever, Show only quests in current zone no longer hides the quests listed under the zone you are in, and Current zone first brings that zone's header to the top. A quest whose quest log heading names your zone now counts as in it, as on Classic Era and TBC Anniversary, as well as a quest whose map marker is there.",
+            } },
+            { head = "New Features", items = {
+                "Timed quests count down on retail and WoW Forever, on the quest's row and in its tooltip, as they already did on Classic Era and TBC Anniversary. The game's own tracker drew that timer, so it went missing along with that tracker. The last minute counts down in seconds, and /eqot timer test puts a two-minute sample on one of your quests so you can see it without finding a timed quest. Reported by frkstram.",
+                "Two new boxes under Show event and scenario widgets on the Tracker tab, both on by default, put a delve's lives and its nemesis groups on the tier's row, each with the game's own icon and tooltip. The lives turn orange at 2 and red at 1, and the nemesis count shows how many groups of the nemesis's minions have been killed, as the bonus objectives HUD counts them, with a check mark once all of them are dead. Both start at Tier 4, on retail. Requested by Tyrial.",
+                "A search field at the top of the settings window's sidebar finds any setting as you type. Each match shows where it lives, such as Tracker > Quest Row Details, and clicking it, or pressing Enter for the first one, opens that tab, scrolls to the setting and flashes it. It searches setting names, card titles and tab names as your game's language shows them.",
+            } },
+            { head = "Improvements", items = {
+                "The Tracker tab's long Options card is now five cards, so each option is easier to find: Quest Row Details for what each quest's row shows, Headers and Buttons, Clicking and Focus, Scenarios and Popups, and Sounds. Every option keeps its setting, the cards above them are unchanged, and the new card titles are translated in every language.",
+                "With section tabs on, a Quest Discovered or Quest Complete box now shows on every tab, not only on the tab holding its section. On another tab the section's header is drawn in its usual place with just the box under it, its count reading the boxes alone. /eqot popup test draws a sample Quest Discovered box, which does nothing when clicked, so you can see where the boxes land.",
+                "The boxes that hand you a link to copy, from Search on Wowhead, the Discord button and the About tab's links, can no longer be typed in, so a stray key cannot change the link before you press Ctrl+C.",
+                "Show section tabs is no longer offered on WoW Forever, where only the quests section ever fills, as on Classic Era and TBC Anniversary. A Forever profile that had tabs on shows one list again, and the tab each section was given stays saved.",
+            } },
+        },
+    },
+    {
         version = "2.5.0", date = "2026-10-16",
         sections = {
             { head = "Bug Fixes", items = {

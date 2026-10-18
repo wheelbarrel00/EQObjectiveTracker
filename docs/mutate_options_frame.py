@@ -118,6 +118,18 @@ MUTANTS = [
     ("Clear is hard-coded in English", [
         (F, '        clear           = L["Clear"],', '        clear           = "Clear",')]),
 
+    ("the settings search is never turned on", [
+        (F, '        search          = L["Search settings"],\n', "")]),
+
+    ("the search hint is hard-coded in English", [
+        (F, '        search          = L["Search settings"],', '        search          = "Search settings",')]),
+
+    ("the line for no match is never passed on", [
+        (F, '        searchEmpty     = L["No settings match"],\n', "")]),
+
+    ("the results title says the hint", [
+        (F, '        searchTitle     = L["Search results"],', '        searchTitle     = L["Search settings"],')]),
+
     ("the context is never kept, so the tabs and menus cannot find it", [
         (F, "Options.ui = ui\n", "")]),
 

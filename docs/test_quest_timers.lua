@@ -1,5 +1,5 @@
--- Unit tests for the Classic timed-quest countdown, run against the SHIPPED source rather than
--- a copy. Run from the repo root with the game's own Lua version:
+-- Unit tests for the timed-quest countdown, Classic and retail, run against the SHIPPED source
+-- rather than a copy. Run from the repo root with the game's own Lua version:
 --
 --     "C:\Users\Big Daddy\Documents\Tools\lua-5.1.5\lua5.1.exe" docs/test_quest_timers.lua
 --
@@ -18,6 +18,15 @@
 --     half a minute stale
 --
 -- The frame-hiding half is covered by docs/test_blizzard.lua, which loads UI/Blizzard.lua whole.
+--
+-- RETAIL AND WOW FOREVER (2026-10-16, reported by frkstram). Retail never drew a countdown for a
+-- timed quest: Blizzard's own tracker draws it as a bar, and this addon hides that tracker.
+-- Data/Providers/Quests.lua now reads C_QuestLog.GetTimeAllowed, the pair that bar is drawn
+-- from, and /eqot timer test lays a two-minute sample over one quest. Its reader, the sample's
+-- toggle and its status line are sliced together over the REAL Data/Entry.lua store, and the
+-- command's branch is sliced out of UI/Commands.lua and driven. The fast tick is no longer
+-- gated to Classic, since a retail quest timer counts its last minute in seconds too. The row
+-- tooltip's faction and Time Left lines (UI/RewardTooltip.lua) are sliced in and driven as well.
 --
 -- Neither UI/Tracker.lua nor Data/Providers/QuestsClassic.lua can be loaded whole without the
 -- game, so both are sliced out by TEXT ANCHORS rather than line numbers, which drift. If an
@@ -446,8 +455,8 @@ local FakeTicker = {}
 FakeTicker.__index = FakeTicker
 function FakeTicker:Cancel() cancels = cancels + 1 self.canceled = true end
 
--- ns.Has.QuestLog is the tree's standing Classic-quest-log test, and the fast rate is gated on
--- its absence, so this stub is what lets the cases below drive BOTH flavors.
+-- ns.Has.QuestLog is the tree's standing Classic-quest-log test. The fast rate was once gated on
+-- its absence, so this stub drives BOTH flavors to hold that it no longer is.
 local hasQuestLog = false
 local tenv = setmetatable({
     Tracker = {},
@@ -536,16 +545,18 @@ ok(T._timerTicker == nil, "and the handle is dropped")
 tick(T, false, nil)
 ok(cancels == 1, "a second render with nothing timed cancels nothing further")
 
--- ---- retail never takes the fast rate, because it can never show a seconds countdown ----
--- expiresAt is re-stamped from whole minutes on every render there, so the label reads the
--- same at 5s as at 30s and the faster tick is pure render cost.
+-- ---- retail takes the fast rate too, since its quest log timers count seconds ----
+-- It was refused there while retail's only deadlines were world quests stamped in whole minutes.
 hasQuestLog = true
 T = freshTicker()
 tick(T, true, NOW + 40)
-ok(created[1] == 30, "a retail deadline inside the window still takes the slow rate")
+ok(created[1] == 5, "a retail deadline inside the window takes the fast rate")
 T = freshTicker()
 tick(T, true, NOW + 10)
-ok(created[1] == 30, "and so does one about to expire")
+ok(created[1] == 5, "and so does one about to expire")
+T = freshTicker()
+tick(T, true, NOW + 91)
+ok(created[1] == 30, "while one outside the window keeps the slow rate")
 hasQuestLog = false
 
 -- ---- an expired deadline still on screen takes the fast rate, not the slow one ----
@@ -609,6 +620,389 @@ ok(created[1] == 5, "a quest timer beside a world quest still takes the fast rat
 
 resetSoonest()
 ok(soonest() == nil, "the reset clears it, or it could only ever fall")
+
+-- ===================================================================== the retail reader
+
+local entryMod
+do
+    local echunk = assert(loadfile(repoFile("Data/Entry.lua")))
+    setfenv(echunk, setmetatable({
+        wipe = function(t) for k in pairs(t) do t[k] = nil end return t end,
+        CopyTable = function(t) local c = {} for k, v in pairs(t) do c[k] = v end return c end,
+    }, { __index = _G }))
+    echunk("EQObjectiveTracker", { RegisterModule = function(_, _, m) entryMod = m return m end })
+end
+assert(entryMod and entryMod.STATE and entryMod.NewStore, "Data/Entry.lua defined STATE and NewStore")
+local STATE = entryMod.STATE
+
+local sliceQuests = slicer("Data/Providers/Quests.lua")
+local retailSrc = sliceQuests("-- /eqot timer test's sample", "-- Unlike 1.15.9, this bound is safe")
+               .. sliceQuests("-- /eqot status and /eqot timer:", "-- Undocumented, like /eqot flavorprobe")
+
+-- What GetTimeAllowed answers per quest, and every quest it was asked for. It raises on an id that
+-- is not a number, as the client's APIs do, and is taken away where the flag reads false.
+local limits, asked = {}, {}
+local function getTimeAllowed(id)
+    if type(id) ~= "number" then error("bad quest id", 0) end
+    asked[#asked + 1] = id
+    local l = limits[id]
+    if l then return l[1], l[2] end
+    return nil, nil
+end
+local rHas = { QuestTimeAllowed = true }
+local rQuestLog = { GetTimeAllowed = getTimeAllowed }
+-- Every timer the sample starts, never run on its own: a case fires one when its time is up.
+local sampleTimers = {}
+-- A timer the sample started, or one that fails the case where none was.
+local function sampleTimer(i)
+    local t = sampleTimers[i]
+    return t and t.fn or function() error("no sample timer " .. i .. " was started", 0) end
+end
+local renv = setmetatable({
+    ns = { Has = rHas },
+    time = function() return NOW end,
+    C_QuestLog = rQuestLog,
+    C_Timer = { After = function(delay, fn) sampleTimers[#sampleTimers + 1] = { delay = delay, fn = fn } end },
+}, { __index = _G })
+
+local RQuests = {}
+local rstore = entryMod.NewStore({ groupID = "quests", icon = { kind = entryMod.ICON.QUESTPOI }, tags = {} })
+local retailChunk = assert(loadstring(
+    "local Quests, store, STATE = ...\nlocal primed, dirtyAll, dirtyObjectives = false, false, false\n"
+    .. retailSrc
+    .. "\nreturn fillTimer, function() return primed, dirtyAll, dirtyObjectives end,"
+    .. " function(p) primed, dirtyAll, dirtyObjectives = p, false, false end", "retail-timer-slice"))
+setfenv(retailChunk, renv)
+local rFill, rFlags, rPrime = retailChunk(RQuests, rstore, STATE)
+assert(type(rFill) == "function" and type(RQuests.ToggleTimerTest) == "function"
+       and type(RQuests.TimerLine) == "function", "the retail slice defined fillTimer, the toggle and the line")
+
+-- One entry carrying every field the provider sets on a quest, run through the real reader.
+local function retailEntry(id, state, stale)
+    local entry = { id = id, title = "Quest " .. id, state = state, isTracked = true, isFocused = false,
+                    level = 30, zone = "Elwynn Forest", groupID = "quests", addedAt = 0, tags = {},
+                    expiresAt = stale }
+    asked = {}
+    local okCall, err = pcall(rFill, entry, id)
+    ok(okCall, "the retail fillTimer does not raise" .. (okCall and "" or (" - " .. tostring(err))))
+    return entry
+end
+
+limits = { [101] = { 1799, 0.4 } }
+local re = retailEntry(101, STATE.ACTIVE)
+ok(re.expiresAt == NOW + 1798, "a running limit stamps the whole seconds left, rounded down: "
+   .. tostring(re.expiresAt and re.expiresAt - NOW))
+ok(#asked == 1 and asked[1] == 101, "and asks for its own quest, once")
+limits = { [102] = { 160, 100.9 } }
+ok(retailEntry(102, STATE.ACTIVE).expiresAt == NOW + 59, "the last minute is stamped to the second")
+limits = { [103] = { 300, 300 } }
+ok(retailEntry(103, STATE.ACTIVE).expiresAt == nil, "no time left draws no countdown")
+limits = { [104] = { 300, 301 } }
+ok(retailEntry(104, STATE.ACTIVE).expiresAt == nil, "and neither does a limit already passed")
+limits = { [105] = { 0, 0 } }
+ok(retailEntry(105, STATE.ACTIVE).expiresAt == nil, "a quest the client answers 0 and 0 for has no timer")
+limits = {}
+re = retailEntry(106, STATE.ACTIVE, NOW + 50)
+ok(re.expiresAt == nil, "a quest with no limit clears a pooled entry's old deadline")
+ok(#asked == 1 and asked[1] == 106, "after asking for that quest")
+
+limits = { [107] = { 600, 30 } }
+re = retailEntry(107, STATE.COMPLETE, NOW + 50)
+ok(re.expiresAt == nil, "a finished quest draws no countdown, as Blizzard's tracker draws none")
+ok(#asked == 0, "and is not asked for at all")
+re = retailEntry(107, STATE.FAILED, NOW + 50)
+ok(re.expiresAt == nil and #asked == 0, "and neither does a failed one")
+ok(retailEntry(107, STATE.ACTIVE).expiresAt == NOW + 570, "while the same quest in progress does")
+
+limits = { [108] = { "600", "100" } }
+ok(retailEntry(108, STATE.ACTIVE).expiresAt == NOW + 500, "string figures are taken as numbers")
+limits = { [109] = { "x", {} } }
+ok(retailEntry(109, STATE.ACTIVE).expiresAt == nil, "and junk is refused rather than raising")
+
+rHas.QuestTimeAllowed, rQuestLog.GetTimeAllowed = false, nil
+limits = { [110] = { 600, 0 } }
+re = retailEntry(110, STATE.ACTIVE, NOW + 50)
+ok(re.expiresAt == nil, "a client without GetTimeAllowed draws no countdown and clears an old one")
+rHas.QuestTimeAllowed, rQuestLog.GetTimeAllowed = true, getTimeAllowed
+
+-- ---- /eqot timer test's sample, over the real store ----
+
+local notifies = 0
+local function logOf(list)
+    rstore:Begin()
+    for _, q in ipairs(list) do
+        local qe = rstore:Acquire(q.id)
+        qe.title, qe.state, qe.isTracked = q.title, q.state, q.tracked
+        qe.level, qe.zone, qe.addedAt, qe.groupID, qe.isFocused = 30, "Elwynn Forest", 0, "quests", false
+        local okCall, err = pcall(rFill, qe, q.id)
+        ok(okCall, "the reader does not raise on " .. q.title .. (okCall and "" or (" - " .. tostring(err))))
+    end
+    rstore:Finish()
+end
+local function toggle()
+    local okCall, title, why = pcall(RQuests.ToggleTimerTest, RQuests)
+    ok(okCall, "ToggleTimerTest does not raise" .. (okCall and "" or (" - " .. tostring(title))))
+    if not okCall then return RAISED end
+    return title, why
+end
+local function timerLine()
+    local okCall, out = pcall(RQuests.TimerLine, RQuests)
+    ok(okCall, "TimerLine does not raise" .. (okCall and "" or (" - " .. tostring(out))))
+    return okCall and out or RAISED
+end
+local function deadline(id) local got = rstore:Get(id) return got and got.expiresAt end
+
+local LOG = {
+    { id = 301, title = "Done and tracked", state = STATE.COMPLETE, tracked = true },
+    { id = 302, title = "Open, untracked", state = STATE.ACTIVE, tracked = false },
+    { id = 303, title = "Open and tracked", state = STATE.ACTIVE, tracked = true },
+    { id = 304, title = "Also open and tracked", state = STATE.ACTIVE, tracked = true },
+}
+
+limits = {}
+RQuests._notifyDirty = nil
+logOf(LOG)
+local title, why = toggle()
+ok(title == nil and why == "off", "with the provider switched off there is no sample")
+logOf(LOG)
+ok(deadline(303) == nil, "and none is stamped")
+
+RQuests._notifyDirty = function() notifies = notifies + 1 end
+logOf({})
+title, why = toggle()
+ok(title == nil and why == "empty", "an empty log has no quest to put a sample on")
+ok(notifies == 0, "and asks for no repaint")
+
+limits = { [304] = { 900, 0 } }
+logOf(LOG)
+rPrime(true)
+title, why = toggle()
+ok(title == "Open and tracked" and why == nil, "the sample goes on the first tracked quest in progress: "
+   .. tostring(title))
+ok(notifies == 1, "and asks for one repaint")
+local primedNow, allNow, objNow = rFlags()
+ok(objNow == true and allNow == false and primedNow == true, "through the cheap refresh once the log is primed")
+logOf(LOG)
+ok(deadline(303) == NOW + 120, "the next pass stamps a two-minute sample on that quest: "
+   .. tostring(deadline(303) and deadline(303) - NOW))
+ok(deadline(304) == NOW + 900, "while a real limit beside it keeps its own deadline")
+ok(deadline(302) == nil and deadline(301) == nil, "and the quests without one stay without")
+ok(timerLine() == "quest timers: GetTimeAllowed, 2 counting down (303:120s 304:900s) | sample 303",
+   "the status line lists both and names the sample: " .. tostring(timerLine()))
+
+title, why = toggle()
+ok(title == nil and why == nil, "a second run clears the sample")
+ok(notifies == 2, "with a repaint of its own")
+logOf(LOG)
+ok(deadline(303) == nil, "and the next pass takes the sample away")
+ok(timerLine() == "quest timers: GetTimeAllowed, 1 counting down (304:900s) | sample off",
+   "the line says so: " .. tostring(timerLine()))
+
+-- Between quest events nothing re-reads the log, so a countdown that runs out still sits on its
+-- entry until the next pass, and the line must not list it.
+local beforeRunOut = NOW
+NOW = NOW + 901
+ok(timerLine() == "quest timers: GetTimeAllowed, 0 counting down | sample off",
+   "a countdown that ran out since the last pass is not listed: " .. tostring(timerLine()))
+NOW = beforeRunOut
+
+-- Before the first full pass only the full rebuild runs, so that is the flag a sample must set.
+rPrime(false)
+title = toggle()
+ok(title == "Open and tracked", "a sample can start before the log is primed")
+local _, allEarly, objEarly = rFlags()
+ok(allEarly == true and objEarly == false, "and asks for the full rebuild then")
+toggle()
+
+-- A sample that has run out is not on, so the next run starts a new one rather than clearing.
+rPrime(true)
+toggle()
+local saved = NOW
+NOW = NOW + 121
+logOf(LOG)
+ok(deadline(303) == nil, "a sample that has run out stamps nothing")
+ok(timerLine():find("| sample off", 1, true) ~= nil, "and reads as off")
+title = toggle()
+ok(title == "Open and tracked", "so the next run starts a fresh one")
+logOf(LOG)
+ok(deadline(303) == NOW + 120, "two minutes from now, not from the first run")
+toggle()
+NOW = saved
+
+-- The pre-ship scan of 2026-10-17: a sample laid over a quest with a REAL limit hid that quest's own
+-- countdown for good once it ran out, and no quest event re-read the log when it did.
+for i = #sampleTimers, 1, -1 do sampleTimers[i] = nil end
+limits = { [303] = { 600, 0 } }
+rPrime(true)
+logOf(LOG)
+ok(deadline(303) == NOW + 600, "a quest with a real limit counts its own time")
+local startNotifies = notifies
+title = toggle()
+ok(title == "Open and tracked", "the sample lands on it")
+ok(#sampleTimers == 1 and sampleTimers[1].delay == 121,
+   "and one timer is started for a second after the sample runs out: "
+   .. tostring(sampleTimers[1] and sampleTimers[1].delay))
+logOf(LOG)
+ok(deadline(303) == NOW + 120, "while the sample runs it takes the quest's row")
+saved = NOW
+NOW = saved + 119
+logOf(LOG)
+ok(deadline(303) == NOW + 1, "with one second of it left, still the sample's")
+NOW = saved + 120
+logOf(LOG)
+ok(deadline(303) == NOW + 600, "and at the second it runs out, the real limit's")
+NOW = saved + 121
+logOf(LOG)
+ok(deadline(303) == NOW + 600, "once it has run out the real countdown comes back on the next pass: "
+   .. tostring(deadline(303) and deadline(303) - NOW))
+rPrime(true)
+local before = notifies
+local okFire = pcall(sampleTimer(1))
+ok(okFire, "the sample's timer does not raise")
+ok(notifies == before + 1, "its end asks for one repaint")
+local _, endAll, endObj = rFlags()
+ok(endObj == true and endAll == false, "through the cheap refresh once the log is primed")
+ok(timerLine():find("| sample off", 1, true) ~= nil, "and the sample reads as off")
+ok(notifies - startNotifies == 2, "two repaints in all: the start and the end")
+rPrime(false)
+pcall(sampleTimer(1))
+local _, allLate = rFlags()
+ok(notifies == before + 1 and allLate == false, "a timer firing again after its sample is gone does nothing")
+NOW = saved
+
+-- Started before the first full pass, the sample's end asks for the full rebuild, as its start does.
+for i = #sampleTimers, 1, -1 do sampleTimers[i] = nil end
+rPrime(false)
+toggle()
+rPrime(false)
+pcall(sampleTimer(1))
+local _, coldAll, coldObj = rFlags()
+ok(coldAll == true and coldObj == false, "a cold log's sample end asks for the full rebuild")
+rPrime(true)
+
+-- A timer left over from a sample that was cleared and started again must not end the new one.
+for i = #sampleTimers, 1, -1 do sampleTimers[i] = nil end
+rPrime(true)
+toggle()
+NOW = NOW + 30
+toggle()
+toggle()
+ok(#sampleTimers == 2, "each start sets a timer of its own: " .. #sampleTimers)
+before = notifies
+pcall(sampleTimer(1))
+ok(notifies == before, "the first sample's timer leaves the second sample alone")
+logOf(LOG)
+ok(deadline(303) == NOW + 120, "which still counts down from its own start")
+ok(timerLine():find("| sample 303", 1, true) ~= nil, "and still reads as on")
+toggle()
+NOW = saved
+limits = {}
+
+-- The store hands its entries out in pairs order, so the line sorts them, as text. These four ids
+-- come out of the store as 61, 33, 7, 512, which is neither their text order nor their number order.
+limits = { [7] = { 100, 0 }, [61] = { 200, 0 }, [512] = { 300, 0 }, [33] = { 400, 0 } }
+logOf({ { id = 7, title = "Seven", state = STATE.ACTIVE, tracked = true },
+        { id = 61, title = "Sixty-one", state = STATE.ACTIVE, tracked = true },
+        { id = 512, title = "Five hundred twelve", state = STATE.ACTIVE, tracked = true },
+        { id = 33, title = "Thirty-three", state = STATE.ACTIVE, tracked = true } })
+ok(timerLine() == "quest timers: GetTimeAllowed, 4 counting down (33:400s 512:300s 61:200s 7:100s) | sample off",
+   "every countdown listed in text order: " .. tostring(timerLine()))
+limits = {}
+
+-- With no tracked quest in progress the first quest in the log takes it, finished or not.
+logOf({ LOG[1], LOG[2] })
+title = toggle()
+ok(title == "Done and tracked", "with no tracked quest in progress, the first quest takes it: " .. tostring(title))
+toggle()
+
+rHas.QuestTimeAllowed = false
+logOf(LOG)
+ok(timerLine() == "quest timers: no GetTimeAllowed, 0 counting down | sample off",
+   "a client without the call says so: " .. tostring(timerLine()))
+rHas.QuestTimeAllowed = true
+
+-- ---- the command ----
+
+local sliceCmd = slicer("UI/Commands.lua")
+local cmdBranch = sliceCmd('        elseif cmd == "timer" then', '        elseif cmd == "importeq" then')
+local cchunk = assert(loadstring("local tracker, ns, strtrim = ...\nreturn function(cmd, rest)\n    if false then\n"
+                                 .. cmdBranch .. "    end\nend", "timer-command-slice"))
+
+local printed, renders, builds
+local blizzard, provider = false, nil
+local cmdNs, cmdRegistry, cmdFeed = {}, {}, {}
+function cmdRegistry:Get(id)
+    assert(self == cmdRegistry, "Registry:Get called without self")
+    return id == "quests" and provider or nil
+end
+function cmdFeed:Build() assert(self == cmdFeed, "Feed:Build called without self") builds = builds + 1 end
+function cmdNs:GetModule(name)
+    assert(self == cmdNs, "ns:GetModule called without self")
+    if name == "Registry" then return cmdRegistry end
+    if name == "Feed" then return cmdFeed end
+end
+function cmdNs:UsesBlizzardTracker() assert(self == cmdNs, "UsesBlizzardTracker called without self") return blizzard end
+function cmdNs:Print(s) assert(self == cmdNs, "ns:Print called without self") printed[#printed + 1] = s end
+local TR = {}
+function TR:Render() assert(self == TR, "Tracker:Render called without self") renders = renders + 1 end
+local runCmd = cchunk(function() return TR end, cmdNs,
+                      function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end)
+
+local function cmd(rest)
+    printed, renders, builds = {}, 0, 0
+    local okCall, err = pcall(runCmd, "timer", rest)
+    ok(okCall, "/eqot timer " .. tostring(rest) .. " does not raise" .. (okCall and "" or (" - " .. tostring(err))))
+    return printed[1]
+end
+
+-- A stand-in provider recording what the command asked of it.
+local toggles, stubAnswer, stubLine
+local function stubProvider()
+    local p = { id = "quests" }
+    function p:ToggleTimerTest() assert(self == p, "ToggleTimerTest called without self") toggles = toggles + 1 return stubAnswer[1], stubAnswer[2] end
+    function p:TimerLine() assert(self == p, "TimerLine called without self") if stubLine == RAISED then error("boom", 0) end return stubLine end
+    return p
+end
+
+provider = nil
+ok(cmd("test") == "timer: not available on this client", "no quests provider: not available")
+provider = { id = "quests" }
+ok(cmd("test") == "timer: not available on this client", "a quests provider with no sample, as on Classic: not available")
+
+provider, toggles = stubProvider(), 0
+blizzard = true
+ok(cmd("test") == "timer: off, Blizzard's tracker in use", "under Blizzard's tracker it says so")
+ok(toggles == 0, "and starts no sample")
+blizzard = false
+
+stubAnswer = { nil, "off" }
+ok(cmd("test") == "timer: the quests provider is switched off (/eqot modules).", "a switched-off provider is named")
+stubAnswer = { nil, "empty" }
+ok(cmd("test") == "timer: the quest log is empty, so there is no quest to put a sample on.", "an empty log is named")
+stubAnswer = { "Red Linen Goods", nil }
+ok(cmd("test") == "timer test: on. A two-minute sample countdown is on Red Linen Goods. "
+   .. "Type /eqot timer test again to clear it.", "a sample names its quest")
+stubAnswer = { nil, nil }
+ok(cmd("test") == "timer test: off.", "and a cleared one says off")
+toggles = 0
+stubAnswer = { "Red Linen Goods", nil }
+cmd("  TEST ")
+ok(toggles == 1, "the word is read trimmed and in any case")
+
+stubLine, toggles = "quest timers: GetTimeAllowed, 0 counting down | sample off", 0
+ok(cmd("") == stubLine, "with no word it prints the provider's line")
+ok(renders == 1 and builds == 1, "after a fresh render and feed build, as /eqot status does")
+ok(toggles == 0, "and starts no sample")
+ok(cmd("late") == stubLine and toggles == 0, "any other word prints the line too, never a sample")
+stubLine = RAISED
+ok(cmd("") == "|cffff5555TimerLine raised|r boom", "a raising line is reported, not thrown")
+
+-- And the real provider behind it, end to end through the slice above.
+provider = RQuests
+logOf(LOG)
+ok(cmd("test") == "timer test: on. A two-minute sample countdown is on Open and tracked. "
+   .. "Type /eqot timer test again to clear it.", "the real provider's sample is named by the command")
+ok(cmd("test") == "timer test: off.", "and cleared by it")
 
 -- ===================================================================== the wiring
 
@@ -695,6 +1089,183 @@ has(compatSrc,
 local _, cmdSrc = slicer("UI/Commands.lua")
 has(cmdSrc, 'debugLine("Blizzard", nil, "QuestTimerLine")',
     "the quest timer line is printed by /eqot status")
+
+-- The retail half's seams. Both paths stamp the deadline, each straight before the objectives and
+-- after the state the reader checks, or a finished quest is read as still running.
+local _, questsSrc = slicer("Data/Providers/Quests.lua")
+has(questsSrc, '                fillTimer(e, id)\n                fillLines(e, id)\n',
+    "the full rebuild stamps the retail deadline straight before the objectives")
+has(questsSrc, '        fillTimer(e, id)\n        fillLines(e, id)\n    end\n',
+    "and so does the cheap refresh")
+local retailCalls = select(2, questsSrc:gsub("\n[ ]+fillTimer%(e, id%)\n", "\n"))
+ok(retailCalls == 2, "exactly those two calls: " .. retailCalls)
+local function stateBeforeTimer(fromAnchor, toAnchor)
+    local a = questsSrc:find(fromAnchor, 1, true)
+    local b = a and questsSrc:find(toAnchor, a, true)
+    local s = a and questsSrc:find("e.state     = questState(id)", a, true)
+    local t = a and questsSrc:find("fillTimer(e, id)", a, true)
+    return a and b and s and t and s < t and t < b
+end
+ok(stateBeforeTimer("local function fullRebuild()", "local function refreshDynamic()"),
+   "the full rebuild writes the state before it stamps the deadline")
+ok(stateBeforeTimer("local function refreshDynamic()", "function Quests:IsAvailable()"),
+   "and so does the cheap refresh")
+
+has(compatSrc, 'Has.QuestTimeAllowed    = method(C_QuestLog, "GetTimeAllowed")\n',
+    "the retail capability probes GetTimeAllowed on C_QuestLog, anchored on the line ending")
+
+local timerBlock = '            if p.TimerLine then\n                local ok, line = pcall(p.TimerLine, p)\n'
+    .. '                ns:Print("      " .. (ok and (line or "")\n'
+    .. '                    or ("|cffff5555TimerLine raised|r " .. tostring(line))))\n            end\n'
+local timerAt = cmdSrc:find(timerBlock, 1, true)
+local debugAt = cmdSrc:find("            if p.DebugLine then\n", 1, true)
+local filtersAt = cmdSrc:find('    debugLine("Filter", nil, "FiltersLine")', 1, true)
+ok(timerAt ~= nil, "/eqot status prints each provider's timer line under a pcall")
+ok(timerAt and debugAt and filtersAt and debugAt < timerAt and timerAt < filtersAt,
+   "inside the providers loop, after its status line")
+has(cmdSrc, 'mplus [test|late], popup [test], timer [test], importeq',
+    "the usage line lists the timer command")
+
+-- ===================================================================== the row's tooltip
+
+-- The pre-ship scans of 2026-10-17: the tooltip's faction and Time Left lines, which every timed
+-- quest now reaches, had no harness, and Time Left floored to minutes drew nothing through the
+-- last minute. Everything from the redraw's budget to _DrawEntry is sliced from UI/RewardTooltip.lua,
+-- the real redraw included, and run over the real Util loaded above, entered the way a hover
+-- enters it, through the row's own paintTooltip sliced out of UI/Row.lua.
+local rtSrc = slicer("UI/RewardTooltip.lua")("local REDRAW_DELAY = 0.4", "function RT:Hide()")
+local rtChunk = assert(loadstring("local RT, ns, Util, L, pickAnchor, renderLines = ...\n" .. rtSrc,
+                                  "entry-tooltip-slice"))
+-- Each redraw the tooltip arms, run by a case when it wants the redraw to happen.
+local redraws = {}
+setfenv(rtChunk, setmetatable({
+    time = function() return NOW end,
+    C_Timer = { After = function(_, fn) redraws[#redraws + 1] = fn end },
+}, { __index = _G }))
+local tipLines, factions, drewObjectives, sawReward = {}, {}, true, true
+local tipStub = {}
+function tipStub:SetOwner(owner) self.owner = owner end
+function tipStub:GetOwner() return self.owner end
+function tipStub:IsShown() return true end
+function tipStub:SetText(text) tipLines = { { text = text } } end
+function tipStub:AddLine(text, r, g, b) tipLines[#tipLines + 1] = { text = text, r = r, g = g, b = b } end
+function tipStub:Show() end
+local QRStub = {}
+-- The game has no title for 503 yet, so the entry's own has to stand in.
+function QRStub:Title(id) if id ~= 503 then return "Quest " .. id end end
+function QRStub:FactionName(id) return factions[id] end
+local RTmod = {}
+local tipUtil = setmetatable({ Tooltip = function() return tipStub end }, { __index = Util })
+rtChunk(RTmod, { GetModule = function(_, n) if n == "QuestRewards" then return QRStub end end }, tipUtil,
+        setmetatable({}, { __index = function(_, k) return k end }),
+        function() return "ANCHOR_RIGHT" end,
+        function() return drewObjectives, sawReward end)
+local function joined()
+    local texts = {}
+    for i, l in ipairs(tipLines) do texts[i] = l.text end
+    return table.concat(texts, "|")
+end
+-- The owner is the row, which the redraw asks still holds the quest.
+local lastOwner
+local function drawTip(id, expiresAt, hint, entryTitle)
+    tipLines = {}
+    lastOwner = { _entry = { id = id } }
+    local okCall, err = pcall(RTmod.ShowForEntry, RTmod, lastOwner,
+                              { id = id, title = entryTitle or ("Quest " .. id), expiresAt = expiresAt }, hint or false)
+    ok(okCall, "the entry tooltip does not raise" .. (okCall and "" or (" - " .. tostring(err))))
+    return joined(), tipLines
+end
+local function lineColor(l)
+    if not (l and l.r and l.g and l.b) then return "no color" end
+    return ("%.2f,%.2f,%.2f"):format(l.r, l.g, l.b)
+end
+
+factions = { [501] = "The Assembly of the Deeps" }
+ok(drawTip(501, nil) == "Quest 501", "with no deadline: no faction line and no time left")
+local text, lines = drawTip(501, NOW + 3900)
+ok(text == "Quest 501|The Assembly of the Deeps| |Time Left: 1h 5m",
+   "a deadline brings the faction under the title, then a gap and the time left: " .. text)
+ok(lineColor(lines[2]) == "0.70,0.70,0.70", "the faction in gray")
+ok(lineColor(lines[4]) == "1.00,0.65,0.10", "an hour and five minutes in the under-two-hours orange: "
+   .. tostring(lineColor(lines[4])))
+text, lines = drawTip(501, NOW + 45)
+ok(text == "Quest 501|The Assembly of the Deeps| |Time Left: 45s",
+   "the last minute counts in seconds rather than going blank: " .. text)
+ok(lineColor(lines[4]) == "1.00,0.25,0.25",
+   "in the row's under-half-an-hour red, never the red of no time left: " .. tostring(lineColor(lines[4])))
+text, lines = drawTip(501, NOW + 60)
+ok(text:find("|Time Left: 1m", 1, true) ~= nil and lineColor(lines[4]) == "1.00,0.25,0.25",
+   "a minute is a minute, in the same red: " .. text)
+text, lines = drawTip(501, NOW + 1799)
+ok(text:find("|Time Left: 29m", 1, true) ~= nil and lineColor(lines[4]) == "1.00,0.25,0.25",
+   "29 and a half minutes reads 29m in the under-half-an-hour red, as the row floors it: " .. text)
+ok(drawTip(501, NOW) == "Quest 501|The Assembly of the Deeps", "at no time left there is no time line")
+ok(drawTip(501, NOW - 5) == "Quest 501|The Assembly of the Deeps", "nor past it")
+ok(drawTip(502, NOW + 45) == "Quest 502| |Time Left: 45s", "a quest with no faction has no faction line")
+drewObjectives = false
+ok(drawTip(502, NOW + 45) == "Quest 502|Time Left: 45s", "and with nothing drawn above it, no gap")
+drewObjectives = true
+text = drawTip(501, NOW + 45, true)
+ok(text == "Quest 501|The Assembly of the Deeps| |Time Left: 45s| "
+   .. "|Click the icon to focus this quest, or again to clear it.|Click the title to open the quest log.",
+   "the click hint comes last, after the time left: " .. text)
+
+ok(drawTip(503, nil, false, "From the entry") == "From the entry",
+   "a quest the game has no title for yet shows the entry's own")
+
+-- Rewards still loading arm a redraw, run through the real one, which has to draw the same
+-- deadline, hint and title again.
+local function runRedraw()
+    tipLines = {}
+    local okCall, err = pcall(redraws[1] or function() error("no redraw was armed", 0) end)
+    ok(okCall, "the redraw does not raise" .. (okCall and "" or (" - " .. tostring(err))))
+    return joined()
+end
+for i = #redraws, 1, -1 do redraws[i] = nil end
+drawTip(501, NOW + 45)
+ok(#redraws == 0, "a tooltip with its rewards in hand arms no redraw")
+sawReward = false
+drawTip(501, NOW + 45, true)
+ok(#redraws == 1, "one with its rewards still loading arms one: " .. #redraws)
+ok(runRedraw() == "Quest 501|The Assembly of the Deeps| |Time Left: 45s| "
+   .. "|Click the icon to focus this quest, or again to clear it.|Click the title to open the quest log.",
+   "and the redraw keeps the faction, the time left and the click hint: " .. joined())
+for i = #redraws, 1, -1 do redraws[i] = nil end
+drawTip(503, NOW + 45, false, "From the entry")
+ok(runRedraw():find("^From the entry|") ~= nil, "and the entry's own title when the game still has none")
+for i = #redraws, 1, -1 do redraws[i] = nil end
+drawTip(501, NOW + 45)
+lastOwner._entry = { id = 999 }
+ok(runRedraw() == "", "a row recycled onto another quest inside the delay draws nothing")
+sawReward = true
+
+-- The hover itself: the row hands its own entry and hint to the tooltip.
+local paintSrc = slicer("UI/Row.lua")("local function paintTooltip(row)",
+                                      "-- The cursor crosses between the icon and the title")
+local rowChunk = assert(loadstring(paintSrc .. "\nreturn paintTooltip", "row-tooltip-slice"))
+local rowProviders = { quests = { idSpace = "quest" } }
+local rowNs = { Util = tipUtil }
+function rowNs:GetModule(name)
+    assert(self == rowNs, "ns:GetModule without self")
+    if name == "Registry" then
+        return { Get = function(_, id) return rowProviders[id] end }
+    end
+    if name == "RewardTooltip" then return RTmod end
+end
+setfenv(rowChunk, setmetatable({ ns = rowNs }, { __index = _G }))
+local paintTooltip = rowChunk()
+local function hoverRow(entry, hint)
+    tipLines = {}
+    local okCall, err = pcall(paintTooltip, { _providerID = "quests", _entry = entry, _hintShown = hint })
+    ok(okCall, "the row's tooltip does not raise" .. (okCall and "" or (" - " .. tostring(err))))
+    return joined()
+end
+ok(hoverRow({ id = 501, title = "Quest 501", expiresAt = NOW + 45 }, false)
+   == "Quest 501|The Assembly of the Deeps| |Time Left: 45s",
+   "hovering a timed quest's row draws its faction and its time left")
+ok(hoverRow({ id = 501, title = "Quest 501", expiresAt = NOW + 45 }, true):find("|Click the title to open the quest log.", 1, true)
+   ~= nil, "and hands its click hint on")
+ok(hoverRow({ id = 501, title = "Quest 501" }, false) == "Quest 501", "and a quest with no deadline draws neither")
 
 print(("test_quest_timers: %d passed, %d failed"):format(pass, fail))
 if fail > 0 then os.exit(1) end

@@ -90,11 +90,16 @@ local function clickThrough()
     return (Tracker and Tracker.IsClickThrough and Tracker:IsClickThrough()) and true or false
 end
 
+-- A spell with no tooltip text of its own shows the spell's, as Blizzard's widget does.
 local function onEnter(frame)
-    if clickThrough() or not frame._tooltip then return end
+    if clickThrough() or not (frame._tooltip or frame._spellID) then return end
     local tip = Util.Tooltip()
     tip:SetOwner(frame, "ANCHOR_RIGHT")
-    tip:SetText(frame._tooltip, 1, 1, 1, 1, true)
+    if frame._tooltip then
+        tip:SetText(frame._tooltip, 1, 1, 1, 1, true)
+    else
+        tip:SetSpellByID(frame._spellID)
+    end
     tip:Show()
 end
 
@@ -117,7 +122,7 @@ local function onUpdateCountdown(bar, elapsed)
 end
 
 local function newState()
-    return { barPool = {}, bars = {}, textPool = {}, texts = {} }
+    return { barPool = {}, bars = {}, textPool = {}, texts = {}, delvePool = {}, delves = {} }
 end
 
 WidgetBlock.top      = newState()
@@ -164,6 +169,113 @@ local function buildText(parent)
     return fs
 end
 
+-- The affix icon is round, as Blizzard masks it, and its earned check is Blizzard's own.
+local function buildCounter(parent, round)
+    local c = CreateFrame("Frame", nil, parent)
+    c.icon = c:CreateTexture(nil, "ARTWORK")
+    c.icon:SetPoint("LEFT", c, "LEFT", 0, 0)
+    if round then
+        c.mask = c:CreateMaskTexture()
+        c.mask:SetAllPoints(c.icon)
+        c.mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask",
+                          "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        c.icon:AddMaskTexture(c.mask)
+        c.check = c:CreateTexture(nil, "OVERLAY")
+        c.check:SetPoint("TOPRIGHT", c.icon, "TOPRIGHT", 3, 3)
+        Util.SafeSetAtlas(c.check, "common-icon-checkmark")
+    end
+    c.text = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    c.text:SetWordWrap(false)
+    c:EnableMouse(true)
+    c:SetScript("OnEnter", onEnter)
+    c:SetScript("OnLeave", onLeave)
+    return c
+end
+
+local function buildDelveRow(parent)
+    local row = CreateFrame("Frame", nil, parent)
+    row.tier = buildText(row)
+    row.tier:SetWordWrap(false)
+    row.tier:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.nem = buildCounter(row, true)
+    row.lives = buildCounter(row, false)
+    return row
+end
+
+local COUNTER_GAP, COUNTER_SPACE = 4, 10
+local TEXT_GRAY = { 0.85, 0.85, 0.85 }
+local LIVES_LOW  = { 1, 0.5, 0.25 }
+local LIVES_LAST = { 1, 0.2, 0.2 }
+
+local function fillCounter(c, iconID, text, color, tooltip, spellID, earned, size)
+    local Media = ns:GetModule("Media")
+    c.icon:SetSize(size, size)
+    c.icon:SetTexture(iconID)
+    c.icon:SetShown(iconID ~= nil)
+    if c.check then
+        local s = math.floor(size * 0.75 + 0.5)
+        c.check:SetSize(s, s)
+        c.check:SetShown(earned and true or false)
+    end
+    Media:ApplyFont(c.text, -2)
+    Media:ApplyTextShadow(c.text)
+    c.text:SetText(text or "")
+    c.text:SetTextColor(color[1], color[2], color[3])
+    c.text:ClearAllPoints()
+    local w = iconID and size or 0
+    if text and text ~= "" then
+        if iconID then w = w + COUNTER_GAP end
+        c.text:SetPoint("LEFT", c, "LEFT", w, 0)
+        w = w + math.ceil(c.text:GetStringWidth() or 0)
+    end
+    c._tooltip, c._spellID = tooltip, spellID
+    c:SetSize(math.max(w, 1), size)
+    c:Show()
+    return w
+end
+
+local function livesColor(lives)
+    if lives <= 1 then return LIVES_LAST end
+    if lives == 2 then return LIVES_LOW end
+    return TEXT_GRAY
+end
+
+-- The tier on the left, then the nemesis affix and the lives at the right edge, as Blizzard's
+-- own delve header lays them out. Returns the row's height.
+local function fillDelveRow(row, w, width)
+    local Media = ns:GetModule("Media")
+    Media:ApplyFont(row.tier, -2)
+    Media:ApplyTextShadow(row.tier)
+    row.tier:SetText(w.text or "")
+    -- Sized to the tier text, never under 14, so a large font does not leave the icons small.
+    local size = math.max(14, math.ceil((row.tier:GetStringHeight() or 0) + 3))
+    row:SetSize(width, size)
+
+    local right = 0
+    row.lives:ClearAllPoints()
+    row.nem:ClearAllPoints()
+    if w.lives then
+        right = fillCounter(row.lives, w.livesIcon, tostring(w.lives), livesColor(w.lives), w.livesTip,
+                            nil, false, size) + COUNTER_SPACE
+        row.lives:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    else
+        row.lives:Hide()
+    end
+    if w.nemAlive then
+        -- Groups killed, as the bonus objectives HUD counts them. The check sits on the affix icon,
+        -- so an affix drawn with no icon keeps its N/N.
+        local earned = w.nemAlive == 0 and w.nemIcon ~= nil
+        local killed = math.max(0, w.nemTotal - w.nemAlive)
+        local text = (not earned) and (killed .. "/" .. w.nemTotal) or nil
+        fillCounter(row.nem, w.nemIcon, text, TEXT_GRAY, w.nemTip, w.nemSpell, earned, size)
+        row.nem:SetPoint("RIGHT", row, "RIGHT", -right, 0)
+    else
+        row.nem:Hide()
+    end
+    row:Show()
+    return size
+end
+
 local function release(state)
     for i = #state.bars, 1, -1 do
         local bar = state.bars[i]
@@ -181,6 +293,14 @@ local function release(state)
         fs:ClearAllPoints()
         state.textPool[#state.textPool + 1] = fs
         state.texts[i] = nil
+    end
+    for i = #state.delves, 1, -1 do
+        local row = state.delves[i]
+        row.nem._tooltip, row.nem._spellID, row.lives._tooltip = nil, nil, nil
+        row:Hide()
+        row:ClearAllPoints()
+        state.delvePool[#state.delvePool + 1] = row
+        state.delves[i] = nil
     end
 end
 
@@ -255,6 +375,13 @@ local function draw(state, container, cfg, top, setID)
 
             bar:Show()
             y = y + barH + ROW_GAP
+        elseif w.kind == "delve" then
+            local row = tremove(state.delvePool) or buildDelveRow(container)
+            if row:GetParent() ~= container then row:SetParent(container) end
+            state.delves[#state.delves + 1] = row
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", container, "TOPLEFT", SIDE_PAD, -y)
+            y = y + fillDelveRow(row, w, width) + ROW_GAP
         else
             local fs = tremove(state.textPool) or buildText(container)
             state.texts[#state.texts + 1] = fs

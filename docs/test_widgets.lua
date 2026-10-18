@@ -1,5 +1,5 @@
 -- luacheck: globals Enum C_UIWidgetManager C_ScenarioInfo geterrorhandler GetTime
--- luacheck: globals issecretvalue
+-- luacheck: globals issecretvalue C_CurrencyInfo C_Spell C_Timer
 --
 -- Unit tests for Data/Widgets.lua, run against the SHIPPED source rather than a copy.
 -- Run from the repo root with the game's own Lua version:
@@ -21,7 +21,7 @@ local function repoFile(rel)
     return "../" .. rel
 end
 
-local ns = { L = setmetatable({}, { __index = function(_, k) return k end }) }
+local ns = { L = setmetatable({}, { __index = function(_, k) return k end }), Has = { DelveHeader = true } }
 local mods = {}
 function ns:RegisterModule(n, t) mods[n] = t return t end
 function ns:GetModule(n) return mods[n] end
@@ -63,6 +63,30 @@ C_ScenarioInfo = {
     end,
 }
 geterrorhandler = function() return function(e) error(e) end end
+-- The nemesis counts. An id with no entry answers nil, as the client does for one it does not know.
+local CUR, currencyRaises = {}, false
+C_CurrencyInfo = {
+    GetCurrencyInfo = function(id)
+        if currencyRaises then error("the currency read raised") end
+        if CUR[id] == nil then return nil end
+        return { currencyID = id, quantity = CUR[id] }
+    end,
+}
+-- Each affix answers its own icon, so reading the wrong spell's shows.
+C_Spell = { GetSpellTexture = function(id) return 900000 + id, 1 end }
+-- The nemesis wait. Every timer is kept so a case can end it, and records a cancel.
+local timers = {}
+C_Timer = {
+    NewTimer = function(delay, fn)
+        local t = { delay = delay, fn = fn, cancelled = false }
+        function t.Cancel(self)
+            assert(self == t, "Cancel without self")
+            self.cancelled = true
+        end
+        timers[#timers + 1] = t
+        return t
+    end,
+}
 local fakeNow = 1000
 GetTime = function() return fakeNow end
 
@@ -78,7 +102,11 @@ mods.Events = {
     Debounce = function() debounced = debounced + 1 end,
 }
 local cfg = {}
-mods.DB = { Tracker = function() return cfg end }
+mods.DB = {}
+function mods.DB.Tracker(self)
+    assert(self == mods.DB, "DB:Tracker without self")
+    return cfg
+end
 
 local chunk = assert(loadfile(repoFile("Data/Widgets.lua")))
 chunk("EQObjectiveTracker", ns)
@@ -189,8 +217,9 @@ C_ScenarioInfo.GetScenarioStepInfo = function() return { title = "Stage One" } e
 line = W:DebugLine()
 ok(line:find("0 drawn", 1, true) ~= nil, "an ended scenario stops being reported, got: " .. line)
 
+-- Back to the variable, not a fixed 777, or every later case that moves the scenario moves nothing.
 C_ScenarioInfo.GetScenarioStepInfo = function()
-    return { title = "Stage One", widgetSetID = 777 }
+    return { title = "Stage One", widgetSetID = scenarioSetID }
 end
 
 -- The snapshot. Reading the same set twice without an invalidate must touch no API at all -
@@ -288,13 +317,169 @@ SETS[240] = { widget(701, "ScenarioHeaderTimer", {
 out = W:Read(240)
 ok(out[1].text == nil, "a header matching the stage title is dropped, got: " .. tostring(out[1].text))
 
--- The delve tier, which is the only thing read off the delve header widget
+-- The delve header. With both counters off, or below Tier 4, the tier draws as a line of text as it
+-- always has. With either on, the tier and the counters are one entry, which the block draws as a row.
+local function delve(id, tier, currencies, spells)
+    return widget(id, "ScenarioHeaderDelves", { orderIndex = 0, shownState = 1, tierText = tier,
+                                                headerText = "Shadowguard Point", currencies = currencies,
+                                                spells = spells })
+end
+local function readDelve(tier, currencies, spells)
+    W:Invalidate()
+    SETS[240] = { delve(702, tier, currencies, spells) }
+    return W:Read(240)
+end
+local function raising() return setmetatable({}, { __index = function() error("raised") end }) end
+-- The second entry carries different values, so reading the wrong one shows.
+local LIVES = { { text = "4", iconFileID = 4410, tooltip = "Total deaths: 1" },
+                { text = "9", iconFileID = 4411, tooltip = "the wrong entry" } }
+-- The nemesis affix in the middle, as on the header, with no tooltip text of its own.
+local SPELLS = { { spellID = 111, tooltip = "first affix" }, { spellID = 1307638, tooltip = "" },
+                 { spellID = 222, tooltip = "third affix" } }
+CUR[3103], CUR[3104] = 2, 3
+
+cfg.showDelveLives, cfg.showNemesisGroups = false, false
+local list, count = readDelve("7", LIVES, SPELLS)
+ok(count == 1 and list[1].kind == "text" and list[1].text == "Tier 7", "both counters switched off: the tier alone, as text")
+-- Both ship on (the author, 2026-10-17), so a profile that never touched them draws both.
+cfg.showDelveLives, cfg.showNemesisGroups = nil, nil
+list, count = readDelve("7", LIVES, SPELLS)
+ok(count == 1 and list[1].kind == "delve" and list[1].lives == 4 and list[1].nemAlive == 2,
+   "both unset: both drawn, as they are on by default")
+cfg.showDelveLives, cfg.showNemesisGroups = 1, "yes"
+list, count = readDelve("7", LIVES, SPELLS)
+ok(count == 1 and list[1].kind == "delve" and list[1].lives == 4 and list[1].nemAlive == 2,
+   "only a real false switches either off")
+
+cfg.showDelveLives, cfg.showNemesisGroups = true, false
+list, count = readDelve("7", LIVES, SPELLS)
+local d = list[1]
+ok(count == 1 and d.kind == "delve" and d.text == "Tier 7", "lives on: one row with the tier on it, got " .. tostring(d.kind))
+ok(d.lives == 4 and d.livesIcon == 4410 and d.livesTip == "Total deaths: 1",
+   "the first currency's number, icon and tooltip: " .. tostring(d.lives) .. " " .. tostring(d.livesIcon))
+ok(d.nemAlive == nil and d.nemTotal == nil and d.nemSpell == nil and d.nemIcon == nil and d.nemTip == nil,
+   "and nothing of the nemesis")
+
+cfg.showDelveLives, cfg.showNemesisGroups = false, true
+d = readDelve("7", LIVES, SPELLS)[1]
+ok(d.kind == "delve" and d.lives == nil and d.livesIcon == nil and d.livesTip == nil, "nemesis on: nothing of the lives")
+ok(d.nemAlive == 2 and d.nemTotal == 3, "the groups alive and the total: " .. tostring(d.nemAlive) .. "/" .. tostring(d.nemTotal))
+ok(d.nemSpell == 1307638 and d.nemIcon == 900000 + 1307638, "the affix found by its id, with that spell's own icon")
+ok(d.nemTip == nil, "an affix with no tooltip text leaves the spell's own tooltip to show")
+
+cfg.showDelveLives = true
+d = readDelve("7", LIVES, SPELLS)[1]
+ok(d.lives == 4 and d.nemAlive == 2 and d.nemSpell == 1307638, "both on: both on the one row")
+
+d = readDelve("7", LIVES, { { spellID = 1270179, tooltip = "Nemesis Influence" } })[1]
+ok(d.nemSpell == 1270179 and d.nemIcon == 900000 + 1270179 and d.nemTip == "Nemesis Influence",
+   "the older season's id is found too, with the affix's own tooltip text")
+d = readDelve("7", LIVES, { { spellID = 1270179 }, { spellID = 1307638 } })[1]
+ok(d.nemSpell == 1270179 and d.nemIcon == 900000 + 1270179, "the first listed affix on the header wins")
+
+-- Each affix reading that fails costs the icon and tooltip only, never the count.
+for _, c in ipairs({ { "no spells", nil }, { "a secret list", SECRET },
+                     { "no listed id", { { spellID = 111 }, { spellID = 222 } } },
+                     { "a secret id", { { spellID = SECRET } } }, { "an entry that is not a table", { 1307638 } },
+                     { "an entry that raises when read", { raising() } } }) do
+    local okRead, got = pcall(readDelve, "8", LIVES, c[2])
+    local row = okRead and got[1]
+    ok(row and row.kind == "delve" and row.nemAlive == 2 and row.nemSpell == nil and row.nemIcon == nil
+       and row.nemTip == nil and row.lives == 4, c[1] .. ": the count with no affix icon, the lives drawn")
+end
+local realSpell = C_Spell
+C_Spell = nil
+d = readDelve("8", LIVES, SPELLS)[1]
+ok(d.nemSpell == 1307638 and d.nemIcon == nil and d.nemAlive == 2, "a client with no spell API: the affix found, no icon")
+C_Spell = { GetSpellTexture = function() return SECRET end }
+ok(readDelve("8", LIVES, SPELLS)[1].nemIcon == nil, "a secret icon reads as no icon")
+C_Spell = realSpell
+
+list, count = readDelve("3", LIVES, SPELLS)
+ok(count == 1 and list[1].kind == "text" and list[1].text == "Tier 3", "Tier 3: the tier alone, as text")
+d = readDelve("4", LIVES, SPELLS)[1]
+ok(d.kind == "delve" and d.lives == 4 and d.nemAlive == 2, "Tier 4: the row, both counters on it")
+d = readDelve("10", LIVES, SPELLS)[1]
+ok(d.kind == "delve" and d.text == "Tier 10", "Tier 10: the row, the tier compared as a number")
+ok(select(2, readDelve(nil, LIVES, SPELLS)) == 0, "no tier: nothing at all")
+ok(select(2, readDelve(SECRET, LIVES, SPELLS)) == 0, "a secret tier: nothing at all")
+
+-- Each lives reading that is not a number costs the lives only.
+ok(readDelve("8", { { text = "0", iconFileID = 4410 } }, SPELLS)[1].lives == 0, "no lives left is a 0, drawn")
+for _, c in ipairs({ { "an empty text", { { text = "" } } }, { "a secret text", { { text = SECRET } } },
+                     { "no currencies", nil }, { "a secret list", SECRET }, { "an entry that is not a table", { "4" } },
+                     { "an entry that raises when read", { raising() } } }) do
+    local okRead, got = pcall(readDelve, "8", c[2], SPELLS)
+    local row = okRead and got[1]
+    ok(row and row.kind == "delve" and row.lives == nil and row.livesIcon == nil and row.nemAlive == 2,
+       c[1] .. ": no lives, the nemesis drawn")
+end
+d = readDelve("8", { { text = "5", iconFileID = SECRET, tooltip = SECRET } }, SPELLS)[1]
+ok(d.lives == 5 and d.livesIcon == nil and d.livesTip == nil, "a secret icon or tooltip reads as absent, the number drawn")
+d = readDelve("8", { { text = "5", iconFileID = 4410, tooltip = "" } }, SPELLS)[1]
+ok(d.lives == 5 and d.livesIcon == 4410 and d.livesTip == nil, "an empty tooltip reads as none")
+cfg.showNemesisGroups = false
+list, count = readDelve("8", { { text = "" } }, SPELLS)
+ok(count == 1 and list[1].kind == "text", "lives on but unreadable, nemesis off: the tier as text")
+cfg.showNemesisGroups = true
+
+-- And each nemesis reading that is not a count costs the nemesis only.
+for _, c in ipairs({ { "no total", 2, 0 }, { "no alive count", nil, 3 }, { "no total count", 2, nil },
+                     { "a secret alive count", SECRET, 3 }, { "a secret total", 2, SECRET },
+                     { "a negative count", -1, 3 } }) do
+    CUR[3103], CUR[3104] = c[2], c[3]
+    local okRead, got = pcall(readDelve, "8", LIVES, SPELLS)
+    d = okRead and got[1]
+    ok(d and d.kind == "delve" and d.lives == 4 and d.nemAlive == nil and d.nemTotal == nil and d.nemSpell == nil,
+       c[1] .. ": nothing of the nemesis, the lives drawn, and no raise: " .. tostring(okRead and "" or got))
+end
+CUR[3103], CUR[3104] = 0, 3
+d = readDelve("8", LIVES, SPELLS)[1]
+ok(d.nemAlive == 0 and d.nemTotal == 3 and d.nemSpell == 1307638, "all dead: still drawn, for the check mark")
+CUR[3103], CUR[3104] = 3, 3
+d = readDelve("8", LIVES, SPELLS)[1]
+ok(d.nemAlive == 3 and d.nemTotal == 3, "none dead yet: 3 of 3")
+-- The row draws total minus alive, so the total must be the game's, and a reading above it must reach the
+-- row, which clamps it.
+CUR[3103], CUR[3104] = 1, 4
+d = readDelve("10", LIVES, SPELLS)[1]
+ok(d.nemAlive == 1 and d.nemTotal == 4, "Tier 10's four groups: the total is the game's, not three: " .. tostring(d.nemTotal))
+CUR[3103], CUR[3104] = 5, 3
+d = readDelve("8", LIVES, SPELLS)[1]
+ok(d.nemAlive == 5 and d.nemTotal == 3, "a reading above the total still reaches the row, which clamps it")
+currencyRaises = true
+local okRaise, raised = pcall(readDelve, "8", LIVES, SPELLS)
+d = okRaise and raised[1]
+ok(d and d.lives == 4 and d.nemAlive == nil, "a currency read that raises costs the nemesis only")
+currencyRaises = false
+CUR[3103], CUR[3104] = 2, 3
+
+-- /eqot status names what the header carried, read whatever the switches say, and every affix id.
+cfg.showDelveLives, cfg.showNemesisGroups = nil, nil
+readDelve("7", LIVES, SPELLS)
+local status = W:DebugLine()
+ok(status:find(" | delve tier 7, lives 4, nemesis alive 2/3, spell 1307638 of 111,1307638,222", 1, true),
+   "the status line names the tier, lives, groups alive and affixes: " .. status)
+currencyRaises = true
+status = W:DebugLine()
+ok(status:find(" | delve tier 7, lives 4, nemesis alive read threw/-, spell 1307638", 1, true),
+   "and says so when the groups read raised: " .. status)
+currencyRaises = false
+readDelve("8", { { text = "" } }, { { spellID = 111 }, { spellID = 222 } })
+status = W:DebugLine()
+ok(status:find(" | delve tier 8, lives nil, nemesis alive 2/3, spell nil of 111,222", 1, true),
+   "no lives number and no listed affix read nil, with the ids it did see: " .. status)
+readDelve("8", LIVES, nil)
+status = W:DebugLine()
+ok(status:find(", spell nil of none", 1, true), "and a header with no affixes says none: " .. status)
+scenarioSetID = 4243
 W:Invalidate()
-SETS[240] = { widget(702, "ScenarioHeaderDelves", {
-    orderIndex = 0, shownState = 1, tierText = "7", headerText = "Shadowguard Point",
-}) }
-out, n = W:Read(240)
-ok(n == 1 and out[1].text == "Tier 7", "the delve tier draws, got: " .. tostring(out[1].text))
+status = W:DebugLine()
+ok(not status:find("delve", 1, true), "a new scenario clears it: " .. status)
+scenarioSetID = 777
+W:Invalidate()
+W:ScenarioSetID()
+cfg.showDelveLives, cfg.showNemesisGroups = nil, nil
 
 -- A secret value types as a string and throws when matched, so it has to read as absent
 W:Invalidate()
@@ -451,10 +636,155 @@ ok(reread[1] and reread[1].text == "moved again",
 
 cfg.showTrackerWidgets = nil
 
+-- The nemesis counts are currencies, so only their own event says they moved. A kill reports 0 and
+-- then the real count, up to a second apart, which would flash the all-dead check. From the first
+-- report the row keeps the count it had, each report restarts a one-second wait (the figure two
+-- other trackers wait for the same reason), and when the reports stop the snapshot drops and the
+-- tracker repaints once.
+ok(handlers.CURRENCY_DISPLAY_UPDATE ~= nil, "the currency event is subscribed where the delve widget exists")
+local repaints = 0
+W:OnDirty(function() repaints = repaints + 1 end)
+local function currencyEvent(id)
+    local sent, err = pcall(handlers.CURRENCY_DISPLAY_UPDATE, "CURRENCY_DISPLAY_UPDATE", id, 1, 1)
+    ok(sent, "the currency handler does not raise: " .. tostring(err))
+end
+local function nemesisOf(entries, size)
+    for i = 1, size do
+        if entries[i].kind == "delve" then return entries[i].nemAlive, entries[i].nemTotal end
+    end
+end
+local function readNem()
+    W:TrackerSetID(); W:ScenarioSetID()
+    return nemesisOf(W:Read(240))
+end
+local function clearTimers() for i = #timers, 1, -1 do timers[i] = nil end end
+-- Ends wait i (the latest when left out), failing rather than raising when none was started.
+local function endWait(i)
+    local t = timers[i or #timers]
+    ok(t ~= nil, "a wait was started to end, " .. #timers .. " running")
+    if t then t.fn() end
+end
+
+cfg.showNemesisGroups = true
+CUR[3103], CUR[3104] = 3, 3
+SETS[240] = { delve(702, "8", LIVES, SPELLS) }
+W:Invalidate()
+ok(readNem() == 3, "three groups alive before any kill")
+
+clearTimers()
+repaints = 0
+CUR[3103] = 0
+currencyEvent(3103)
+ok(#timers == 1 and timers[1].delay == 1 and not timers[1].cancelled, "the first report starts a one-second wait")
+W:Invalidate()
+local alive, total = readNem()
+ok(alive == 3 and total == 3, "a read while the reports come in keeps the count it had, not the 0: " .. tostring(alive))
+ok(W:DebugLine():find("nemesis alive 0/3 held", 1, true), "and the status line says it is held: " .. W:DebugLine())
+ok(repaints == 0, "nothing repaints yet")
+
+CUR[3103] = 2
+currencyEvent(3103)
+ok(#timers == 2 and timers[1].cancelled and not timers[2].cancelled and timers[2].delay == 1,
+   "the next report cancels the wait and starts another")
+W:Invalidate()
+ok(readNem() == 3, "still held")
+local calls = apiCalls
+endWait(2)
+ok(repaints == 1, "when the reports stop the tracker repaints once, got " .. repaints)
+alive = readNem()
+ok(apiCalls > calls, "the snapshot was dropped, so that read went back to the client")
+ok(alive == 2, "and the row shows the real count: " .. tostring(alive))
+ok(not W:DebugLine():find(" held", 1, true), "no longer held")
+
+CUR[3103] = 0
+currencyEvent(3103)
+endWait()
+ok(readNem() == 0, "a 0 that stands past the wait is all dead")
+
+-- The total's own report holds too.
+CUR[3103], CUR[3104] = 2, 3
+currencyEvent(3104)
+endWait()
+ok(readNem() == 2, "settled at 2 of 3")
+clearTimers()
+CUR[3103] = 0
+currencyEvent(3104)
+ok(#timers == 1, "currency 3104 starts the wait as well")
+W:Invalidate()
+ok(readNem() == 2, "and holds the count")
+endWait(1)
+-- The hold keeps the total with the count, so a total reporting 0 in the wait cannot reach the row.
+CUR[3103], CUR[3104] = 2, 3
+W:Invalidate()
+ok(readNem() == 2, "settled at 2 of 3 again")
+clearTimers()
+CUR[3103], CUR[3104] = 0, 0
+currencyEvent(3104)
+W:Invalidate()
+local heldA, heldT = readNem()
+ok(heldA == 2 and heldT == 3, "a total that reports 0 in the wait is held as well: " .. tostring(heldA) .. "/" .. tostring(heldT))
+CUR[3104] = 3
+endWait(1)
+CUR[3103], CUR[3104] = 1, 4
+W:Invalidate()
+heldA, heldT = readNem()
+ok(heldA == 1 and heldT == 4, "a fresh read takes the new total: " .. tostring(heldT))
+clearTimers()
+currencyEvent(3103)
+W:Invalidate()
+heldA, heldT = readNem()
+ok(heldA == 1 and heldT == 4, "and the hold serves the last read's total, not an older one: " .. tostring(heldT))
+endWait(1)
+CUR[3104] = 3
+
+-- Any other currency starts nothing and holds nothing.
+for _, id in ipairs({ 3102, 3105, 1, SECRET, "3103" }) do
+    clearTimers()
+    CUR[3103] = 1
+    currencyEvent(id)
+    W:Invalidate()
+    ok(#timers == 0 and readNem() == 1, "currency " .. tostring(id) .. " starts no wait and holds nothing")
+end
+clearTimers()
+currencyEvent(nil)
+ok(#timers == 0, "an event with no currency id starts no wait")
+
+-- The wait always drops the snapshot, and repaints only while the count can draw.
+for _, c in ipairs({ { "with the nemesis count off", false, nil, 0 }, { "with it unset, so on", nil, nil, 1 },
+                     { "with it set to a non-false value", 1, nil, 1 },
+                     { "with the widgets box off", true, false, 0 } }) do
+    cfg.showNemesisGroups, cfg.showTrackerWidgets = c[2], c[3]
+    clearTimers()
+    currencyEvent(3103)
+    W:Read(240)
+    calls = apiCalls
+    repaints = 0
+    endWait(1)
+    ok(repaints == c[4], c[1] .. ", the wait ends with " .. c[4] .. " repaint(s), got " .. repaints)
+    W:Read(240)
+    ok(apiCalls > calls, c[1] .. ", the snapshot drops")
+end
+cfg.showNemesisGroups, cfg.showTrackerWidgets = true, nil
+
+-- A new delve drops the held count, so a hold cannot carry one run's count into the next.
+CUR[3103] = 2
+W:Invalidate()
+ok(readNem() == 2, "two alive")
+clearTimers()
+currencyEvent(3103)
+CUR[3103] = 1
+scenarioSetID = 4244
+W:Invalidate()
+ok(readNem() == 1, "a new scenario reads the count afresh while the wait still runs")
+scenarioSetID = 777
+W:Invalidate()
+endWait(1)
+cfg.showNemesisGroups, cfg.showTrackerWidgets = nil, nil
+
 -- Fail OPEN before anything has resolved a set id, which is the state at login: the filter may
 -- only ever remove work, never introduce a case where a real change is missed.
 local fresh = {}
-local nsFresh = { L = ns.L }
+local nsFresh = { L = ns.L, Has = {} }
 function nsFresh:RegisterModule(name, t) fresh[name] = t return t end
 function nsFresh:GetModule(name) return fresh[name] end
 local h2, d2 = {}, 0
@@ -467,6 +797,8 @@ assert(loadfile(repoFile("Data/Widgets.lua")))("EQObjectiveTracker", nsFresh)
 fresh.Widgets:OnEnable()
 h2.UPDATE_UI_WIDGET("UPDATE_UI_WIDGET", { widgetSetID = 424242 })
 ok(d2 == 1, "before any set id is resolved, an unknown set is let through rather than dropped")
+ok(h2.CURRENCY_DISPLAY_UPDATE == nil, "a client with no delve widget never subscribes the currency event")
+ok(h2.UPDATE_UI_WIDGET ~= nil, "while it still subscribes the widget events")
 
 print(string.format("test_widgets: %d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

@@ -110,15 +110,20 @@ end
 
 -- o.order is the tracker's section order, o.known the sections the TOC loaded, o.tags the
 -- provider tags, o.cfg the saved settings, o.gen the general ones, o.has the client's
--- capabilities (retail's by default).
+-- capabilities (retail's by default), o.forever a WoW Forever client.
 local function trackerTab(o)
     o = o or {}
-    local st = { cfg = o.cfg or { filters = {} }, gen = o.gen or {}, render = 0, invalidate = 0, icons = 0, played = {}, moves = {},
+    local st = { cfg = o.cfg or { filters = {} }, gen = o.gen or {}, render = 0, invalidate = 0, widgetReads = 0,
+                 icons = 0, played = {}, moves = {},
                  hidden = {}, tipHides = 0, arrows = {}, dims = {}, measured = {}, wqPositions = {},
                  order = o.order or { "campaign", "quests", "achievements" } }
     local modules = {}
     local ns = {
-        Has = o.has or { SuperTrack = true, ChallengeTimer = true },
+        Has = o.has or { SuperTrack = true, ChallengeTimer = true, DelveHeader = true },
+        IsForever = function(...)
+            assert(select("#", ...) == 0, "IsForever is a plain function, called with no self")
+            return o.forever == true
+        end,
         L = setmetatable({}, { __index = function(_, k) return K(k) end }),
         -- One tooltip for the whole tab, as Core/Util.lua's shared one is, recording each hover.
         Util = { Tooltip = function()
@@ -175,6 +180,10 @@ local function trackerTab(o)
         end,
     }
     modules.Row = { Invalidate = function() st.invalidate = st.invalidate + 1 end }
+    modules.Widgets = { Invalidate = function()
+        st.widgetReads = st.widgetReads + 1
+        st.seq[#st.seq + 1] = "widgets"
+    end }
     modules.Media = {
         Play = function(_, v) st.played[#st.played + 1] = v end,
         GetSoundList = function() return { "None", "Bell" }, { None = "NONE", Bell = "bell" } end,
@@ -224,16 +233,16 @@ local function trackerTab(o)
         end
     end
 
-    local ui = { boxes = {}, dropdowns = {}, cards = {}, sliders = {}, radios = {} }
+    local ui = { boxes = {}, dropdowns = {}, cards = {}, cardOrder = {}, sliders = {}, radios = {} }
     -- The library appends each of these controls to its parent's _controls, which only the tab's
     -- content carries (Libs/EverythingUI/Controls.lua), so one built on a card or on nothing
     -- raises here as it does in game.
     local function adopt(parent, f)
         parent._controls[#parent._controls + 1] = f
     end
-    function ui:CreateGroup(_, label)
+    function ui:CreateGroup(parent, label)
         local card = frame()
-        card.title, card.rows, card.label = label, {}, frame()
+        card.title, card.rows, card.label, card.parent = label, {}, frame(), parent
         card.Add = function(c, control, opts)
             c.rows[#c.rows + 1] = control
             control.dependent = opts and opts.dependent and true or false
@@ -248,6 +257,7 @@ local function trackerTab(o)
         card.layouts = 0
         card.Layout = function(c) c.layouts = c.layouts + 1 end
         ui.cards[label] = card
+        ui.cardOrder[#ui.cardOrder + 1] = card
         return card
     end
     function ui:CreateCheckbox(parent, label, getter, setter, tooltip)
@@ -804,13 +814,13 @@ case("Keep section headers in view re-anchors the list, then redraws", function(
        "unticked, the same two calls in the same order")
     ok(not box.getter(), "and reads back off")
 
-    local rows, at, countAt = st.ui.cards[K"Options"].rows, nil, nil
+    local rows, at, countAt = st.ui.cards[K"Headers and Buttons"].rows, nil, nil
     for i, r in ipairs(rows) do
         if r == box then at = i end
         if r == st.ui.boxes[K"Show the visible / total count on section headers"] then countAt = i end
     end
     ok(at ~= nil and countAt ~= nil and at == countAt + 1,
-       "sits on the Options card straight under the header count box: " .. tostring(at) .. ", " .. tostring(countAt))
+       "sits on the Headers and Buttons card straight under the header count box: " .. tostring(at) .. ", " .. tostring(countAt))
     ok(box.dependent == false, "and is not indented under it")
 end)
 
@@ -831,7 +841,7 @@ local TRACKER_KEYS = { "showOnlyWatched", "simplifyMode", "splitQuestClick", "cl
                        "showFilterButton", "trackerAlphaFocus",
                        "trackerAlphaHover", "showLevelInTracker", "showZoneTag", "showObjectiveNumbers",
                        "showTrackerWidgets", "showMythicPlusTimer", "showQuestID", "showItemButtons",
-                       "showRecentlyAddedTag" }
+                       "showRecentlyAddedTag", "showDelveLives", "showNemesisGroups" }
 local GENERAL_KEYS = { "autoTrackAccepted", "restoreSuperTrackOnLogin", "useBlizzardTracker" }
 local function allSet(v, own, ownV)
     local cfg, gen = { filters = {} }, {}
@@ -851,11 +861,11 @@ case("the two focus boxes sit under Split quest click, where the client has supe
     if not (unfocus and accept) then return end
     -- Built on anything but the tab's content, either one raises in trackerTab, as in game.
     local at = {}
-    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    for i, r in ipairs(st.ui.cards[K"Clicking and Focus"].rows) do at[r] = i end
     local splitBox = st.ui.boxes[K"Split quest click"]
     local split = at[splitBox]
     ok(split ~= nil and at[unfocus] == split + 1 and at[accept] == split + 2,
-       "on the Options card straight under Split quest click, in that order: "
+       "on the Clicking and Focus card straight under Split quest click, in that order: "
        .. tostring(split) .. ", " .. tostring(at[unfocus]) .. ", " .. tostring(at[accept]))
     ok(unfocus.dependent == false and accept.dependent == false, "and neither is indented under it")
     ok(unfocus.fill == false and accept.fill == false, "and neither is added full width")
@@ -936,11 +946,16 @@ case("the Mythic+ timer box sits under the widgets box, where the client can run
     ok(box ~= nil, "built on retail")
     if not box then return end
     local at = {}
-    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    for i, r in ipairs(st.ui.cards[K"Scenarios and Popups"].rows) do at[r] = i end
     local widgets = at[st.ui.boxes[K"Show event and scenario widgets"]]
-    ok(widgets ~= nil and at[box] == widgets + 1, "on the Options card straight under the widgets box: "
+    ok(widgets ~= nil and at[box] == widgets + 3, "on the Scenarios and Popups card under the widgets box and its two delve boxes: "
        .. tostring(widgets) .. ", " .. tostring(at[box]))
-    ok(at[st.ui.boxes[K"Show quest ID"]] == at[box] + 1, "and above Show quest ID")
+    local noDelves = trackerTab({ has = { SuperTrack = true, ChallengeTimer = true, DelveHeader = false } })
+    local nat = {}
+    for i, r in ipairs(noDelves.ui.cards[K"Scenarios and Popups"].rows) do nat[r] = i end
+    ok(nat[noDelves.ui.boxes[K"Show the Mythic+ timer"]] == nat[noDelves.ui.boxes[K"Show event and scenario widgets"]] + 1,
+       "and straight under the widgets box where there are no delves")
+    ok(at[st.ui.boxes[K"Show Quest Discovered popups"]] == at[box] + 1, "and above Show Quest Discovered popups")
     ok(box.dependent == false and box.fill == false, "neither indented nor full width")
     ok(box.tipTitle == K"Show the Mythic+ timer", "its tooltip is titled as the box: " .. tostring(box.tipTitle))
     ok(box.tipBody == K"During a Mythic+ run, draws the keystone level, the affixes, the time left with the +2 and +3 times, and the deaths in place of the stage banner. This tracker replaces the default one, so without this they are not shown anywhere.",
@@ -955,6 +970,77 @@ case("the Mythic+ timer box sits under the widgets box, where the client can run
     local classic = trackerTab({ has = { SuperTrack = false, ChallengeTimer = true }, scenarios = false })
     ok(classic.ui.boxes[K"Show the Mythic+ timer"] == nil, "not built with no scenario provider to draw a key")
     ok(classic.ui.boxes[K"Show event and scenario widgets"] ~= nil, "while the widgets box still is")
+end)
+
+-- Both draw under the delve's tier, a widget line, so they hang off the widgets box. Retail only:
+-- Blizzard's API docs list the delve call for Era and TBC too, whose TOCs load no scenario provider,
+-- and Forever has the call but no delves.
+local DELVE_BOXES = {
+    { "Show delve lives", "showDelveLives",
+      "In a delve of Tier 4 or higher, shows the lives left beside the delve's tier. The number turns orange at 2 lives and red at 1." },
+    { "Show nemesis groups", "showNemesisGroups",
+      "In a delve with a Nemesis Strongbox, shows beside the delve's tier how many groups of the nemesis's minions have been killed, and a check mark once all of them are dead. Hover the icon for the game's own description." },
+}
+case("the two delve boxes hang under the widgets box, on by default, on retail only", function()
+    local st = trackerTab()
+    local widgetBox = st.ui.boxes[K"Show event and scenario widgets"]
+    local at = {}
+    for i, r in ipairs(st.ui.cards[K"Scenarios and Popups"].rows) do at[r] = i end
+    for i, d in ipairs(DELVE_BOXES) do
+        local box = st.ui.boxes[K(d[1])]
+        ok(box ~= nil, d[1] .. ": built on retail")
+        if box then
+            ok(at[box] == at[widgetBox] + i, d[1] .. ": row " .. i .. " under the widgets box: " .. tostring(at[box]))
+            ok(box.dependent == true and box.fill == false, d[1] .. ": indented under it, not full width")
+            ok(box.tooltip == K(d[3]), d[1] .. ": its own tooltip: " .. tostring(box.tooltip))
+            -- Both ship on (the author, 2026-10-17), and the unset reading has to match what ships.
+            ok(shippedDefaults()[d[2]] == true, d[1] .. ": Core/DB.lua ships " .. d[2] .. " on")
+            ok(box.getter() == true, d[1] .. ": on while unset")
+            local inv, reads, ren = st.invalidate, st.widgetReads, st.render
+            st.seq = {}
+            setOnly(st, box, false, d[2])
+            ok(st.cfg[d[2]] == false and box.getter() == false, d[1] .. ": unticked, stores off and reads back off")
+            ok(table.concat(st.seq, ",") == "widgets,render",
+               d[1] .. ": the widget read is dropped, then the tracker redrawn: " .. table.concat(st.seq, ","))
+            ok(st.widgetReads == reads + 1 and st.render == ren + 1 and st.invalidate == inv,
+               d[1] .. ": once each, and the rows are not invalidated")
+            setOnly(st, box, true, d[2])
+            ok(st.cfg[d[2]] == true and box.getter() == true, d[1] .. ": ticked, stores on and reads back on")
+            for _, v in ipairs({ true, false }) do
+                ok(allSet(v, d[2], nil).ui.boxes[K(d[1])].getter() == true,
+                   d[1] .. ": reads on while unset, beside neighbors all " .. tostring(v))
+                ok(allSet(v, d[2], false).ui.boxes[K(d[1])].getter() == false,
+                   d[1] .. ": reads its own saved off, beside neighbors all " .. tostring(v))
+            end
+        end
+    end
+    local lives, nemesis = st.ui.boxes[K"Show delve lives"], st.ui.boxes[K"Show nemesis groups"]
+    ok(st.dims[lives] == true and st.dims[nemesis] == true, "lit while the widgets box is on")
+    widgetBox.setter(false)
+    ok(st.dims[lives] == false and st.dims[nemesis] == false, "dimmed once it is unticked")
+    widgetBox.setter(true)
+    ok(st.dims[lives] == true and st.dims[nemesis] == true, "and lit again once it is ticked")
+    ok(st.dims[widgetBox] == nil, "while the widgets box itself is never dimmed")
+    local off = trackerTab({ cfg = { filters = {}, showTrackerWidgets = false } })
+    ok(off.dims[off.ui.boxes[K"Show delve lives"]] == false and off.dims[off.ui.boxes[K"Show nemesis groups"]] == false,
+       "a tab built with the widgets box off starts them dimmed")
+    st.cfg.showTrackerWidgets = false
+    st.spec.refresh(st.ui, st.content)
+    ok(st.dims[lives] == false and st.dims[nemesis] == false, "and a refresh picks up a change made elsewhere")
+
+    for _, c in ipairs({ { "Classic", { has = { SuperTrack = false, ChallengeTimer = false } } },
+                         { "Era and TBC, with the delve call but no scenario provider",
+                           { has = { SuperTrack = false, ChallengeTimer = false, DelveHeader = true }, scenarios = false } },
+                         { "a retail client whose scenario provider is missing",
+                           { has = { SuperTrack = true, ChallengeTimer = true, DelveHeader = true }, scenarios = false } },
+                         { "a client with no delve widget", { has = { SuperTrack = true, ChallengeTimer = true, DelveHeader = false } } },
+                         { "WoW Forever", { forever = true } } }) do
+        local t = trackerTab(c[2])
+        ok(t.ui.boxes[K"Show delve lives"] == nil and t.ui.boxes[K"Show nemesis groups"] == nil, c[1] .. ": neither is built")
+        ok(t.ui.boxes[K"Show event and scenario widgets"] ~= nil, c[1] .. ": the widgets box still is")
+    end
+    ok(trackerTab({ forever = true }).ui.boxes[K"Show the Mythic+ timer"] ~= nil,
+       "Forever still gets the Mythic+ box, which is not a delve's")
 end)
 
 -- None changes a drawn row's look outside the text Row's repaint gate compares, so a redraw is enough.
@@ -1035,9 +1121,9 @@ case("the sort button box sits under the cogwheel's, reads off while unset, and 
     ok(box ~= nil, "the box is built")
     if not box then return end
     local at = {}
-    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    for i, r in ipairs(st.ui.cards[K"Headers and Buttons"].rows) do at[r] = i end
     local cog = at[st.ui.boxes[K"Show the options cogwheel on the tracker"]]
-    ok(cog ~= nil and at[box] == cog + 1, "on the Options card straight under the cogwheel box: "
+    ok(cog ~= nil and at[box] == cog + 1, "on the Headers and Buttons card straight under the cogwheel box: "
        .. tostring(cog) .. ", " .. tostring(at[box]))
     ok(box.dependent == false and box.fill == false, "neither indented nor full width")
     ok(box.tooltip == K"A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default.",
@@ -1234,9 +1320,9 @@ case("the filter button box sits under the sort button's, reads off while unset,
     ok(box ~= nil, "the box is built")
     if not box then return end
     local at = {}
-    for i, r in ipairs(st.ui.cards[K"Options"].rows) do at[r] = i end
+    for i, r in ipairs(st.ui.cards[K"Headers and Buttons"].rows) do at[r] = i end
     local sortBox = at[st.ui.boxes[K"Show the sort button on the tracker"]]
-    ok(sortBox ~= nil and at[box] == sortBox + 1, "on the Options card straight under the sort button box: "
+    ok(sortBox ~= nil and at[box] == sortBox + 1, "on the Headers and Buttons card straight under the sort button box: "
        .. tostring(sortBox) .. ", " .. tostring(at[box]))
     ok(box.dependent == false and box.fill == false, "neither indented nor full width")
     ok(box.tooltip == K"A small funnel at the top-left of the tracker that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default.",
@@ -1278,6 +1364,86 @@ case("the tracker's sort button offers the dropdown's own list, and a view follo
     st.spec.refresh(st.ui, st.content)
     ok(hint.shown == false, "and hides it again for any other order")
     ok(sort.getter() == "distance", "while the dropdown reads the order stored")
+end)
+
+-- The author's split of the old Options card (2026-10-16): five cards in its place, each keeping the
+-- order its controls had there, with the four cards above it left as they were.
+local CARD_TITLES = { "On-Screen Tracker", "Filters", "Tracker Visibility", "Section Order",
+                      "Quest Row Details", "Headers and Buttons", "Clicking and Focus",
+                      "Scenarios and Popups", "Sounds" }
+local CARD_ROWS = {
+    ["Quest Row Details"] = { "Show quest level prefix", "Show zone label under quest titles",
+                              "Show objective progress numbers", "Show quest ID",
+                              "Show usable quest item buttons", "Show NEW tag on recently accepted quests" },
+    ["Headers and Buttons"] = { "Show the visible / total count on section headers",
+                                "Keep section headers in view while scrolling",
+                                "Show the options cogwheel on the tracker", "Show the sort button on the tracker",
+                                "Show the filter button on the tracker" },
+    ["Clicking and Focus"] = { "Split quest click", "Click a focused quest to unfocus it", "Focus newly accepted quests" },
+    ["Scenarios and Popups"] = { "Show event and scenario widgets", "Show delve lives", "Show nemesis groups",
+                                 "Show the Mythic+ timer", "Show Quest Discovered popups" },
+    ["Sounds"] = { "Quest Sound", "Quest Complete Sound", "Play a sound when you accept a quest",
+                   "Quest Accepted Sound", "Play a sound when you turn a quest in", "Quest Turned In Sound" },
+}
+local INDENTED = { ["Quest Complete Sound"] = true, ["Quest Accepted Sound"] = true, ["Quest Turned In Sound"] = true,
+                   ["Show delve lives"] = true, ["Show nemesis groups"] = true }
+
+local function cardLabels(card)
+    local out = {}
+    for i, r in ipairs(card and card.rows or {}) do out[i] = tostring(r.label) end
+    return table.concat(out, " | ")
+end
+local function marked(list, drop)
+    local out = {}
+    for _, s in ipairs(list) do if not (drop and drop[s]) then out[#out + 1] = K(s) end end
+    return table.concat(out, " | ")
+end
+
+local function checkCards(st, flavor, drop)
+    local got = {}
+    for i, c in ipairs(st.ui.cardOrder) do got[i] = tostring(c.title) end
+    ok(table.concat(got, " | ") == marked(CARD_TITLES), flavor .. ": the nine cards in order: " .. table.concat(got, " | "))
+    ok(st.ui.cards[K"Options"] == nil, flavor .. ": no Options card is left")
+    for _, c in ipairs(st.ui.cardOrder) do
+        ok(c.parent == st.content, flavor .. ": " .. tostring(c.title) .. " is built on the tab's content")
+    end
+    local gap = st.ui:Spacing("groupGap")
+    local seen, total = {}, 0
+    for i = 5, #CARD_TITLES do
+        local name = CARD_TITLES[i]
+        local card, prev = st.ui.cards[K(name)], st.ui.cards[K(CARD_TITLES[i - 1])]
+        ok(card ~= nil, flavor .. ": " .. name .. " is built")
+        if card then
+            local p = card.points or {}
+            ok(#p == 2 and p[1][1] == "TOPLEFT" and p[1][2] == prev and p[1][3] == "BOTTOMLEFT"
+               and p[1][4] == 0 and p[1][5] == -gap
+               and p[2][1] == "TOPRIGHT" and p[2][2] == prev and p[2][3] == "BOTTOMRIGHT"
+               and p[2][4] == 0 and p[2][5] == -gap,
+               flavor .. ": " .. name .. " hangs one gap under " .. CARD_TITLES[i - 1])
+            ok(cardLabels(card) == marked(CARD_ROWS[name], drop),
+               flavor .. ": " .. name .. " holds its rows in order: " .. cardLabels(card))
+            for _, r in ipairs(card.rows) do
+                local label = tostring(r.label):sub(2, -2)
+                ok(r.dependent == (INDENTED[label] == true) and r.fill == false,
+                   flavor .. ": " .. label .. " is indented only if it is a sound picker or a delve box, and never full width")
+                ok(not seen[r], flavor .. ": " .. label .. " is added to one card only")
+                seen[r] = true
+                total = total + 1
+            end
+        end
+    end
+    return total
+end
+
+case("the old Options card is five cards, each with its own rows, under Section Order", function()
+    local retail = checkCards(trackerTab(), "retail")
+    ok(retail == 25, "retail: 25 controls across the five cards: " .. retail)
+    local classic = trackerTab({ has = { SuperTrack = false, ChallengeTimer = false }, scenarios = false, tags = {} })
+    local n = checkCards(classic, "Classic", { ["Click a focused quest to unfocus it"] = true,
+                                               ["Focus newly accepted quests"] = true,
+                                               ["Show the Mythic+ timer"] = true,
+                                               ["Show delve lives"] = true, ["Show nemesis groups"] = true })
+    ok(n == 20, "Classic: the five retail-only boxes are the only ones missing: " .. n)
 end)
 
 print(("test_tracker_tab: %d passed, %d failed"):format(pass, fail))

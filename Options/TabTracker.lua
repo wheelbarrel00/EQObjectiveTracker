@@ -453,18 +453,18 @@ Options:RegisterTab({
         -- Read again on each visit too, since the zone bar is docked from the Appearance tab.
         content._renderOrderRows = renderOrderRows
 
-        local display = self:CreateGroup(content, L["Options"])
-        display:SetPoint("TOPLEFT", order, "BOTTOMLEFT", 0, -gap)
-        display:SetPoint("TOPRIGHT", order, "BOTTOMRIGHT", 0, -gap)
+        local questRows = self:CreateGroup(content, L["Quest Row Details"])
+        questRows:SetPoint("TOPLEFT", order, "BOTTOMLEFT", 0, -gap)
+        questRows:SetPoint("TOPRIGHT", order, "BOTTOMRIGHT", 0, -gap)
 
         local lvl = self:CreateCheckbox(content, L["Show quest level prefix"],
             rowSetting("showLevelInTracker"))
-        display:Add(lvl)
+        questRows:Add(lvl)
         self:AttachTooltip(lvl, L["Show quest level prefix"], L["For example, [60] Title."])
 
         local zoneCheck = self:CreateCheckbox(content, L["Show zone label under quest titles"],
             rowSetting("showZoneTag"))
-        display:Add(zoneCheck)
+        questRows:Add(zoneCheck)
         self:AttachTooltip(zoneCheck, L["Show zone label under quest titles"],
             L["Adds the quest log heading each quest came from as a small line under its title. While Show zone headers is on, on the Appearance tab, only quests in the Dungeons header show it."])
         -- Its masters are on another tab, so its dimming is set again each time this tab is shown.
@@ -473,43 +473,46 @@ Options:RegisterTab({
 
         local objCheck = self:CreateCheckbox(content, L["Show objective progress numbers"],
             rowSetting("showObjectiveNumbers", true))
-        display:Add(objCheck)
+        questRows:Add(objCheck)
         self:AttachTooltip(objCheck, L["Show objective progress numbers"],
             L["For example, 0/4, 1/1, etc."])
 
         -- Show progress bars moved to the Appearance tab's Progress Bars group, so the switch
         -- that turns the bars on is not two tabs away from the controls that style them. Same
         -- move the zone progress bar's own toggles made, for the same reason.
-        local widgetCheck = self:CreateCheckbox(content, L["Show event and scenario widgets"],
-            rowSetting("showTrackerWidgets", true))
-        display:Add(widgetCheck)
-        self:AttachTooltip(widgetCheck, L["Show event and scenario widgets"],
-            L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."])
-
-        -- Only the scenario provider reads a key, and the Classic TOCs do not load it
-        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then
-            local mplusCheck = self:CreateCheckbox(content, L["Show the Mythic+ timer"],
-                rowSetting("showMythicPlusTimer", true))
-            display:Add(mplusCheck)
-            self:AttachTooltip(mplusCheck, L["Show the Mythic+ timer"],
-                L["During a Mythic+ run, draws the keystone level, the affixes, the time left with the +2 and +3 times, and the deaths in place of the stage banner. This tracker replaces the default one, so without this they are not shown anywhere."])
-        end
 
         local qidCheck = self:CreateCheckbox(content, L["Show quest ID"],
             rowSetting("showQuestID"))
-        display:Add(qidCheck)
+        questRows:Add(qidCheck)
         self:AttachTooltip(qidCheck, L["Show quest ID"], L["Useful for bug reports."])
+
+        local itemBtnCheck = self:CreateCheckbox(content, L["Show usable quest item buttons"],
+            rowSetting("showItemButtons", true))
+        questRows:Add(itemBtnCheck)
+        self:AttachTooltip(itemBtnCheck, L["Show usable quest item buttons"],
+            L["Puts a button on the tracker row of any quest that carries a usable item, so you can use it without opening your bags."])
+
+        local newTagCheck = self:CreateCheckbox(content,
+            L["Show NEW tag on recently accepted quests"],
+            rowSetting("showRecentlyAddedTag", true))
+        questRows:Add(newTagCheck)
+        self:AttachTooltip(newTagCheck, L["Show NEW tag on recently accepted quests"],
+            L["For about an hour after accepting."])
+
+        local headers = self:CreateGroup(content, L["Headers and Buttons"])
+        headers:SetPoint("TOPLEFT", questRows, "BOTTOMLEFT", 0, -gap)
+        headers:SetPoint("TOPRIGHT", questRows, "BOTTOMRIGHT", 0, -gap)
 
         -- UI/Tracker.lua reads showQuestTotal for every ordinary section and for the pinned
         -- world quest region, not just Quests and Campaign, and UI/ZoneHeaders.lua for every zone
         -- header. The pair drawn is visible/total rather than tracked/total.
-        display:Add(self:CreateCheckbox(content,
+        headers:Add(self:CreateCheckbox(content,
             L["Show the visible / total count on section headers"],
             function() return DB().showQuestTotal ~= false end,
             function(v) DB().showQuestTotal = v; render() end,
             L["For example, 3/9. Applies to every section header and zone header."]))
 
-        display:Add(self:CreateCheckbox(content, L["Keep section headers in view while scrolling"],
+        headers:Add(self:CreateCheckbox(content, L["Keep section headers in view while scrolling"],
             function() return DB().stickySectionHeaders ~= false end,
             function(v)
                 DB().stickySectionHeaders = v
@@ -518,15 +521,9 @@ Options:RegisterTab({
             end,
             L["The header of the section you are scrolled into stays at the top of the quest list, so you can always see which section you are in. With zone headers on, the header of the zone you are scrolled into stays just under it. On by default."]))
 
-        local itemBtnCheck = self:CreateCheckbox(content, L["Show usable quest item buttons"],
-            rowSetting("showItemButtons", true))
-        display:Add(itemBtnCheck)
-        self:AttachTooltip(itemBtnCheck, L["Show usable quest item buttons"],
-            L["Puts a button on the tracker row of any quest that carries a usable item, so you can use it without opening your bags."])
-
         -- Named after the cogwheel itself: as "Options icon" two players, the author among them,
         -- went looking for a way to hide it and never found this box.
-        display:Add(self:CreateCheckbox(content, L["Show the options cogwheel on the tracker"],
+        headers:Add(self:CreateCheckbox(content, L["Show the options cogwheel on the tracker"],
             function() return DB().showOptionsIcon ~= false end,
             function(v)
                 DB().showOptionsIcon = v
@@ -534,7 +531,7 @@ Options:RegisterTab({
             end,
             L["A small cogwheel at the top-right of the tracker that opens the options panel."]))
 
-        display:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],
+        headers:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],
             function() return DB().showSortButton == true end,
             function(v)
                 DB().showSortButton = v
@@ -542,45 +539,98 @@ Options:RegisterTab({
             end,
             L["A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default."]))
 
-        display:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],
+        headers:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],
             function() return DB().showFilterButton == true end,
             function(v)
                 DB().showFilterButton = v
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
             L["A small funnel at the top-left of the tracker that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default."]))
+        -- EQ's Show Chain Guide icon is deliberately not ported: it opens EQ's Chain Guide, which
+        -- EQOT does not have.
 
-        -- EQ has Show Chain Guide icon after this one. Deliberately not ported: it opens
-        -- EQ's Chain Guide, which EQOT does not have.
-        display:Add(self:CreateCheckbox(content, L["Show Quest Discovered popups"],
-            function() return DB().showQuestPopups ~= false end,
-            function(v) DB().showQuestPopups = v; render() end,
-            L["Boxes for newly discovered / completed quests."]))
-
-        local newTagCheck = self:CreateCheckbox(content,
-            L["Show NEW tag on recently accepted quests"],
-            rowSetting("showRecentlyAddedTag", true))
-        display:Add(newTagCheck)
-        self:AttachTooltip(newTagCheck, L["Show NEW tag on recently accepted quests"],
-            L["For about an hour after accepting."])
+        local clicking = self:CreateGroup(content, L["Clicking and Focus"])
+        clicking:SetPoint("TOPLEFT", headers, "BOTTOMLEFT", 0, -gap)
+        clicking:SetPoint("TOPRIGHT", headers, "BOTTOMRIGHT", 0, -gap)
 
         local splitCheck = self:CreateCheckbox(content, L["Split quest click"],
             trackerSetting("splitQuestClick"))
-        display:Add(splitCheck)
+        clicking:Add(splitCheck)
         self:AttachTooltip(splitCheck, L["Split quest click"],
             L["Click the icon to focus, click the title to open the quest log."])
 
         -- Classic already toggles its focus on every click, and its game never focuses a quest on its own.
         if ns.Has.SuperTrack then
-            display:Add(self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],
+            clicking:Add(self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],
                 function() return DB().clickToUnfocus == true end,
                 function(v) DB().clickToUnfocus = v end,
                 L["Click the focused quest again to unfocus it. With Split quest click on, click its icon."]))
-            display:Add(self:CreateCheckbox(content, L["Focus newly accepted quests"],
+            clicking:Add(self:CreateCheckbox(content, L["Focus newly accepted quests"],
                 function() return DB().focusAcceptedQuests ~= false end,
                 function(v) DB().focusAcceptedQuests = v end,
                 L["While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused."]))
         end
+
+        local scenarios = self:CreateGroup(content, L["Scenarios and Popups"])
+        scenarios:SetPoint("TOPLEFT", clicking, "BOTTOMLEFT", 0, -gap)
+        scenarios:SetPoint("TOPRIGHT", clicking, "BOTTOMRIGHT", 0, -gap)
+
+        local widgetGet, widgetSet = rowSetting("showTrackerWidgets", true)
+        local delveRows = {}
+        local function syncDelveRows()
+            for _, r in ipairs(delveRows) do self:SetDependent(r, widgetGet()) end
+        end
+        local widgetCheck = self:CreateCheckbox(content, L["Show event and scenario widgets"],
+            widgetGet,
+            function(v)
+                widgetSet(v)
+                syncDelveRows()
+            end)
+        scenarios:Add(widgetCheck)
+        self:AttachTooltip(widgetCheck, L["Show event and scenario widgets"],
+            L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event's progress bar or a delve's tier. This tracker replaces the default one, so without this those are not shown anywhere."])
+
+        -- Both counters draw on the delve's tier row, which is a widget line, so they go with the box
+        -- above. Forever has the widget call but no delves, and Blizzard's API docs list it for Era and
+        -- TBC too, whose TOCs load no scenario provider.
+        if ns.Has.DelveHeader and ns:GetModule("Registry"):Get("scenarios") and not ns.IsForever() then
+            -- The reader draws from a snapshot, so a switch has to make it read again.
+            local function delveBox(label, key, tooltip)
+                return self:CreateCheckbox(content, label,
+                    function() return DB()[key] ~= false end,
+                    function(v)
+                        DB()[key] = v
+                        ns:GetModule("Widgets"):Invalidate()
+                        render()
+                    end,
+                    tooltip)
+            end
+            delveRows[1] = delveBox(L["Show delve lives"], "showDelveLives",
+                L["In a delve of Tier 4 or higher, shows the lives left beside the delve's tier. The number turns orange at 2 lives and red at 1."])
+            delveRows[2] = delveBox(L["Show nemesis groups"], "showNemesisGroups",
+                L["In a delve with a Nemesis Strongbox, shows beside the delve's tier how many groups of the nemesis's minions have been killed, and a check mark once all of them are dead. Hover the icon for the game's own description."])
+            for _, r in ipairs(delveRows) do scenarios:Add(r, { dependent = true }) end
+            syncDelveRows()
+            content._syncDelveRows = syncDelveRows
+        end
+
+        -- Only the scenario provider reads a key, and the Classic TOCs do not load it
+        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then
+            local mplusCheck = self:CreateCheckbox(content, L["Show the Mythic+ timer"],
+                rowSetting("showMythicPlusTimer", true))
+            scenarios:Add(mplusCheck)
+            self:AttachTooltip(mplusCheck, L["Show the Mythic+ timer"],
+                L["During a Mythic+ run, draws the keystone level, the affixes, the time left with the +2 and +3 times, and the deaths in place of the stage banner. This tracker replaces the default one, so without this they are not shown anywhere."])
+        end
+
+        scenarios:Add(self:CreateCheckbox(content, L["Show Quest Discovered popups"],
+            function() return DB().showQuestPopups ~= false end,
+            function(v) DB().showQuestPopups = v; render() end,
+            L["Boxes for newly discovered / completed quests."]))
+
+        local sounds = self:CreateGroup(content, L["Sounds"])
+        sounds:SetPoint("TOPLEFT", scenarios, "BOTTOMLEFT", 0, -gap)
+        sounds:SetPoint("TOPRIGHT", scenarios, "BOTTOMRIGHT", 0, -gap)
 
         local function playSound(value)
             ns:GetModule("Media"):Play(value)
@@ -599,11 +649,11 @@ Options:RegisterTab({
         -- Each picker sits under the switch it belongs to and is never dimmed: two of the three
         -- switches ship off, and a picker grayed out in the common state reads as broken (the
         -- author's call, 2026-10-01).
-        display:Add(self:CreateCheckbox(content, L["Quest Sound"],
+        sounds:Add(self:CreateCheckbox(content, L["Quest Sound"],
             function() return DB().questSoundEnabled ~= false end,
             function(v) DB().questSoundEnabled = v end,
             L["Plays when a quest is ready to turn in."]))
-        display:Add(self:CreateDropdown(content, L["Quest Complete Sound"],
+        sounds:Add(self:CreateDropdown(content, L["Quest Complete Sound"],
             soundList,
             function() return DB().questCompleteSound or "NONE" end,
             function(v) DB().questCompleteSound = v; playSound(v) end,
@@ -612,12 +662,12 @@ Options:RegisterTab({
 
         -- Its own switch rather than hanging off Quest Sound above, so a player can have one
         -- without the other. == true, not ~= false: this one ships off.
-        display:Add(self:CreateCheckbox(content,
+        sounds:Add(self:CreateCheckbox(content,
             L["Play a sound when you accept a quest"],
             function() return DB().questAcceptSoundEnabled == true end,
             function(v) DB().questAcceptSoundEnabled = v end,
             L["Off by default. It has its own sound below, so accepting and completing can be told apart."]))
-        display:Add(self:CreateDropdown(content, L["Quest Accepted Sound"],
+        sounds:Add(self:CreateDropdown(content, L["Quest Accepted Sound"],
             soundList,
             function() return DB().questAcceptSound or "NONE" end,
             function(v) DB().questAcceptSound = v; playSound(v) end,
@@ -627,26 +677,27 @@ Options:RegisterTab({
         -- Its own switch and its own sound, like the accept pair above. This one fires at the
         -- quest giver, which is where the Quest Complete sound was landing on Classic by
         -- accident.
-        display:Add(self:CreateCheckbox(content,
+        sounds:Add(self:CreateCheckbox(content,
             L["Play a sound when you turn a quest in"],
             function() return DB().questTurnInSoundEnabled == true end,
             function(v) DB().questTurnInSoundEnabled = v end,
             L["Off by default. It has its own sound below, so handing a quest in and finishing its objectives can be told apart."]))
-        display:Add(self:CreateDropdown(content, L["Quest Turned In Sound"],
+        sounds:Add(self:CreateDropdown(content, L["Quest Turned In Sound"],
             soundList,
             function() return DB().questTurnInSound or "NONE" end,
             function(v) DB().questTurnInSound = v; playSound(v) end,
             L["Which sound plays when you hand a quest in at the quest giver."],
             nil, playSound), { dependent = true })
 
-        -- The zone progress bar's two toggles used to sit here, and so did the bonus
-        -- objectives HUD's three. Both features live under their own Appearance heading now,
-        -- beside the controls that style them - one feature, one place.
+        -- The zone progress bar's two toggles and the bonus objectives HUD's three used to be on
+        -- this tab. Both features live under their own Appearance heading now, beside the
+        -- controls that style them - one feature, one place.
     end,
 
     refresh = function(_, content)
         if content._syncZoneTag then content._syncZoneTag() end
         if content._syncManualHint then content._syncManualHint() end
+        if content._syncDelveRows then content._syncDelveRows() end
         if content._renderOrderRows then content._renderOrderRows() end
     end,
 })

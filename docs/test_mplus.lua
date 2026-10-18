@@ -2728,8 +2728,8 @@ guard("F. seams", function()
     ok(not has(probe, "showMythicPlusTimer"), "the stripper removes line and block comments")
 
     local tab = stripComments(readFile("Options/TabTracker.lua"))
-    ok(has(tab, 'if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            local mplusCheck = self:CreateCheckbox(content, L["Show the Mythic+ timer"],\n                rowSetting("showMythicPlusTimer", true))\n            display:Add(mplusCheck)'),
-       "the box is built where a key can be read and drawn, on the Options card, default on")
+    ok(has(tab, 'if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            local mplusCheck = self:CreateCheckbox(content, L["Show the Mythic+ timer"],\n                rowSetting("showMythicPlusTimer", true))\n            scenarios:Add(mplusCheck)'),
+       "the box is built where a key can be read and drawn, on the Scenarios and Popups card, default on")
 
     local cmd = stripComments(readFile("UI/Commands.lua"))
     ok(has(cmd, 'local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true,\n                      Keystone = true, MythicPlus = true }'),

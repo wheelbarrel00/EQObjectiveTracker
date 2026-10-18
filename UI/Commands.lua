@@ -134,6 +134,11 @@ handlers.status = function()
                 ns:Print("      " .. (ok and (line or "")
                     or ("|cffff5555DebugLine raised|r " .. tostring(line))))
             end
+            if p.TimerLine then
+                local ok, line = pcall(p.TimerLine, p)
+                ns:Print("      " .. (ok and (line or "")
+                    or ("|cffff5555TimerLine raised|r " .. tostring(line))))
+            end
         end
     end
 
@@ -392,6 +397,61 @@ function Commands:OnEnable()
                 debugLine("MythicPlus")
                 debugLine("Visibility")
             end
+        elseif cmd == "popup" then
+            -- Diagnostic output, English like /eqot status. A real popup cannot be made on demand,
+            -- so the sample is how a box's place on each tab can be checked.
+            local P   = ns:GetModule("AutoQuestPopups")
+            local arg = strtrim(rest or ""):lower()
+            if not (P and P:Available()) then
+                ns:Print("popup: not available on this client")
+            elseif ns:UsesBlizzardTracker() then
+                ns:Print("popup: off, Blizzard's tracker in use")
+            elseif arg == "test" then
+                local on = P:ToggleSample()
+                tracker():Render()
+                if on then
+                    local cfg = ns:GetModule("DB"):Tracker()
+                    ns:Print("popup test: on. A sample Quest Discovered box is drawn with the Quests section, "
+                        .. "and on every other tab while section tabs are on. Type /eqot popup test again to clear it."
+                        .. ((cfg and cfg.showQuestPopups == false)
+                            and " Show Quest Discovered popups is off, so it is not drawn." or ""))
+                else
+                    ns:Print("popup test: off.")
+                end
+            else
+                tracker():Render()
+                -- Render returns early while the tracker is hidden, as /eqot status allows for.
+                P:Refresh()
+                debugLine("AutoQuestPopups")
+            end
+        elseif cmd == "timer" then
+            -- Diagnostic output, English like /eqot status. Timed quests are rare, so the sample is
+            -- how the countdown can be checked at all.
+            local Q   = ns:GetModule("Registry"):Get("quests")
+            local arg = strtrim(rest or ""):lower()
+            if not (Q and Q.ToggleTimerTest) then
+                ns:Print("timer: not available on this client")
+            elseif ns:UsesBlizzardTracker() then
+                ns:Print("timer: off, Blizzard's tracker in use")
+            elseif arg == "test" then
+                local title, why = Q:ToggleTimerTest()
+                if why == "off" then
+                    ns:Print("timer: the quests provider is switched off (/eqot modules).")
+                elseif why == "empty" then
+                    ns:Print("timer: the quest log is empty, so there is no quest to put a sample on.")
+                elseif title then
+                    ns:Print(("timer test: on. A two-minute sample countdown is on %s. "
+                        .. "Type /eqot timer test again to clear it."):format(title))
+                else
+                    ns:Print("timer test: off.")
+                end
+            else
+                -- Read fresh, as /eqot status is.
+                tracker():Render()
+                ns:GetModule("Feed"):Build()
+                local ok, line = pcall(Q.TimerLine, Q)
+                ns:Print(ok and line or ("|cffff5555TimerLine raised|r " .. tostring(line)))
+            end
         elseif cmd == "importeq" then
             importEQ()
         elseif cmd == "flavorprobe" then
@@ -446,7 +506,7 @@ function Commands:OnEnable()
             -- The subcommands are literals the dispatcher matches, so they stay outside
             -- L. Only the word introducing them is translated.
             ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, status, debug, "
-                .. "bonushud [test], mplus [test|late], importeq, modules, disable <m>, enable <m>")
+                .. "bonushud [test], mplus [test|late], popup [test], timer [test], importeq, modules, disable <m>, enable <m>")
         end
     end
 end

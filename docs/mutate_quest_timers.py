@@ -1,5 +1,5 @@
-"""Prove docs/test_quest_timers.lua actually discriminates, by breaking the Classic timed-quest
-countdown on purpose one change at a time and checking the harness notices.
+"""Prove docs/test_quest_timers.lua actually discriminates, by breaking the timed-quest countdown,
+Classic's and since 2.6.0 retail's, on purpose one change at a time and checking the harness notices.
 
     python docs/mutate_quest_timers.py         (run from the repo root)
 
@@ -8,11 +8,14 @@ the tracker row is the ONLY timer a Classic player has. Every mutant below is a 
 to draw nothing, draw the wrong number, or draw a number for a quest that has no timer - and
 before this file, a green harness said nothing about any of them.
 
-THREE FILES, which is what makes this battery worth having at all. The read half is in
-Data/Providers/QuestsClassic.lua, the format half in Core/Util.lua and the tick rate in
-UI/Tracker.lua, and the seams between them are exactly where the two halves of a feature can be
-individually correct and jointly useless. The harness covers those seams with greps, so the
-call-site mutants at the end are the ones that prove the greps fire.
+EIGHT FILES, which is what makes this battery worth having at all. Classic's read half is in
+Data/Providers/QuestsClassic.lua, the format half in Core/Util.lua, the tick rate in
+UI/Tracker.lua and the row's countdown block in UI/Row.lua. Since 2.6.0 retail's reader and
+/eqot timer test are in Data/Providers/Quests.lua, the command in UI/Commands.lua, the
+GetTimeAllowed flag in Core/Compat.lua and the tooltip's lines in UI/RewardTooltip.lua. The seams
+between them are exactly where the two halves of a feature can be individually correct and
+jointly useless. The harness covers some of those seams with greps, and the call-site mutants
+are the ones that prove the greps fire.
 
 The pooled-entry mutant is the one that would have shipped. Entries are handed out again, so a
 quest whose timer has ENDED inherits the previous occupant's deadline unless the field is
@@ -34,13 +37,13 @@ A CRASHED verdict is still reported apart from "caught" on purpose. A mutant tha
 exits nonzero too, and counting that as caught is a false pass in the one tool whose job is to
 find false passes.
 
-WRITES TO THE TREE. It edits three files in place and restores them after every mutant through a
+WRITES TO THE TREE. It edits those eight files in place and restores them after every mutant through a
 finally, then verifies the restore and re-checks the baseline before reporting. If you hard-kill
 it, recover from your editor's undo history.
 
-Line endings are resolved PER FILE rather than once. All three are LF today, but this tree is
-mixed - Core/Compat.lua is CRLF - and a bare-LF anchor against a CRLF file fails to match and
-reports SKIPPED, which reads as a rotted anchor rather than as the driver's own bug.
+Line endings are resolved PER FILE rather than once. This tree is mixed: Core/Compat.lua is CRLF
+in the working tree and the others are LF, and a bare-LF anchor against a CRLF file fails to
+match and reports SKIPPED, which reads as a rotted anchor rather than as the driver's own bug.
 
 Anchors are exact source text and they rot. A SKIPPED line means an anchor stopped matching: fix
 the anchor rather than dropping the mutant.
@@ -60,6 +63,10 @@ SUMMARY = re.compile(r"^test_quest_timers: (\d+) passed, (\d+) failed$")
 PROV = "Data/Providers/QuestsClassic.lua"
 UTIL = "Core/Util.lua"
 TRAC = "UI/Tracker.lua"
+QRET = "Data/Providers/Quests.lua"
+CMDS = "UI/Commands.lua"
+COMPAT = "Core/Compat.lua"
+RTIP = "UI/RewardTooltip.lua"
 
 FILL = """local function fillTimer(e, timers, index)
     local secs = index and timers[index] or nil
@@ -84,7 +91,7 @@ SECS_FN = """function Util.TimeShortSecs(secs)
 end"""
 
 RATE_GUARD = "    if self._timerRate == want then return end"
-FAST = "        local fast = left and left <= FAST_WINDOW and not ns.Has.QuestLog"
+FAST = "        local fast = left and left <= FAST_WINDOW"
 WANT = "        want = fast and TICK_FAST or TICK_SLOW"
 
 # (file, name, old, new)
@@ -217,7 +224,7 @@ end"""),
     (TRAC,
      "the window test is inverted, so it ticks fast when the deadline is far away",
      FAST,
-     "        local fast = left and left > FAST_WINDOW and not ns.Has.QuestLog"),
+     "        local fast = left and left > FAST_WINDOW"),
 
     (TRAC,
      "the fast rate is never chosen, so a seconds readout sits half a minute stale",
@@ -280,14 +287,14 @@ end"""),
             timeText = Util.TimeShort(timeMins)"""),
 
     ("UI/Tracker.lua",
-     "the fast rate is not gated on the flavor, so retail pays it for no visible change",
-     "        local fast = left and left <= FAST_WINDOW and not ns.Has.QuestLog",
-     "        local fast = left and left <= FAST_WINDOW"),
+     "the fast rate is gated to Classic again, so a retail quest timer's last minute sits half a minute stale",
+     FAST,
+     FAST + " and not ns.Has.QuestLog"),
 
     ("UI/Tracker.lua",
-     "the flavor test is inverted, so only retail takes the fast rate",
-     "        local fast = left and left <= FAST_WINDOW and not ns.Has.QuestLog",
-     "        local fast = left and left <= FAST_WINDOW and ns.Has.QuestLog"),
+     "the fast rate is gated to retail, so a Classic quest timer's last minute sits half a minute stale",
+     FAST,
+     FAST + " and ns.Has.QuestLog"),
 
     ("UI/Row.lua",
      "the color is taken at minute resolution, so a live sub-minute row draws expired",
@@ -339,6 +346,303 @@ end"""),
      "the calmest band swallows the one below it, so half a day out draws the same as two hours",
      "    if mins < 720  then return 1.00, 1.00, 0.40 end",
      "    if mins < 120  then return 1.00, 1.00, 0.40 end"),
+    # ------------------------------------------- retail and WoW Forever (2026-10-16, frkstram)
+    (QRET,
+     "the retail reader ignores the state, so a finished quest keeps counting down",
+     "    elseif e.state == STATE.ACTIVE and ns.Has.QuestTimeAllowed then",
+     "    elseif ns.Has.QuestTimeAllowed then"),
+
+    (QRET,
+     "the retail reader lets a failed quest count down",
+     "    elseif e.state == STATE.ACTIVE and ns.Has.QuestTimeAllowed then",
+     "    elseif e.state ~= STATE.COMPLETE and ns.Has.QuestTimeAllowed then"),
+
+    (QRET,
+     "the retail reader skips the capability test, so a client without the call raises",
+     "    elseif e.state == STATE.ACTIVE and ns.Has.QuestTimeAllowed then",
+     "    elseif e.state == STATE.ACTIVE then"),
+
+    (QRET,
+     "the time left is rounded up, so a countdown reads a second long",
+     "        if total and elapsed then left = math.floor(total - elapsed) end",
+     "        if total and elapsed then left = math.ceil(total - elapsed) end"),
+
+    (QRET,
+     "the time left is the whole limit, ignoring what has already run",
+     "        if total and elapsed then left = math.floor(total - elapsed) end",
+     "        if total then left = math.floor(total) end"),
+
+    (QRET,
+     "the figures are taken unchecked, so junk from the client raises",
+     "        total, elapsed = tonumber(total), tonumber(elapsed)\n",
+     ""),
+
+    (QRET,
+     "the retail deadline is stored RELATIVE, so the row reads it as a time in 1970",
+     "    e.expiresAt = (left and left > 0) and (time() + left) or nil",
+     "    e.expiresAt = (left and left > 0) and left or nil"),
+
+    (QRET,
+     "a quest with no limit keeps a POOLED entry's old retail deadline",
+     "    e.expiresAt = (left and left > 0) and (time() + left) or nil",
+     "    if left and left > 0 then e.expiresAt = time() + left end"),
+
+    (QRET,
+     "a limit with no time left still stamps a deadline",
+     "    e.expiresAt = (left and left > 0) and (time() + left) or nil",
+     "    e.expiresAt = (left and left >= 0) and (time() + left) or nil"),
+
+    (QRET,
+     "the sample is never laid over its quest",
+     "    if testTimerID and id == testTimerID and testTimerAt > time() then",
+     "    if false then"),
+
+    (QRET,
+     "the sample is laid over every quest",
+     "    if testTimerID and id == testTimerID and testTimerAt > time() then",
+     "    if testTimerID and testTimerAt > time() then"),
+
+    (QRET,
+     "the sample's deadline is read as seconds left, so it never runs down",
+     "        left = testTimerAt - time()",
+     "        left = testTimerAt"),
+
+    (QRET,
+     "the full rebuild stops stamping the retail deadline",
+     "                fillTimer(e, id)\n                fillLines(e, id)",
+     "                fillLines(e, id)"),
+
+    (QRET,
+     "the cheap refresh stops stamping it, so a timer starting mid-quest never shows",
+     "        fillTimer(e, id)\n        fillLines(e, id)\n    end\n",
+     "        fillLines(e, id)\n    end\n"),
+
+    (QRET,
+     "the sample prefers no tracked quest, so it can land on one the tracker hides",
+     "            if e.isTracked and e.state == STATE.ACTIVE then pick = e break end",
+     "            if e.state == STATE.ACTIVE then pick = e break end"),
+
+    (QRET,
+     "the sample lands on a tracked quest that is already finished",
+     "            if e.isTracked and e.state == STATE.ACTIVE then pick = e break end",
+     "            if e.isTracked then pick = e break end"),
+
+    (QRET,
+     "a second run never clears the sample",
+     "    if testTimerID and testTimerAt > time() then",
+     "    if false then"),
+
+    (QRET,
+     "a sample that has run out is cleared rather than started again",
+     "    if testTimerID and testTimerAt > time() then",
+     "    if testTimerID then"),
+
+    (QRET,
+     "the sample asks for no repaint, so nothing shows until an unrelated quest event",
+     "    self._notifyDirty()\n    return pick and pick.title or nil",
+     "    return pick and pick.title or nil"),
+
+    (QRET,
+     "the sample sets no dirty flag, so the store hands back the old entries",
+     "    end\n    if primed then dirtyObjectives = true else dirtyAll = true end\n",
+     "    end\n"),
+
+    (QRET,
+     "before the first full pass the sample sets only the cheap flag, which skips quests not yet cached",
+     "    end\n    if primed then dirtyObjectives = true else dirtyAll = true end\n",
+     "    end\n    dirtyObjectives = true\n"),
+
+    (QRET,
+     "the sample runs on a switched-off provider and raises",
+     "    if not self._notifyDirty then return nil, \"off\" end\n",
+     ""),
+
+    (QRET,
+     "an empty log raises instead of saying so",
+     "        if not pick then return nil, \"empty\" end\n",
+     ""),
+
+    (QRET,
+     "the sample is ten minutes rather than two",
+     "local TEST_TIMER_SECS = 120",
+     "local TEST_TIMER_SECS = 600"),
+
+    (QRET,
+     "the status line lists a countdown that is already over",
+     "        if e.expiresAt and e.expiresAt > now then",
+     "        if e.expiresAt then"),
+
+    (QRET,
+     "the status line reports a run-out sample as still on",
+     "        (testTimerID and testTimerAt > now) and tostring(testTimerID) or \"off\")",
+     "        testTimerID and tostring(testTimerID) or \"off\")"),
+
+    (COMPAT,
+     "the retail capability probes a call the client does not have",
+     "Has.QuestTimeAllowed    = method(C_QuestLog, \"GetTimeAllowed\")",
+     "Has.QuestTimeAllowed    = method(C_QuestLog, \"GetTimeLeft\")"),
+
+    (CMDS,
+     "the timer command starts a sample under Blizzard's tracker",
+     "            elseif ns:UsesBlizzardTracker() then\n                ns:Print(\"timer: off, Blizzard's tracker in use\")\n",
+     ""),
+
+    (CMDS,
+     "the timer command reads its word case-sensitively",
+     "            local Q   = ns:GetModule(\"Registry\"):Get(\"quests\")\n            local arg = strtrim(rest or \"\"):lower()",
+     "            local Q   = ns:GetModule(\"Registry\"):Get(\"quests\")\n            local arg = strtrim(rest or \"\")"),
+
+    (CMDS,
+     "a switched-off provider is reported as an empty log",
+     "                if why == \"off\" then\n                    ns:Print(\"timer: the quests provider",
+     "                if why == \"empty\" then\n                    ns:Print(\"timer: the quests provider"),
+
+    (CMDS,
+     "the timer line is printed without a fresh render",
+     "                tracker():Render()\n                ns:GetModule(\"Feed\"):Build()\n                local ok, line = pcall(Q.TimerLine, Q)",
+     "                local ok, line = pcall(Q.TimerLine, Q)"),
+
+    (CMDS,
+     "a raising timer line aborts the command",
+     "                local ok, line = pcall(Q.TimerLine, Q)\n                ns:Print(ok and line or (\"|cffff5555TimerLine raised|r \" .. tostring(line)))",
+     "                ns:Print(Q:TimerLine())"),
+
+    (CMDS,
+     "/eqot status never prints the providers' timer lines",
+     "            if p.TimerLine then\n",
+     "            if false then\n"),
+
+    # ------------------------------------------- the pre-ship scan of 2026-10-17
+    (QRET,
+     "a sample that has run out keeps the quest's row, hiding a real limit under it for good",
+     "    if testTimerID and id == testTimerID and testTimerAt > time() then",
+     "    if testTimerID and id == testTimerID then"),
+
+    (QRET,
+     "the sample's end is timed to the second it runs out rather than one after",
+     "        C_Timer.After(TEST_TIMER_SECS + 1, function()",
+     "        C_Timer.After(TEST_TIMER_SECS, function()"),
+
+    (QRET,
+     "a cleared sample's timer ends the sample started after it",
+     "            if testTimerAt ~= at then return end\n",
+     ""),
+
+    (QRET,
+     "the sample is left set once its timer has ended it",
+     "            testTimerID, testTimerAt = nil, nil\n            if primed then dirtyObjectives",
+     "            if primed then dirtyObjectives"),
+
+    (QRET,
+     "the sample's end marks nothing dirty, so the next pass keeps its deadline",
+     "            if primed then dirtyObjectives = true else dirtyAll = true end\n            self._notifyDirty()\n        end)",
+     "            self._notifyDirty()\n        end)"),
+
+    (QRET,
+     "the sample's end asks for no repaint",
+     "            self._notifyDirty()\n        end)",
+     "        end)"),
+
+    (QRET,
+     "the timer line lists its quests in no set order",
+     "    table.sort(parts)\n    return (\"quest timers:",
+     "    return (\"quest timers:"),
+
+    (RTIP,
+     "the tooltip floors Time Left to minutes, so the last minute draws nothing",
+     "        local secs = math.floor(expiresAt - time())",
+     "        local secs = math.floor((expiresAt - time()) / 60) * 60"),
+
+    (RTIP,
+     "the tooltip draws no time under a minute",
+     "        if secs > 0 then",
+     "        if secs > 60 then"),
+
+    (RTIP,
+     "the tooltip colors Time Left by its seconds rather than its minutes",
+     "                        Util.TimeColor(math.max(1, math.floor(secs / 60))))",
+     "                        Util.TimeColor(secs))"),
+
+    (RTIP,
+     "the tooltip draws the last minute in the red of no time left, unlike the row",
+     "                        Util.TimeColor(math.max(1, math.floor(secs / 60))))",
+     "                        Util.TimeColor(math.floor(secs / 60)))"),
+
+    (RTIP,
+     "the tooltip is handed no deadline, so no row shows its faction or time left",
+     "    self:_DrawEntry(owner, entry.id, entry.title, entry.expiresAt, clickHint)",
+     "    self:_DrawEntry(owner, entry.id, entry.title, nil, clickHint)"),
+
+    (RTIP,
+     "a redraw while the rewards load drops the faction and the time left",
+     "            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)\n        end)",
+     "            self:_DrawEntry(owner, questID, title, nil, clickHint)\n        end)"),
+
+    ("UI/Row.lua",
+     "a quest row's hover hands the tooltip no deadline",
+     "        if RT then RT:ShowForEntry(row, row._entry, row._hintShown) end",
+     "        if RT then RT:ShowForEntry(row, { id = row._entry.id, title = row._entry.title }, row._hintShown) end"),
+
+    ("UI/Row.lua",
+     "a quest row's hover drops its click hint",
+     "        if RT then RT:ShowForEntry(row, row._entry, row._hintShown) end",
+     "        if RT then RT:ShowForEntry(row, row._entry, false) end"),
+
+    # The bounded round after scan 3: the tooltip's redraw, its title fallback and its minute floor.
+    (RTIP,
+     "a hover never refills the redraw budget, so a cold quest's rewards never appear",
+     "    self._redrawLeft = REDRAW_TRIES\n    -- Scalars only from here down.",
+     "    -- Scalars only from here down."),
+
+    (RTIP,
+     "the redraw is armed for no quest, so it never draws",
+     "        armRedraw(owner, questID, function()\n            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)",
+     "        armRedraw(owner, nil, function()\n            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)"),
+
+    (RTIP,
+     "the redraw is armed for no row, so it never draws",
+     "        armRedraw(owner, questID, function()\n            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)",
+     "        armRedraw(nil, questID, function()\n            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)"),
+
+    (RTIP,
+     "the redraw drops the click hint",
+     "            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)\n        end)",
+     "            self:_DrawEntry(owner, questID, title, expiresAt, false)\n        end)"),
+
+    (RTIP,
+     "the redraw drops the entry's title",
+     "            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)\n        end)",
+     "            self:_DrawEntry(owner, questID, nil, expiresAt, clickHint)\n        end)"),
+
+    (RTIP,
+     "the tooltip is handed no title, so a quest the game has none for yet shows nothing",
+     "    self:_DrawEntry(owner, entry.id, entry.title, entry.expiresAt, clickHint)",
+     "    self:_DrawEntry(owner, entry.id, nil, entry.expiresAt, clickHint)"),
+
+    (RTIP,
+     "the tooltip rounds a minute up, so it goes orange while the row is still red",
+     "                        Util.TimeColor(math.max(1, math.floor(secs / 60))))",
+     "                        Util.TimeColor(math.max(1, math.ceil(secs / 60))))"),
+
+    (QRET,
+     "a sample still counts in the second it runs out",
+     "    if testTimerID and id == testTimerID and testTimerAt > time() then",
+     "    if testTimerID and id == testTimerID and testTimerAt >= time() then"),
+
+    (QRET,
+     "a cold log's sample end asks only for the cheap refresh, which skips quests not yet cached",
+     "            if primed then dirtyObjectives = true else dirtyAll = true end\n            self._notifyDirty()\n        end)",
+     "            dirtyObjectives = true\n            self._notifyDirty()\n        end)"),
+
+    (RTIP,
+     "a deadline brings no faction line",
+     "    if expiresAt then\n        local faction = QR:FactionName(questID)",
+     "    if false then\n        local faction = QR:FactionName(questID)"),
+
+    (RTIP,
+     "the time left is drawn with no gap after the objectives",
+     "            if drew then tip:AddLine(\" \") end\n",
+     ""),
 ]
 
 

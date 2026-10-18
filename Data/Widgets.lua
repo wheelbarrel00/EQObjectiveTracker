@@ -8,6 +8,7 @@ local L       = ns.L
 local _issecret = _G.issecretvalue
 
 local REFRESH_DEBOUNCE = 0.2
+local NEMESIS_SETTLE   = 1.0
 
 -- Read only, and it must stay that way. Registering a UIWidgetContainer against one of these
 -- sets was reported breaking the next tooltip to close with widgets on it, and removing that
@@ -122,6 +123,8 @@ local function acquire(order, tooltip)
     o.kind, o.text, o.value, o.min, o.max = nil, nil, nil, nil, nil
     o.valueTextKind, o.overrideText, o.colorTint, o.textureKit = nil, nil, nil, nil
     o.countdown, o.deadline = nil, nil
+    o.lives, o.livesIcon, o.livesTip = nil, nil, nil
+    o.nemAlive, o.nemTotal, o.nemSpell, o.nemIcon, o.nemTip = nil, nil, nil, nil, nil
     o.order, o.tooltip = order or 0, tooltip
     o.seq = outN
     out[outN] = o
@@ -232,11 +235,116 @@ function READERS.ScenarioHeaderTimer(info, order)
     end
 end
 
+-- Lives start at Tier 4, and so does the Nemesis Strongbox.
+local DELVE_COUNTERS_TIER = 4
+-- The Strongbox's groups still alive and its total, which other addons read the same way.
+local NEMESIS_ALIVE, NEMESIS_TOTAL = 3103, 3104
+-- The Strongbox's affix among the header's spells, which carries its icon and the game's tooltip.
+-- 1307638 measured on 12.1, 1270179 carried by other addons and unmeasured here. A season can bring
+-- a new id, so APPEND: /eqot status lists the ids a delve shows.
+local NEMESIS_SPELLS = { 1307638, 1270179 }
+
+-- Measured going 5 to 4 on a death (2026-09-05). The tooltip is the game's own and is never
+-- parsed, and an empty text reads as no lives shown rather than as zero lives.
+local function readLives(info)
+    local list = plain(info.currencies)
+    local c = type(list) == "table" and list[1]
+    if type(c) ~= "table" then return nil end
+    local lives = tonumber(plain(c.text))
+    if not lives then return nil end
+    return lives, num(c.iconFileID), str(c.tooltip)
+end
+
+local function quantity(currencyID)
+    local c = C_CurrencyInfo.GetCurrencyInfo(currencyID)
+    return type(c) == "table" and num(c.quantity) or nil
+end
+
+local function readNemesis()
+    return quantity(NEMESIS_ALIVE), quantity(NEMESIS_TOTAL)
+end
+
+local function isNemesisSpell(id)
+    for i = 1, #NEMESIS_SPELLS do
+        if id == NEMESIS_SPELLS[i] then return true end
+    end
+    return false
+end
+
+-- Also records every spell id the header carried in spellIDs, so a season's new id can be read off
+-- /eqot status.
+local spellIDs = {}
+local function readNemesisSpell(info)
+    for i = #spellIDs, 1, -1 do spellIDs[i] = nil end
+    local list = plain(info.spells)
+    if type(list) ~= "table" then return nil end
+    local found, icon, tip
+    for i = 1, #list do
+        local s = list[i]
+        local id = type(s) == "table" and num(s.spellID)
+        if id then
+            spellIDs[#spellIDs + 1] = id
+            if not found and isNemesisSpell(id) then
+                found, tip = id, str(s.tooltip)
+                icon = C_Spell and C_Spell.GetSpellTexture and num((C_Spell.GetSpellTexture(id)))
+            end
+        end
+    end
+    return found, icon, tip
+end
+
+local function delveCfg()
+    local DB = ns:GetModule("DB")
+    return DB and DB:Tracker()
+end
+
+-- Other addons find a kill reports 0 alive before the real count and wait a second for it, so a
+-- reading in between could flash the all-dead check. The count is held until the reports stop, and
+-- Widgets:OnEnable's timer repaints then.
+local nemesisHeld, heldAlive, heldTotal = false, nil, nil
+
+-- For /eqot status, read whether or not the counters are switched on. Cleared with the scenario.
+local seenTier, seenLives, seenSpell
+
 -- The delve tier, which has been on screen nowhere since the widget container came out and
 -- which v1.9.1's changelog promised back. tierText is a bare number with no label of its own.
+-- Every counter read is pcalled: a raise in a reader costs the whole set, the tier included.
 function READERS.ScenarioHeaderDelves(info, order)
     local tier = tonumber(plain(info.tierText))
-    if tier then pushText(order, (L["Tier %d"]):format(tier)) end
+    if not tier then return end
+    local tierText = (L["Tier %d"]):format(tier)
+    local okLives, lives, livesIcon, livesTip = pcall(readLives, info)
+    if not okLives then lives = nil end
+    local okSpell, spellID, spellIcon, spellTip = pcall(readNemesisSpell, info)
+    if not okSpell then spellID = nil end
+    seenTier, seenLives, seenSpell = tier, lives, spellID
+
+    local cfg = delveCfg()
+    local showLives = cfg and cfg.showDelveLives ~= false and lives ~= nil
+    local alive, total
+    if cfg and cfg.showNemesisGroups ~= false then
+        if nemesisHeld and heldTotal then
+            alive, total = heldAlive, heldTotal
+        else
+            local ok, a, t = pcall(readNemesis)
+            if ok and a and t and a >= 0 and t > 0 then alive, total = a, t end
+            heldAlive, heldTotal = alive, total
+        end
+    end
+    if tier < DELVE_COUNTERS_TIER or not (showLives or alive) then
+        pushText(order, tierText)
+        return
+    end
+
+    local o = acquire(order)
+    o.kind, o.text = "delve", tierText
+    if showLives then
+        o.lives, o.livesIcon, o.livesTip = lives, livesIcon, livesTip
+    end
+    if alive then
+        o.nemAlive, o.nemTotal = alive, total
+        o.nemSpell, o.nemIcon, o.nemTip = spellID, spellIcon, spellTip
+    end
 end
 
 -- Everything below is served from a snapshot until something says the widgets moved. Before
@@ -287,6 +395,8 @@ local function resolveIDs()
     -- A new scenario is a new clock, and two runs can coincidentally push the same value
     if scenarioID ~= prevScenario then
         lastTimerValue, lastTimerMax, lastTimerDeadline = nil, nil, nil
+        seenTier, seenLives, seenSpell = nil, nil, nil
+        heldAlive, heldTotal = nil, nil
     end
 end
 
@@ -422,8 +532,16 @@ function Widgets:DebugLine()
     if nNames > 0 then
         skips = " | unread types: " .. table.concat(names, ",", 1, math.min(nNames, 6))
     end
-    return ("widgets: tracker set %s, scenario set %s | %d drawn | %d api reads this session%s")
-        :format(tostring(tid), tostring(sid), drawn, apiReads, skips)
+    local delve = ""
+    if seenTier then
+        local ok, alive, total = pcall(readNemesis)
+        delve = (" | delve tier %d, lives %s, nemesis alive %s/%s%s, spell %s of %s"):format(seenTier,
+            tostring(seenLives), ok and tostring(alive) or "read threw", ok and tostring(total) or "-",
+            nemesisHeld and " held" or "", tostring(seenSpell),
+            #spellIDs > 0 and table.concat(spellIDs, ",") or "none")
+    end
+    return ("widgets: tracker set %s, scenario set %s | %d drawn | %d api reads this session%s%s")
+        :format(tostring(tid), tostring(sid), drawn, apiReads, skips, delve)
 end
 
 local dirtyListeners = {}
@@ -495,6 +613,24 @@ function Widgets:OnEnable()
     Events:On("UPDATE_UI_WIDGET",      dirty)
     Events:On("UPDATE_ALL_UI_WIDGETS", dirty)
     Events:On("PLAYER_ENTERING_WORLD", dirty)
+
+    -- The nemesis counts are currencies, so no widget event says they moved. Each report restarts
+    -- the wait, as other addons do, since a kill can report more than once.
+    local nemesisTimer
+    local function nemesisSettled()
+        nemesisTimer, nemesisHeld = nil, false
+        self:Invalidate()
+        local cfg = delveCfg()
+        if cfg and cfg.showNemesisGroups ~= false and cfg.showTrackerWidgets ~= false then fire() end
+    end
+    local function nemesisMoved(_, currencyID)
+        currencyID = num(currencyID)
+        if currencyID ~= NEMESIS_ALIVE and currencyID ~= NEMESIS_TOTAL then return end
+        nemesisHeld = true
+        if nemesisTimer then nemesisTimer:Cancel() end
+        nemesisTimer = C_Timer.NewTimer(NEMESIS_SETTLE, nemesisSettled)
+    end
+    if ns.Has.DelveHeader then Events:On("CURRENCY_DISPLAY_UPDATE", nemesisMoved) end
 
     -- Invalidate only. A repaint already follows every one of these - the four scenario events
     -- through Data/ScenarioBonus.lua, ZONE_CHANGED_NEW_AREA through the quest providers - so

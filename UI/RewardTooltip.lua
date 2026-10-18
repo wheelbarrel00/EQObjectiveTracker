@@ -155,9 +155,9 @@ function RT:_DrawQuest(owner, questID)
     end
 end
 
--- The tracker row tooltip, mirroring EQ: title, objectives and rewards on a quest row, plus
--- a faction line and a color-coded countdown on a world quest row. There is no click hint on
--- the row as a whole - with Split quest click on, one sentence describes only half of it,
+-- The tracker row tooltip, mirroring EQ: title, objectives and rewards on a quest row, plus a
+-- faction line and a color-coded countdown on a world quest or timed quest row. There is no click
+-- hint on the row as a whole - with Split quest click on, one sentence describes only half of it,
 -- which is why the caller asks for the hint by hovering the icon and not before.
 --
 -- The hint names focus rather than an arrow because a standalone tracker has no coordinates
@@ -174,8 +174,8 @@ function RT:_DrawEntry(owner, questID, title, expiresAt, clickHint)
     local QR = ns:GetModule("QuestRewards")
     if not QR then return end
 
-    -- An expiry is what makes a row a world quest in the Entry shape - Row's own countdown
-    -- reads the same field - so it gates both of EQ's world-quest-only lines.
+    -- Only world quests and timed quests carry an expiry, the field Row's own countdown reads,
+    -- and it gates both of these lines, which EQ drew for world quests alone.
     local tip = Util.Tooltip()
     tip:SetOwner(owner, pickAnchor(owner))
     tip:SetText(QR:Title(questID) or title or "", 1.0, 0.82, 0.0, 1, true)
@@ -188,11 +188,12 @@ function RT:_DrawEntry(owner, questID, title, expiresAt, clickHint)
     local drew, sawReward = renderLines(tip, questID)
 
     if expiresAt then
-        local mins = math.floor((expiresAt - time()) / 60)
-        if mins > 0 then
+        local secs = math.floor(expiresAt - time())
+        if secs > 0 then
             if drew then tip:AddLine(" ") end
-            tip:AddLine(L["Time Left: "] .. Util.FmtDuration(mins * 60),
-                        Util.TimeColor(mins))
+            -- At least a minute, as on the row: TimeColor's zero means no time left.
+            tip:AddLine(L["Time Left: "] .. Util.FmtDuration(secs),
+                        Util.TimeColor(math.max(1, math.floor(secs / 60))))
         end
     end
 

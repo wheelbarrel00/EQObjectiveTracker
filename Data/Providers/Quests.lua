@@ -299,10 +299,35 @@ end
 -- the zone - 7 resolving to another map, 7 with no position anywhere. GetInfo's own isOnMap
 -- picked the same 2 quests as GetQuestsOnMap there, so it is not a second opinion to fall back
 -- to. Read /eqot zoneprobe before changing this.
+-- On Forever a heading equal to GetZoneText() counts too: its headings are zone names, as Classic's
+-- are, and a quest's marker can sit in another zone (in Stormwind, every quest under Stormwind City
+-- was marked at a hand-in elsewhere).
 function Quests:IsCurrentZone(entry)
+    if ns.IsForever() and GetZoneText then
+        local zone = GetZoneText()
+        if zone and zone ~= "" and entry.zone == zone then return true end
+    end
     local set = currentZoneSet()
     if not set then return nil end
     return set[entry.id] == true
+end
+
+-- /eqot timer test's sample: the quest it sits on and its deadline in time() seconds.
+local testTimerID, testTimerAt
+
+-- Blizzard's retail tracker draws a quest's timer from this pair, and only while the quest is
+-- neither finished nor failed. Assigned on every pass, or a pooled entry keeps the last
+-- quest's deadline.
+local function fillTimer(e, id)
+    local left
+    if testTimerID and id == testTimerID and testTimerAt > time() then
+        left = testTimerAt - time()
+    elseif e.state == STATE.ACTIVE and ns.Has.QuestTimeAllowed then
+        local total, elapsed = C_QuestLog.GetTimeAllowed(id)
+        total, elapsed = tonumber(total), tonumber(elapsed)
+        if total and elapsed then left = math.floor(total - elapsed) end
+    end
+    e.expiresAt = (left and left > 0) and (time() + left) or nil
 end
 
 -- Unlike 1.15.9, this bound is safe: on retail the count read 50 with every quest log header
@@ -349,6 +374,7 @@ local function fullRebuild()
                 e.canGroup  = QuestGroups:CanCreate(id)
                 fillTags(e, id, info)
                 e.groupID = e.tags.campaign and "campaign" or "quests"
+                fillTimer(e, id)
                 fillLines(e, id)
             end
         end
@@ -404,6 +430,7 @@ local function refreshDynamic()
         -- icon while the card stays tinted as an ordinary quest.
         e.tags.legendary = (CLASS_LEGENDARY and e.icon.classification == CLASS_LEGENDARY)
                            or nil
+        fillTimer(e, id)
         fillLines(e, id)
     end
     dirtyObjectives = false
@@ -461,6 +488,53 @@ function Quests:DebugLine()
         list and tostring(#list) or "nil", climbed)
 end
 
+-- /eqot status and /eqot timer: each quest counting down, with its seconds left.
+function Quests:TimerLine()
+    local now, parts = time(), {}
+    for id, e in store:Each() do
+        if e.expiresAt and e.expiresAt > now then
+            parts[#parts + 1] = ("%d:%ds"):format(id, e.expiresAt - now)
+        end
+    end
+    table.sort(parts)
+    return ("quest timers: %s, %d counting down%s | sample %s"):format(
+        ns.Has.QuestTimeAllowed and "GetTimeAllowed" or "no GetTimeAllowed", #parts,
+        #parts > 0 and (" (" .. table.concat(parts, " ") .. ")") or "",
+        (testTimerID and testTimerAt > now) and tostring(testTimerID) or "off")
+end
+
+local TEST_TIMER_SECS = 120
+
+-- /eqot timer test. Timed quests are rare, so this puts a two-minute sample on the first tracked
+-- quest still in progress, or on the first quest when none is, and a second run clears it.
+function Quests:ToggleTimerTest()
+    if not self._notifyDirty then return nil, "off" end
+    local pick
+    if testTimerID and testTimerAt > time() then
+        testTimerID, testTimerAt = nil, nil
+    else
+        local first
+        for _, e in ipairs(store:Out()) do
+            first = first or e
+            if e.isTracked and e.state == STATE.ACTIVE then pick = e break end
+        end
+        pick = pick or first
+        if not pick then return nil, "empty" end
+        testTimerID, testTimerAt = pick.id, time() + TEST_TIMER_SECS
+        -- No quest event marks the end of a sample, so its row would keep the spent deadline.
+        local at = testTimerAt
+        C_Timer.After(TEST_TIMER_SECS + 1, function()
+            if testTimerAt ~= at then return end
+            testTimerID, testTimerAt = nil, nil
+            if primed then dirtyObjectives = true else dirtyAll = true end
+            self._notifyDirty()
+        end)
+    end
+    if primed then dirtyObjectives = true else dirtyAll = true end
+    self._notifyDirty()
+    return pick and pick.title or nil
+end
+
 -- Undocumented, like /eqot flavorprobe. Prints every signal that could place a quest beside
 -- the verdict IsCurrentZone actually returned, which is what the zone rule was chosen from and
 -- what to read before changing it again.
@@ -485,9 +559,10 @@ function Quests:ZoneProbeLines()
     local onMap, nMap = idsOn(map)
     local onPar, nPar = idsOn(par)
 
-    out[#out + 1] = ("zone probe: map %s %s (%d on map) | parent %s %s (%d on map)"):format(
+    out[#out + 1] = ("zone probe: map %s %s (%d on map) | parent %s %s (%d on map) | zone text %s%s"):format(
         tostring(map), mi and mi.name or "?", nMap,
-        tostring(par), pmi and pmi.name or "?", nPar)
+        tostring(par), pmi and pmi.name or "?", nPar,
+        tostring(GetZoneText and GetZoneText()), ns.IsForever() and " (Forever: a heading naming it counts)" or "")
     out[#out + 1] = "  id     set par iOM POI wp          dist         tz   verdict | header | title"
 
     local header
@@ -523,7 +598,7 @@ function Quests:ZoneProbeLines()
                     tz = tostring(z)
                 end
 
-                local verdict = self:IsCurrentZone({ id = id })
+                local verdict = self:IsCurrentZone({ id = id, zone = header })
 
                 out[#out + 1] = ("  %-6d %-3s %-3s %-3s %-3s %-11s %-14s %-4s %-7s | %s | %s"):format(
                     id, onMap[id] and "YES" or "no", onPar[id] and "YES" or "no",

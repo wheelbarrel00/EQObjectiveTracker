@@ -31,6 +31,13 @@ HARNESS = "docs/test_tracker_tab.lua"
 
 T = "Options/TabTracker.lua"
 TR = "UI/Tracker.lua"
+DBF = "Core/DB.lua"
+
+DELVE_SYNC = "            syncDelveRows()\n            content._syncDelveRows = syncDelveRows\n"
+DELVE_GATE = "        if ns.Has.DelveHeader and ns:GetModule(\"Registry\"):Get(\"scenarios\") and not ns.IsForever() then\n"
+DELVE_SET = ("                        DB()[key] = v\n"
+             "                        ns:GetModule(\"Widgets\"):Invalidate()\n"
+             "                        render()\n")
 
 UP_CLICK = ("                r.up:SetScript(\"OnClick\", function()\n"
             "                    Sections:Move(id, -1)\n"
@@ -43,14 +50,14 @@ DOWN_CLICK = ("                r.down:SetScript(\"OnClick\", function()\n"
               "                    renderOrderRows()\n"
               "                    ns.Util.Tooltip():Hide()\n")
 
-COG_BOX = ('        display:Add(self:CreateCheckbox(content, L["Show the options cogwheel on the tracker"],\n'
+COG_BOX = ('        headers:Add(self:CreateCheckbox(content, L["Show the options cogwheel on the tracker"],\n'
            '            function() return DB().showOptionsIcon ~= false end,\n'
            '            function(v)\n'
            '                DB().showOptionsIcon = v\n'
            '                ns:GetModule("Tracker"):ApplyHeaderIcons()\n'
            '            end,\n'
            '            L["A small cogwheel at the top-right of the tracker that opens the options panel."]))\n')
-SORT_BOX = ('        display:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n'
+SORT_BOX = ('        headers:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n'
             '            function() return DB().showSortButton == true end,\n'
             '            function(v)\n'
             '                DB().showSortButton = v\n'
@@ -59,8 +66,8 @@ SORT_BOX = ('        display:Add(self:CreateCheckbox(content, L["Show the sort b
             '            L["A small button at the top-left of the tracker that opens a list of the sort orders, so you'
             ' can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card.'
             ' Off by default."]))\n')
-UNFOCUS_OPEN = '            display:Add(self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],\n'
-ACCEPT_OPEN = '            display:Add(self:CreateCheckbox(content, L["Focus newly accepted quests"],\n'
+UNFOCUS_OPEN = '            clicking:Add(self:CreateCheckbox(content, L["Click a focused quest to unfocus it"],\n'
+ACCEPT_OPEN = '            clicking:Add(self:CreateCheckbox(content, L["Focus newly accepted quests"],\n'
 ST_GUARD = '        if ns.Has.SuperTrack then\n' + UNFOCUS_OPEN
 UNFOCUS_BOX = (UNFOCUS_OPEN +
                '                function() return DB().clickToUnfocus == true end,\n'
@@ -131,12 +138,12 @@ MUTANTS = [
     ("a box is built for a section the TOC never loaded", [
         (T, "            if liveSections[id] then\n", "            if true then\n")]),
 
-    # ------------------------------------------------------------------- the Options card
+    # ------------------------------------------------- the boxes that were on the Options card
     # The difficulty box became one choice of Quest Title Color on Appearance. These three put
     # back what its removal took away, or break the box that took its place in the card.
     ("the difficulty box comes back to this tab", [
         (T, "        local lvl = self:CreateCheckbox(content, L[\"Show quest level prefix\"],\n",
-            "        display:Add(self:CreateCheckbox(content, L[\"Quest Title Color By Difficulty\"],\n"
+            "        questRows:Add(self:CreateCheckbox(content, L[\"Quest Title Color By Difficulty\"],\n"
             "            rowSetting(\"colorByDifficulty\", true)))\n"
             "        local lvl = self:CreateCheckbox(content, L[\"Show quest level prefix\"],\n")]),
 
@@ -399,12 +406,12 @@ MUTANTS = [
 
     # ------------------------------------------------------- the two focus boxes (2.2.0)
     ("the focus boxes are built on Classic too, where a click already toggles", [
-        (T, "        if ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused",
-            "        if true then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
+        (T, "        if ns.Has.SuperTrack then\n            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused",
+            "        if true then\n            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
 
     ("the focus boxes are built only on Classic", [
-        (T, "        if ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused",
-            "        if not ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
+        (T, "        if ns.Has.SuperTrack then\n            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused",
+            "        if not ns.Has.SuperTrack then\n            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
 
     ("the unfocus box reads on while unset", [
         (T, "                function() return DB().clickToUnfocus == true end,\n",
@@ -443,24 +450,24 @@ MUTANTS = [
             "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]), { dependent = true })\n")]),
 
     ("the unfocus box is built but never added to the card", [
-        (T, "            display:Add(self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n",
+        (T, "            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n",
             "            local _ = (self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n")]),
 
     ("the two boxes are added the other way round", [
-        (T, "            display:Add(self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n",
+        (T, "            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n",
             "            local unfocusBox = (self:CreateCheckbox(content, L[\"Click a focused quest to unfocus it\"],\n"),
         (T, "                L[\"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.\"]))\n",
             "                L[\"While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused.\"]))\n"
-            "            display:Add(unfocusBox)\n")]),
+            "            clicking:Add(unfocusBox)\n")]),
 
     ("the focus boxes are added above Split quest click", [
         (T, "        local splitCheck = self:CreateCheckbox(content, L[\"Split quest click\"],\n"
             "            trackerSetting(\"splitQuestClick\"))\n"
-            "        display:Add(splitCheck)\n",
+            "        clicking:Add(splitCheck)\n",
             "        local splitCheck = self:CreateCheckbox(content, L[\"Split quest click\"],\n"
             "            trackerSetting(\"splitQuestClick\"))\n"),
         (T, "Turn this off to leave new quests unfocused.\"]))\n        end\n",
-            "Turn this off to leave new quests unfocused.\"]))\n        end\n        display:Add(splitCheck)\n")]),
+            "Turn this off to leave new quests unfocused.\"]))\n        end\n        clicking:Add(splitCheck)\n")]),
 
     # ------------------------------------------- found by the pre-release scan's hand-breaks
     ("the unfocus box also writes Split quest click's key", [
@@ -485,8 +492,8 @@ MUTANTS = [
             "                function() return DB().focusAcceptedQuests ~= false and DB().clickToUnfocus ~= true end,\n")]),
 
     ("the focus boxes are built on Classic, where super-track reads false", [
-        (T, "        if ns.Has.SuperTrack then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused",
-            "        if ns.Has.SuperTrack ~= nil then\n            display:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
+        (T, "        if ns.Has.SuperTrack then\n            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused",
+            "        if ns.Has.SuperTrack ~= nil then\n            clicking:Add(self:CreateCheckbox(content, L[\"Click a focused")]),
 
     ("the unfocus box is added full width", [
         (T, "                L[\"Click the focused quest again to unfocus it. With Split quest click on, click its icon.\"]))\n",
@@ -509,7 +516,7 @@ MUTANTS = [
     # The library appends a checkbox to its parent's _controls, which only the content carries,
     # so either of these stops the whole tab building in game.
     ("the unfocus box is built on the card, not the tab's content", [
-        (T, UNFOCUS_OPEN, UNFOCUS_OPEN.replace("CreateCheckbox(content,", "CreateCheckbox(display,"))]),
+        (T, UNFOCUS_OPEN, UNFOCUS_OPEN.replace("CreateCheckbox(content,", "CreateCheckbox(clicking,"))]),
 
     ("the accept box is built with no parent", [
         (T, ACCEPT_OPEN, ACCEPT_OPEN.replace("CreateCheckbox(content,", "CreateCheckbox(nil,"))]),
@@ -520,7 +527,7 @@ MUTANTS = [
          '                function() return DB().clickToUnfocus == true end,\n'
          '                function(v) DB().clickToUnfocus = v end,\n'
          '                L["Click the focused quest again to unfocus it. With Split quest click on, click its icon."])\n'
-         '            display:Add(unfocusBox)\n'
+         '            clicking:Add(unfocusBox)\n'
          '            self:SetDependent(unfocusBox, DB().splitQuestClick == true)\n')]),
 
     ("the accept box is dimmed while Auto track accepted quests is off", [
@@ -529,7 +536,7 @@ MUTANTS = [
          '                function() return DB().focusAcceptedQuests ~= false end,\n'
          '                function(v) DB().focusAcceptedQuests = v end,\n'
          '                L["While nothing is focused, the game focuses each quest you accept. Turn this off to leave new quests unfocused."])\n'
-         '            display:Add(acceptBox)\n'
+         '            clicking:Add(acceptBox)\n'
          '            self:SetDependent(acceptBox, (ns:GetModule("DB"):General() or {}).autoTrackAccepted ~= false)\n')]),
 
     ("the unfocus box's setter invalidates every row and redraws, for a key no row reads", [
@@ -713,8 +720,8 @@ MUTANTS = [
             "                ns:GetModule(\"Tracker\"):Render()\n")]),
 
     ("the filter button box is labeled in English", [
-        (T, '        display:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],\n',
-            '        display:Add(self:CreateCheckbox(content, "Show the filter button on the tracker",\n')]),
+        (T, '        headers:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],\n',
+            '        headers:Add(self:CreateCheckbox(content, "Show the filter button on the tracker",\n')]),
 
     ("the filter button box ships on in Core/DB.lua", [
         ("Core/DB.lua", "            showFilterButton     = false,\n", "            showFilterButton     = true,\n")]),
@@ -744,8 +751,8 @@ MUTANTS = [
             "                DB().showSortButton = v\n                ns:GetModule(\"Tracker\"):ApplyHeaderIcons()\n"
             "                render()\n")]),
 
-    ("the sort button box is built but never added to the Options card", [
-        (T, '        display:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n',
+    ("the sort button box is built but never added to its card", [
+        (T, '        headers:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n',
             '        (self:CreateCheckbox(content, L["Show the sort button on the tracker"],\n')]),
 
     ("the sort button box sits above the cogwheel's", [
@@ -833,20 +840,18 @@ MUTANTS = [
             '                function() return DB().showMythicPlusTimer ~= false end,\n'
             '                function(v) DB().showMythicPlusTimer = v; render() end)\n')]),
     ("the Mythic+ timer box is never added to the card", [
-        (T, "            display:Add(mplusCheck)\n", "")]),
-    ("the Mythic+ timer box goes under Show quest ID", [
-        (T, "            display:Add(mplusCheck)\n", ""),
-        (T, "        display:Add(qidCheck)\n", "        display:Add(qidCheck)\n        if mplusCheck then display:Add(mplusCheck) end\n"),
-        (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            local mplusCheck', '        local mplusCheck\n        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n            mplusCheck')]),
+        (T, "            scenarios:Add(mplusCheck)\n", "")]),
+    ("the Mythic+ timer box goes on the Quest Row Details card", [
+        (T, "            scenarios:Add(mplusCheck)\n", "            questRows:Add(mplusCheck)\n")]),
     ("the Mythic+ timer box borrows the widgets box's tooltip", [
         (T, '                L["During a Mythic+ run, draws the keystone level',
             '                L["Draws the extra bars and status lines the default tracker shows during world events, delves and scenarios, such as an event\'s progress bar or a delve\'s tier. This tracker replaces the default one, so without this those are not shown anywhere."] or L["During a Mythic+ run, draws the keystone level')]),
     ("the Mythic+ timer box has no tooltip title", [
         (T, '            self:AttachTooltip(mplusCheck, L["Show the Mythic+ timer"],\n', "            self:AttachTooltip(mplusCheck, nil,\n")]),
     ("the Mythic+ timer box is indented", [
-        (T, "            display:Add(mplusCheck)\n", "            display:Add(mplusCheck, { dependent = true })\n")]),
+        (T, "            scenarios:Add(mplusCheck)\n", "            scenarios:Add(mplusCheck, { dependent = true })\n")]),
     ("the Mythic+ timer box is added full width", [
-        (T, "            display:Add(mplusCheck)\n", "            display:Add(mplusCheck, { fill = true })\n")]),
+        (T, "            scenarios:Add(mplusCheck)\n", "            scenarios:Add(mplusCheck, { fill = true })\n")]),
     ("the Mythic+ timer box is built with no scenario provider", [
         (T, '        if ns.Has.ChallengeTimer and ns:GetModule("Registry"):Get("scenarios") then\n',
             '        if ns.Has.ChallengeTimer then\n')]),
@@ -882,6 +887,104 @@ MUTANTS = [
     ("Show section tabs redraws before storing", [
         (T, "                    DB().showTabs = v\n                    render()\n                    renderOrderRows()\n",
             "                    render()\n                    DB().showTabs = v\n                    renderOrderRows()\n")]),
+    # The author's split of the Options card (2026-10-16): five cards in its place, in order, each
+    # holding its own rows, built on the tab's content and hung one gap under the card before it.
+    ("the Options card comes back in place of Quest Row Details", [
+        (T, '        local questRows = self:CreateGroup(content, L["Quest Row Details"])\n',
+            '        local questRows = self:CreateGroup(content, L["Options"])\n')]),
+    ("Headers and Buttons and Clicking and Focus swap titles", [
+        (T, '        local headers = self:CreateGroup(content, L["Headers and Buttons"])\n',
+            '        local headers = self:CreateGroup(content, L["Clicking and Focus"])\n'),
+        (T, '        local clicking = self:CreateGroup(content, L["Clicking and Focus"])\n',
+            '        local clicking = self:CreateGroup(content, L["Headers and Buttons"])\n')]),
+    ("Quest Row Details hangs under Tracker Visibility, over Section Order", [
+        (T, '        questRows:SetPoint("TOPLEFT", order, "BOTTOMLEFT", 0, -gap)\n',
+            '        questRows:SetPoint("TOPLEFT", visibility, "BOTTOMLEFT", 0, -gap)\n')]),
+    ("Headers and Buttons keeps only its left edge on the card above", [
+        (T, '        headers:SetPoint("TOPRIGHT", questRows, "BOTTOMRIGHT", 0, -gap)\n', '')]),
+    ("Clicking and Focus hangs under Quest Row Details, over Headers and Buttons", [
+        (T, '        clicking:SetPoint("TOPLEFT", headers, "BOTTOMLEFT", 0, -gap)\n'
+            '        clicking:SetPoint("TOPRIGHT", headers, "BOTTOMRIGHT", 0, -gap)\n',
+            '        clicking:SetPoint("TOPLEFT", questRows, "BOTTOMLEFT", 0, -gap)\n'
+            '        clicking:SetPoint("TOPRIGHT", questRows, "BOTTOMRIGHT", 0, -gap)\n')]),
+    ("Scenarios and Popups sits flush against the card above, with no gap", [
+        (T, '        scenarios:SetPoint("TOPLEFT", clicking, "BOTTOMLEFT", 0, -gap)\n'
+            '        scenarios:SetPoint("TOPRIGHT", clicking, "BOTTOMRIGHT", 0, -gap)\n',
+            '        scenarios:SetPoint("TOPLEFT", clicking, "BOTTOMLEFT", 0, 0)\n'
+            '        scenarios:SetPoint("TOPRIGHT", clicking, "BOTTOMRIGHT", 0, 0)\n')]),
+    ("Sounds overlaps the card above by a gap on its right edge", [
+        (T, '        sounds:SetPoint("TOPRIGHT", scenarios, "BOTTOMRIGHT", 0, -gap)\n',
+            '        sounds:SetPoint("TOPRIGHT", scenarios, "BOTTOMRIGHT", 0, gap)\n')]),
+    ("the Sounds card is built inside Scenarios and Popups, not on the tab's content", [
+        (T, '        local sounds = self:CreateGroup(content, L["Sounds"])\n',
+            '        local sounds = self:CreateGroup(scenarios, L["Sounds"])\n')]),
+    ("the NEW tag box lands on the Section Order card", [
+        (T, '        questRows:Add(newTagCheck)\n', '        order:Add(newTagCheck)\n')]),
+    ("the quest ID box is added to Scenarios and Popups as well", [
+        (T, '        scenarios:Add(widgetCheck)\n', '        scenarios:Add(widgetCheck)\n        scenarios:Add(qidCheck)\n')]),
+    ("the header count box lands on Quest Row Details", [
+        (T, '        headers:Add(self:CreateCheckbox(content,\n            L["Show the visible / total count on section headers"],\n',
+            '        questRows:Add(self:CreateCheckbox(content,\n            L["Show the visible / total count on section headers"],\n')]),
+    ("the filter button box lands on Quest Row Details", [
+        (T, '        headers:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],\n',
+            '        questRows:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],\n')]),
+    ("Split quest click lands on Headers and Buttons", [
+        (T, '        clicking:Add(splitCheck)\n', '        headers:Add(splitCheck)\n')]),
+    ("Split quest click is added only where super-track exists, so Classic's card is empty", [
+        (T, '        clicking:Add(splitCheck)\n', '        if ns.Has.SuperTrack then clicking:Add(splitCheck) end\n')]),
+    ("Show Quest Discovered popups lands on Clicking and Focus", [
+        (T, '        scenarios:Add(self:CreateCheckbox(content, L["Show Quest Discovered popups"],\n',
+            '        clicking:Add(self:CreateCheckbox(content, L["Show Quest Discovered popups"],\n')]),
+    ("Quest Sound lands on Scenarios and Popups", [
+        (T, '        sounds:Add(self:CreateCheckbox(content, L["Quest Sound"],\n',
+            '        scenarios:Add(self:CreateCheckbox(content, L["Quest Sound"],\n')]),
+
+    # ------------------------------------------------------------------------ the delve boxes
+    ("the widgets box stops relighting the delve boxes", [
+        (T, "                widgetSet(v)\n                syncDelveRows()\n", "                widgetSet(v)\n")]),
+    ("the delve boxes are not dimmed to match at build", [
+        (T, DELVE_SYNC, "            content._syncDelveRows = syncDelveRows\n")]),
+    ("refresh is never handed the delve boxes", [
+        (T, DELVE_SYNC, "            syncDelveRows()\n")]),
+    ("refresh skips the delve boxes", [
+        (T, "        if content._syncDelveRows then content._syncDelveRows() end\n", "")]),
+    ("the delve boxes are lit while the widgets box is off", [
+        (T, "            for _, r in ipairs(delveRows) do self:SetDependent(r, widgetGet()) end\n",
+            "            for _, r in ipairs(delveRows) do self:SetDependent(r, not widgetGet()) end\n")]),
+    ("the delve boxes are built on Forever", [
+        (T, DELVE_GATE, "        if ns.Has.DelveHeader and ns:GetModule(\"Registry\"):Get(\"scenarios\") then\n")]),
+    ("the delve boxes are built with no delve widget", [
+        (T, DELVE_GATE, "        if ns:GetModule(\"Registry\"):Get(\"scenarios\") and not ns.IsForever() then\n")]),
+    ("the delve boxes are built on Era and TBC, which carry the delve call but no scenario provider", [
+        (T, DELVE_GATE, "        if ns.Has.DelveHeader and not ns.IsForever() then\n")]),
+    ("a delve box reads unset as off", [
+        (T, "                    function() return DB()[key] ~= false end,\n",
+            "                    function() return DB()[key] == true end,\n")]),
+    ("a delve box writes nothing", [
+        (T, DELVE_SET, DELVE_SET.replace("                        DB()[key] = v\n", ""))]),
+    ("a delve box keeps the widget snapshot", [
+        (T, DELVE_SET, DELVE_SET.replace("                        ns:GetModule(\"Widgets\"):Invalidate()\n", ""))]),
+    ("a delve box does not redraw", [
+        (T, DELVE_SET, DELVE_SET.replace("                        render()\n", ""))]),
+    ("a delve box redraws before the snapshot drops", [
+        (T, DELVE_SET, "                        DB()[key] = v\n"
+                       "                        render()\n"
+                       "                        ns:GetModule(\"Widgets\"):Invalidate()\n")]),
+    ("a delve box invalidates the rows instead", [
+        (T, DELVE_SET, DELVE_SET.replace("ns:GetModule(\"Widgets\")", "ns:GetModule(\"Row\")"))]),
+    ("the delve boxes are not indented", [
+        (T, "            for _, r in ipairs(delveRows) do scenarios:Add(r, { dependent = true }) end\n",
+            "            for _, r in ipairs(delveRows) do scenarios:Add(r) end\n")]),
+    ("the lives box writes the nemesis key", [
+        (T, '            delveRows[1] = delveBox(L["Show delve lives"], "showDelveLives",\n',
+            '            delveRows[1] = delveBox(L["Show delve lives"], "showNemesisGroups",\n')]),
+    ("the nemesis box writes the lives key", [
+        (T, '            delveRows[2] = delveBox(L["Show nemesis groups"], "showNemesisGroups",\n',
+            '            delveRows[2] = delveBox(L["Show nemesis groups"], "showDelveLives",\n')]),
+    ("Core/DB.lua ships the lives off", [
+        (DBF, "            showDelveLives       = true,\n", "            showDelveLives       = false,\n")]),
+    ("Core/DB.lua ships the nemesis groups off", [
+        (DBF, "            showNemesisGroups    = true,\n", "            showNemesisGroups    = false,\n")]),
 ]
 
 SUMMARY = re.compile(r"^test_tracker_tab: (\d+) passed, (\d+) failed$")

@@ -60,6 +60,8 @@ Has.QuestProgressBar    = global("GetQuestProgressBarPercent")
 -- Bare globals with no C_ twin, so global() rather than method(). The pair Blizzard's own
 -- QuestTimerFrame reads - the provider carries why that pair rather than another.
 Has.QuestTimers         = global("GetQuestTimers") and global("GetQuestIndexForTimer")
+-- What Blizzard's retail tracker draws a timed quest's bar from.
+Has.QuestTimeAllowed    = method(C_QuestLog, "GetTimeAllowed")
 Has.TaskQuestProgressBar = method(C_TaskQuest, "GetQuestProgressBarInfo")
 Has.WorldQuestWatchAPI  = method(C_QuestLog, "RemoveWorldQuestWatch")
 Has.WorldQuestWatchAdd  = method(C_QuestLog, "AddWorldQuestWatch")
@@ -81,6 +83,8 @@ Has.ChallengeTimer      = method(C_ChallengeMode, "GetActiveChallengeMapID")
                           and method(C_ChallengeMode, "GetMapUIInfo")
                           and method(C_ChallengeMode, "GetActiveKeystoneInfo")
                           and global("GetWorldElapsedTimers") and global("GetWorldElapsedTime")
+-- The delve header widget, which carries the tier and the lives.
+Has.DelveHeader         = method(C_UIWidgetManager, "GetScenarioHeaderDelvesWidgetVisualizationInfo")
 Has.Atlas               = method(C_Texture, "GetAtlasInfo")
 Has.AddOns              = method(C_AddOns, "IsAddOnLoaded")
 
@@ -95,4 +99,12 @@ do
     local probe = CreateFrame("Frame")
     Has.ResizeBounds = type(probe.SetResizeBounds) == "function"
     probe:SetParent(nil)
+end
+
+-- An exception to the rule at the top, as Data/Focus.lua's and UI/RowMenu.lua's own copies are. WoW
+-- Forever runs the retail client with retail's API and project id but 1.x content, so only the
+-- packager's interface range tells it apart.
+function ns.IsForever()
+    local toc = tonumber((select(4, GetBuildInfo())))
+    return toc ~= nil and toc >= 16000 and toc < 17000
 end

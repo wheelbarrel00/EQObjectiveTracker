@@ -26,6 +26,9 @@ local ui = EUI:NewContext({
         discordTip      = L["Click to copy the invite link."],
         testSound       = L["Plays the currently selected sound."],
         clear           = L["Clear"],
+        search          = L["Search settings"],
+        searchEmpty     = L["No settings match"],
+        searchTitle     = L["Search results"],
     },
     getLastTab = function()
         local c = ns:GetModule("DB"):Char()
@@ -67,8 +70,11 @@ function Options:SelectTab(id)
 end
 
 -- Viewing a tab again re-reads every control on it, so a setting changed from the tracker shows on
--- the tab at once when that tab is the one on screen.
+-- the tab at once when that tab is the one on screen. Viewing it would end a search, so search results
+-- stay up, and the tab is read again when a result or the sidebar opens it.
 function Options:RefreshIfShown(id)
+    local search = self.frame and self.frame.search
+    if search and search:GetText():match("%S") then return end
     local c = ns:GetModule("DB"):Char()
     if self.frame and self.frame:IsShown() and c and c.lastOptionsTab == id then ui:SelectTab(id) end
 end

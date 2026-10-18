@@ -477,6 +477,10 @@ local function refreshRig(o)
     local O = {}
     if o.frame ~= nil then
         O.frame = { IsShown = function(self) return self.shownFlag end, shownFlag = o.frame }
+        -- The library's search field, whose GetText reads its box. A window from an older copy has none.
+        if o.search ~= nil then
+            O.frame.search = { GetText = function() return o.search end }
+        end
     end
     local chunk = assert(loadstring(refreshSrc, "refresh-if-shown"))
     setfenv(chunk, setmetatable({ Options = O, ui = ui, ns = ns }, { __index = _G }))
@@ -504,6 +508,25 @@ case("RefreshIfShown views a tab again only when it is the one on screen", funct
     st = refreshRig({ frame = true, noChar = true })
     ok(pcall(function() st.O:RefreshIfShown("tracker") end) and #st.selected == 0,
        "no character settings: nothing, and no error")
+end)
+
+-- The author, 2026-10-17: a sort, filter or lock picked on the tracker leaves an open search alone.
+case("RefreshIfShown leaves search results up and views the tab again once the search is gone", function()
+    local st = refreshRig({ frame = true, search = "sort", char = { lastOptionsTab = "tracker" } })
+    st.O:RefreshIfShown("tracker")
+    ok(#st.selected == 0, "a search on screen is left up, so its results stay")
+    st = refreshRig({ frame = true, search = "", char = { lastOptionsTab = "tracker" } })
+    st.O:RefreshIfShown("tracker")
+    ok(#st.selected == 1 and st.selected[1] == "tracker", "an empty search field: the tab is viewed again")
+    st = refreshRig({ frame = true, search = "   ", char = { lastOptionsTab = "tracker" } })
+    st.O:RefreshIfShown("tracker")
+    ok(#st.selected == 1, "spaces alone are no search, as the library reads them")
+    st = refreshRig({ frame = true, search = " x ", char = { lastOptionsTab = "tracker" } })
+    st.O:RefreshIfShown("tracker")
+    ok(#st.selected == 0, "a word with spaces round it is one")
+    st = refreshRig({ frame = true, search = "sort", noChar = true })
+    ok(pcall(function() st.O:RefreshIfShown("tracker") end) and #st.selected == 0,
+       "a search with no character settings: nothing, and no error")
 end)
 
 -- ------------------------------------------------------------- the public API's header icons

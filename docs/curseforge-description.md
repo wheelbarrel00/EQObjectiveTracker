@@ -18,7 +18,7 @@ The tracker shows your quests on Forever, and with Everything Quests and TomTom 
 
 ## At a glance
 
-*   Replaces Blizzard's objective tracker with a frame you can move, resize and scroll
+*   Replaces Blizzard's objective tracker with a frame you can move, resize and scroll, and while it is unlocked a gold strip along its top shows where to drag it
 *   Prefer Blizzard's own tracker? One checkbox brings it back, and the quest sounds and most other parts that don't need the window keep running
 *   Runs on Retail, Classic Era and TBC Anniversary, and on WoW Forever as a work in progress
 *   Tracks quests, campaign quests, world quests, bonus objectives, scenarios, delves, achievements, professions and endeavors on Retail, and quests on Classic and Forever
@@ -28,14 +28,15 @@ The tracker shows your quests on Forever, and with Everything Quests and TomTom 
 *   On Retail and Forever, optionally click the quest you are following to unfocus it, or stop the game focusing each quest you accept while nothing is focused
 *   Pin a quest to keep it on screen no matter how your filters are set
 *   Hover a quest to see its objectives and full rewards, with item level compared against what you have equipped
+*   Timed quests count down on their row, in seconds through the last minute
 *   Eight sort orders, including by distance and a manual order you drag into place, and an optional button on the tracker to switch between them in two clicks
 *   Filter by quest type, or show only the quests with an objective in your current zone, on Retail optionally keeping your campaign quests from every zone
 *   An optional filter button on the tracker lists the zone filter and every quest type in one menu, and turns gold while any of them is set to hide quests
-*   Split your sections across up to three tabs on Retail and Forever, switched from a strip at the top of the tracker
+*   Split your sections across up to three tabs on Retail, switched from a strip at the top of the tracker
 *   Collapse, hide and reorder your sections, and keep a section's header in view while you scroll through it
 *   Group your quests under a header for each zone, each collapsing on its own, with the zones on your map first or in alphabetical order
 *   Gather your dungeon quests, heroic ones included, under one Dungeons header, with or without zone headers, and keep it at the bottom if you like
-*   Fonts, sizes, spacing, colors, progress bars, the card layout and borders are all yours to change
+*   Fonts, sizes, spacing, colors, progress bars, the card layout, borders and the scroll bar, down to a slim strip, are all yours to change
 *   Color quest titles by difficulty, in gold, in your class color, in a color you pick, or the way the game's own tracker does, and give the objective text, progress counts, finished objectives, finished quest titles and the NEW tag their own colors
 *   Fade the tracker down to as little as 10% opacity, with it coming back to full under the mouse and the quest you are following kept solid
 *   Shows a Mythic+ key's timer, keystone level, affixes and deaths, with the time left for +3 and +2, though it is not yet tested in a real key
@@ -81,9 +82,11 @@ On Retail and Forever both trackers use the game's own list of tracked quests. O
 
 **A filter button**, off by default: turn on **Show the filter button on the tracker** on the Tracker tab for a funnel beside the sort button. Its list holds **Show only quests in current zone**, the quest types from the Filters card and **Reset filters to defaults**, and stays open while you check boxes, so several filters change in one go. The funnel turns gold while any of them is set to hide quests.
 
-**Section tabs**, on Retail and Forever, off by default: turn on **Show section tabs** on the Section Order card and the number beside each section, World Quests included, picks one of up to three tabs. Once two tabs hold a section, a strip under the top of the tracker switches between them, each tab named after its sections. The scenario panel shows on every tab, and each character keeps the tab it was on.
+**Section tabs**, on Retail, off by default: turn on **Show section tabs** on the Section Order card and the number beside each section, World Quests included, picks one of up to three tabs. Once two tabs hold a section, a strip under the top of the tracker switches between them, each tab named after its sections. The scenario panel shows on every tab, and so does a quest popup box, under its own section's header, and each character keeps the tab it was on.
 
 **Quests you hand in from the tracker.** A finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt, shows a "click to complete" line, and left clicking it should open the reward window. That could not be tested on a finished hunt before release, so please report anything that looks wrong.
+
+**Timed quests**, on Retail and Forever, count down on their row and in their tooltip, in seconds through the last minute, as they do on Classic. `/eqot timer test` puts a two-minute sample on one of your quests so you can see it without finding a timed quest.
 
 **Hovering any quest** shows its objectives and everything it pays out: money, experience, currencies, and items with their item level set against what you are wearing.
 
@@ -91,7 +94,7 @@ On Retail and Forever both trackers use the game's own list of tracked quests. O
 
 **Bonus objectives** get a section of their own, the way the default tracker gives them one. They appear when you walk into one and go away when you leave, and they have their own filter, so you can turn them off without touching world quests.
 
-**Scenarios and delves** draw the stage banner and its criteria, including weighted progress bars, along with the stage countdown, the delve tier, and a clickable button for any spell the stage hands you.
+**Scenarios and delves** draw the stage banner and its criteria, including weighted progress bars, along with the stage countdown, the delve tier, and a clickable button for any spell the stage hands you. Two switches on the Tracker tab, on by default, put the lives left and the nemesis groups killed on a delve's tier row, from Tier 4 up, with the game's own icons and tooltips: the lives turn orange at 2 and red at 1, and a check mark shows once every nemesis group is dead.
 
 **Mythic+ keys** get the key's own panel in the stage banner's place, the way the default tracker draws it: the keystone level, the affixes with their descriptions on hover, the time left with a bar that runs down, and the deaths, with the time they cost on hover. Under the bar it lists the time left for +3 and +2, and the bar is marked where each one runs out. The boss and Enemy Forces lines stay under it. Show the Mythic+ timer on the Tracker tab turns it off if you use a separate timer addon, and `/eqot mplus test` draws a sample key so you can see it without running one. **This could not be tested in a real key before release**, so please report anything that looks wrong, with what `/eqot mplus` prints during the key.
 
@@ -109,7 +112,11 @@ On Retail and Forever both trackers use the game's own list of tracked quests. O
 
 **A zone progress bar** shows how far through a Midnight zone's questlines you are, either floating on its own or docked into the tracker as a section you can reorder.
 
-**Make it yours.** Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick, or in Original Style, the way the game's own tracker colors them on your version of the game. The objective text, a count like 0/5 as it goes from none done to in progress to done, finished objectives, the title of a finished quest and the NEW tag on quests you accepted in the last hour can each take a color of their own. There are 42 bundled fonts plus anything from LibSharedMedia, each shown in its own typeface in the picker, 7 status bar textures, and 31 sounds (27 voice lines and 4 chimes), plus a card layout with quest type tints, border thickness, header bars, section and zone headers that stay in view while you scroll, zone headers with a size, color, bar, divider and indent of their own, and scroll bar skinning and width. Settings live in profiles you can switch between.
+**Moving it.** Unlock the tracker and the strip along its top turns gold and reads "Drag to move, corner grip to resize.", with a check button that locks it again and a gold outline around the tracker, so you can see exactly what moves. It shows while the options window is open, or right after you unlock it. Right click that strip or the cogwheel to unlock or lock it, reset its position and size, or open the options.
+
+**Make it yours.** Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick, or in Original Style, the way the game's own tracker colors them on your version of the game. The objective text, a count like 0/5 as it goes from none done to in progress to done, finished objectives, the title of a finished quest and the NEW tag on quests you accepted in the last hour can each take a color of their own. There are 42 bundled fonts plus anything from LibSharedMedia, each shown in its own typeface in the picker, 7 status bar textures, and 31 sounds (27 voice lines and 4 chimes), plus a card layout with quest type tints, border thickness, header bars, section and zone headers that stay in view while you scroll, zone headers with a size, color, bar, divider and indent of their own, and a scroll bar with its own background color, a solid color thumb and a Scroll Bar Width slider that narrows the bar to a flat strip as slim as 4 pixels and gives the quest text the room it frees. Settings live in profiles you can switch between.
+
+**Find any setting.** A search field at the top of the options window's sidebar lists, as you type, every setting whose name matches in your game's language, with the tab and card it lives on. Click one, or press Enter for the first, and the window opens that tab, scrolls to the setting and flashes it.
 
 **Read the changelog in game.** The About tab carries the full release history, the commands, a Discord link, and a live view of what each section is currently producing.
 
@@ -119,7 +126,7 @@ On Retail and Forever both trackers use the game's own list of tracked quests. O
 
 ## On Classic Era and TBC Anniversary
 
-Everything the tracker is actually for works on Classic: quests with zone subtitles, objectives and progress, the sort orders, manual drag ordering, per-quest pinning, filters, section visibility and ordering, zone headers, the card layout, all 42 fonts, the color options, profiles, row tooltips and the row right click menu. Blizzard's own quest watch frame is hidden, so you do not get two trackers.
+Everything the tracker is actually for works on Classic: quests with zone subtitles, objectives and progress, the sort orders and the sort button, manual drag ordering, per-quest pinning, filters and the filter button, section visibility and ordering, zone headers, the card layout, the scroll bar width, all 42 fonts, the color options, profiles, row tooltips and the row right click menu. Blizzard's own quest watch frame is hidden, so you do not get two trackers.
 
 **No five quest cap.** The tracker keeps its own list of the quests you are tracking rather than using the game's, which on these versions is capped at five and cannot track a quest automatically when you accept it. So "Auto-track accepted quests" works, "Show only tracked quests" can show more than five, and shift clicking a quest in the game's own quest log still tracks and untracks it, with its checkmarks showing this tracker's list.
 
@@ -145,6 +152,8 @@ Everything the tracker is actually for works on Classic: quests with zone subtit
 *   `/eqot debug` toggles entry validation warnings
 *   `/eqot bonushud` prints what the bonus objectives HUD can see, or `test` to place it
 *   `/eqot mplus` prints what the tracker read for the current Mythic+ key, or `test` or `late` to draw a sample key
+*   `/eqot popup` prints the quest popups the tracker read, or `test` to draw a sample Quest Discovered box
+*   `/eqot timer` prints the quest timers the tracker read on Retail and Forever, or `test` to put a two-minute sample on a quest
 *   `/eqot importeq` replaces this profile with your Everything Quests tracker settings
 *   `/eqot modules` lists the optional parts and which are switched off
 *   `/eqot disable <name>` switches off one part, or `all`, to narrow down a fault
@@ -157,9 +166,9 @@ Everything the tracker is actually for works on Classic: quests with zone subtit
 *   **Retail, Classic Era, TBC Anniversary and WoW Forever.** Retail, Classic Era and TBC Anniversary are supported, and what Classic lacks is listed above. Forever is a work in progress, see the note at the top. Mists of Pandaria Classic is not supported yet.
 *   **No dependencies.** Every library it needs is bundled.
 *   **Profiles** are supported and shared across all your characters, so you can keep different setups and switch between them.
-*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 514 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
+*   **Translated into German, French, Russian, Korean, Simplified Chinese and Traditional Chinese**, thanks to Stonetwist, Zox, Malevi4, labrie75, 失眠啤酒 and BNS333. Every language covers all 525 of the addon's phrases, and anything a later release adds falls back to English on its own until it is translated, so a partial translation is never a broken one.
 *   **World quests sit in their own pinned area** above or below the quest list rather than in the reorderable run, so a long world quest list can never push your quests off screen.
-*   Unlock the tracker to move it: drag the strip along the top, which turns gold with a lock button while the options window is open or after an unlock, and the corner grip to resize it. Right click that strip or the cogwheel to unlock, lock or reset it.
+*   Unlock the tracker to move it: drag the gold strip along the top, or the corner grip to resize it, as described under Moving it above.
 
 ***
 

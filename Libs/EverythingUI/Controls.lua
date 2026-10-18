@@ -334,13 +334,14 @@ function Context:CreateTextRow(content, label, text)
     return holder
 end
 
--- Unlike retail and Forever, Classic keeps the keyboard on a click elsewhere. Called after the box's
--- own focus scripts, since SetScript drops hooks. A client without the event raises on it.
+-- Unlike retail and Forever, Classic keeps the keyboard on a click elsewhere, so this lets go as Mainline's
+-- ClearCurrentKeyboardFocus does: on a left click with no modifier held. Called after the box's own focus
+-- scripts, since SetScript drops hooks. A client without the event raises on it.
 local function releaseOnClickAway(box, area)
     if not pcall(box.RegisterEvent, box, "GLOBAL_MOUSE_DOWN") then return end
     box:UnregisterEvent("GLOBAL_MOUSE_DOWN")
-    box:SetScript("OnEvent", function(b)
-        if not area:IsMouseOver() then b:ClearFocus() end
+    box:SetScript("OnEvent", function(b, _, button)
+        if button == "LeftButton" and not IsModifierKeyDown() and not area:IsMouseOver() then b:ClearFocus() end
     end)
     box:HookScript("OnEditFocusGained", function(b) b:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
     box:HookScript("OnEditFocusLost", function(b) b:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)

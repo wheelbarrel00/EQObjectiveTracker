@@ -82,6 +82,8 @@ local trackerSrc = readFile("UI/Tracker.lua")
 local tabsSrc  = between(trackerSrc, "function Tracker:SectionTab(groupID)\n", "function Tracker:RebuildHeaderIcons()\n")
 local insetSrc = throughEnd(trackerSrc, "function Tracker:ApplyContentInset()\n")
 local lineSrc  = throughEnd(trackerSrc, "function Tracker:TabsLine()\n")
+-- The empty group and the helper that hands it to a section drawn on another tab.
+local groupSrc = between(trackerSrc, "local EMPTY_GROUP = ", "-- Layouts one row is given before")
 local stripSrc = between(trackerSrc, '    local tabStrip = CreateFrame("Frame", nil, f)\n',
                          '    local eventsRegion = CreateFrame("Frame", nil, f)\n')
 local LOOP_LINE = "    for _, groupID in ipairs(self:_OrderOnTab(Sections:Order(), activeTab)) do\n"
@@ -145,6 +147,24 @@ function FONTSTRING:SetTextColor(r, g, b) self.color = { r, g, b } end
 
 local st
 
+-- The shipped Core/Compat.lua run over one interface number, so the Forever test is the real one.
+local compatByToc = {}
+local function compatFor(toc)
+    local key = toc or "none"
+    if compatByToc[key] then return compatByToc[key] end
+    local cns = {}
+    local chunk = assert(loadfile(repoFile("Core/Compat.lua")))
+    setfenv(chunk, setmetatable({
+        GetBuildInfo = function() return "1.0.0", "1", "Jan 1 2026", toc end,
+        CreateFrame = function() return { SetResizeBounds = function() end, SetParent = function() end } end,
+    }, { __index = _G }))
+    chunk("EQObjectiveTracker", cns)
+    assert(type(cns.IsForever) == "function", "Core/Compat.lua defines ns.IsForever")
+    compatByToc[key] = cns
+    return cns
+end
+
+-- o.toc is the client's interface number, retail's unless a case names another.
 local function load(o)
     o = o or {}
     st = { renders = 0, deferred = 0, tips = {} }
@@ -154,7 +174,7 @@ local function load(o)
     st.cfg, st.char = cfg, char
     local L = setmetatable({}, { __index = function(_, k) return "<" .. k .. ">" end })
     local modules = {}
-    local ns = { L = L }
+    local ns = { L = L, IsForever = compatFor(o.toc or 120100).IsForever }
     function ns:RegisterModule(name, m) modules[name] = m return m end
     function ns:GetModule(name) return modules[name] end
     local db = {}
@@ -173,6 +193,16 @@ local function load(o)
     function zoneBar.IsDocked(self) assert(self == zoneBar, "IsDocked without self") return st.docked == true end
     function zoneBar.HideDocked(self) assert(self == zoneBar, "HideDocked without self") st.zoneHides = st.zoneHides + 1 end
     modules.ZoneProgressBar = zoneBar
+    -- o.popups maps a section to its popup boxes; left out, the module is absent, as before it was read.
+    if o.popups then
+        st.popups = o.popups
+        local popups = {}
+        function popups.CountFor(self, id)
+            assert(self == popups, "CountFor without self")
+            return st.popups[id] or 0
+        end
+        modules.AutoQuestPopups = popups
+    end
     local tip = {}
     function tip:SetOwner(owner, anchor) st.tips[#st.tips + 1] = { owner = owner, anchor = anchor } end
     function tip:SetText(s, r, g, b, a) st.tips[#st.tips].text, st.tips[#st.tips].color = s, { r, g, b, a } end
@@ -202,11 +232,11 @@ local function load(o)
     env.PINNED_GROUP = "worldquests"
     env.headerBand = function() return 20 end
     env.setRegionHeight = function(r, h) r.height = h end
-    local chunk = assert(loadstring(tabsSrc .. insetSrc .. lineSrc .. pinnedSrc .. "    return \"drawn\"\nend\n"
+    local chunk = assert(loadstring(tabsSrc .. insetSrc .. lineSrc .. groupSrc .. pinnedSrc .. "    return \"drawn\"\nend\n"
         .. "\nreturn function(f)\n" .. stripSrc .. "\nend, function(self, f)\n" .. prologueSrc
-        .. "\nreturn activeTab\nend", "tabs-slice"))
+        .. "\nreturn activeTab\nend, EMPTY_GROUP", "tabs-slice"))
     setfenv(chunk, env)
-    st.buildStrip, st.prologue = chunk()
+    st.buildStrip, st.prologue, st.EMPTY = chunk()
     local f = newFrame("Frame")
     f.width = 304
     f.scenarioContainer = newFrame("Frame", f)
@@ -282,6 +312,50 @@ case("on a client with one quest section, tabs saved on in a profile make no str
     ok(st.Tracker:TabsOffered() == false, "the scenario panel is not a second section")
     load({ cfg = { showTabs = true, sectionTab = { quests = 2 } }, groups = { "campaign", "quests" } })
     ok(st.Tracker:TabsOffered() == true and st.Tracker:TabsInUse() ~= nil, "Campaign and Quests: offered, and in use")
+end)
+
+-- Forever loads the retail file list, so every retail section is known there, but only its quests
+-- ever fill (the author, 2026-10-16: hide the box there as on Era and TBC).
+case("WoW Forever offers no tabs, whatever its retail sections and a saved profile say", function()
+    local cfg = { showTabs = true, sectionTab = { quests = 2, achievements = 3 } }
+    load({ cfg = cfg, toc = 16001 })
+    local T = st.Tracker
+    ok(T:TabsOffered() == false, "Forever 16001: not offered")
+    ok(T:TabsInUse() == nil and T:ActiveTab() == nil, "so a profile with tabs on shows no strip")
+    ok(T:TabsLine() == "tabs: on, not offered on this client", "and the status line says why: " .. T:TabsLine())
+    load({ cfg = cfg, toc = 120100 })
+    ok(st.Tracker:TabsOffered() == true and st.Tracker:TabsInUse() ~= nil, "the same profile on retail 120100: offered and in use")
+    -- The packager's Forever range is 16000 to 16999. The other clients EQOT ships for sit on both sides.
+    for _, c in ipairs({ { 16000, true }, { 16999, true }, { 15999, false }, { 17000, false },
+                         { 11509, false }, { 20506, false }, { 120007, false }, { 120105, false } }) do
+        ok(compatFor(c[1]).IsForever() == c[2], "interface " .. c[1] .. " reads as Forever: " .. tostring(c[2]))
+    end
+    local okNil, isForever = pcall(compatFor(nil).IsForever)
+    ok(okNil and isForever == false, "a client that answers no interface number is not Forever, and nothing raises")
+end)
+
+-- The delve boxes and the nemesis event hang on this flag, and every other harness stubs it, so the
+-- real Compat is run over widget managers with and without the delve header's call.
+case("Has.DelveHeader is read off the delve header widget's own call", function()
+    local function delveFlag(manager)
+        local cns = {}
+        local chunk = assert(loadfile(repoFile("Core/Compat.lua")))
+        setfenv(chunk, setmetatable({
+            GetBuildInfo = function() return "12.0.0", "1", "Jan 1 2026", 120100 end,
+            CreateFrame = function() return { SetResizeBounds = function() end, SetParent = function() end } end,
+            C_UIWidgetManager = manager,
+        }, { __index = _G }))
+        chunk("EQObjectiveTracker", cns)
+        return cns.Has and cns.Has.DelveHeader
+    end
+    local fn = function() end
+    ok(delveFlag({ GetScenarioHeaderDelvesWidgetVisualizationInfo = fn }) == true,
+       "a widget manager with GetScenarioHeaderDelvesWidgetVisualizationInfo has the delve header")
+    ok(delveFlag({ GetScenarioHeaderCurrenciesAndBackgroundWidgetVisualizationInfo = fn }) == false,
+       "one with only another header's call does not")
+    ok(delveFlag({ GetScenarioHeaderDelvesWidgetVisualizationInfo = true }) == false,
+       "nor one where the name is not a function")
+    ok(delveFlag(nil) == false, "nor a client with no widget manager")
 end)
 
 case("a section's tab draws only while the section does", function()
@@ -496,6 +570,91 @@ case("the render keeps only the active tab's sections, in order", function()
     ok(table.concat(T:_OrderOnTab(order, 3), ",") == "", "an empty tab: nothing")
     ok(table.concat(T:_OrderOnTab(order, 1), ",") == "zoneprogress,campaign,achievements",
        "and the reused list holds nothing from the call before")
+end)
+
+-- The author's call (2026-10-16): a popup box is that quest's only prompt, so its section joins the
+-- tab on screen, in its Section Order place, with only its boxes under its header.
+case("a section on another tab joins the tab on screen, in its order place, while it has popup boxes", function()
+    load({ cfg = { showTabs = true, sectionTab = { quests = 2, achievements = 3 } }, popups = { quests = 1 } })
+    local T = st.Tracker
+    local order = { "zoneprogress", "campaign", "quests", "achievements" }
+    ok(table.concat(T:_OrderOnTab(order, 1), ",") == "zoneprogress,campaign,quests",
+       "Quests, with a box, joins tab 1 between Campaign and the end, its own order place")
+    ok(table.concat(T:_OrderOnTab(order, 2), ",") == "quests", "its own tab is unchanged")
+    ok(table.concat(T:_OrderOnTab(order, 3), ",") == "quests,achievements",
+       "and it joins tab 3 ahead of Achievements, as the order has it")
+    st.popups.quests = 0
+    ok(table.concat(T:_OrderOnTab(order, 1), ",") == "zoneprogress,campaign",
+       "with no box left it goes back to its own tab")
+    st.popups = { campaign = 2 }
+    st.cfg.sectionTab = { campaign = 3 }
+    ok(table.concat(T:_OrderOnTab(order, 1), ",") == "zoneprogress,campaign,quests,achievements",
+       "Campaign's boxes bring Campaign to tab 1, in its place")
+    ok(T:_OrderOnTab(order, nil) == order, "no tab strip: the whole order, the same table, boxes or not")
+end)
+
+case("a section drawn on another tab brings no rows, only its boxes", function()
+    load({ cfg = { showTabs = true, sectionTab = { quests = 2 } }, popups = { quests = 1 } })
+    local T, E = st.Tracker, st.EMPTY
+    ok(type(E) == "table" and E.visibleCount == 0 and E.totalCount == 0 and #E.entries == 0,
+       "the empty group counts nothing and holds nothing")
+    local rows = { visibleCount = 3, totalCount = 5, entries = { {}, {}, {} } }
+    ok(T:_GroupOnTab("quests", rows, 1) == E, "Quests on tab 2, drawn on tab 1: no rows, its header counts the boxes alone")
+    ok(T:_GroupOnTab("quests", rows, 2) == rows, "on its own tab: its rows")
+    ok(T:_GroupOnTab("campaign", rows, 1) == rows, "a section on the tab on screen keeps its rows")
+    ok(T:_GroupOnTab("quests", rows, nil) == rows, "no tab strip: its rows")
+    ok(T:_GroupOnTab("quests", nil, 2) == E and T:_GroupOnTab("quests", nil, nil) == E,
+       "a section Feed made no group for still draws into the empty one")
+    local code = stripComments(trackerSrc)
+    ok(count(code, "            local group      = self:_GroupOnTab(groupID, byGroup[groupID], activeTab)\n") == 1,
+       "Render takes each section's group through it, as one whole statement")
+    ok(count(code, "byGroup[groupID] or EMPTY_GROUP") == 0, "and no longer straight off the feed")
+end)
+
+-- The pre-ship scan of 2026-10-17 switched the feature off at the three lines of Render between the
+-- group and the header, which nothing drove. Sliced from the group through the test that draws the
+-- section, and run over the real _GroupOnTab and a stubbed popup count.
+case("Render draws a section that has popup boxes but no rows on the tab on screen", function()
+    local a = trackerSrc:find("            local group      = self:_GroupOnTab(", 1, true)
+    local b = trackerSrc:find("                local collapsed = Sections:IsCollapsed(groupID)", 1, true)
+    ok(a and b and b > a, "the lines between the group and the header are found in Render")
+    if not (a and b and b > a) then return end
+    local chunk = assert(loadstring("local self, groupID, byGroup, activeTab, Popups, Sections = ...\n"
+        .. trackerSrc:sub(a, b - 1) .. "    return true, group, popupCount\nend\nreturn false, group, popupCount",
+        "section-draw-slice"))
+    load({ cfg = { showTabs = true, sectionTab = { quests = 2 } }, popups = { quests = 1 } })
+    local T, P = st.Tracker, st.modules.AutoQuestPopups
+    local hidden = {}
+    local S = {}
+    function S.IsHidden(self, id) assert(self == S, "IsHidden without self") return hidden[id] == true end
+    local rows = { visibleCount = 3, totalCount = 5, entries = { {}, {}, {} } }
+    local function draws(id, byGroup, tab)
+        local good, drawn, group, n = pcall(chunk, T, id, byGroup, tab, P, S)
+        ok(good, "the slice runs" .. (good and "" or (" - " .. tostring(drawn))))
+        return drawn, group, n
+    end
+    local drawn, group, n = draws("quests", { quests = rows }, 1)
+    ok(drawn == true, "Quests, on tab 2 with a box and drawn on tab 1, is drawn")
+    ok(group == st.EMPTY and n == 1, "with no rows and its one box: " .. tostring(n))
+    drawn, group, n = draws("quests", { quests = rows }, 2)
+    ok(drawn == true and group == rows and n == 1, "on its own tab, its rows and its box")
+    st.popups.quests = 0
+    drawn = draws("quests", { quests = rows }, 1)
+    ok(drawn == false, "with no box left it is not drawn on another tab")
+    st.popups.quests = 1
+    drawn = draws("campaign", {}, 1)
+    ok(drawn == false, "a section with neither rows nor boxes is not drawn")
+    st.popups.campaign = 1
+    drawn, group, n = draws("campaign", {}, nil)
+    ok(drawn == true and group == st.EMPTY and n == 1, "with no tab strip, a box alone still draws its section")
+    hidden.campaign = true
+    drawn = draws("quests", { quests = rows }, 1)
+    ok(drawn == true, "a hidden Campaign leaves Quests drawn: each section reads its own hide")
+    hidden.campaign, hidden.quests = nil, true
+    drawn = draws("campaign", {}, nil)
+    ok(drawn == true, "and a hidden Quests leaves Campaign's box drawn")
+    drawn = draws("quests", { quests = rows }, 1)
+    ok(drawn == false, "while the hidden section stays hidden, box or not")
 end)
 
 -- ---------------------------------------------------------------------------- the strip

@@ -155,6 +155,9 @@ DB.defaults = {
             -- A NEW key, on for the same reason: the key timer is Blizzard's too, and goes
             -- with the tracker EQOT hides.
             showMythicPlusTimer  = true,
+            -- On, as the default tracker shows both (the author, 2026-10-17). Neither shipped off.
+            showDelveLives       = true,
+            showNemesisGroups    = true,
             showQuestTotal       = true,
             stickySectionHeaders = true,
             showLevelInTracker   = false,

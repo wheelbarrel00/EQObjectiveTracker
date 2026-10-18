@@ -31,6 +31,9 @@ HARNESS = "docs/test_tabs.lua"
 T = "UI/Tracker.lua"
 V = "UI/Visibility.lua"
 D = "Core/DB.lua"
+C = "Core/Compat.lua"
+
+FOREVER_RANGE = "    return toc ~= nil and toc >= 16000 and toc < 17000\n"
 
 READ = "    if t and t >= 1 and t <= MAX_TABS then return math.floor(t) end\n"
 ON = "    if not (cfg and cfg.showTabs == true) or not self:TabsOffered() then return nil end\n"
@@ -59,8 +62,10 @@ WIDTH = "    local w = (width - (n - 1) * 2) / n\n"
 PLACE = '            b:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * (w + 2), 0)\n'
 NAMES = "                if drawsOnTab(Sections, id) and self:SectionTab(id) == t then\n"
 LABEL = "            if b._label ~= label then\n"
-ORDER_GUARD = "    if not active then return order end\n    wipe(onTab)\n"
-ORDER_KEEP = "        if self:SectionTab(id) == active then onTab[#onTab + 1] = id end\n"
+ORDER_GUARD = "    if not active then return order end\n    local Popups = ns:GetModule(\"AutoQuestPopups\")\n    wipe(onTab)\n"
+ORDER_KEEP = "        if self:SectionTab(id) == active or (Popups and Popups:CountFor(id) > 0) then\n"
+GROUP_TEST = "    if active and self:SectionTab(groupID) ~= active then return EMPTY_GROUP end\n"
+GROUP_LINE = "            local group      = self:_GroupOnTab(groupID, byGroup[groupID], activeTab)\n"
 TOP = "    local top = DRAG_HANDLE_H + (self:TabsInUse() and TAB_STRIP_H or 0)\n"
 INSET_GUARD = "    if f._scrollGutter == gutter and f._contentTop == top then return end\n"
 INSET_STORE = "    f._scrollGutter, f._contentTop = gutter, top\n"
@@ -164,10 +169,35 @@ MUTANTS = [
     ("the label is never set", [(T, "                b.text:SetText(label)\n", "")]),
 
     # ----------------------------------------------------------------------------- _OrderOnTab
-    ("the render filters with no tab strip", [(T, ORDER_GUARD, "    wipe(onTab)\n")]),
+    ("the render filters with no tab strip", [
+        (T, ORDER_GUARD, "    local Popups = ns:GetModule(\"AutoQuestPopups\")\n    wipe(onTab)\n")]),
     ("the render keeps the other tabs' sections", [
-        (T, ORDER_KEEP, "        if self:SectionTab(id) ~= active then onTab[#onTab + 1] = id end\n")]),
-    ("the filtered order keeps the last call's sections", [(T, ORDER_GUARD, "    if not active then return order end\n")]),
+        (T, ORDER_KEEP, "        if self:SectionTab(id) ~= active or (Popups and Popups:CountFor(id) > 0) then\n")]),
+    ("the filtered order keeps the last call's sections", [
+        (T, ORDER_GUARD, "    if not active then return order end\n    local Popups = ns:GetModule(\"AutoQuestPopups\")\n")]),
+
+    # ------------------------------------- popup boxes on every tab (the author's call, 2026-10-16)
+    ("the order asks the box module, not the one that counts them", [
+        (T, ORDER_GUARD, ORDER_GUARD.replace('"AutoQuestPopups"', '"AutoQuestPopup"'))]),
+    ("a section with popup boxes stays on its own tab", [
+        (T, ORDER_KEEP, "        if self:SectionTab(id) == active then\n")]),
+    ("every section joins while the popup module is loaded, boxes or not", [
+        (T, ORDER_KEEP, "        if self:SectionTab(id) == active or Popups then\n")]),
+    ("a single popup box is not enough to join", [
+        (T, ORDER_KEEP, "        if self:SectionTab(id) == active or (Popups and Popups:CountFor(id) > 1) then\n")]),
+    ("the popup module is asked with a dot call", [
+        (T, ORDER_KEEP, "        if self:SectionTab(id) == active or (Popups and Popups.CountFor(id) > 0) then\n")]),
+    ("a section drawn on another tab brings its rows", [(T, GROUP_TEST, "    if false then return EMPTY_GROUP end\n")]),
+    ("every section draws the empty group while tabs are on", [(T, GROUP_TEST, "    if active then return EMPTY_GROUP end\n")]),
+    ("a section Feed made no group for gets nothing to draw into", [
+        (T, "    return group or EMPTY_GROUP\n", "    return group\n")]),
+    ("the empty group counts a row", [
+        (T, "local EMPTY_GROUP = { visibleCount = 0, totalCount = 0, entries = {} }\n",
+            "local EMPTY_GROUP = { visibleCount = 1, totalCount = 0, entries = {} }\n")]),
+    ("Render takes its group straight off the feed again", [
+        (T, GROUP_LINE, "            local group      = byGroup[groupID] or EMPTY_GROUP\n")]),
+    ("Render hands the helper no tab, so a visiting section brings its rows", [
+        (T, GROUP_LINE, GROUP_LINE.replace("byGroup[groupID], activeTab)", "byGroup[groupID], nil)"))]),
 
     # -------------------------------------------------------------------------- content inset
     ("the content stays under the strip", [(T, TOP, "    local top = DRAG_HANDLE_H\n")]),
@@ -277,6 +307,39 @@ MUTANTS = [
     ("the status line raises with no tracker frame", [
         (T, "tostring(self._pendingTab), tostring(self.frame and self.frame._contentTop))\n",
             "tostring(self._pendingTab), tostring(self.frame._contentTop))\n")]),
+
+    # --------------------------------------------------------------------------- WoW Forever
+    ("Forever offers tabs for its retail sections", [
+        (T, "    if ns.IsForever() then return false end\n", "")]),
+    ("Forever's first interface number is not Forever", [
+        (C, FOREVER_RANGE, "    return toc ~= nil and toc > 16000 and toc < 17000\n")]),
+    ("Forever's last interface number is not Forever", [
+        (C, FOREVER_RANGE, "    return toc ~= nil and toc >= 16000 and toc < 16999\n")]),
+    ("the next game type's first number reads as Forever", [
+        (C, FOREVER_RANGE, "    return toc ~= nil and toc >= 16000 and toc <= 17000\n")]),
+    ("a client with no interface number raises", [
+        (C, FOREVER_RANGE, "    return toc >= 16000 and toc < 17000\n")]),
+    ("the build date is read as the interface number", [
+        (C, "    local toc = tonumber((select(4, GetBuildInfo())))\n",
+            "    local toc = tonumber((select(3, GetBuildInfo())))\n")]),
+    # The pre-ship scan of 2026-10-17: the lines of Render between the group and the header.
+    ("Render counts no popup boxes, so a section with only boxes leaves every other tab", [
+        (T, "            local popupCount = Popups:CountFor(groupID)\n", "            local popupCount = 0\n")]),
+    ("a section with only popup boxes is never drawn", [
+        (T, "            local anything   = group.visibleCount + popupCount\n",
+            "            local anything   = group.visibleCount\n")]),
+    ("each section reads Quests' hide rather than its own", [
+        (T, "            if anything > 0 and not Sections:IsHidden(groupID) then\n",
+            "            if anything > 0 and not Sections:IsHidden(\"quests\") then\n")]),
+    ("a hidden section with popup boxes is drawn", [
+        (T, "            if anything > 0 and not Sections:IsHidden(groupID) then\n",
+            "            if anything > 0 then\n")]),
+    ("the delve header flag asks for another header's call", [
+        (C, 'Has.DelveHeader         = method(C_UIWidgetManager, "GetScenarioHeaderDelvesWidgetVisualizationInfo")',
+            'Has.DelveHeader         = method(C_UIWidgetManager, "GetScenarioHeaderCurrenciesAndBackgroundWidgetVisualizationInfo")')]),
+    ("the delve header flag is on whatever the client has", [
+        (C, 'Has.DelveHeader         = method(C_UIWidgetManager, "GetScenarioHeaderDelvesWidgetVisualizationInfo")',
+            "Has.DelveHeader         = true")]),
 ]
 
 SUMMARY = re.compile(r"^test_tabs: (\d+) passed, (\d+) failed$")

@@ -19,8 +19,8 @@
 -- driven case green. The last block loads the real Options/TabTracker.lua over a stub context and
 -- drives its Filters card: the order its rows stack in, and what Reset filters does.
 --
--- OUT OF SCOPE BY CONSTRUCTION: whether IsCurrentZone places a quest correctly, which no harness
--- covers (/eqot zoneprobe reads it in game), and how the checkbox looks on screen.
+-- OUT OF SCOPE BY CONSTRUCTION: whether IsCurrentZone places a quest correctly, which
+-- docs/test_zone_filter.lua covers, and how the checkbox looks on screen.
 
 local function repoFile(rel)
     local f = io.open(rel, "r")

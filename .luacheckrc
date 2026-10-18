@@ -57,7 +57,7 @@ read_globals = {
     -- ENDEAVORS header. A different system from the Traveler's Log above it.
     "C_NeighborhoodInitiative",
     "C_Scenario", "C_ScenarioInfo", "GetInstanceInfo", "C_Texture", "C_AddOns", "Enum",
-    "C_VignetteInfo", "C_UnitAuras", "C_UIWidgetManager",
+    "C_VignetteInfo", "C_UnitAuras", "C_UIWidgetManager", "C_Spell",
     "IsInInstance", "C_ChallengeMode", "WorldMapFrame",
     -- The Mythic+ key timer: the world timer it runs on, the current affixes for the sample
     -- key, and the leader check that picks the time's-up tooltip line

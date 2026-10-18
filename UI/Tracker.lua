@@ -243,7 +243,9 @@ end
 
 -- Era and TBC have one quest section, so a second tab could hold only the zone bar. The Tracker
 -- tab offers its box by this too, so a profile with tabs on cannot show a strip nothing turns off.
+-- Forever loads every retail section, but only its quests ever fill.
 function Tracker:TabsOffered()
+    if ns.IsForever() then return false end
     local Sections = ns:GetModule("Sections")
     local n = 0
     for _, id in ipairs(Sections:Known()) do
@@ -404,12 +406,17 @@ function Tracker:LayoutTabs(active)
     strip:Show()
 end
 
+-- A section on another tab joins in, in its order place, while it has popup boxes: a box is that
+-- quest's only prompt, Blizzard's own being suppressed.
 local onTab = {}
 function Tracker:_OrderOnTab(order, active)
     if not active then return order end
+    local Popups = ns:GetModule("AutoQuestPopups")
     wipe(onTab)
     for _, id in ipairs(order) do
-        if self:SectionTab(id) == active then onTab[#onTab + 1] = id end
+        if self:SectionTab(id) == active or (Popups and Popups:CountFor(id) > 0) then
+            onTab[#onTab + 1] = id
+        end
     end
     return onTab
 end
@@ -1758,6 +1765,13 @@ end
 -- and the row loop only ever read these two counts.
 local EMPTY_GROUP = { visibleCount = 0, totalCount = 0, entries = {} }
 
+-- A section drawn on another tab for its popup boxes alone brings no rows, so its header counts
+-- only those boxes.
+function Tracker:_GroupOnTab(groupID, group, active)
+    if active and self:SectionTab(groupID) ~= active then return EMPTY_GROUP end
+    return group or EMPTY_GROUP
+end
+
 -- Layouts one row is given before its current reading is taken as settled, so a height that
 -- never settles cannot keep the tracker rendering. Counted per row, not per check: rows are
 -- drawn at different times, so a run shared across all of them can give up on a row that has
@@ -1964,7 +1978,7 @@ function Tracker:Render()
             end
             y = y + added
         else
-            local group      = byGroup[groupID] or EMPTY_GROUP
+            local group      = self:_GroupOnTab(groupID, byGroup[groupID], activeTab)
             local popupCount = Popups:CountFor(groupID)
             local anything   = group.visibleCount + popupCount
             if anything > 0 and not Sections:IsHidden(groupID) then
@@ -2134,7 +2148,7 @@ end
 -- the rows whose countdown actually rolled over. No Invalidate needed here.
 --
 -- Thirty seconds is right for a world quest measured in hours and wrong for the last minute of
--- a Classic quest timer, where the row counts in seconds and would sit half a minute stale. The
+-- a quest log timer, where the row counts in seconds and would sit half a minute stale. The
 -- faster rate is entered only inside that final stretch and left again the moment the row is
 -- gone, so the render rate v1.17.0 exists to cut is untouched everywhere else.
 local TICK_SLOW, TICK_FAST, FAST_WINDOW = 30, 5, 90
@@ -2143,10 +2157,8 @@ function Tracker:_EnsureTimerTicker(wanted, soonest)
     local want = 0
     if wanted then
         local left = soonest and (soonest - time()) or nil
-        -- Only where a sub-minute countdown can actually draw, which is the Classic provider.
-        -- Retail stamps expiresAt from whole minutes and re-stamps it every render, so the
-        -- label reads the same at either rate and the faster one buys nothing there.
-        local fast = left and left <= FAST_WINDOW and not ns.Has.QuestLog
+        -- Not gated by client: retail's quest log timers count their last minute in seconds too.
+        local fast = left and left <= FAST_WINDOW
         want = fast and TICK_FAST or TICK_SLOW
     end
 

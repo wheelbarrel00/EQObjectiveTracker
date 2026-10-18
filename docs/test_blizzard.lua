@@ -547,9 +547,9 @@ end
 
 print("== and left completely alone on retail, where nothing would replace it")
 do
-    -- The case that matters most. Data/Providers/Quests.lua does not fill expiresAt, so hiding
-    -- this frame on retail would take a timer away and put nothing back - and it would reach
-    -- every retail player rather than the Era ones the feature is for.
+    -- The case that matters most. Data/Providers/Quests.lua does not read the GetQuestTimers pair
+    -- this frame draws from, so hiding it on retail could take a timer away and put nothing back -
+    -- and it would reach every retail player rather than the Era ones the feature is for.
     local qt = timerFrame()
     local B = load(fakeTracker(), "ObjectiveTrackerFrame", { has = RETAIL, timerFrame = qt })
     suppress(B, "a retail suppress with a quest timer frame present")

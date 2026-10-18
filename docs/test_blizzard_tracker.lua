@@ -847,7 +847,7 @@ local function realDialog()
     local chunk = assert(loadfile(repoFile("UI/Dialog.lua")))
     setfenv(chunk, setmetatable({}, { __index = _G }))
     chunk("EQObjectiveTracker", ns)
-    return modules.Dialog, shown
+    return modules.Dialog, shown, ns
 end
 
 case("Dialog:Show hands the library's dialog every field it knows", function()
@@ -864,6 +864,7 @@ case("Dialog:Show hands the library's dialog every field it knows", function()
     ok(o.hasEditBox == true and o.maxLetters == 32 and o.editBoxText == "Raid" and o.highlightEditBox == true,
        "the field, its limit, its text and its selection")
     ok(o.timeout == nil, "and nothing the library does not know, which would make it raise")
+    ok(o.readOnly == nil, "and the profile name box stays one you can type in")
 
     D:Show({ text = "Done." })
     o = shown[2] or {}
@@ -873,6 +874,46 @@ case("Dialog:Show hands the library's dialog every field it knows", function()
     D:Show({ hasEditBox = 1, highlightEditBox = "yes" })
     o = shown[3] or {}
     ok(o.hasEditBox == true and o.highlightEditBox == true and o.text == "", "a truthy flag is handed on as true, a missing text as empty")
+
+    D:Show({ hasEditBox = true, editBoxText = "https://example.com", readOnly = 1 })
+    o = shown[4] or {}
+    ok(o.readOnly == true, "a read-only field is handed on, as true: " .. tostring(o.readOnly))
+    D:Show({ readOnly = true, text = "No field." })
+    o = shown[5] or {}
+    ok(o.readOnly == nil and o.hasEditBox == nil, "read-only with no field is left out, since the library raises on it")
+    D:Show({ hasEditBox = true, readOnly = false })
+    ok((shown[6] or {}).readOnly == nil, "and a field not marked read-only stays editable")
+end)
+
+-- The author's call (2026-10-16), after EQ 2.5.0 made its own link boxes read-only: a stray key no
+-- longer changes a link before it is copied. Core/Init.lua's two link boxes, sliced and run through the
+-- REAL UI/Dialog.lua above.
+case("the link boxes are read-only, through the real dialog", function()
+    local _, shown, ns = realDialog()
+    local fh = assert(io.open(repoFile("Core/Init.lua"), "r"))
+    local src = fh:read("*a")
+    fh:close()
+    local a = src:find("-- The client offers no way to open a browser", 1, true)
+    local b = src:find("-- Modules whose OnEnable is skipped", 1, true)
+    ok(a and b and b > a, "Core/Init.lua's link boxes are found")
+    if not (a and b and b > a) then return end
+    local chunk = assert(loadstring(src:sub(a, b - 1), "init-links"))
+    setfenv(chunk, setmetatable({ ns = ns }, { __index = _G }))
+    chunk()
+
+    ns:ShowURL("https://www.wowhead.com/quest=176")
+    local o = shown[1] or {}
+    ok(o.readOnly == true and o.hasEditBox == true and o.highlightEditBox == true
+       and o.editBoxText == "https://www.wowhead.com/quest=176",
+       "a link opens in a pre-selected, read-only field holding it")
+    ok(o.button1 == "Close", "with Close as its one button")
+    ns:ShowDiscord()
+    o = shown[2] or {}
+    ok(o.readOnly == true and o.hasEditBox == true and o.highlightEditBox == true
+       and o.editBoxText == "https://discord.gg/vm8K2WfQUE",
+       "the Discord invite opens the same way")
+    ns:ShowURL(nil)
+    ok(#shown == 2, "no link, no box")
 end)
 
 case("the box heads the General column", function()
