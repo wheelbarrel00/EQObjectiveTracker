@@ -175,19 +175,12 @@ local function build(parent, groupID, title)
     h:SetHeight(HEADER_H)
     h:RegisterForClicks("LeftButtonUp")
 
-    -- White base so ApplyBar can tint it, and BACKGROUND keeps it under the hairline and the label
+    -- White base so PaintBar can tint it, and BACKGROUND keeps it under the hairline and the label
     h.bar = h:CreateTexture(nil, "BACKGROUND")
     h.bar:SetColorTexture(1, 1, 1, 1)
     h.bar:SetPoint("LEFT",  h, "LEFT",  0, 0)
     h.bar:SetPoint("RIGHT", h, "RIGHT", 0, 0)
     h.bar:Hide()
-
-    -- The mask affects the bar's alpha only, so the gradient survives it
-    if h.CreateMaskTexture then
-        h.barMask = h:CreateMaskTexture(nil, "BACKGROUND")
-        h.barMask:SetTexture(SOFT_MASK, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-        h.barMask:SetAllPoints(h.bar)
-    end
 
     h.hairline = h:CreateTexture(nil, "ARTWORK")
     h.hairline:SetColorTexture(HAIRLINE[1], HAIRLINE[2], HAIRLINE[3], HAIRLINE[4])
@@ -241,10 +234,25 @@ function Sections:ApplyBar(header, cfg)
         return
     end
 
-    local c = cfg.headerBarColor or {}
-    local r, g, b, a = c.r or BAR_COLOR[1], c.g or BAR_COLOR[2], c.b or BAR_COLOR[3], c.a or BAR_COLOR[4]
+    local c = Util.Color(cfg.headerBarColor) or {}
     bar:SetHeight(cfg.headerBarHeight or 22)
+    self:PaintBar(header, cfg, c.r or BAR_COLOR[1], c.g or BAR_COLOR[2], c.b or BAR_COLOR[3], c.a or BAR_COLOR[4])
+end
 
+-- The mask affects the bar's alpha only, so the gradient survives it
+local function barMask(header)
+    if not header.barMask and header.CreateMaskTexture then
+        header.barMask = header:CreateMaskTexture(nil, "BACKGROUND")
+        header.barMask:SetTexture(SOFT_MASK, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        header.barMask:SetAllPoints(header.bar)
+    end
+    return header.barMask
+end
+
+-- Every header bar takes Bar Style and the soft edges from the Section Headers card, zone headers
+-- included. Each kind keeps its own switch, color and size, so the caller passes the color.
+function Sections:PaintBar(header, cfg, r, g, b, a)
+    local bar = header.bar
     if bar.SetGradient then
         local k = BAR_DARKEN
         -- Cached ColorMixins so dragging a slider does not churn GC
@@ -256,26 +264,27 @@ function Sections:ApplyBar(header, cfg)
         else
             bar:SetGradient("HORIZONTAL", header._barC1, header._barC2)
         end
+    else
+        bar:SetVertexColor(r, g, b, a)
     end
 
-    if header.barMask then
-        if cfg.headerBarSoftEdges then
-            -- Strength is inverted - lower values oversize the mask so the bar samples its
-            -- solid interior, and the bottom stays flush so that edge never feathers.
-            local s    = cfg.headerBarSoftEdgeStrength or 10
-            local extX = 30 * (10 - s) / 9
-            local extY = 8  * (10 - s) / 9
-            header.barMask:ClearAllPoints()
-            header.barMask:SetPoint("TOPLEFT",     bar, "TOPLEFT",     -extX, extY)
-            header.barMask:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT",  extX, 0)
-            if not header._barMasked then
-                bar:AddMaskTexture(header.barMask)
-                header._barMasked = true
-            end
-        elseif header._barMasked then
-            bar:RemoveMaskTexture(header.barMask)
-            header._barMasked = false
+    local mask = cfg.headerBarSoftEdges and barMask(header)
+    if mask then
+        -- Strength is inverted - lower values oversize the mask so the bar samples its
+        -- solid interior, and the bottom stays flush so that edge never feathers.
+        local s    = cfg.headerBarSoftEdgeStrength or 10
+        local extX = 30 * (10 - s) / 9
+        local extY = 8  * (10 - s) / 9
+        mask:ClearAllPoints()
+        mask:SetPoint("TOPLEFT",     bar, "TOPLEFT",     -extX, extY)
+        mask:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT",  extX, 0)
+        if not header._barMasked then
+            bar:AddMaskTexture(mask)
+            header._barMasked = true
         end
+    elseif header._barMasked then
+        bar:RemoveMaskTexture(header.barMask)
+        header._barMasked = false
     end
 
     bar:Show()
@@ -313,7 +322,7 @@ function Sections:ApplyStyle(header)
     header.count:SetTextColor(r, g, b)
     header.collapse:SetTextColor(r, g, b)
 
-    local d = cfg.headerDividerColor or {}
+    local d = Util.Color(cfg.headerDividerColor) or {}
     header.hairline:SetColorTexture(d.r or HAIRLINE[1], d.g or HAIRLINE[2],
                                     d.b or HAIRLINE[3], d.a or HAIRLINE[4])
 end

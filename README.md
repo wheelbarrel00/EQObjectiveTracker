@@ -109,8 +109,8 @@ back.
   right-click menu. With zone headers on, both sections group their quests under a header for
   each quest log heading (the zone, for most quests), each header collapsing on its own. An
   optional Dungeons header gathers every dungeon quest in one place, with or without zone headers.
-  A timed quest counts down on its row, in seconds through the last minute, and `/eqot timer test`
-  puts a two-minute sample on one so you can see it
+  A timed quest counts down on its row, in seconds through the last minute, and on retail and WoW
+  Forever `/eqot timer test` puts a two-minute sample on one so you can see it
 - **World quests** in their own capped area, with the quest type on the marker, a
   color-coded countdown, and the same Find Group button and menu item where the game allows
   one. Every world quest in your current zone is listed, not only the ones you have tracked,
@@ -119,7 +119,8 @@ back.
 - **Bonus objectives**, in a section of their own the way the default tracker gives them one.
   They appear when you walk into one and go away when you leave, and they have their own
   filter, so you can turn them off without touching world quests
-- **Scenarios and delves**, with the stage banner, its criteria, the stage countdown, the
+- **Scenarios and delves**, with the stage banner (shrunk to fit a narrow tracker, or swapped
+  for one plain line if you prefer), its criteria, the stage countdown, the
   delve tier, and a clickable button for any spell the stage hands you. Two switches, on by
   default, put the lives left and the nemesis groups killed on the tier's row, from Tier 4 up,
   with the game's own icons and tooltips
@@ -223,19 +224,23 @@ bar, and the delve or scenario panel.
 Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
 shown in its own typeface in the picker), sizes, spacing, colors, opacity (back to full under
 the mouse, with the quest you are following kept solid), the progress bars, the scroll bar's
-width, a card layout that can wrap the delve and scenario panel as well as your quests, section
+width and texture, a card layout that can wrap the delve and scenario panel as well as your quests, section
 order, visibility and tabs, filters by quest type, and eight sort modes including by distance and by hand.
 The current-zone filter shows only quests with an objective on the map you are standing on.
 If that map lists none of its own, such as a building interior, a covenant sanctum or a
 dungeon, it asks the zone around it instead, so you still get that zone's quests rather
-than an empty tracker. On retail, an option keeps your campaign quests on screen from every
+than an empty tracker. On Classic Era and TBC Anniversary, where quest log headings are zone
+names, it shows the quests under your zone's heading, and on WoW Forever a quest under that
+heading counts as well. On retail, an option keeps your campaign quests on screen from every
 zone while that filter is on.
 
 Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick,
 or in Original Style, the way the game's own tracker colors them on your version of the game. The
 objective text, a count like 0/5 as it goes from none done to in progress to done, finished
 objectives, the title of a finished quest and the NEW tag on quests you accepted in the last hour
-can each be given their own color as well. Section headers can also stay at the top of
+can each be given their own color as well. A Class button beside almost every color, from the
+tracker's background to the scroll bar, makes that color follow your class color instead, at the
+opacity you picked. Section headers can also stay at the top of
 the list while you scroll through their section, and with zone headers on, the header of the zone
 you are scrolled into stays just under them, so you can always see where you are.
 
@@ -317,8 +322,8 @@ cleared. It fires on Classic Era and TBC, where the tracker owns the focus, and 
 where it follows the quest you super-track and fires again when you click the quest you already
 follow, or with a nil quest ID when Click a focused quest to unfocus it is on, since that click
 clears the focus. On retail it never fires. `/eqot status` reports what is registered. Everything Quests uses this
-for two header icons, its Chain Guide and its own options, for its "Get Directions" menu entry,
-and for its TomTom arrow.
+for two header icons, its Chain Guide and its own options, for its "Get Directions" and "Open
+Chain Guide" menu entries, and for its TomTom arrow.
 
 ## License
 

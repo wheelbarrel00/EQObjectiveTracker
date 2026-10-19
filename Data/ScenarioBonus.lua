@@ -9,6 +9,8 @@ local _issecret = _G.issecretvalue
 
 local REFRESH_DEBOUNCE = 0.25
 local DELVE_DIFFICULTY = 208
+-- The tier row's rule: the Strongbox, and the game's count of it, start at Tier 4.
+local STRONGBOX_TIER   = 4
 
 -- Delves expose no scenario bonus steps, so these vignette, spell and aura IDs stand in for
 -- them. They churn every season, so they are the first thing to check when a delve tracks
@@ -428,6 +430,17 @@ local function checkRun()
     end
 end
 
+-- The game's own count, the one the tier row draws, so the two always agree. Nil sends the line
+-- back to the pack markers below.
+local function gameStrongbox()
+    if (delveTier or readTier() or 0) < STRONGBOX_TIER then return nil end
+    local W = ns:GetModule("Widgets")
+    if not W then return nil end
+    local alive, total = W:NemesisCount()
+    if alive and total then return alive, total end
+    return nil
+end
+
 local function gatherDelveModel()
     checkRun()
     if not playerInDelve() then return false end
@@ -435,12 +448,16 @@ local function gatherDelveModel()
 
     local step = pushStep(L["Delve Bonus Loot"], nil, nil)
 
-    -- Read once per run for the pack total below.
+    -- Read once per run for the Strongbox line below.
     if not delveTier then delveTier = readTier() end
 
+    local gameAlive, gameTotal = gameStrongbox()
+    if gameAlive then
+        pushCriterion(step, (L["Nemesis Strongbox: %d/%d packs"]):format(
+                          math.max(0, gameTotal - gameAlive), gameTotal), gameAlive == 0)
     -- packsKilledBase alone is enough: after a reload every pack may already be dead, so the
     -- live scan sees none and only the restored tally proves the line belongs on screen.
-    if nemesisSeenCount > 0 or packsKilledBase > 0 then
+    elseif nemesisSeenCount > 0 or packsKilledBase > 0 then
         local tier, expected = delveTier or 0, 0
         if     tier >= 10 then expected = 4
         elseif tier >= 8  then expected = 3
@@ -507,10 +524,11 @@ function Bonus:GetModel()
 end
 
 function Bonus:DebugLine()
-    return ("source=%s banner=%s packs seen %d remaining %s tier=%s"):format(
+    return ("source=%s banner=%s packs seen %d remaining %s tier=%s strongbox from %s"):format(
         playerInDelve() and "delve" or "scenario",
         tostring(bannerState), nemesisSeenCount,
-        tostring(nemesisRemaining), tostring(delveTier))
+        tostring(nemesisRemaining), tostring(delveTier),
+        gameStrongbox() and "game" or "markers")
 end
 
 -- Built through ONE pcall by the caller: every value here can be one that throws, and guarding
@@ -540,6 +558,11 @@ function Bonus:DumpLines(out)
         .. "vignettes the scan could not read: %d")
         :format(okL and tostring(lv) or "read threw", runDeaths,
                 packsKilledNow(), packsKilledBase, vignetteMisses)
+    local W, nAlive, nTotal = ns:GetModule("Widgets"), nil, nil
+    if W then nAlive, nTotal = W:NemesisCount() end
+    out[#out + 1] = ("strongbox from %s | game nemesis alive %s/%s, run tier %s")
+        :format(gameStrongbox() and "the game's count" or "pack markers",
+                tostring(nAlive), tostring(nTotal), tostring(delveTier))
 
     if GetInstanceInfo then
         local _, itype, diffID = GetInstanceInfo()

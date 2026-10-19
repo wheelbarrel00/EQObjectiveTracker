@@ -1,6 +1,7 @@
 local _, ns = ...
 
 local Media = ns:RegisterModule("Media", {})
+local Util  = ns.Util
 
 local FONT_PATH = [[Interface\AddOns\EQObjectiveTracker\Media\Fonts\]]
 
@@ -296,7 +297,7 @@ function Media:ApplyTextShadow(fs)
     if not fs then return end
     local cfg = ns:GetModule("DB"):Tracker()
     if not cfg then return end
-    setShadow(fs, cfg.textShadow, cfg.textShadowColor, cfg.textShadowStrength)
+    setShadow(fs, cfg.textShadow, Util.Color(cfg.textShadowColor), cfg.textShadowStrength)
 end
 
 -- fontName overrides the tracker's own font for callers that offer their own picker. It
@@ -310,7 +311,7 @@ function Media:ApplyFont(fs, sizeDelta, fontName)
         fs:SetFont(file, math.max(8, (cfg.fontSize or 12) + (sizeDelta or 0)),
                    cfg.fontOutline or "")
     end
-    setShadow(fs, cfg.textShadow, cfg.textShadowColor, cfg.textShadowStrength)
+    setShadow(fs, cfg.textShadow, Util.Color(cfg.textShadowColor), cfg.textShadowStrength)
 end
 
 function Media:ApplyTitleFont(fs, fontName)
@@ -322,7 +323,7 @@ function Media:ApplyScenarioShadow(fs)
     if not fs then return end
     local cfg = ns:GetModule("DB"):Tracker()
     if not cfg then return end
-    setShadow(fs, cfg.scenarioTextShadow, cfg.scenarioTextShadowColor,
+    setShadow(fs, cfg.scenarioTextShadow, Util.Color(cfg.scenarioTextShadowColor),
               cfg.scenarioTextShadowStrength or 1)
 end
 
@@ -373,7 +374,7 @@ function Media:ApplyProgressBar(bar, skipFill)
 
     bar:SetStatusBarTexture(self:GetStatusBarFile(st.barTexture))
     if not skipFill then
-        local fill = st.barColor
+        local fill = Util.Color(st.barColor)
         if fill then bar:SetStatusBarColor(fill.r, fill.g, fill.b, fill.a or 1)
         else         bar:SetStatusBarColor(0.26, 0.42, 1.0) end
     end
@@ -382,7 +383,7 @@ function Media:ApplyProgressBar(bar, skipFill)
         if st.showBackground == false then
             bar.bg:Hide()
         else
-            local c = st.backgroundColor
+            local c = Util.Color(st.backgroundColor)
             bar.bg:SetColorTexture(c and c.r or 0.04, c and c.g or 0.07,
                                    c and c.b or 0.18, c and c.a or 0.9)
             bar.bg:Show()
@@ -393,7 +394,7 @@ function Media:ApplyProgressBar(bar, skipFill)
         if st.showBorder == false then
             bar.border:Hide()
         else
-            local c = st.borderColor
+            local c = Util.Color(st.borderColor)
             bar.border:SetBackdropBorderColor(c and c.r or 0, c and c.g or 0,
                                               c and c.b or 0, c and c.a or 0.9)
             bar.border:Show()

@@ -303,6 +303,17 @@ end
 -- Widgets:OnEnable's timer repaints then.
 local nemesisHeld, heldAlive, heldTotal = false, nil, nil
 
+-- One reading of groups alive for the tier row and the bonus objectives HUD, hold included, so the
+-- two never show different counts. Both draw it as groups killed.
+local function nemesisCount()
+    if nemesisHeld and heldTotal then return heldAlive, heldTotal end
+    local ok, a, t = pcall(readNemesis)
+    local alive, total
+    if ok and a and t and a >= 0 and t > 0 then alive, total = a, t end
+    heldAlive, heldTotal = alive, total
+    return alive, total
+end
+
 -- For /eqot status, read whether or not the counters are switched on. Cleared with the scenario.
 local seenTier, seenLives, seenSpell
 
@@ -322,15 +333,7 @@ function READERS.ScenarioHeaderDelves(info, order)
     local cfg = delveCfg()
     local showLives = cfg and cfg.showDelveLives ~= false and lives ~= nil
     local alive, total
-    if cfg and cfg.showNemesisGroups ~= false then
-        if nemesisHeld and heldTotal then
-            alive, total = heldAlive, heldTotal
-        else
-            local ok, a, t = pcall(readNemesis)
-            if ok and a and t and a >= 0 and t > 0 then alive, total = a, t end
-            heldAlive, heldTotal = alive, total
-        end
-    end
+    if cfg and cfg.showNemesisGroups ~= false then alive, total = nemesisCount() end
     if tier < DELVE_COUNTERS_TIER or not (showLives or alive) then
         pushText(order, tierText)
         return
@@ -508,6 +511,13 @@ function Widgets:Forget(setID)
     if setID then stats[setID], snaps[setID] = nil, nil end
 end
 
+-- The Strongbox groups alive and their total, as the tier row draws them. Nil when the game has no
+-- count, which sends the bonus objectives HUD back to the pack markers.
+function Widgets:NemesisCount()
+    if not ns.Has.DelveHeader then return nil end
+    return nemesisCount()
+end
+
 function Widgets:DebugLine()
     if not self:IsAvailable() then return "widgets: api absent" end
     local tid, sid = self:TrackerSetID(), self:ScenarioSetID()
@@ -612,7 +622,12 @@ function Widgets:OnEnable()
 
     Events:On("UPDATE_UI_WIDGET",      dirty)
     Events:On("UPDATE_ALL_UI_WIDGETS", dirty)
-    Events:On("PLAYER_ENTERING_WORLD", dirty)
+    -- The held count belongs to the delve it was read in. Only a render clears it otherwise, and a
+    -- hidden tracker never renders, so the bonus objectives HUD could open on the last delve's count.
+    Events:On("PLAYER_ENTERING_WORLD", function(...)
+        heldAlive, heldTotal = nil, nil
+        dirty(...)
+    end)
 
     -- The nemesis counts are currencies, so no widget event says they moved. Each report restarts
     -- the wait, as other addons do, since a kill can report more than once.
@@ -622,6 +637,8 @@ function Widgets:OnEnable()
         self:Invalidate()
         local cfg = delveCfg()
         if cfg and cfg.showNemesisGroups ~= false and cfg.showTrackerWidgets ~= false then fire() end
+        local Bonus = ns:GetModule("ScenarioBonus")
+        if Bonus then Bonus:QueueRefresh() end
     end
     local function nemesisMoved(_, currencyID)
         currencyID = num(currencyID)

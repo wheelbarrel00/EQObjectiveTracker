@@ -110,7 +110,7 @@ function HUD:ApplySettings()
     if st.showBackground == false then
         f:SetBackdropColor(0, 0, 0, 0)
     elseif st.backgroundColor then
-        local c = st.backgroundColor
+        local c = ns.Util.Color(st.backgroundColor)
         -- A picked color carries its own alpha, so the lock fade below stops applying.
         f:SetBackdropColor(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
     else
@@ -121,7 +121,7 @@ function HUD:ApplySettings()
     if st.showBorder == false then
         f:SetBackdropBorderColor(0, 0, 0, 0)
     else
-        local bc = st.borderColor
+        local bc = ns.Util.Color(st.borderColor)
         if bc then f:SetBackdropBorderColor(bc.r, bc.g, bc.b, bc.a or 1)
         else       f:SetBackdropBorderColor(BORDER_RED[1], BORDER_RED[2], BORDER_RED[3], BORDER_RED[4]) end
     end

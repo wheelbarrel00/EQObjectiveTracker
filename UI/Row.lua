@@ -36,14 +36,16 @@ local SUBTITLE_COLOR   = { 0.42, 0.69, 1.00 }
 local DEFAULT_DONE_HEX = "44ff44"
 
 -- Objective lines are drawn as an ordered run of blocks rather than one string, so a bar can
--- sit between two text lines instead of being pushed under them. With bars switched off every
--- line is text, the run collapses to the single block that shipped before it existed, and the
--- layout below is unchanged.
--- Height, texture and colors all come from Media's shared progress bar block, which the
+-- sit between two text lines instead of being pushed under them. A finished line is a block of
+-- its own with a check icon beside it. Unfinished lines share a block between bars.
+-- A bar's height, texture and colors all come from Media's shared progress bar block, which the
 -- scenario criteria bars read too, so there is no local constant for any of them.
 local BLOCK_BAR   = "bar"
+local BLOCK_CHECK = "check"
 local BAR_GAP     = 2
 local BAR_PAD     = 4
+local CHECK_SIZE  = 12
+local CHECK_GAP   = 4
 
 -- A client with super-track marks its focused row with the -SuperTracked atlas, and that art
 -- does not exist anywhere else, so a client without the API gets a title tint instead. Nil is
@@ -220,6 +222,7 @@ end
 function Row:TitleColorLine()
     local cfg = ns:GetModule("DB"):Tracker()
     local function picked(c)
+        if c and c.class == true then return "class" end
         if not (c and c.r) then return "unset" end
         return ("%.2f %.2f %.2f"):format(c.r, c.g, c.b)
     end
@@ -236,13 +239,13 @@ end
 -- With no finished color picked and no title color to take, a finished line follows the done
 -- count's color, which defaults to the green finished lines always had, so picking one recolors it.
 local function doneHex(cfg)
-    local f = cfg and cfg.finishedObjectiveColor
+    local f = Util.Color(cfg and cfg.finishedObjectiveColor)
     if f and f.r then return Util.Hex(f.r, f.g, f.b) end
     if cfg and cfg.overrideCompleteGreen ~= false then
         local r, g, b = Util.EffectiveTitleColor(cfg, true)
         if r then return Util.Hex(r, g, b) end
     end
-    local d = cfg and cfg.countColorDone
+    local d = Util.Color(cfg and cfg.countColorDone)
     if d and d.r then return Util.Hex(d.r, d.g, d.b) end
     return DEFAULT_DONE_HEX
 end
@@ -258,7 +261,7 @@ local function titleColor(entry, cfg)
     end
     if entry.state == STATE.FAILED then return 0.85, 0.27, 0.27, false end
     local complete = entry.state == STATE.COMPLETE
-    local fq = complete and cfg and cfg.finishedQuestColor
+    local fq = complete and Util.Color(cfg and cfg.finishedQuestColor)
     if fq and fq.r then return fq.r, fq.g, fq.b, false end
     local r, g, b = Util.EffectiveTitleColor(cfg, complete)
     if complete and not (r and (not cfg or cfg.overrideCompleteGreen ~= false)) then
@@ -297,6 +300,16 @@ local function flushText()
     _bPct[_nBlocks]  = nil
     _bText[_nBlocks] = table.concat(_scratch, "\n", 1, _nText)
     _nText = 0
+end
+
+-- An inline |A icon drew off its line at Line Spacing 12, and on one reused row at 0 until the row
+-- was laid out again, so the check is a texture Render anchors to this block's first line.
+local function pushCheckLine(text)
+    flushText()
+    _nText = 1
+    _scratch[1] = text
+    flushText()
+    _bKind[_nBlocks] = BLOCK_CHECK
 end
 
 -- A completed line keeps its checkmark and its text rather than drawing a full bar, matching
@@ -360,7 +373,7 @@ local function buildBlocks(entry, cfg)
                     _bReq[_nBlocks] = ln.required
                 end
             else
-                local text = ln.text or ""
+                local text, checked = ln.text or "", false
                 if not ln.richText then
                     if (ln.kind == LINE.PROGRESSBAR or ln.kind == LINE.WEIGHTED)
                        and ln.required and ln.required > 0 then
@@ -373,17 +386,26 @@ local function buildBlocks(entry, cfg)
                             text = meter
                         end
                     end
-                    if hideN then text = Util.StripLeadingCount(text) end
+                    if hideN then
+                        -- A finished bar with no label is its count, so the count stays.
+                        local stripped = Util.StripLeadingCount(text)
+                        if stripped ~= "" or not ln.completed then text = stripped end
+                    end
                     if ln.completed then
-                        text = "|A:common-icon-checkmark:12:12|a |cff" .. hex .. text .. "|r"
+                        checked = true
+                        text = "|cff" .. hex .. text .. "|r"
                     elseif ln.kind == LINE.NOTE then
                         text = "|cff999999- " .. text .. "|r"
                     else
                         text = "- " .. Util.ColorizeProgress(text, cfg)
                     end
                 end
-                _nText = _nText + 1
-                _scratch[_nText] = text
+                if checked then
+                    pushCheckLine(text)
+                else
+                    _nText = _nText + 1
+                    _scratch[_nText] = text
+                end
             end
             if simple then break end
         end
@@ -394,9 +416,11 @@ local function buildBlocks(entry, cfg)
     -- bare title and reads as though it had no objectives at all
     if _nBlocks == 0 and hideDone and #lines > 0 then
         local last = lines[#lines]
-        _nBlocks  = 1
-        _bKind[1] = nil
-        _bText[1] = "|A:common-icon-checkmark:12:12|a |cff" .. hex .. (last.text or "") .. "|r"
+        local text = last.text or ""
+        if text == "" and last.required and last.required > 0 then
+            text = tostring(last.current or 0) .. "/" .. tostring(last.required)
+        end
+        pushCheckLine("|cff" .. hex .. text .. "|r")
     end
 end
 
@@ -412,10 +436,19 @@ local function blocksKey()
             _keyBuf[i] = ("%d bar%s %s/%s"):format(
                 i, _bPct[i] and " pct" or "", _bCur[i], _bReq[i])
         else
-            _keyBuf[i] = i .. " " .. _bText[i]
+            _keyBuf[i] = i .. (_bKind[i] == BLOCK_CHECK and " check " or " ") .. _bText[i]
         end
     end
     return table.concat(_keyBuf, "\n", 1, _nBlocks)
+end
+
+-- The first block keeps the old gap under the title. A bar's border sits a pixel OUTSIDE it, so
+-- it pays BAR_PAD on the side it meets a neighbor on or it reads as touching. Text after text is
+-- a run split at a check mark, spaced as the lines inside one block are.
+local function blockGap(i, isBar, prevBar, subGap, lineGap)
+    if i == 1 then return subGap + (isBar and BAR_PAD or 0) end
+    if isBar or prevBar then return BAR_GAP + BAR_PAD end
+    return lineGap
 end
 
 local function newTextBlock(row)
@@ -471,9 +504,30 @@ local function hideBlocks(row, firstText, firstBar)
     for i = firstText, (t and #t or 0) do
         t[i]:SetText("")
         t[i]:Hide()
+        if t[i].check then t[i].check:Hide() end
     end
     local b = row._barBlocks
     for i = firstBar, (b and #b or 0) do b[i]:Hide() end
+end
+
+-- Centered on the block's first line, so a wrapped objective keeps it beside its start.
+local function placeCheck(fs, on)
+    local tex = fs.check
+    if not on then
+        if tex then tex:Hide() end
+        return
+    end
+    if not tex then
+        tex = fs:GetParent():CreateTexture(nil, "OVERLAY")
+        tex:SetSize(CHECK_SIZE, CHECK_SIZE)
+        fs.check = tex
+    end
+    -- Asked on every placement until it resolves, so an early miss is not kept for good.
+    if not tex.eqotAtlas then tex.eqotAtlas = Util.SafeSetAtlas(tex, "common-icon-checkmark") end
+    local _, fontH = fs:GetFont()
+    tex:ClearAllPoints()
+    tex:SetPoint("TOPRIGHT", fs, "TOPLEFT", -CHECK_GAP, -((fontH or CHECK_SIZE) - CHECK_SIZE) / 2)
+    tex:Show()
 end
 
 -- EQ applies all three of these inside _RenderQuestGroup, so only quest and campaign rows
@@ -487,7 +541,7 @@ local PIN_TAG    = "|cffEBB706\226\152\133|r "
 -- Rebuilt only when the picked color moves, since a NEW title is decorated again on every repaint.
 local newTag, newRGB = NEW_TAG, {}
 local function newTagFor(cfg)
-    local c = cfg.newTagColor
+    local c = Util.Color(cfg.newTagColor)
     if not (c and c.r) then
         newTag, newRGB.r = NEW_TAG, nil
     elseif newRGB.r ~= c.r or newRGB.g ~= c.g or newRGB.b ~= c.b then
@@ -984,18 +1038,15 @@ function Row:Render(row, entry, width, cfg)
 
     local nText, nBar, linesH, prevBar = 0, 0, 0, false
     local textH = 0
-    local oc = cfg and cfg.objectiveColor
+    local oc = Util.Color(cfg and cfg.objectiveColor)
     local oR, oG, oB = 0.85, 0.85, 0.85
     if oc and oc.r then oR, oG, oB = oc.r, oc.g, oc.b end
+    local lineGap = Media:LineSpacing()
+    local shift = 0
     for i = 1, _nBlocks do
         local isBar = _bKind[i] == BLOCK_BAR
-        -- The first block keeps the old gap under the title, so a row that is all text sits
-        -- exactly where it used to. Blocks after it are spaced against each other, and a bar
-        -- pays BAR_PAD on the side it meets a neighbor on. Its border is anchored a pixel
-        -- OUTSIDE it on every edge, so BAR_GAP alone leaves one visible pixel and the bar reads
-        -- as though it is touching the label above it.
-        local gap = BAR_GAP + ((isBar or prevBar) and BAR_PAD or 0)
-        if i == 1 then gap = subGap + (isBar and BAR_PAD or 0) end
+        local indent = (_bKind[i] == BLOCK_CHECK) and (CHECK_SIZE + CHECK_GAP) or 0
+        local gap = blockGap(i, isBar, prevBar, subGap, lineGap)
         prevBar = isBar
         local block, blockH
         if isBar then
@@ -1019,17 +1070,19 @@ function Row:Render(row, entry, width, cfg)
             block = acquireTextBlock(row, nText)
             Media:ApplyFont(block, -2)
             block:SetTextColor(oR, oG, oB)
-            block:SetSpacing(Media:LineSpacing())
-            if textW > 0 then block:SetWidth(blockW) end
+            block:SetSpacing(lineGap)
+            if textW > 0 then block:SetWidth(math.max(1, blockW - indent)) end
             block:SetText(_bText[i])
             block:Show()
             blockH = block:GetStringHeight()
             textH = textH + blockH
         end
         block:ClearAllPoints()
-        block:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
+        -- Each block anchors to the one above, so an indent is undone by the block after it
+        block:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", indent - shift, -gap)
+        if not isBar then placeCheck(block, indent > 0) end
         linesH = linesH + gap + blockH
-        anchor = block
+        anchor, shift = block, indent
     end
     hideBlocks(row, nText + 1, nBar + 1)
 

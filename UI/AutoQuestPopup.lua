@@ -7,6 +7,10 @@ local PAD       = 7
 local LINE_GAP  = 2
 local BOX_GAP   = 6
 local ICON_SIZE = 34
+local ICON_LEFT = 10
+-- The text is centered in the room right of the icon, so a narrow tracker cannot run it under the icon.
+local TEXT_LEFT  = ICON_LEFT + ICON_SIZE + 6
+local TEXT_RIGHT = 8
 local BORDER = { 0.82, 0.65, 0.13, 0.55 }
 local HILITE = { 0.95, 0.78, 0.20, 0.95 }
 
@@ -52,7 +56,7 @@ local function buildBox()
 
     box.iconHolder = CreateFrame("Frame", nil, box)
     box.iconHolder:SetSize(ICON_SIZE, ICON_SIZE)
-    box.iconHolder:SetPoint("LEFT", box, "LEFT", 10, 0)
+    box.iconHolder:SetPoint("LEFT", box, "LEFT", ICON_LEFT, 0)
 
     box.iconGlow = box.iconHolder:CreateTexture(nil, "BACKGROUND")
     box.iconGlow:SetSize(44, 44)
@@ -84,7 +88,7 @@ local function buildBox()
     box.hint:SetJustifyH("CENTER")
     box.hint:SetText(L["Click to view quest"])
 
-    box.header:SetPoint("TOP", box, "TOP", 0, -PAD)
+    box.header:SetPoint("TOPLEFT", box, "TOPLEFT", TEXT_LEFT, -PAD)
     box.title:SetPoint("TOP", box.header, "BOTTOM", 0, -LINE_GAP)
     box.hint:SetPoint("TOP", box.title, "BOTTOM", 0, -LINE_GAP)
 
@@ -118,7 +122,7 @@ function Popup:Render(content, contentWidth, yStart, groupID)
     local n = Popups:Count()
     if n == 0 then return 0 end
 
-    local textW  = math.max(40, (contentWidth or 0) - 16)
+    local textW  = math.max(40, (contentWidth or 0) - TEXT_LEFT - TEXT_RIGHT)
     local y      = yStart or 0
     local startY = y
     local Row    = ns:GetModule("Row")

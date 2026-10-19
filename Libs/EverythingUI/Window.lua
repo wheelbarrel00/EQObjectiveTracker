@@ -198,6 +198,23 @@ local function pagesInOrder(ctx)
     return pages
 end
 
+-- A setting a tab anchored to a card row by hand, such as a list's second column, is found right after that row.
+local function besideRows(content)
+    local isRow, rowControl, beside = {}, {}, {}
+    for _, card in ipairs(content._euiCards or {}) do
+        for _, row in ipairs(card._rows) do isRow[row], rowControl[row.control] = true, true end
+    end
+    for _, c in ipairs(content._controls or {}) do
+        local rel = not rowControl[c] and c:GetNumPoints() > 0 and select(2, c:GetPoint(1))
+        if rel and isRow[rel] then
+            local list = beside[rel] or {}
+            beside[rel] = list
+            list[#list + 1] = c
+        end
+    end
+    return beside
+end
+
 -- Every shown card and row of each built page, and the controls of each strip and footer.
 local function gather(ctx)
     local found = {}
@@ -210,6 +227,7 @@ local function gather(ctx)
             local path = group and (group.title .. PATH_SEP .. t.title) or t.title
             local content = t._content
             local settings = settingsOf(content)
+            local beside = besideRows(content)
             for _, card in ipairs(content._euiCards or {}) do
                 if card:IsShown() then
                     local title = card.label and card.label:GetText()
@@ -223,6 +241,10 @@ local function gather(ctx)
                         if row.control:IsShown() then
                             local label = labelOf(row.control, settings)
                             if label then add(t, label, cardPath, row, row) end
+                            for _, c in ipairs(beside[row] or {}) do
+                                local sideLabel = c:IsShown() and labelOf(c, settings)
+                                if sideLabel then add(t, sideLabel, cardPath, row, row) end
+                            end
                         end
                     end
                 end
@@ -241,9 +263,8 @@ local function gather(ctx)
     return found
 end
 
--- Every word has to be in the place's name, its card's or its page's. A name where each word starts a word
--- comes first, then a name holding them anywhere, then a place only its card or page names, so "play"
--- finds Play a sound before Display. A word may sit inside another because Chinese writes no spaces.
+-- Every word is in the name, its card's or its page's: names where each starts a word, then names holding them all,
+-- then places with a word only their card or page has. A word may sit inside another, as Chinese writes no spaces.
 local function match(ctx, text)
     local words = {}
     for w in fold(text):gmatch("%S+") do words[#words + 1] = w end

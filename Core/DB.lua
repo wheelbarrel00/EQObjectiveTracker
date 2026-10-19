@@ -73,6 +73,7 @@ DB.defaults = {
             textShadowColor    = { r = 0, g = 0, b = 0, a = 1 },
             textShadowStrength = 2,
 
+            scenarioBanner             = true,
             scenarioTextShadow         = true,
             scenarioTextShadowColor    = { r = 0, g = 0, b = 0, a = 1 },
             scenarioTextShadowStrength = 1,
@@ -132,6 +133,7 @@ DB.defaults = {
 
             scrollBarBg          = true,
             scrollBarBgColor     = { r = 0.60, g = 0.60, b = 0.65, a = 0.25 },
+            scrollBarTexture     = "",
             hideScrollBar        = false,
             skinScrollBar        = false,
             scrollBarThumbColor  = { r = 0.60, g = 0.60, b = 0.65, a = 0.90 },
@@ -289,7 +291,7 @@ DB.defaults = {
 local APPEARANCE_KEYS = {
     "font", "fontSize", "fontOutline", "titleSizeDelta",
     "textShadow", "textShadowColor", "textShadowStrength",
-    "scenarioTextShadow", "scenarioTextShadowColor", "scenarioTextShadowStrength",
+    "scenarioBanner", "scenarioTextShadow", "scenarioTextShadowColor", "scenarioTextShadowStrength",
     "scenarioTextAlign", "scenarioTextSizeDelta", "scenarioFontSize",
     "scenarioTitleColor", "scenarioTitleSizeDelta",
     "titleColorOverride", "overrideCompleteGreen", "headerColor",
@@ -310,7 +312,7 @@ local APPEARANCE_KEYS = {
     "cardTintByType", "cardTintCampaign", "cardTintLegendary", "cardTintDungeon", "cardTintRaid",
     "scenarioCard",
     "showBackground", "backgroundColor", "showBorder", "borderColor", "borderSize",
-    "scrollBarBg", "scrollBarBgColor", "skinScrollBar",
+    "scrollBarBg", "scrollBarBgColor", "scrollBarTexture", "skinScrollBar",
     "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows", "scrollBarWidth",
     -- showZoneProgressBar and zoneProgressLocation belong on this tab but must NOT be here:
     -- they default to off and floating, so clearing them switches a configured bar off and

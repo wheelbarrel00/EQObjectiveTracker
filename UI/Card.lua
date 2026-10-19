@@ -1,6 +1,7 @@
 local _, ns = ...
 
 local Card = ns:RegisterModule("Card", {})
+local Util = ns.Util
 
 local PAD_DEFAULT     = 6
 local BG_FALLBACK     = { r = 0.09, g = 0.10, b = 0.12, a = 0.73 }
@@ -38,17 +39,17 @@ end
 
 function Card:Colors(t)
     t = tracker(t)
-    return (t and t.cardColor) or BG_FALLBACK, (t and t.cardBorderColor) or BORDER_FALLBACK
+    return Util.Color(t and t.cardColor) or BG_FALLBACK, Util.Color(t and t.cardBorderColor) or BORDER_FALLBACK
 end
 
 -- Most specific wins - an instance tag beats a storyline classification
 function Card:TintFor(cfg, entry)
     local tags = entry and entry.tags
     if not (cfg and tags) then return nil end
-    if tags.dungeon   then return cfg.cardTintDungeon end
-    if tags.raid      then return cfg.cardTintRaid end
-    if tags.legendary then return cfg.cardTintLegendary end
-    if tags.campaign  then return cfg.cardTintCampaign end
+    if tags.dungeon   then return Util.Color(cfg.cardTintDungeon) end
+    if tags.raid      then return Util.Color(cfg.cardTintRaid) end
+    if tags.legendary then return Util.Color(cfg.cardTintLegendary) end
+    if tags.campaign  then return Util.Color(cfg.cardTintCampaign) end
     return nil
 end
 

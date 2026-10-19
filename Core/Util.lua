@@ -31,9 +31,9 @@ end
 
 function Util.ColorizeProgress(text, cfg)
     if not text or text == "" then return text end
-    setCount(1, cfg and cfg.countColorNone)
-    setCount(2, cfg and cfg.countColorPartial)
-    setCount(3, cfg and cfg.countColorDone)
+    setCount(1, Util.Color(cfg and cfg.countColorNone))
+    setCount(2, Util.Color(cfg and cfg.countColorPartial))
+    setCount(3, Util.Color(cfg and cfg.countColorDone))
     return (text:gsub("(%d+)%s*/%s*(%d+)", progressRepl))
 end
 
@@ -104,6 +104,22 @@ function Util.GetPlayerClassColor()
     if playerClassColor then
         return playerClassColor[1], playerClassColor[2], playerClassColor[3]
     end
+end
+
+-- A color whose Class toggle is on (class = true) reads as the class color at its own opacity. One
+-- table per stored color, so the card's repaint gate, which compares tables, sees the same one.
+local followed = setmetatable({}, { __mode = "k" })
+function Util.Color(c)
+    if not (type(c) == "table" and c.class == true) then return c end
+    local r, g, b = Util.GetPlayerClassColor()
+    if not r then return c end
+    local f = followed[c]
+    if not f then
+        f = {}
+        followed[c] = f
+    end
+    f.r, f.g, f.b, f.a = r, g, b, c.a
+    return f
 end
 
 local TITLE_MODES = { difficulty = true, gold = true, class = true, custom = true, original = true }

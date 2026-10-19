@@ -9,6 +9,28 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.7.0", date = "2026-10-18",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "The check mark on a finished objective now always sits beside its own line. With a large Line Spacing every check was drawn above its line, and now and then one was at 0 too. A finished objective long enough to wrap now starts its second line under its text rather than under the check.",
+                "The bonus objectives HUD's Nemesis Strongbox line now reads the game's own count, the one the delve's tier row shows, so the two always agree. It counted fewer kills when the HUD was switched on partway through a delve, and it now shows from the moment you enter a Tier 4 or higher delve.",
+                "If another addon opened the color picker while one of this addon's colors was open in it, closing the options window shut that addon's picker and set this addon's color back. Another addon's picker is now left alone.",
+                "In a tracker narrower than about 280 pixels, the scenario and delve banner no longer sticks out past the tracker. It now shrinks to fit, text and all, and the tier row and objectives below it move up to meet it. Reported by Tyrial.",
+                "A Quest Complete! or Quest Discovered! box's text no longer runs under its icon in a narrow tracker. The text now has a column of its own beside the icon, centered there and wrapped to fit. Reported by Tyrial.",
+                "With Show objective progress numbers off, a finished objective that is only a count, such as a progress bar with no text of its own, now keeps its count beside the check mark rather than showing the check mark alone. Simplify Mode's last line, once everything is finished, does the same.",
+            } },
+            { head = "New Features", items = {
+                "Scroll Bar Texture on the Appearance tab's Scroll Bar card draws the scroll bar's track in any bar texture, the same list the progress bars offer, tinted by Scroll Bar Color. It starts at None, the flat track it has always been, so nothing changes until you pick one. Requested by Tyrial.",
+                "Every color on the Appearance tab but three now has a Class button beside its swatch. Turned on, that color follows the class color of the character you are logged in on, at the opacity picked for it, and turned off, a color you had picked comes back. Section Header Color, Zone Header Color and Custom Title Color have no button, since they keep the class color options they already had.",
+                "Show the stage banner, on the Appearance tab's Scenario card, can hide the scenario and delve banner. The stage then shows as one plain line under the event title, with the stage's name after it unless that name repeats the title above, as a delve's does. It is on by default, so nothing changes until you untick it. Requested by Tyrial.",
+            } },
+            { head = "Improvements", items = {
+                "Bar Style and Soft edges on the Section Headers card now shape the zone header bars too, the Dungeons header included, so every header bar can share one look. Each kind of bar keeps its own switch and color, and a zone bar still fills its own header.",
+                "The settings search now also finds the colors that sit at the end of a checkbox's row, such as Shadow Color beside Text Shadow and Thumb Color beside Solid color thumb, and lists each one right after its row.",
+            } },
+        },
+    },
+    {
         version = "2.6.0", date = "2026-10-17",
         sections = {
             { head = "Bug Fixes", items = {

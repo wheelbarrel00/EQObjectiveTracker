@@ -39,7 +39,7 @@ handlers.debug = function()
 end
 
 local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true,
-                      Keystone = true, MythicPlus = true }
+                      Keystone = true, MythicPlus = true, Scenario = true }
 
 -- One module raising must not take the rest of the report
 -- with it: this is the tool for diagnosing a broken subsystem, so it has to outlive one, and
@@ -178,6 +178,7 @@ handlers.status = function()
     debugLine("ItemButtons")
     debugLine("ScenarioSpells")
     if Registry:Get("scenarios") then
+        debugLine("Scenario", nil, "BannerLine")
         debugLine("Keystone")
         debugLine("MythicPlus")
     end

@@ -1087,7 +1087,7 @@ local function applyScrollBarSkin(sf, cfg)
     sizeScrollBar(sf, bar, slim)
     -- A slim bar is always the flat thumb at the bar's own width, with no arrows.
     local on = cfg.skinScrollBar == true or slim ~= nil
-    local c  = cfg.scrollBarThumbColor or {}
+    local c  = ns.Util.Color(cfg.scrollBarThumbColor) or {}
     local r, g, b, a = c.r or 0.60, c.g or 0.60, c.b or 0.65, c.a or 0.90
     local w  = slim or cfg.scrollBarThumbWidth
 
@@ -1147,7 +1147,7 @@ end
 -- background texture. The Appearance preview draws its own tracker with this.
 function Tracker:SkinBackdrop(bgFrame, background, cfg)
     if cfg.showBackground then
-        local c = cfg.backgroundColor or {}
+        local c = ns.Util.Color(cfg.backgroundColor) or {}
         background:SetColorTexture(c.r or 0, c.g or 0, c.b or 0, c.a or 0.6)
         background:Show()
     else
@@ -1163,10 +1163,27 @@ function Tracker:SkinBackdrop(bgFrame, background, cfg)
     end
 
     if cfg.showBorder then
-        local c = cfg.borderColor or {}
+        local c = ns.Util.Color(cfg.borderColor) or {}
         bgFrame:SetBackdropBorderColor(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
     else
         bgFrame:SetBackdropBorderColor(0, 0, 0, 0)
+    end
+end
+
+-- The track in Scroll Bar Color, flat or in a status bar texture tinted by it. A status bar texture
+-- shades across its height, so on the upright track it is turned on its side.
+local function paintTrack(tex, cfg)
+    local s = ns.Util.Color(cfg.scrollBarBgColor) or {}
+    local r, g, b, a = s.r or 0.60, s.g or 0.60, s.b or 0.65, s.a or 0.25
+    local name = cfg.scrollBarTexture
+    if type(name) == "string" and name ~= "" then
+        tex:SetTexture(ns:GetModule("Media"):GetStatusBarFile(name))
+        tex:SetTexCoord(0, 0, 1, 0, 0, 1, 1, 1)
+        tex:SetVertexColor(r, g, b, a)
+    else
+        tex:SetTexCoord(0, 1, 0, 1)
+        tex:SetVertexColor(1, 1, 1, 1)
+        tex:SetColorTexture(r, g, b, a)
     end
 end
 
@@ -1175,8 +1192,7 @@ function Tracker:SkinScroll(sf, barBG, cfg)
     local hideBar = cfg.hideScrollBar == true
     if barBG then
         if cfg.scrollBarBg ~= false and not hideBar then
-            local s = cfg.scrollBarBgColor or {}
-            barBG:SetColorTexture(s.r or 0.60, s.g or 0.60, s.b or 0.65, s.a or 0.25)
+            paintTrack(barBG, cfg)
             barBG:Show()
         else
             barBG:Hide()
@@ -1341,8 +1357,8 @@ function Tracker:DebugScroll()
         out[#out + 1] = ("arrows %s/%s"):format(shown(up), shown(down))
     end
 
-    out[#out + 1] = ("cfg hide=%s bg=%s skin=%s noArrows=%s"):format(
-        tostring(cfg.hideScrollBar), tostring(cfg.scrollBarBg),
+    out[#out + 1] = ("cfg hide=%s bg=%s texture=%s skin=%s noArrows=%s"):format(
+        tostring(cfg.hideScrollBar), tostring(cfg.scrollBarBg), tostring(cfg.scrollBarTexture),
         tostring(cfg.skinScrollBar), tostring(cfg.hideScrollArrows))
     out[#out + 1] = ("barWidth cfg=%s applied=%s"):format(
         tostring(cfg.scrollBarWidth), tostring(bar and bar._eqotSlimW or "stock"))
@@ -1484,8 +1500,7 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
     if f.eventsScrollBarBG then
         local needsBar = y > viewport + 0.5
         if needsBar and cfg and cfg.scrollBarBg ~= false and cfg.hideScrollBar ~= true then
-            local s = cfg.scrollBarBgColor or {}
-            f.eventsScrollBarBG:SetColorTexture(s.r or 0.60, s.g or 0.60, s.b or 0.65, s.a or 0.25)
+            paintTrack(f.eventsScrollBarBG, cfg)
             f.eventsScrollBarBG:Show()
         else
             f.eventsScrollBarBG:Hide()

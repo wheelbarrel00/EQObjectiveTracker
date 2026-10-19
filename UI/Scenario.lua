@@ -180,8 +180,13 @@ function Scenario:Build(container)
     banner.Stage._baseFont = { banner.Stage:GetFont() }
     banner.Name._baseFont  = { banner.Name:GetFont() }
 
+    -- The banner's two lines as one line of tracker text, drawn instead of it when it is off.
+    local stageLine = container:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    stageLine:SetTextColor(1, 0.914, 0.682)
+
     self.subHeader = subHeader
     self.banner    = banner
+    self.stageLine = stageLine
 end
 
 -- A FontString anchored on one side alone has no width, so it never wraps and it measures as a
@@ -208,7 +213,7 @@ end
 
 -- Per channel, the shape UI/Sections.lua uses on headerColor: a missing one falls back alone.
 local function titleColor(cfg)
-    local c = (cfg and cfg.scenarioTitleColor) or {}
+    local c = Util.Color(cfg and cfg.scenarioTitleColor) or {}
     return c.r or HEADER_COLOR[1], c.g or HEADER_COLOR[2], c.b or HEADER_COLOR[3]
 end
 
@@ -295,7 +300,9 @@ function Scenario:_Clear()
     local MP = ns:GetModule("MythicPlus")
     if MP then MP:Clear() end
     self.headH = BANNER_H
+    self.bannerMode = nil
     if self.subHeader then self.subHeader:Hide() end
+    if self.stageLine then self.stageLine:Hide() end
     local banner = self.banner
     if banner then
         banner:Hide()
@@ -321,16 +328,26 @@ function Scenario:_DrawBanner(info, cfg)
     -- a frame of 201: the Midnight kit's art is 249, evergreen's 252.5. nx is added because the
     -- art is pinned at the frame's left PLUS nx, so the sum is what puts their right edges on
     -- the same line. The only kit with a non-zero nx has a NEGATIVE one.
-    banner:SetSize(hasArt and (artW + offsets.nx) or BANNER_W, BANNER_H)
+    local frameW = hasArt and (artW + offsets.nx) or BANNER_W
+    banner:SetSize(frameW, BANNER_H)
 
+    -- The art keeps its atlas size, so in a tracker narrower than about 280 it ran past the tracker.
+    -- It is scaled down evenly to the room instead, text and all (2026-10-18).
+    local roomW = (self.frame and self.frame:GetWidth()) or 0
+    local scale = (roomW >= 1 and frameW > roomW) and (roomW / frameW) or 1
+    banner:SetScale(scale)
+    self.bannerScale, self.bannerRoom = scale, roomW
+
+    -- An offset is read in the banner's own scaled space, so the gap is divided back out.
+    local gap   = -BANNER_GAP / scale
     local align = (cfg and cfg.scenarioTextAlign) or "CENTER"
     banner:ClearAllPoints()
     if align == "LEFT" then
-        banner:SetPoint("TOPLEFT",  subHeader, "BOTTOMLEFT",  0, -BANNER_GAP)
+        banner:SetPoint("TOPLEFT",  subHeader, "BOTTOMLEFT",  0, gap)
     elseif align == "RIGHT" then
-        banner:SetPoint("TOPRIGHT", subHeader, "BOTTOMRIGHT", 0, -BANNER_GAP)
+        banner:SetPoint("TOPRIGHT", subHeader, "BOTTOMRIGHT", 0, gap)
     else
-        banner:SetPoint("TOP",      subHeader, "BOTTOM",      0, -BANNER_GAP)
+        banner:SetPoint("TOP",      subHeader, "BOTTOM",      0, gap)
     end
 
     banner.NormalBG:ClearAllPoints()
@@ -391,6 +408,38 @@ function Scenario:_DrawBanner(info, cfg)
     banner.Name:Show()
     self:ApplyBannerFont()
     self:ApplyBannerShadow()
+end
+
+-- With the banner off. A stage named like the title above it, as a delve's is, gives only the
+-- stage, and a line with nothing to say takes no room at all.
+function Scenario:_DrawStageLine(info, cfg, top)
+    local line = self.stageLine
+    local stage
+    if info.isFinalStage then
+        stage = L["Final Stage"]
+    elseif (info.numStages or 0) > 1 then
+        stage = L["Stage %d"]:format(info.stage or 1)
+    end
+    local name  = info.stageName
+    local title = info.name or info.category
+    if name == "" or (name and title and name:lower() == title:lower()) then name = nil end
+    local text = (stage and name) and (stage .. ": " .. name) or stage or name
+    if not text then
+        line:Hide()
+        return 0
+    end
+
+    local Media = ns:GetModule("Media")
+    Media:ApplyFont(line, 0)
+    Media:ApplyTextShadow(line)
+    local align = cfg and cfg.scenarioTextAlign
+    line:SetJustifyH((align == "LEFT" or align == "RIGHT") and align or "CENTER")
+    line:SetWidth(headerTextWidth(self))
+    line:SetText(text)
+    line:ClearAllPoints()
+    line:SetPoint("TOPLEFT", self.frame, "TOPLEFT", HEADER_PAD, -top)
+    line:Show()
+    return line:GetStringHeight()
 end
 
 function Scenario:_DrawCriteria(container, cfg, lines)
@@ -543,24 +592,34 @@ function Scenario:Render(container, cfg, info, entry, topOffset)
     self:ApplyHeaderFont(cfg)
 
     -- In a key the key block takes the banner's place, as Blizzard's does, and headH is
-    -- whichever of the two is drawn
+    -- whichever of key block, banner or stage line is drawn
     local headTop = (self.topOffset or 0) + (self.subHeaderH or SUBHEADER_H) + BANNER_GAP
     local MP  = ns:GetModule("MythicPlus")
     local key = info.keystone
     local off = cfg and cfg.showMythicPlusTimer == false
     if key and MP and not off then
         self.banner:Hide()
+        self.stageLine:Hide()
+        self.bannerMode = "key"
         self.headH = MP:Render(container, cfg, key, headTop)
     else
         if MP then MP:Clear(off and "switched off" or nil) end
-        self.banner:Show()
-        self:_DrawBanner(info, cfg)
-        self.headH = BANNER_H
+        if cfg and cfg.scenarioBanner == false then
+            self.banner:Hide()
+            self.bannerMode = "line"
+            self.headH = self:_DrawStageLine(info, cfg, headTop)
+        else
+            self.stageLine:Hide()
+            self.bannerMode = "banner"
+            self.banner:Show()
+            self:_DrawBanner(info, cfg)
+            self.headH = BANNER_H * (self.bannerScale or 1)
+        end
     end
 
-    -- Between the banner and the criteria, where Blizzard's stage block draws it. In a key it goes
-    -- under the key block instead. The scenario's countdown belongs to the scenario, not to the
-    -- top of the tracker.
+    -- Between the banner (or its line) and the criteria, where Blizzard's stage block draws it. In a
+    -- key it goes under the key block instead. The scenario's countdown belongs to the scenario,
+    -- not to the top of the tracker.
     local WB = ns:GetModule("WidgetBlock")
     self.widgetH = WB and WB:RenderScenario(container, cfg, headTop + self.headH) or 0
 
@@ -578,4 +637,18 @@ function Scenario:Render(container, cfg, info, entry, topOffset)
     local spellH = SS and SS:Place(container, info, (self.topOffset or 0) + h) or 0
 
     return h + spellH + 6
+end
+
+function Scenario:BannerLine()
+    local mode = self.bannerMode
+    if mode == "banner" then
+        return ("stage banner: on, %.1f wide in a room of %.1f, scale %.2f"):format(
+            self.banner:GetWidth() or 0, self.bannerRoom or 0, self.bannerScale or 1)
+    elseif mode == "line" then
+        local line = self.stageLine
+        return ("stage banner: off, line %q"):format(line:IsShown() and (line:GetText() or "") or "")
+    elseif mode == "key" then
+        return "stage banner: the key block in its place"
+    end
+    return "stage banner: nothing drawn"
 end

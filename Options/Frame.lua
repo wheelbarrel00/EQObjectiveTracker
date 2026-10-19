@@ -26,6 +26,7 @@ local ui = EUI:NewContext({
         discordTip      = L["Click to copy the invite link."],
         testSound       = L["Plays the currently selected sound."],
         clear           = L["Clear"],
+        classColor      = L["Swaps this color for the class color of the character you are logged in on and keeps its opacity. Click again to turn it off."],
         search          = L["Search settings"],
         searchEmpty     = L["No settings match"],
         searchTitle     = L["Search results"],

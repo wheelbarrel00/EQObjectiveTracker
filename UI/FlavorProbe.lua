@@ -46,7 +46,7 @@ local ATLASES = {
     "UI-QuestPoi-QuestNumber-SuperTracked", "UI-QuestPoiCampaign-OuterGlow",
     "UI-QuestPoiCampaign-QuestNumber", "UI-QuestIcon-TurnIn-Normal",
     "Quest-In-Progress-Icon-yellow", "Worldquest-icon",
-    -- UI/Row.lua writes this one as an inline |A:...|a escape on every completed objective
+    -- UI/Row.lua sets this one on the check texture beside every completed objective
     "common-icon-checkmark",
 }
 
@@ -413,7 +413,7 @@ function Probe:Dump()
     -- the atlas, not whether the markup renders inside a FontString. Copying these lines out of
     -- chat drops the art too, so a blank in a pasted log says nothing. Only the screen answers.
     ns:Print("inline escapes (READ THESE ON SCREEN, a paste drops the art):")
-    ns:Print("  |A:common-icon-checkmark:12:12|a <- atlas escape, the one Row.lua ships")
+    ns:Print("  |A:common-icon-checkmark:12:12|a <- atlas escape of the atlas Row.lua's check uses")
     ns:Print("  |TInterface\\Buttons\\UI-CheckBox-Check:12:12|t <- UI-CheckBox-Check")
     ns:Print("  |TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t <- ReadyCheck-Ready")
 

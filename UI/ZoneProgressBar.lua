@@ -2,6 +2,7 @@ local _, ns = ...
 
 local ZoneBar = ns:RegisterModule("ZoneProgressBar", {})
 local L       = ns.L
+local Util    = ns.Util
 
 local FRAME_W     = 220
 local FRAME_H     = 38
@@ -42,7 +43,7 @@ local function applyBarFill(bar)
     local st = barState() or {}
     local Media = ns:GetModule("Media")
     bar:SetStatusBarTexture(Media:GetStatusBarFile(st.barTexture) or DEFAULT_BAR)
-    local c = st.barColor
+    local c = Util.Color(st.barColor)
     if c then bar:SetStatusBarColor(c.r, c.g, c.b, c.a or 1)
     else       bar:SetStatusBarColor(0.26, 0.42, 1.0) end
 end
@@ -65,7 +66,7 @@ function ZoneBar:ApplySettings()
     if st.showBackground == false then
         f:SetBackdropColor(0, 0, 0, 0)
     elseif st.backgroundColor then
-        local c = st.backgroundColor
+        local c = Util.Color(st.backgroundColor)
         -- A picked color carries its own alpha, so the lock fade below stops applying.
         f:SetBackdropColor(c.r or 0, c.g or 0, c.b or 0, c.a or 1)
     else
@@ -76,7 +77,7 @@ function ZoneBar:ApplySettings()
     if st.showBorder == false then
         f:SetBackdropBorderColor(0, 0, 0, 0)
     else
-        local bc = st.borderColor
+        local bc = Util.Color(st.borderColor)
         if bc then f:SetBackdropBorderColor(bc.r, bc.g, bc.b, bc.a or 1)
         else       f:SetBackdropBorderColor(BORDER_RED[1], BORDER_RED[2], BORDER_RED[3], BORDER_RED[4]) end
     end
@@ -270,10 +271,10 @@ function ZoneBar:Update()
     f.bar.label:SetText(("%d%%"):format(math.floor(pct + 0.5)))
 
     local st = barState() or {}
-    local hc = st.headerColor
+    local hc = Util.Color(st.headerColor)
     if hc then f.title:SetTextColor(hc.r, hc.g, hc.b, hc.a or 1)
     else       f.title:SetTextColor(TITLE_COLOR[1], TITLE_COLOR[2], TITLE_COLOR[3]) end
-    local cc = st.countColor
+    local cc = Util.Color(st.countColor)
     if cc then f.count:SetTextColor(cc.r, cc.g, cc.b, cc.a or 1)
     else       f.count:SetTextColor(COUNT_COLOR[1], COUNT_COLOR[2], COUNT_COLOR[3]) end
 

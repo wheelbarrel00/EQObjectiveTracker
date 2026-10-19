@@ -17,3 +17,10 @@ Desktop.ini
 # Bytecode from the docs/ tooling
 __pycache__/
 *.pyc
+
+# docs/ is local tooling. Only the scripts the workflows run are tracked.
+docs/*
+!docs/check_toc.py
+!docs/test_check_toc.py
+!docs/_verify_locale.py
+!docs/_gen_changelog.py
