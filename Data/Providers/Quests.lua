@@ -662,10 +662,18 @@ local function openQuestLog(id)
 end
 
 -- Only the quest providers answer this, and that is what gates the split-click option, matching
--- EQ having it on quest blocks alone. The title half of a split click is Blizzard's header click,
--- so it hands a quest in the same way.
+-- EQ having it on quest blocks alone. The title half hands a quest in as Blizzard's header click does,
+-- and unlike it closes the map while the map shows that quest's details. The map's Legend and Events
+-- tabs keep the quest set but hide its details, so both are read. Left open in combat, where a world
+-- map close was seen once raising a blocked action.
 function Quests:OnEntryOpenLog(entry)
     if turnIn(self, entry.id) then return end
+    local shown = QuestMapFrame_GetDetailQuestID and QuestMapFrame_GetDetailQuestID()
+    local details = QuestMapFrame and QuestMapFrame.DetailsFrame
+    if shown == entry.id and details and details:IsVisible() and ToggleQuestLog and not InCombatLockdown() then
+        ToggleQuestLog()
+        return
+    end
     openQuestLog(entry.id)
 end
 

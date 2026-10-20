@@ -18,6 +18,8 @@ local WHEEL_STEP = 24
 local TOTALS = { campaign = 4, quests = 25 }
 local ZONE_DONE, ZONE_TOTAL = 7, 12
 local ZONE_GROUP = { visibleCount = 0, totalCount = 0 }
+-- The sample strip's tabs, the first drawn as the tab on screen.
+local TAB_SAMPLES = { "Campaign, Quests", "World Quests" }
 
 -- Made up to show each way a row can look. English on every client: they are sample data, like the
 -- diagnostic lines on the About tab, so they carry no translation keys. Rebuilt per refresh, so the
@@ -148,6 +150,34 @@ function Preview:ZoneHeader(key)
     return h
 end
 
+-- Painted and spaced the tracker's way, and deaf to the mouse, so a sample tab can never switch the
+-- tracker's own.
+function Preview:Tabs(cfg, width, height, top, pad)
+    local Tracker = ns:GetModule("Tracker")
+    local strip = self.tabStrip
+    if not strip then
+        strip = CreateFrame("Frame", nil, self.box)
+        strip.tabs = {}
+        for i, label in ipairs(TAB_SAMPLES) do
+            local b = Tracker:NewTabButton(strip)
+            b:EnableMouse(false)
+            b.text:SetText(label)
+            strip.tabs[i] = b
+        end
+        self.tabStrip = strip
+    end
+    strip:ClearAllPoints()
+    strip:SetPoint("TOPLEFT", self.box, "TOPLEFT", pad, -top)
+    strip:SetPoint("TOPRIGHT", self.box, "TOPRIGHT", -pad, -top)
+    strip:SetHeight(height)
+    for i, b in ipairs(strip.tabs) do
+        Tracker:PlaceTab(strip, b, i, #strip.tabs, width)
+        Tracker:PaintTab(b, i == 1, cfg)
+        b:Show()
+    end
+    strip:Show()
+end
+
 -- The samples list each zone's quests together, so their own order is the zone order. Keyed the
 -- way the tracker keys its runs, so the dungeon sample joins the Dungeons header when that is on.
 function Preview:Runs(list, cfg)
@@ -258,18 +288,28 @@ function Preview:Refresh(again)
     local panelH = panel:GetHeight() or 0
     if panelH <= 0 then panelH = FALLBACK_H end
     local scale = (panelW > 0) and math.min(1, (panelW - MARGIN * 2) / width) or 1
-    local avail = math.max(1, (panelH - MARGIN * 2) / scale - top - SCENARIO_GAP - bottom)
+
+    -- The strip sits under the drag strip and pushes the list down, as on the tracker.
+    local tabH = 0
+    if cfg.showTabs == true and Tracker:TabsOffered() then
+        tabH = Tracker:TabStripHeight()
+        self:Tabs(cfg, width - pad * 2, tabH, top, pad)
+    elseif self.tabStrip then
+        self.tabStrip:Hide()
+    end
+
+    local avail = math.max(1, (panelH - MARGIN * 2) / scale - top - tabH - SCENARIO_GAP - bottom)
     local view  = math.min(avail, math.max(MIN_VIEW, y - PEEK))
 
     box:SetScale(scale)
-    box:SetSize(width, top + SCENARIO_GAP + view + bottom)
+    box:SetSize(width, top + tabH + SCENARIO_GAP + view + bottom)
     box:ClearAllPoints()
     box:SetPoint("TOP", panel, "TOP", 0, -MARGIN / scale)
     box:SetAlpha(cfg.trackerAlpha or 1)
 
     local scroll = self.scroll
     scroll:ClearAllPoints()
-    scroll:SetPoint("TOPLEFT", box, "TOPLEFT", pad, -(top + SCENARIO_GAP))
+    scroll:SetPoint("TOPLEFT", box, "TOPLEFT", pad, -(top + tabH + SCENARIO_GAP))
     scroll:SetSize(inner, view)
     if scroll.UpdateScrollChildRect then scroll:UpdateScrollChildRect() end
     local range = math.max(0, scroll:GetVerticalScrollRange() or 0)

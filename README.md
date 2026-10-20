@@ -191,11 +191,14 @@ On retail, Show section tabs on the Section Order card splits the tracker into u
 to three tabs. The number beside each section picks its tab, and once two tabs hold a section a
 strip under the top of the tracker switches between them. The scenario panel shows on every tab,
 and so does a quest popup box, under its own section's header, and each character keeps the tab it
-was on.
+was on. The Section Tabs card on the Appearance tab styles the strip: the line under the tab you
+are on, the line under the others, the fills, the names' colors and size, and the tab height.
 Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. On
 retail and WoW Forever two options on the Tracker tab change how focusing works: Click a focused quest
 to unfocus it makes a click on the quest you are following unfocus it, and turning off Focus newly
-accepted quests stops the game focusing each quest you accept while nothing is focused. A
+accepted quests stops the game focusing each quest you accept while nothing is focused. With Split
+quest click on, clicking a quest's icon focuses it and clicking its title opens it in the quest log,
+and on retail and WoW Forever a second click on the title closes the map again. A
 finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt,
 shows a click to complete line, and left-clicking it should open the reward window instead. That last part could
 not be tested on a finished hunt before release, so please report anything that looks wrong.
@@ -223,7 +226,8 @@ bar, and the delve or scenario panel.
 
 Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
 shown in its own typeface in the picker), sizes, spacing, colors, opacity (back to full under
-the mouse, with the quest you are following kept solid), the progress bars, the scroll bar's
+the mouse, with the quest you are following kept solid), a background that fades in while the
+mouse is over the tracker, at an opacity you pick, the progress bars, the scroll bar's
 width and texture, a card layout that can wrap the delve and scenario panel as well as your quests, section
 order, visibility and tabs, filters by quest type, and eight sort modes including by distance and by hand.
 The current-zone filter shows only quests with an objective on the map you are standing on.

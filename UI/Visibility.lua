@@ -74,12 +74,13 @@ end
 -- The hide below owns alpha 0 and the opacity option owns every alpha a SHOWN tracker has, so
 -- the two can never disagree about the frame.
 local FADE_TIME  = 0.2
-local HOLD_TIME  = 1
+local HOLD_TIME  = 0.5
 local HOVER_POLL = 0.05
 -- A faded tracker still takes clicks, so no stored value may make it invisible.
 local MIN_ALPHA  = 0.1
 
-local fade = { current = 1, over = false, leftAt = nil, poll = 0 }
+-- bg is how far Background on Mouseover has taken the fill, 0 at rest and 1 under the mouse.
+local fade = { current = 1, over = false, leftAt = nil, poll = 0, bg = 0 }
 local focusRow, focusQuestID
 local exemptRow, exemptButton
 local driver
@@ -103,6 +104,18 @@ end
 local function focusOn()
     local t = appearance()
     return not (t and t.trackerAlphaFocus == false)
+end
+
+local function bgHoverLevel()
+    local t = appearance()
+    local a = t and tonumber(t.backgroundHoverAlpha)
+    if a and a > 0 then return a end
+    return nil
+end
+
+-- For the fade, or for Background on Mouseover, which also works at full opacity.
+local function wantsHover()
+    return (fadeLevel() < 1 and hoverOn()) or bgHoverLevel() ~= nil
 end
 
 local function over(r)
@@ -130,22 +143,39 @@ local function mouseOverDrawn(f)
     return not (Tracker and Tracker:IsLocked())
 end
 
+local function held()
+    return fade.over or (fade.leftAt ~= nil and GetTime() - fade.leftAt < HOLD_TIME)
+end
+
 local function fadeTarget()
     local level = fadeLevel()
     if level >= 1 then return 1 end
-    if hoverOn() and (fade.over or (fade.leftAt and GetTime() - fade.leftAt < HOLD_TIME)) then
+    if hoverOn() and held() then
         return 1
     end
     return level
+end
+
+local function bgTarget()
+    return (bgHoverLevel() ~= nil and held()) and 1 or 0
+end
+
+-- Repaints the backdrop alone, and only on a change. A render between two steps reads fade.bg too.
+local function setBackground(v)
+    if fade.bg == v then return end
+    fade.bg = v
+    local Tracker = ns:GetModule("Tracker")
+    if Tracker and Tracker.PaintBackground then Tracker:PaintBackground() end
 end
 
 -- Takes the level at once rather than animating from wherever the last fade left off. Every
 -- Apply that leaves the tracker shown lands here, so combat or a map toggle also ends a mouseover
 -- hold early.
 local function settle(f)
-    fade.over = fadeLevel() < 1 and hoverOn() and mouseOverDrawn(f)
+    fade.over = wantsHover() and mouseOverDrawn(f)
     fade.leftAt = nil
     fade.current = fadeTarget()
+    setBackground(bgTarget())
     return fade.current
 end
 
@@ -160,6 +190,11 @@ local function stepFade(_, elapsed)
         if fade.over and not now then fade.leftAt = GetTime() end
         fade.over = now
     end
+    local bg, bgTo = fade.bg, bgTarget()
+    if bg ~= bgTo then
+        local by = elapsed / FADE_TIME
+        if bg < bgTo then setBackground(math.min(bgTo, bg + by)) else setBackground(math.max(bgTo, bg - by)) end
+    end
     local cur, target = fade.current, fadeTarget()
     if cur == target then return end
     local step = elapsed / FADE_TIME
@@ -168,9 +203,9 @@ local function stepFade(_, elapsed)
     f:SetAlpha(cur)
 end
 
--- Runs only while a shown tracker is faded with mouseover on, so the default costs nothing.
+-- Runs only while a shown tracker polls the mouse, so the default costs nothing.
 local function syncDriver(visible)
-    if visible and fadeLevel() < 1 and hoverOn() then
+    if visible and wantsHover() then
         if not driver then
             driver = CreateFrame("Frame")
             driver:SetScript("OnUpdate", stepFade)
@@ -333,12 +368,19 @@ function Visibility:SetFocus(row, questID)
     syncExempt(f ~= nil and not f._eqotHidden)
 end
 
+-- The tracker's skin pass reads this on every render, so a render under the mouse keeps the fill.
+function Visibility:BackgroundHover()
+    return fade.bg
+end
+
 function Visibility:FadeLine()
     local Tracker = ns:GetModule("Tracker")
     local f = Tracker and Tracker.frame
-    return ("fade: opacity %.2f, mouseover %s, focused quest %s | now %.2f, over %s, driver %s | exempt quest %s, item button %s | ignore parent alpha %s")
+    local bgLevel = bgHoverLevel()
+    return ("fade: opacity %.2f, mouseover %s, focused quest %s, background on mouseover %s | now %.2f, background %.2f, over %s, driver %s | exempt quest %s, item button %s | ignore parent alpha %s")
         :format(fadeLevel(), hoverOn() and "on" or "off", focusOn() and "on" or "off",
-                fade.current, tostring(fade.over),
+                bgLevel and ("%.2f"):format(bgLevel) or "off",
+                fade.current, fade.bg, tostring(fade.over),
                 (driver and driver:IsShown()) and "running" or "idle",
                 exemptRow and tostring(focusQuestID) or "none",
                 exemptButton and "yes" or "no",

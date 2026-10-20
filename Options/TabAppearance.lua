@@ -202,7 +202,7 @@ Options:RegisterTab({
                     ReloadUI()
                 end,
             })
-        end, L["Restores every control on this tab, including the zone bar block, to its default. Other tabs are left alone."])
+        end, L["Restores every control on this tab to its default, except the switches for zone headers, the Dungeons header, section tabs, the zone progress bar and the bonus objectives HUD, Zone Order, Keep Dungeons at the bottom and Float as a movable bar. Where the zone bar and the HUD were dragged to is kept too. Other tabs are left alone."])
         reset:SetPoint("RIGHT")
     end,
     preview = function(_, panel) ns:GetModule("TrackerPreview"):Build(panel) end,
@@ -433,6 +433,19 @@ Options:RegisterTab({
             L["Background color and opacity."], true, nil, true)
         satellite(self, bgRow, w.bgPicker)
 
+        -- Never dimmed, since it works with Background off, and left out of the preview, which
+        -- nothing hovers. It paints in Background Color, so it lights that picker too.
+        tracker:Add(self:CreateSlider(content, L["Background on Mouseover"], 0, 100, 5,
+            function() return math.floor((DB().backgroundHoverAlpha or 0) * 100 + 0.5) end,
+            function(v)
+                DB().backgroundHoverAlpha = v / 100
+                ns:GetModule("Visibility"):ApplyFade()
+                ns:GetModule("Tracker"):PaintBackground()
+                syncDependents()
+            end,
+            L["Fills the tracker behind the text while the mouse is over its quests or headers, at this opacity and in the Background Color. It works with Background off too, so the fill shows only then. Off by default."],
+            function(v) return v > 0 and ("%d"):format(v) or L["Off"] end))
+
         local borderRow = tracker:Add(self:CreateCheckbox(content, L["Border"],
             function() return DB().showBorder end,
             function(v) relayout("showBorder", v); syncDependents() end,
@@ -581,6 +594,74 @@ Options:RegisterTab({
             function(v) relayout("zoneHeaderIndent", v) end,
             L["How far the quests under each zone header are moved in from the left edge."])
         zoneHeads:Add(w.zoneIndent)
+
+        -- Only where the Tracker tab offers section tabs at all, which is retail.
+        if ns:GetModule("Tracker"):TabsOffered() then
+            local tabs = stack(self:CreateGroup(content, L["Section Tabs"]))
+
+            -- The Tracker tab's switch as well, so the rows it lights are not two tabs away from it.
+            tabs:Add(self:CreateCheckbox(content, L["Show section tabs"],
+                function() return DB().showTabs == true end,
+                function(v) relayout("showTabs", v); syncDependents() end,
+                L["The same switch as on the Tracker tab, where the number beside each section chooses its tab. The tabs appear once two of them hold a section. Off by default."]))
+
+            local tabLine = self:CreateColorPicker(content, L["Active Tab Line Color"],
+                function() return DB().tabLineColor end,
+                function(v) relayout("tabLineColor", v) end,
+                L["The line under the tab you are on. Gold by default."], true, nil, true)
+            tabs:Add(tabLine, DEPENDENT)
+
+            local tabLineSize = self:CreateSlider(content, L["Line Thickness"], 1, 6, 1,
+                function() return DB().tabLineSize or 2 end,
+                function(v) relayout("tabLineSize", v) end,
+                L["How thick the line under each tab is, in pixels."])
+            tabs:Add(tabLineSize, DEPENDENT)
+
+            local tabOtherLine = self:CreateColorPicker(content, L["Inactive Tab Line Color"],
+                function() return DB().tabInactiveLineColor end,
+                function(v) relayout("tabInactiveLineColor", v) end,
+                L["The line under the other tabs. Set its opacity to 0 to hide it."], true, nil, true)
+            tabs:Add(tabOtherLine, DEPENDENT)
+
+            local tabFill = self:CreateColorPicker(content, L["Active Tab Color"],
+                function() return DB().tabActiveColor end,
+                function(v) relayout("tabActiveColor", v) end,
+                L["Fills the tab you are on."], true, nil, true)
+            tabs:Add(tabFill, DEPENDENT)
+
+            local tabOtherFill = self:CreateColorPicker(content, L["Inactive Tab Color"],
+                function() return DB().tabInactiveColor end,
+                function(v) relayout("tabInactiveColor", v) end,
+                L["Fills the other tabs."], true, nil, true)
+            tabs:Add(tabOtherFill, DEPENDENT)
+
+            local tabText = self:CreateColorPicker(content, L["Active Text Color"],
+                function() return DB().tabActiveTextColor end,
+                function(v) relayout("tabActiveTextColor", v) end,
+                L["The section names on the tab you are on."], true, nil, true)
+            tabs:Add(tabText, DEPENDENT)
+
+            local tabOtherText = self:CreateColorPicker(content, L["Inactive Text Color"],
+                function() return DB().tabInactiveTextColor end,
+                function(v) relayout("tabInactiveTextColor", v) end,
+                L["The section names on the other tabs."], true, nil, true)
+            tabs:Add(tabOtherText, DEPENDENT)
+
+            local tabTextSize = self:CreateSlider(content, L["Tab Text Size"], 8, 16, 1,
+                function() return DB().tabTextSize or 10 end,
+                function(v) relayout("tabTextSize", v) end,
+                L["The size of the section names on the tabs, which use the Font and Font Outline from the Text card."])
+            tabs:Add(tabTextSize, DEPENDENT)
+
+            local tabHeight = self:CreateSlider(content, L["Tab Height"], 14, 30, 1,
+                function() return DB().tabHeight or 18 end,
+                function(v) relayout("tabHeight", v) end,
+                L["How tall the tabs are. Raise it to fit larger names."])
+            tabs:Add(tabHeight, DEPENDENT)
+
+            w.tabRows = { tabLine, tabLineSize, tabOtherLine, tabFill, tabOtherFill, tabText, tabOtherText,
+                          tabTextSize, tabHeight }
+        end
 
         local spacing = stack(self:CreateGroup(content, L["Spacing"]))
 
@@ -1050,7 +1131,7 @@ Options:RegisterTab({
                 dim(w.thumbColorPicker, true)
             end
 
-            dim(w.bgPicker,          cfg.showBackground)
+            dim(w.bgPicker,          cfg.showBackground or (tonumber(cfg.backgroundHoverAlpha) or 0) > 0)
             dim(w.borderPicker,      cfg.showBorder)
             dim(w.borderThickSlider, cfg.showBorder)
 
@@ -1069,6 +1150,11 @@ Options:RegisterTab({
             dim(w.zoneLineCheck,  headed)
             dim(w.zoneLinePicker, headed and cfg.zoneHeaderDivider)
             dim(w.zoneIndent,     headed)
+
+            -- Show section tabs heads its card and so is never dimmed. No card off retail.
+            if w.tabRows then
+                for _, control in ipairs(w.tabRows) do dim(control, cfg.showTabs == true) end
+            end
 
             -- Bar Style and the soft edges shape the zone header bars too, so either kind lights them.
             local anyBar = cfg.headerBar or (headed and cfg.zoneHeaderBar)

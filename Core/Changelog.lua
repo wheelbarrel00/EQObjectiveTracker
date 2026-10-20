@@ -9,6 +9,22 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.8.0", date = "2026-10-20",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Two tooltips now say what their option really does. Split quest click's tooltip also says that a second click on the title closes the quest log, and that a finished quest you can hand in from the tracker is handed in from its title. The Appearance tab's Reset to Defaults tooltip no longer claims to reset everything: it names what it leaves alone, which is the switches for zone headers, the Dungeons header, section tabs, the zone progress bar and the bonus objectives HUD, along with Zone Order, Keep Dungeons at the bottom, Float as a movable bar and where you dragged the zone bar and the HUD.",
+            } },
+            { head = "New Features", items = {
+                "Background on Mouseover, on the Appearance tab's Tracker card, gives the tracker a background while the mouse is over its quests or headers, with a slider for how solid it is. It uses Background Color's color and works with Background off too, so the background shows only while you hover. It starts at Off, so nothing changes until you move it. Requested by silhouetteone.",
+                "On retail and WoW Forever, with Split quest click on, clicking a quest's title again now closes the map when the map is showing that quest. Clicking another quest's title still moves the map to that quest, and during combat the map stays open. Classic Era and TBC Anniversary already closed the quest log on a second click. Requested by silhouetteone.",
+                "A Section Tabs card on the Appearance tab styles the section tabs: the line under the tab you are on, gold until you change it, the line under the other tabs, how thick both lines are, the fill and name color of the tab you are on and of the others, the size of the names and the height of the tabs. Every color has its own opacity and the Class button. The card also has Show section tabs, the same switch as on the Tracker tab, and the preview shows two sample tabs while it is on. The tab names now use the Font and Font Outline from the Text card, at the same size as before. Retail only, where section tabs are offered.",
+            } },
+            { head = "Improvements", items = {
+                "With Full opacity on mouseover, the tracker now starts fading back half a second after the mouse leaves it, instead of a full second. Background on Mouseover waits the same half second.",
+            } },
+        },
+    },
+    {
         version = "2.7.0", date = "2026-10-18",
         sections = {
             { head = "Bug Fixes", items = {

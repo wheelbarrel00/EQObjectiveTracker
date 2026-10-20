@@ -102,6 +102,7 @@ DB.defaults = {
 
             showBackground     = false,
             backgroundColor    = { r = 0, g = 0, b = 0, a = 0.6 },
+            backgroundHoverAlpha = 0,
             showBorder         = false,
             borderColor        = { r = 0.635, g = 0.000, b = 0.039, a = 1 },
             borderSize         = 1,
@@ -219,6 +220,16 @@ DB.defaults = {
             -- stored as nothing, so a default entry would come back over a player's tab 1.
             showTabs       = false,
             sectionTab     = {},
+            -- The strip's look before it could be styled, as UI/Tracker.lua's TAB_COLORS and TAB_SIZES have it.
+            tabLineColor         = { r = 0.92, g = 0.72, b = 0.02, a = 1 },
+            tabLineSize          = 2,
+            tabInactiveLineColor = { r = 1, g = 1, b = 1, a = 0.15 },
+            tabActiveColor       = { r = 0, g = 0, b = 0, a = 0.35 },
+            tabInactiveColor     = { r = 0, g = 0, b = 0, a = 0.15 },
+            tabActiveTextColor   = { r = 1, g = 1, b = 1, a = 1 },
+            tabInactiveTextColor = { r = 0.6, g = 0.6, b = 0.6, a = 1 },
+            tabTextSize          = 10,
+            tabHeight            = 18,
 
             showZoneProgressBar  = false,
             zoneProgressLocation = "floating",
@@ -306,12 +317,15 @@ local APPEARANCE_KEYS = {
     -- The look only. The two switches and the two orders stay out, for the zone bar's reason below.
     "zoneHeaderSizeDelta", "zoneHeaderColor", "zoneHeaderColorUseClass", "zoneHeaderBar",
     "zoneHeaderBarColor", "zoneHeaderDivider", "zoneHeaderDividerColor", "zoneHeaderIndent",
+    -- The tabs' look. Show section tabs stays out, as the zone headers' switch does.
+    "tabLineColor", "tabLineSize", "tabInactiveLineColor", "tabActiveColor", "tabInactiveColor",
+    "tabActiveTextColor", "tabInactiveTextColor", "tabTextSize", "tabHeight",
     "blockSpacing", "lineSpacing", "headerSpacing", "scale",
     "trackerAlpha", "trackerAlphaHover", "trackerAlphaFocus",
     "blockLayout", "cardColor", "cardBorderColor", "cardBorderSize", "cardPadding",
     "cardTintByType", "cardTintCampaign", "cardTintLegendary", "cardTintDungeon", "cardTintRaid",
     "scenarioCard",
-    "showBackground", "backgroundColor", "showBorder", "borderColor", "borderSize",
+    "showBackground", "backgroundColor", "backgroundHoverAlpha", "showBorder", "borderColor", "borderSize",
     "scrollBarBg", "scrollBarBgColor", "scrollBarTexture", "skinScrollBar",
     "scrollBarThumbColor", "scrollBarThumbWidth", "hideScrollArrows", "scrollBarWidth",
     -- showZoneProgressBar and zoneProgressLocation belong on this tab but must NOT be here:
@@ -324,9 +338,9 @@ local APPEARANCE_KEYS = {
 }
 
 -- Clearing a key lets AceDB re-apply its default. Left alone by design: the zone bar's saved
--- position, and zoneHeaders, zoneHeaderOrder, dungeonHeader, dungeonHeaderLast, showZoneProgressBar
--- and zoneProgressLocation, kept out of the list above, because clearing one of those switches a
--- configured feature off, undocks it or reorders it rather than restoring a look.
+-- position, and zoneHeaders, zoneHeaderOrder, dungeonHeader, dungeonHeaderLast, showTabs,
+-- showZoneProgressBar and zoneProgressLocation, kept out of the list above, because clearing one
+-- of those switches a configured feature off, undocks it or reorders it rather than restoring a look.
 function DB:ResetTrackerAppearance()
     local prof = self:Tracker()
     if not prof then return end

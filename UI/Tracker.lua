@@ -310,27 +310,71 @@ function Tracker:SetActiveTab(t)
     self:Render()
 end
 
-local function paintTab(b, active)
-    if active then
-        b.bg:SetColorTexture(0, 0, 0, 0.35)
-        b.line:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 1)
-        b.text:SetTextColor(1, 1, 1)
-    else
-        b.bg:SetColorTexture(0, 0, 0, 0.15)
-        b.line:SetColorTexture(1, 1, 1, 0.15)
-        b.text:SetTextColor(0.6, 0.6, 0.6)
+-- The strip's look before the Section Tabs card, which Core/DB.lua's defaults repeat.
+local TAB_COLORS = {
+    tabLineColor         = { r = 0.92, g = 0.72, b = 0.02, a = 1 },
+    tabInactiveLineColor = { r = 1,    g = 1,    b = 1,    a = 0.15 },
+    tabActiveColor       = { r = 0,    g = 0,    b = 0,    a = 0.35 },
+    tabInactiveColor     = { r = 0,    g = 0,    b = 0,    a = 0.15 },
+    tabActiveTextColor   = { r = 1,    g = 1,    b = 1,    a = 1 },
+    tabInactiveTextColor = { r = 0.6,  g = 0.6,  b = 0.6,  a = 1 },
+}
+-- { lowest, highest, default }, the Section Tabs card's slider ranges.
+local TAB_SIZES = {
+    tabHeight   = { 14, 30, TAB_STRIP_H },
+    tabLineSize = { 1, 6, 2 },
+    tabTextSize = { 8, 16, 10 },
+}
+
+local function tabColor(cfg, key)
+    local d = TAB_COLORS[key]
+    local c = ns.Util.Color(cfg[key]) or d
+    return c.r or d.r, c.g or d.g, c.b or d.b, c.a or d.a
+end
+
+local function tabSize(cfg, key)
+    local range = TAB_SIZES[key]
+    local v = tonumber(cfg and cfg[key])
+    if not v then return range[3] end
+    return math.max(range[1], math.min(range[2], math.floor(v + 0.5)))
+end
+
+function Tracker:TabStripHeight()
+    return tabSize(ns:GetModule("DB"):Tracker(), "tabHeight")
+end
+
+-- The strip's tabs and the Appearance preview's sample both look this way. The names follow the
+-- Text card's Font and Font Outline at their own size.
+function Tracker:PaintTab(b, active, cfg)
+    b:SetHeight(self:TabStripHeight() - 2)
+    b.line:SetHeight(tabSize(cfg, "tabLineSize"))
+    b.bg:SetColorTexture(tabColor(cfg, active and "tabActiveColor" or "tabInactiveColor"))
+    b.line:SetColorTexture(tabColor(cfg, active and "tabLineColor" or "tabInactiveLineColor"))
+    b.text:SetTextColor(tabColor(cfg, active and "tabActiveTextColor" or "tabInactiveTextColor"))
+    local Media = ns:GetModule("Media")
+    local file = Media and Media:GetFontFile(cfg.font)
+    local size, outline = tabSize(cfg, "tabTextSize"), cfg.fontOutline or ""
+    if file and (b._font ~= file or b._fontSize ~= size or b._outline ~= outline) then
+        b._font, b._fontSize, b._outline = file, size, outline
+        b.text:SetFont(file, size, outline)
     end
 end
 
-local function newTabButton(strip)
+-- Tabs share the strip's width evenly, two pixels apart.
+function Tracker:PlaceTab(strip, b, i, n, width)
+    local w = (width - (n - 1) * 2) / n
+    b:SetWidth(w)
+    b:ClearAllPoints()
+    b:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * (w + 2), 0)
+end
+
+function Tracker:NewTabButton(strip)
     local b = CreateFrame("Button", nil, strip)
-    b:SetHeight(TAB_STRIP_H - 2)
     b.bg = b:CreateTexture(nil, "BACKGROUND")
     b.bg:SetAllPoints()
     b.line = b:CreateTexture(nil, "ARTWORK")
     b.line:SetPoint("BOTTOMLEFT")
     b.line:SetPoint("BOTTOMRIGHT")
-    b.line:SetHeight(2)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.08)
@@ -372,15 +416,16 @@ function Tracker:LayoutTabs(active)
             tabSlots[n] = t
         end
     end
+    local cfg = ns:GetModule("DB"):Tracker() or {}
+    strip:SetHeight(self:TabStripHeight())
     local width = math.max(1, (f:GetWidth() or 0) - CONTENT_PAD * 2)
-    local w = (width - (n - 1) * 2) / n
     for i = 1, MAX_TABS do
         local b = strip.tabs[i]
         if i > n then
             if b then b:Hide() end
         else
             if not b then
-                b = newTabButton(strip)
+                b = self:NewTabButton(strip)
                 strip.tabs[i] = b
             end
             local t = tabSlots[i]
@@ -396,10 +441,8 @@ function Tracker:LayoutTabs(active)
                 b.text:SetText(label)
             end
             b.tab = t
-            b:SetWidth(w)
-            b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * (w + 2), 0)
-            paintTab(b, t == active)
+            self:PlaceTab(strip, b, i, n, width)
+            self:PaintTab(b, t == active, cfg)
             b:Show()
         end
     end
@@ -1144,11 +1187,18 @@ local function applyScrollBarSkin(sf, cfg)
 end
 
 -- The background and border, on any frame built like the tracker's: a backdrop frame and a
--- background texture. The Appearance preview draws its own tracker with this.
-function Tracker:SkinBackdrop(bgFrame, background, cfg)
-    if cfg.showBackground then
-        local c = ns.Util.Color(cfg.backgroundColor) or {}
-        background:SetColorTexture(c.r or 0, c.g or 0, c.b or 0, c.a or 0.6)
+-- background texture. The Appearance preview draws its own tracker with this. hover runs from 0
+-- to 1 as Background on Mouseover takes the fill from its resting opacity to its own.
+function Tracker:SkinBackdrop(bgFrame, background, cfg, hover)
+    local fill = ns.Util.Color(cfg.backgroundColor) or {}
+    local a = cfg.showBackground and (fill.a or 0.6) or nil
+    local over = tonumber(cfg.backgroundHoverAlpha)
+    if hover and hover > 0 and over and over > 0 then
+        local rest = a or 0
+        a = rest + (math.min(1, over) - rest) * hover
+    end
+    if a then
+        background:SetColorTexture(fill.r or 0, fill.g or 0, fill.b or 0, a)
         background:Show()
     else
         background:Hide()
@@ -1212,11 +1262,24 @@ function Tracker:Insets()
     return CONTENT_PAD, DRAG_HANDLE_H, GRIP_SIZE + 2
 end
 
+local function backgroundHover()
+    local V = ns:GetModule("Visibility")
+    return V and V.BackgroundHover and V:BackgroundHover()
+end
+
+-- Called between renders: by Visibility as the fill steps, and by the slider when it moves.
+function Tracker:PaintBackground()
+    local f = self.frame
+    local cfg = ns:GetModule("DB"):Tracker()
+    if not (f and f.bgFrame and cfg) then return end
+    self:SkinBackdrop(f.bgFrame, f.background, cfg, backgroundHover())
+end
+
 function Tracker:ApplyFrameSkin(cfg)
     local f = self.frame
     if not (f and f.bgFrame and cfg) then return end
 
-    self:SkinBackdrop(f.bgFrame, f.background, cfg)
+    self:SkinBackdrop(f.bgFrame, f.background, cfg, backgroundHover())
 
     -- The scroll frame is sized explicitly per render, so the gutter feeds the anchoring
     -- pass rather than a BOTTOMRIGHT point that would fight SetSize.
@@ -1234,7 +1297,7 @@ function Tracker:ApplyContentInset()
     if not (f and f.scenarioContainer) then return end
     local gutter = scrollGutter(ns:GetModule("DB"):Tracker())
     -- The tab strip, while it shows, sits between the drag strip and the content.
-    local top = DRAG_HANDLE_H + (self:TabsInUse() and TAB_STRIP_H or 0)
+    local top = DRAG_HANDLE_H + (self:TabsInUse() and self:TabStripHeight() or 0)
     if f._scrollGutter == gutter and f._contentTop == top then return end
 
     -- The quest scroll anchors to this container, so re-anchoring it is a protected move once
@@ -1973,7 +2036,7 @@ function Tracker:Render()
 
     local activeTab = self:ActiveTab()
     -- Combat defers moving the content down under the strip, and the tabs wait for it.
-    if activeTab and f._contentTop ~= DRAG_HANDLE_H + TAB_STRIP_H then activeTab = nil end
+    if activeTab and f._contentTop ~= DRAG_HANDLE_H + self:TabStripHeight() then activeTab = nil end
     self._activeTab = activeTab
     self:LayoutTabs(activeTab)
     -- Only the zone section's own pass hides its docked bar, and a tab without it skips that pass.

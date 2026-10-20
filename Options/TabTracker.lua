@@ -557,7 +557,7 @@ Options:RegisterTab({
             trackerSetting("splitQuestClick"))
         clicking:Add(splitCheck)
         self:AttachTooltip(splitCheck, L["Split quest click"],
-            L["Click the icon to focus, click the title to open the quest log."])
+            L["Click the icon to focus, click the title to open the quest log. Click the title again to close it. A finished quest that can be handed in from the tracker is handed in from its title."])
 
         -- Classic already toggles its focus on every click, and its game never focuses a quest on its own.
         if ns.Has.SuperTrack then
