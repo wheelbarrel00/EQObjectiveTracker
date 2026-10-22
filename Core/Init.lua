@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EQObjectiveTracker = ns
 ns.NAME    = addonName
-ns.VERSION = "2.8.0"
+ns.VERSION = "2.8.1"
 
 ns.modules     = {}
 ns.moduleOrder = {}

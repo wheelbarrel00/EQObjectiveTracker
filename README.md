@@ -198,7 +198,8 @@ retail and WoW Forever two options on the Tracker tab change how focusing works:
 to unfocus it makes a click on the quest you are following unfocus it, and turning off Focus newly
 accepted quests stops the game focusing each quest you accept while nothing is focused. With Split
 quest click on, clicking a quest's icon focuses it and clicking its title opens it in the quest log,
-and on retail and WoW Forever a second click on the title closes the map again. A
+and a second click on the title closes the map, or the quest log on Classic, again. Clicking another
+quest's title while it is open shows that quest instead. A
 finished quest that is turned in from the tracker rather than at an NPC, such as a Prey hunt,
 shows a click to complete line, and left-clicking it should open the reward window instead. That last part could
 not be tested on a finished hunt before release, so please report anything that looks wrong.

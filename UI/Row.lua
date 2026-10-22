@@ -1059,7 +1059,6 @@ function Row:Render(row, entry, width, cfg)
             Media:ApplyProgressBar(block)
             Media:ApplyFont(block.value, -2)
             block.value:SetText(_bPct[i] and ("%d%%"):format(cur) or (cur .. "/" .. req))
-            Media:ApplyTextShadow(block.value)
             -- The height is the user's now rather than measured off a label the bar no longer
             -- holds. Shared with the scenario criteria bars, which is the point of the block.
             blockH = Media:ProgressBarHeight()

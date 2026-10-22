@@ -5,6 +5,22 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1] - 2026-10-21
+
+### Bug Fixes
+
+- On Classic Era and TBC Anniversary, a quest's reward tooltip now lists that quest's own choice of rewards, and the item level beside each reward is that item's own. On Era both came from whichever quest was selected in your quest log, the same problem the XP line once had, so they are now read the way the XP line is and appear a moment after you log in.
+- On Classic Era and TBC Anniversary, Open in Map & Quest Log in a quest's right-click menu no longer closes a quest log that is already open. It shows that quest in the log instead. With Split quest click on, clicking another quest's title while the log is open now does the same, and clicking the title of the quest the log is already showing still closes it, as on retail. The log cannot switch to a quest whose zone is collapsed in it, so for such a quest the title closes an open log, Open in Map & Quest Log leaves it as it is, and either one opens a closed log on the quest it showed last.
+
+### Improvements
+
+- On Classic Era and TBC Anniversary, `/eqot status` now has a quest timers line, as retail has had since 2.6.0. It says how many quest timers the game reported, how many of them matched an entry in your quest log and which quests are counting down, so a timer missing from the tracker can be traced from one `/eqot status` report.
+- The Korean wording is updated throughout the options and the tracker. Translated by labrie75.
+
+### Coming Next
+
+- To-Do Mode is coming in a later update: a way to turn the tracker into a short list of the quests you still have to do in the zone you are in. Requested by Tjuv.
+
 ## [2.8.0] - 2026-10-20
 
 ### Bug Fixes

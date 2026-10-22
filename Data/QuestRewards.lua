@@ -97,10 +97,11 @@ local function lowestEquipped(equipLoc)
     return lowest, hasEmpty and true or false
 end
 
-local function addItem(questID, kind, index, name, count, quality, itemID, rewardIlvl)
+local function addItem(questID, kind, index, name, count, quality, itemID, rewardIlvl, link)
     local equipLoc = equipLocOf(itemID)
     if not rewardIlvl then
-        local link = GetQuestLogItemLink and GetQuestLogItemLink(kind, index, questID)
+        -- nil asks the client now. false means no link to use, read by a sweep or not, and a hover must not ask.
+        if link == nil then link = GetQuestLogItemLink and GetQuestLogItemLink(kind, index, questID) end
         if link then rewardIlvl = detailedIlvl(link) end
     end
 
@@ -164,15 +165,57 @@ local XP_RETRY_S = 30
 local xpRefusedAt = {}
 local xpStats = { sweeps = 0, reads = 0, refused = 0, unrestored = 0 }
 
+-- Era's choice rewards and item links answer for the selection too (measured 2026-10-20), so the
+-- sweep reads them while the selection sits on the quest. A read missing an item's name or link is
+-- kept and asked again after the same wait.
+local itemCache, itemRetryAt = {}, {}
+
+local function readItems(id)
+    local held, complete = { links = {}, choices = {} }, true
+    local okN, n = pcall(GetNumQuestLogRewards, id)
+    for i = 1, (okN and tonumber(n) or 0) do
+        local okL, link = pcall(GetQuestLogItemLink, "reward", i, id)
+        held.links[i] = okL and link or false
+        if not held.links[i] then complete = false end
+    end
+    local okC, c = pcall(GetNumQuestLogChoices, id)
+    for i = 1, (okC and tonumber(c) or 0) do
+        local okI, name, _, count, quality, _, itemID = pcall(GetQuestLogChoiceInfo, i, id)
+        if okI and name and name ~= "" then
+            local okL, link = pcall(GetQuestLogItemLink, "choice", i, id)
+            held.choices[#held.choices + 1] = { name = name, count = count, quality = quality,
+                                                itemID = itemID, link = okL and link or false }
+            if not (okL and link) then complete = false end
+        else
+            complete = false
+        end
+    end
+    return held, complete
+end
+
+-- The confirm checks where the selection landed, and this that the row there still holds the quest.
+local function rowHolds(index, id)
+    if type(GetQuestLogTitle) ~= "function" then return true end
+    local ok, _, _, _, _, _, _, _, rowID = pcall(GetQuestLogTitle, index)
+    return not ok or rowID == id
+end
+
 local function waiting(questID, clock)
     local at = xpRefusedAt[questID]
     return at ~= nil and clock - at < XP_RETRY_S
 end
 
+local function needsRead(questID, clock)
+    if waiting(questID, clock) then return false end
+    if xpCache[questID] == nil then return true end
+    local at = itemRetryAt[questID]
+    return at ~= nil and clock - at >= XP_RETRY_S
+end
+
 function QR:NeedsXP(questID)
     if not xpBySelection then return false end
     if xpLevel ~= UnitLevel("player") then return true end
-    return xpCache[questID] == nil and not waiting(questID, GetTime())
+    return needsRead(questID, GetTime())
 end
 
 -- Read to n, never #, because the caller reuses both arrays.
@@ -196,16 +239,19 @@ function QR:CollectXP(indices, ids, n)
     local moved = false
     for k = 1, n do
         local index, id = indices[k], ids[k]
-        if xpCache[id] == nil and not waiting(id, clock) then
+        if needsRead(id, clock) then
             moved = true
             pcall(SelectQuestLogEntry, index)
             -- Confirmed rather than assumed, because a figure read while the selection sat
             -- elsewhere belongs to another quest.
             local okSel, sel = pcall(GetQuestLogSelection)
             local okXP, xp
-            if okSel and sel == index then okXP, xp = pcall(GetQuestLogRewardXP, id) end
+            if okSel and sel == index and rowHolds(index, id) then okXP, xp = pcall(GetQuestLogRewardXP, id) end
             if okXP and type(xp) == "number" then
                 xpCache[id] = xp
+                local items, complete = readItems(id)
+                itemCache[id] = items
+                itemRetryAt[id] = (not complete) and clock or nil
                 xpRefusedAt[id] = nil
                 xpStats.reads = xpStats.reads + 1
             else
@@ -269,18 +315,34 @@ function QR:Lines(questID)
         push("xp").amount = xp
     end
 
+    local held = xpBySelection and itemCache[questID] or nil
     local numItems = GetNumQuestLogRewards and GetNumQuestLogRewards(questID) or 0
     for i = 1, numItems do
         local name, _, count, quality, _, itemID, ilvl = GetQuestLogRewardInfo(i, questID)
-        if name then addItem(questID, "reward", i, name, count, quality, itemID, ilvl) end
+        if name then
+            local link
+            if xpBySelection then link = held and held.links[i] or false end
+            addItem(questID, "reward", i, name, count, quality, itemID, ilvl, link)
+        end
     end
 
-    local numChoices = GetNumQuestLogChoices and GetNumQuestLogChoices(questID) or 0
-    if numChoices and numChoices > 0 then
-        push("choices")
-        for i = 1, numChoices do
-            local name, _, count, quality, _, itemID = GetQuestLogChoiceInfo(i, questID)
-            if name then addItem(questID, "choice", i, name, count, quality, itemID, nil) end
+    if xpBySelection then
+        local choices = held and held.choices
+        if choices and #choices > 0 then
+            push("choices")
+            for i = 1, #choices do
+                local c = choices[i]
+                addItem(questID, "choice", i, c.name, c.count, c.quality, c.itemID, nil, c.link)
+            end
+        end
+    else
+        local numChoices = GetNumQuestLogChoices and GetNumQuestLogChoices(questID) or 0
+        if numChoices and numChoices > 0 then
+            push("choices")
+            for i = 1, numChoices do
+                local name, _, count, quality, _, itemID = GetQuestLogChoiceInfo(i, questID)
+                if name then addItem(questID, "choice", i, name, count, quality, itemID, nil) end
+            end
         end
     end
 

@@ -128,12 +128,18 @@ end
 -- where # is undefined. tonumber rather than a type test on both values: the documented
 -- return is a STRING of seconds, and refusing one silently costs a timer already hidden.
 local timerSecs = {}
+-- The last read's running timers and whether it raised, for TimerLine.
+local timersSeen, timersRaised = 0, false
 local function gatherTimers(ok, ...)
-    if not ok then return end
+    if not ok then
+        timersRaised = true
+        return
+    end
     for slot = 1, select("#", ...) do
         local raw = select(slot, ...)
         local secs = tonumber(raw)
         if secs and secs > 0 then
+            timersSeen = timersSeen + 1
             local gotIndex, index = pcall(GetQuestIndexForTimer, slot)
             local at = gotIndex and tonumber(index)
             if at and at > 0 then
@@ -147,6 +153,7 @@ end
 -- this file already refuses to allocate per quest.
 local function readTimers()
     wipe(timerSecs)
+    timersSeen, timersRaised = 0, false
     if ns.Has.QuestTimers then gatherTimers(pcall(GetQuestTimers)) end
     return timerSecs
 end
@@ -513,6 +520,23 @@ function Quests:DebugLine()
         table.concat(sample, " "))
 end
 
+-- /eqot status: the last read beside the quests counting down, so a missing countdown shows whether
+-- the client reported no timer, the timer named no quest log entry, or a matched timer reached no quest.
+function Quests:TimerLine()
+    local now, matched, parts = time(), 0, {}
+    for _ in pairs(timerSecs) do matched = matched + 1 end
+    for id, e in store:Each() do
+        if e.expiresAt and e.expiresAt > now then
+            parts[#parts + 1] = ("%d:%ds"):format(id, e.expiresAt - now)
+        end
+    end
+    table.sort(parts)
+    return ("quest timers: %s, %d reported, %d matched to the log, %d counting down%s%s"):format(
+        ns.Has.QuestTimers and "GetQuestTimers" or "no GetQuestTimers", timersSeen, matched, #parts,
+        #parts > 0 and (" (" .. table.concat(parts, " ") .. ")") or "",
+        timersRaised and " | last read raised" or "")
+end
+
 -- The icon half of a left-click lands here and the title half goes to OnEntryOpenLog, which is
 -- retail's layout with focus standing in for super-track. With Split quest click OFF the whole
 -- row lands here, so focus is then the only left-click and the quest log is reached from the
@@ -525,18 +549,51 @@ function Quests:OnEntryClick(entry, button)
     Focus:Toggle(self.id, entry.id)
 end
 
+local function logShown()
+    return QuestLogFrame and QuestLogFrame.IsVisible and QuestLogFrame:IsVisible() and true or false
+end
+
+-- Blizzard's QuestLog_SetSelection draws no details for an index past the visible rows, which is
+-- where a quest under a collapsed header sits.
+local function drawable(i)
+    if not i then return false end
+    local visible = type(GetNumQuestLogEntries) == "function" and GetNumQuestLogEntries()
+    return type(visible) ~= "number" or i <= visible
+end
+
+-- ToggleQuestLog hides a log that is already shown, so an open log is switched with QuestLog_SetSelection
+-- and QuestLog_Update, the pair Blizzard's own title buttons call. A quest it cannot draw is never
+-- selected, since the pane would show another quest until the log's next QUEST_LOG_UPDATE.
+local function openLogOn(i)
+    if logShown() then
+        if drawable(i) and type(QuestLog_SetSelection) == "function" and type(QuestLog_Update) == "function" then
+            QuestLog_SetSelection(i)
+            QuestLog_Update()
+        end
+        return
+    end
+    if drawable(i) and type(SelectQuestLogEntry) == "function" then SelectQuestLogEntry(i) end
+    if type(ToggleQuestLog) == "function" then ToggleQuestLog() end
+end
+
+-- A click on the quest the open log already shows closes it, as the title does on retail, and so does
+-- one the open log cannot draw. The menu's Open item calls openLogOn and never closes.
 function Quests:OnEntryOpenLog(entry)
     local i = logIndex(entry.id)
-    if i and type(SelectQuestLogEntry) == "function" then SelectQuestLogEntry(i) end
-    if type(ToggleQuestLog) == "function" then ToggleQuestLog() end
+    if logShown() and type(ToggleQuestLog) == "function"
+       and (not drawable(i) or (type(GetQuestLogSelection) == "function" and GetQuestLogSelection() == i)) then
+        ToggleQuestLog()
+        return
+    end
+    openLogOn(i)
 end
 
 local menuOut = {}
 local pinShim = {}
 
--- Still shorter than the retail menu. Pop out and Abandon both need a Blizzard popup or detail
--- frame, and Data/ may not drive one - the two calls that already do in Quests.lua are recorded
--- debt, not a precedent to copy. Named indirectly so the layering grep's output stays a known
+-- Still shorter than the retail menu. Pop out and Abandon both need a Blizzard popup, and Data/
+-- may not open one - the two calls that already do in Quests.lua are recorded debt, not a
+-- precedent to copy. Named indirectly so the layering grep's output stays a known
 -- set. Focus is here at retail's own order 30 now that this client has a focus concept.
 function Quests:GetEntryMenu(entry)
     local Filter = ns:GetModule("Filter")
@@ -572,7 +629,7 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
     elseif itemID == "unfocus" then
         Focus:Set(nil, nil)
     elseif itemID == "openlog" then
-        self:OnEntryOpenLog({ id = entryID })
+        openLogOn(logIndex(entryID))
     end
     if self._notifyDirty then self._notifyDirty() end
 end
