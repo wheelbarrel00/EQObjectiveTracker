@@ -161,7 +161,9 @@ function Tracker:FilterActive()
     local cfg = ns:GetModule("DB"):Tracker()
     local f = cfg and cfg.filters
     if not f then return false end
-    if f.onlyCurrentZone == true then return true end
+    -- While To-Do Mode is on it decides the zone, so the box alone lights nothing.
+    local TodoMode = ns:GetModule("TodoMode")
+    if f.onlyCurrentZone == true and not (TodoMode and TodoMode:IsOn(cfg)) then return true end
     local Filter, Registry = ns:GetModule("Filter"), ns:GetModule("Registry")
     if not (Filter and Registry) then return false end
     for _, c in ipairs(Filter.CATEGORIES) do
@@ -192,12 +194,15 @@ function Tracker:OpenFilterMenu(owner)
         Tracker:Render()
         Options:RefreshIfShown("tracker")
     end
-    local items = {
-        { kind = "title", text = L["Filters"] },
-        { kind = "check", text = L["Show only quests in current zone"], checked = f.onlyCurrentZone == true,
-          onClick = function(on) f.onlyCurrentZone = on; changed() end },
-        { kind = "divider" },
-    }
+    local items = { { kind = "title", text = L["Filters"] } }
+    -- Left out while To-Do Mode decides the zone, since the menu has no dimmed row.
+    local TodoMode = ns:GetModule("TodoMode")
+    if not (TodoMode and TodoMode:IsOn(cfg)) then
+        items[#items + 1] = { kind = "check", text = L["Show only quests in current zone"],
+                              checked = f.onlyCurrentZone == true,
+                              onClick = function(on) f.onlyCurrentZone = on; changed() end }
+    end
+    items[#items + 1] = { kind = "divider" }
     local byKey = {}
     for _, c in ipairs(Filter.CATEGORIES) do byKey[c.key] = c end
     for _, key in ipairs(Options.FILTER_ORDER) do
@@ -1638,6 +1643,8 @@ local function stickyHead(band, slot, groupID)
         h.text:SetText(src.text:GetText())
         h.count:SetText(src.count:GetText())
         h.collapse:SetText(src.collapse:GetText())
+        local TodoCounts = ns:GetModule("TodoCounts")
+        if TodoCounts then TodoCounts:Mirror(h, src) end
     end
     -- One made mid-scroll would otherwise wear the stock font until the next render.
     if made then Sections:ApplyStyle(h) end
@@ -1949,6 +1956,7 @@ function Tracker:Render()
     local ItemButtons = ns:GetModule("ItemButtons")
     local PopupBoxes  = ns:GetModule("AutoQuestPopup")
     local Popups      = ns:GetModule("AutoQuestPopups")
+    local TodoMode = ns:GetModule("TodoMode")
     local cfg      = DB:Tracker()
 
     self:ApplyFrameSkin(cfg)
@@ -1999,6 +2007,7 @@ function Tracker:Render()
             if not Sections:IsHidden(gid) then
                 local g = byGroup[gid]
                 questRows = questRows + ((g and g.visibleCount) or 0) + Popups:CountFor(gid)
+                    + (TodoMode:Holds(g, cfg) and 1 or 0)
             end
         end
     end
@@ -2059,7 +2068,8 @@ function Tracker:Render()
             local group      = self:_GroupOnTab(groupID, byGroup[groupID], activeTab)
             local popupCount = Popups:CountFor(groupID)
             local anything   = group.visibleCount + popupCount
-            if anything > 0 and not Sections:IsHidden(groupID) then
+            -- A shown To-Do count above 0 keeps the header up, so an empty view can still be switched.
+            if (anything > 0 or TodoMode:Holds(group, cfg)) and not Sections:IsHidden(groupID) then
                 local collapsed = Sections:IsCollapsed(groupID)
                 local header    = Sections:Acquire(content, groupID)
                 sectionTops[#sectionTops + 1] = y

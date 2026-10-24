@@ -325,6 +325,8 @@ function Sections:ApplyStyle(header)
     local d = Util.Color(cfg.headerDividerColor) or {}
     header.hairline:SetColorTexture(d.r or HAIRLINE[1], d.g or HAIRLINE[2],
                                     d.b or HAIRLINE[3], d.a or HAIRLINE[4])
+    local TodoCounts = header.todo and ns:GetModule("TodoCounts")
+    if TodoCounts then TodoCounts:Style(header, cfg) end
 end
 
 -- extra is the auto-quest popup count for this group. Popup boxes are section content
@@ -342,6 +344,16 @@ function Sections:Place(header, content, y, group, collapsed, showTotal, extra)
         header.count:SetText(visible .. "/" .. total)
     else
         header.count:SetText(tostring(visible))
+    end
+    -- A To-Do group's counts replace this one.
+    local TodoCounts = ns:GetModule("TodoCounts")
+    if TodoCounts then
+        if group.todoOn then
+            header.count:SetText("")
+            TodoCounts:Paint(header, group)
+        else
+            TodoCounts:Clear(header)
+        end
     end
     -- ASCII rather than an en dash: the Korean client font has no glyph for U+2013
     -- and every section header drew an empty box.

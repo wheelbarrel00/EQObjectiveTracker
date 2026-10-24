@@ -5,6 +5,17 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-10-24
+
+### New Features
+
+- To-Do Mode, on its own card on the Tracker tab, turns the Quests header, and the Campaign header on retail, into four counts: your unfinished quests in the zone you are in, the ones ready to turn in there, every quest there and every quest you have. Click a count and the section shows exactly those quests, with the count you picked underlined. It starts on your unfinished quests in the zone, each character remembers the count it picked, and a header stays up while a count you show is above 0, so you can always switch back. While it is on it decides which quests are in your zone, so Show only quests in current zone is dimmed and keeps your own setting for when you turn it off. The quest type filters, Show only tracked quests, pinned quests and every other section stay as they are, and the counts follow them. Quest popup boxes and pinned quests show whichever count you pick, as they always have. The card can hide any of the four counts, give each one its own color with a Class button, and size them. Off by default, on every version of the game. Requested by Tjuv.
+- Two new count colors on the Appearance tab's Quest Colors card, Count Color: Half Done and Count Color: Mostly Done, color a count like 5/10 from half done and one like 7/10 from seven tenths done. Both start unset, so no count changes color until you pick one, and Mostly Done takes Half Done's color while it is unset. Requested by Tjuv.
+
+### Improvements
+
+- `/eqot status` now has a To-Do Mode line naming the count you picked and the four counts of each quest section.
+
 ## [2.8.1] - 2026-10-21
 
 ### Bug Fixes

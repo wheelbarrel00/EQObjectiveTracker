@@ -39,7 +39,7 @@ handlers.debug = function()
 end
 
 local WINDOW_ONLY = { Tracker = true, ItemButtons = true, ZoneGroups = true,
-                      Keystone = true, MythicPlus = true, Scenario = true }
+                      Keystone = true, MythicPlus = true, Scenario = true, TodoMode = true }
 
 -- One module raising must not take the rest of the report
 -- with it: this is the tool for diagnosing a broken subsystem, so it has to outlive one, and
@@ -143,6 +143,7 @@ handlers.status = function()
     end
 
     debugLine("Filter", nil, "FiltersLine")
+    debugLine("TodoMode")
     debugLine("Filter")
 
     ns:Print("sections (in render order):")

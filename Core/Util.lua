@@ -2,11 +2,12 @@ local _, ns = ...
 
 local Util = ns:RegisterModule("Util", {})
 
--- None done, some done, all done. Rebuilt only when a picked color moves: every objective line on
--- the tracker passes through here on a repaint, and a hex string per line would be garbage.
+-- None done, some done, all done, then half done and seven tenths done, which have no default and
+-- stay nil until picked. Rebuilt only when a picked color moves: every objective line on the
+-- tracker passes through here on a repaint, and a hex string per line would be garbage.
 local COUNT_DEFAULT = { "|cffff5050", "|cffeeaa00", "|cff44ff44" }
 local countEsc = { COUNT_DEFAULT[1], COUNT_DEFAULT[2], COUNT_DEFAULT[3] }
-local countRGB = { {}, {}, {} }
+local countRGB = { {}, {}, {}, {}, {} }
 
 local function setCount(i, c)
     local k = countRGB[i]
@@ -22,9 +23,12 @@ local function progressRepl(have, need)
     local h, n = tonumber(have), tonumber(need)
     if not (h and n) then return have .. "/" .. need end
     local color
-    if h == 0    then color = countEsc[1]
-    elseif h < n then color = countEsc[2]
-    else              color = countEsc[3]
+    if h == 0     then color = countEsc[1]
+    elseif h >= n then color = countEsc[3]
+    -- An unset step falls to the one below it.
+    elseif countEsc[5] and h * 10 >= n * 7 then color = countEsc[5]
+    elseif countEsc[4] and h * 2 >= n then color = countEsc[4]
+    else               color = countEsc[2]
     end
     return color .. have .. "/" .. need .. "|r"
 end
@@ -34,6 +38,8 @@ function Util.ColorizeProgress(text, cfg)
     setCount(1, Util.Color(cfg and cfg.countColorNone))
     setCount(2, Util.Color(cfg and cfg.countColorPartial))
     setCount(3, Util.Color(cfg and cfg.countColorDone))
+    setCount(4, Util.Color(cfg and cfg.countColorHalf))
+    setCount(5, Util.Color(cfg and cfg.countColorMost))
     return (text:gsub("(%d+)%s*/%s*(%d+)", progressRepl))
 end
 

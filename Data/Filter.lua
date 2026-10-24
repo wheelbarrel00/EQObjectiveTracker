@@ -23,11 +23,14 @@ Filter.rejects = { popup = 0, watched = 0, category = 0, zone = 0 }
 -- The rows the zone rule would have hidden and the campaign exemption kept, so a "why is
 -- this quest showing" report is answered from the same line as the rejects.
 Filter.campaignKept = 0
+-- The rows To-Do Mode's view hid for being finished or not, read by its status line.
+Filter.todoHidden = 0
 
 function Filter:BeginPass()
     local r = self.rejects
     r.popup, r.watched, r.category, r.zone = 0, 0, 0, 0
     self.campaignKept = 0
+    self.todoHidden = 0
 end
 
 -- Keyed by provider then entry id so two providers can never collide on a bare numeric id.
@@ -106,10 +109,25 @@ function Filter:PassesCategory(entry, f)
     return f.showNormal ~= false
 end
 
+function Filter:PassesWatched(entry, cfg)
+    return not (cfg and cfg.showOnlyWatched and entry.isTracked == false)
+end
+
+-- nil from IsCurrentZone means the provider cannot tell, so it fails open. The second answer is
+-- true only when the campaign exemption kept the quest.
+function Filter:IsHere(entry, f, provider)
+    if not (provider and provider.IsCurrentZone) or provider:IsCurrentZone(entry) ~= false then
+        return true, false
+    end
+    if f and f.campaignAnyZone and entry.tags and entry.tags.campaign then return true, true end
+    return false, false
+end
+
 -- Category filters are opt-in per provider. Without that gate an untagged entry from
 -- any other provider falls through to showNormal, and unchecking "Normal" would hide
--- every achievement too.
-function Filter:Visible(entry, cfg, provider)
+-- every achievement too. view is To-Do Mode's picked view, handed over only for a provider that
+-- takes it, and nil is the filter as it has always been.
+function Filter:Visible(entry, cfg, provider, view)
     local rejects = self.rejects
 
     -- A quest with a Complete popup is drawn as a popup box instead, so it must not also
@@ -128,7 +146,7 @@ function Filter:Visible(entry, cfg, provider)
     -- "keep this on screen", so it outranks every display setting below it.
     if self:IsPinned(entry) then return true end
 
-    if cfg and cfg.showOnlyWatched and entry.isTracked == false then
+    if not self:PassesWatched(entry, cfg) then
         rejects.watched = rejects.watched + 1
         return false
     end
@@ -139,17 +157,25 @@ function Filter:Visible(entry, cfg, provider)
             rejects.category = rejects.category + 1
             return false
         end
-        -- nil from IsCurrentZone means the provider cannot tell, so fail open
-        if f and f.onlyCurrentZone and provider.IsCurrentZone
-           and provider:IsCurrentZone(entry) == false then
-            -- Asked after the zone test, so campaignKept counts only rows it really kept.
-            if f.campaignAnyZone and entry.tags and entry.tags.campaign then
-                self.campaignKept = self.campaignKept + 1
-            else
+        -- While To-Do Mode is on its view decides this, and the saved box is left alone.
+        local TodoMode = view and ns:GetModule("TodoMode")
+        local zoneRule
+        if TodoMode then zoneRule = TodoMode:IsHereView(view) else zoneRule = f and f.onlyCurrentZone end
+        local kept
+        if zoneRule then
+            local here
+            here, kept = self:IsHere(entry, f, provider)
+            if not here then
                 rejects.zone = rejects.zone + 1
                 return false
             end
         end
+        if TodoMode and not TodoMode:Fits(view, true, TodoMode:IsFinished(entry)) then
+            self.todoHidden = self.todoHidden + 1
+            return false
+        end
+        -- Counted last, so a row the view then hid is never reported as kept.
+        if kept then self.campaignKept = self.campaignKept + 1 end
     end
 
     return true

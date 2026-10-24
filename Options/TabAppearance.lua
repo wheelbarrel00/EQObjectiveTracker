@@ -345,7 +345,7 @@ Options:RegisterTab({
         questColors:Add(self:CreateColorPicker(content, L["Objective Text Color"],
             function() return DB().objectiveColor end,
             function(v) restyle("objectiveColor", v) end,
-            L["Color of the objective lines under each title. The count at the start of a line has its own three colors below."], nil, nil, true))
+            L["Color of the objective lines under each title. The count at the start of a line has its own colors below."], nil, nil, true))
 
         questColors:Add(self:CreateColorPicker(content, L["Count Color: None Done"],
             function() return DB().countColorNone end,
@@ -356,6 +356,21 @@ Options:RegisterTab({
             function() return DB().countColorPartial end,
             function(v) restyle("countColorPartial", v) end,
             L["Color of a count like 2/5, while some of it is done."], nil, nil, true))
+
+        -- Unset by default, so until one is picked each takes the step below it and no count changes.
+        questColors:Add(self:CreateColorPicker(content, L["Count Color: Half Done"],
+            function() return DB().countColorHalf end,
+            function(v) restyle("countColorHalf", v) end,
+            L["Color of a count like 5/10, from half done. While unset it takes Count Color: In Progress."],
+            false,
+            function() restyle("countColorHalf", nil) end, true))
+
+        questColors:Add(self:CreateColorPicker(content, L["Count Color: Mostly Done"],
+            function() return DB().countColorMost end,
+            function(v) restyle("countColorMost", v) end,
+            L["Color of a count like 7/10, from seven tenths done. While unset it takes Count Color: Half Done."],
+            false,
+            function() restyle("countColorMost", nil) end, true))
 
         questColors:Add(self:CreateColorPicker(content, L["Count Color: Done"],
             function() return DB().countColorDone end,

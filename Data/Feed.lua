@@ -26,7 +26,7 @@ local spaces = {}
 local function group(self, id)
     local g = self.byGroup[id]
     if not g then
-        g = { id = id, entries = {}, visibleCount = 0, totalCount = 0 }
+        g = { id = id, entries = {}, visibleCount = 0, totalCount = 0, todo = { 0, 0, 0, 0 }, todoOn = false }
         self.byGroup[id] = g
     end
     return g
@@ -43,12 +43,17 @@ function Feed:Build()
     for _, g in pairs(self.byGroup) do
         wipe(g.entries)
         g.visibleCount, g.totalCount = 0, 0
+        local t = g.todo
+        t[1], t[2], t[3], t[4] = 0, 0, 0, 0
+        g.todoOn = false
     end
     for _, s in pairs(spaces) do wipe(s) end
     Filter:BeginPass()
     local ZoneGroups = ns:GetModule("ZoneGroups")
     local zoned = ZoneGroups and ZoneGroups:Grouping(cfg)
     if zoned then ZoneGroups:Begin(cfg) end
+    local Todo = ns:GetModule("TodoMode")
+    local view = Todo and Todo:IsOn(cfg) and Todo:View() or nil
 
     for _, p in ipairs(Registry:Active()) do
         if p._available then
@@ -77,7 +82,12 @@ function Feed:Build()
                     local g = group(self, e.groupID)
                     g.totalCount = g.totalCount + 1
                     if zoned then ZoneGroups:Note(e.groupID, e) end
-                    if Filter:Visible(e, cfg, p) then
+                    local pView = p.todo and view or nil
+                    if pView then
+                        g.todoOn = true
+                        Todo:Count(g, e, cfg, p)
+                    end
+                    if Filter:Visible(e, cfg, p, pView) then
                         g.visibleCount = g.visibleCount + 1
                         g.entries[g.visibleCount] = e
                         st.shown = st.shown + 1

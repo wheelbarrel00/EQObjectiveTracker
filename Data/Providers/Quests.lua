@@ -16,6 +16,8 @@ local Quests = {
     tags     = { "campaign", "daily", "weekly", "scheduled", "dungeon", "raid", "legendary",
                  "worldquest" },
     filterCategories = true,
+    -- The Quests and Campaign sections take To-Do Mode's view and counts.
+    todo = true,
 }
 
 -- Compared against info.frequency from C_QuestLog.GetInfo, which is Enum.QuestFrequency, so the

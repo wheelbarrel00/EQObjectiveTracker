@@ -191,6 +191,8 @@ DB.defaults = {
             -- finishedObjectiveColor is left unset: a finished line then takes the title color when
             -- Use title color for completed quests is on and the mode gives one, else the done color.
             -- finishedQuestColor is unset for the same reason, so a finished title keeps its old rules.
+            -- countColorHalf and countColorMost are unset too: until one is picked, a count half or seven
+            -- tenths done takes the step below it, so no count changes color.
             -- titleColorMode must never get a default either. Absent, Util.TitleColorMode reads it
             -- off the three title keys, so a default would read every old profile as that default.
 
@@ -205,6 +207,14 @@ DB.defaults = {
                 onlyCurrentZone = false,
                 campaignAnyZone = false,
             },
+
+            -- The pick (char.todoView), the four show boxes and todoCountSizeDelta have no default:
+            -- absent reads as the unfinished view, every count shown and the header count's own size.
+            todoMode            = false,
+            todoColorUnfinished = { r = 238 / 255, g = 170 / 255, b = 0 },
+            todoColorReady      = { r = 68 / 255, g = 1, b = 68 / 255 },
+            todoColorHere       = { r = 1, g = 1, b = 1 },
+            todoColorAll        = { r = 0.6, g = 0.6, b = 0.6 },
 
             -- positionInScreenUnits is deliberately NOT defaulted here, and must never be.
             -- Its ABSENCE is what marks a profile whose xOffset and yOffset predate the
@@ -310,7 +320,8 @@ local APPEARANCE_KEYS = {
     "titleColorUseClass", "headerColorUseClass",
     -- Both, or a reset could land on Gold: the mode is read off colorByDifficulty while unset.
     "titleColorMode", "colorByDifficulty",
-    "objectiveColor", "countColorNone", "countColorPartial", "countColorDone", "finishedObjectiveColor",
+    "objectiveColor", "countColorNone", "countColorPartial", "countColorHalf", "countColorMost",
+    "countColorDone", "finishedObjectiveColor",
     "finishedQuestColor", "newTagColor",
     "headerBar", "headerBarColor", "headerBarHeight", "headerBarStyle",
     "headerBarSoftEdges", "headerBarSoftEdgeStrength",
@@ -383,7 +394,8 @@ end
 -- trackedWorldQuests does not because the two fail in opposite directions.
 --
 -- delveRun clears too, and it is not a third exemption: it is the delve HUD's live tally
--- rather than a choice, and absence is already what it reads as "no run in progress".
+-- rather than a choice, and absence is already what it reads as "no run in progress". todoView
+-- clears too: absent, it reads as the unfinished view, where the switch's tooltip says the mode starts.
 function DB:ResetAll()
     if not self.db then return end
     if self.db.ResetProfile then self.db:ResetProfile() end
@@ -406,6 +418,7 @@ function DB:ResetAll()
         c.pinned            = {}
         c.trackedQuests     = nil
         c.delveRun          = nil
+        c.todoView          = nil
     end
 end
 

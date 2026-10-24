@@ -32,8 +32,8 @@ activities and the neighborhood tasks you have tracked.
 ### What works on Classic today
 
 Quest tracking and the customization around it: sorting, manual drag ordering, per-quest
-pinning, filters, section visibility and ordering, zone headers, the card layout, fonts and
-colors, profiles, row tooltips, and the row right-click menu. Blizzard's own quest watch frame is
+pinning, filters, To-Do Mode, section visibility and ordering, zone headers, the card layout, fonts
+and colors, profiles, row tooltips, and the row right-click menu. Blizzard's own quest watch frame is
 suppressed so you do not get two trackers.
 
 The tracker keeps its own list of which quests you are tracking rather than using the game's,
@@ -186,7 +186,9 @@ Show the sort button on the tracker, on the Tracker tab, for a small button at t
 left that opens a list of the sort orders, so switching between Level and Distance, or any other
 two, takes two clicks. Show the filter button on the tracker adds a funnel beside it whose list
 holds Show only quests in current zone, the quest types and Reset filters to defaults, and stays
-open while you change them. The funnel turns gold while any of them is set to hide quests.
+open while you change them. The funnel turns gold while any of them is set to hide quests. While
+To-Do Mode is on, the list leaves out the current-zone line and that box no longer turns the funnel
+gold, since the mode decides which quests are in your zone.
 On retail, Show section tabs on the Section Order card splits the tracker into up
 to three tabs. The number beside each section picks its tab, and once two tabs hold a section a
 strip under the top of the tracker switches between them. The scenario panel shows on every tab,
@@ -239,9 +241,22 @@ names, it shows the quests under your zone's heading, and on WoW Forever a quest
 heading counts as well. On retail, an option keeps your campaign quests on screen from every
 zone while that filter is on.
 
+To-Do Mode, off by default and switched on from its own card on the Tracker tab, turns the
+Quests header, and the Campaign header on retail, into four counts: your unfinished quests in the
+zone you are in, the ones ready to turn in there, every quest there and every quest you have.
+Click a count and the section shows exactly those quests, with the count you picked underlined. It starts on your unfinished quests in
+the zone, which is the short to-do list it is named for, and each character remembers the count it
+picked. While it is on it decides which quests are in your zone, so Show only quests in current
+zone is dimmed and keeps your own setting for later, while the quest type filters, Show only
+tracked quests, pinned quests and the other sections stay as they are. Always show campaign quests
+keeps working too, so your campaign quests from other zones show, and count, in the views for your
+zone. The card can hide any of the four counts, color each one, with the Class button, and size them.
+Hiding the box of the count you picked keeps that view, with nothing underlined.
+
 Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick,
 or in Original Style, the way the game's own tracker colors them on your version of the game. The
-objective text, a count like 0/5 as it goes from none done to in progress to done, finished
+objective text, a count like 0/5 as it goes from none done to in progress, half done, mostly done
+and done, finished
 objectives, the title of a finished quest and the NEW tag on quests you accepted in the last hour
 can each be given their own color as well. A Class button beside almost every color, from the
 tracker's background to the scroll bar, makes that color follow your class color instead, at the

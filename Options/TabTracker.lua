@@ -99,6 +99,61 @@ function Options:ResetFilters()
     f.campaignAnyZone = false
 end
 
+-- Each To-Do count's box and color, in the order the header draws them.
+local TODO_COUNTS = {
+    { show = "todoShowUnfinished", color = "todoColorUnfinished", label = L["Unfinished here"] },
+    { show = "todoShowReady",      color = "todoColorReady",      label = L["Ready to turn in here"] },
+    { show = "todoShowHere",       color = "todoColorHere",       label = L["All here"] },
+    { show = "todoShowAll",        color = "todoColorAll",        label = L["All quests"] },
+}
+
+-- Its own function so the tab's build closes over one name, not every control on the card. It dims
+-- its rows while the mode is off, and the current-zone box while it is on, since the mode decides that.
+local function buildTodoCard(ui, content, above, zoneOnly)
+    local gap  = ui:Spacing("groupGap")
+    local card = ui:CreateGroup(content, L["To-Do Mode"])
+    card:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
+    card:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -gap)
+
+    local rows = {}
+    local function sync()
+        local on = DB().todoMode == true
+        for _, r in ipairs(rows) do ui:SetDependent(r, on) end
+        ui:SetDependent(zoneOnly, not on)
+    end
+
+    card:Add(ui:CreateCheckbox(content, L["Turn on To-Do Mode"],
+        function() return DB().todoMode == true end,
+        function(v) DB().todoMode = v; sync(); render() end,
+        L["Turns the quest headers into four counts: your unfinished quests in this zone, the ones ready to turn in here, every quest here and every quest you have. Click a count to show only those quests. It starts on the unfinished ones."]))
+
+    for _, c in ipairs(TODO_COUNTS) do
+        local box = ui:CreateCheckbox(content, c.label,
+            function() return DB()[c.show] ~= false end,
+            function(v) DB()[c.show] = v; render() end,
+            L["Shows this count on the quest headers."])
+        local row = card:Add(box, { dependent = true })
+        local picker = ui:CreateColorPicker(content, L["Color"],
+            function() return DB()[c.color] end,
+            function(v) DB()[c.color] = v; render() end,
+            L["Color of this count on the quest headers."], nil, nil, true)
+        picker:SetPoint("RIGHT", row, "RIGHT", -ui:Spacing("rowPadding"), 0)
+        rows[#rows + 1] = box
+        rows[#rows + 1] = picker
+    end
+
+    local size = ui:CreateSlider(content, L["Count Size Offset"], -4, 8, 1,
+        function() return tonumber(DB().todoCountSizeDelta) or 0 end,
+        function(v) DB().todoCountSizeDelta = v; render() end,
+        L["Sizes the counts on the quest headers. 0 keeps them the size the header count has today."])
+    card:Add(size, { dependent = true })
+    rows[#rows + 1] = size
+
+    sync()
+    content._syncTodo = sync
+    return card
+end
+
 local function sectionLabel(id)
     return ns:GetModule("Sections"):Title(id)
 end
@@ -240,7 +295,7 @@ Options:RegisterTab({
         local zoneOnly = self:CreateCheckbox(content, L["Show only quests in current zone"],
             function() return DB().filters.onlyCurrentZone end,
             function(v) DB().filters.onlyCurrentZone = v; render() end,
-            L["Only show entries with an objective on your current map. Entries whose provider cannot tell are always shown."])
+            L["Only show entries with an objective on your current map. Entries whose provider cannot tell are always shown. While To-Do Mode is on, its picked count decides this instead."])
         filters:Add(zoneOnly)
 
         -- Gated like the category run above. Classic has no campaigns, so it could never act.
@@ -249,7 +304,7 @@ Options:RegisterTab({
             campaignZone = self:CreateCheckbox(content, L["Always show campaign quests"],
                 function() return DB().filters.campaignAnyZone end,
                 function(v) DB().filters.campaignAnyZone = v; render() end,
-                L["Campaign quests from every zone stay on the tracker, even while Show only quests in current zone is on."])
+                L["Campaign quests from every zone stay on the tracker, even while Show only quests in current zone is on. In To-Do Mode they also show, and count, in the views for your zone."])
             filters:Add(campaignZone)
         end
 
@@ -276,9 +331,11 @@ Options:RegisterTab({
         -- The last row of the card, after whichever filter ends the run.
         filters:Add(resetFilters)
 
+        local todoCard = buildTodoCard(self, content, filters, zoneOnly)
+
         local visibility = self:CreateGroup(content, L["Tracker Visibility"])
-        visibility:SetPoint("TOPLEFT", filters, "BOTTOMLEFT", 0, -gap)
-        visibility:SetPoint("TOPRIGHT", filters, "BOTTOMRIGHT", 0, -gap)
+        visibility:SetPoint("TOPLEFT", todoCard, "BOTTOMLEFT", 0, -gap)
+        visibility:SetPoint("TOPRIGHT", todoCard, "BOTTOMRIGHT", 0, -gap)
 
         -- Gated like the filter run above it: a section its TOC never loaded must not get a
         -- toggle that can never do anything.
@@ -510,7 +567,7 @@ Options:RegisterTab({
             L["Show the visible / total count on section headers"],
             function() return DB().showQuestTotal ~= false end,
             function(v) DB().showQuestTotal = v; render() end,
-            L["For example, 3/9. Applies to every section header and zone header."]))
+            L["For example, 3/9. Applies to every section header and zone header, except the Quests and Campaign headers while To-Do Mode is on."]))
 
         headers:Add(self:CreateCheckbox(content, L["Keep section headers in view while scrolling"],
             function() return DB().stickySectionHeaders ~= false end,
@@ -696,6 +753,7 @@ Options:RegisterTab({
 
     refresh = function(_, content)
         if content._syncZoneTag then content._syncZoneTag() end
+        if content._syncTodo then content._syncTodo() end
         if content._syncManualHint then content._syncManualHint() end
         if content._syncDelveRows then content._syncDelveRows() end
         if content._renderOrderRows then content._renderOrderRows() end

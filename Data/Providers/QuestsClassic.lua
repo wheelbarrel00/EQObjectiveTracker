@@ -20,6 +20,8 @@ local Quests = {
     idSpace  = "quest",
     tags     = { "daily", "weekly", "dungeon", "raid" },
     filterCategories = true,
+    -- The Quests section takes To-Do Mode's view and counts.
+    todo = true,
 }
 
 -- GetQuestLogTitle returns the full modern tuple on 1.15.9 and 2.5.6, measured on both:
