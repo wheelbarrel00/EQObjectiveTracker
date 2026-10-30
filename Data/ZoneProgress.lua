@@ -54,10 +54,8 @@ end
 -- Zone seen is kept as the answer for when nothing above it resolves either. Every zone that
 -- works today resolves on its own hop and never climbs.
 --
--- The per-hop test is the same pair Count uses, mapID AND name, and that is load-bearing:
--- Eversong Woods carries no mapID entry in either addon - the one listed is Silvermoon City -
--- so a mapID-only climb would pass it over from a sub-area inside it, answer the sub-area,
--- and draw no bar at all: the same NO ROUTING this walk was fixed for.
+-- The per-hop test is Count's: a mapID match, else a name match. The name half compares
+-- English names, so a zone reached by name alone draws no bar on any other client.
 local function zoneRoot()
     if not _rootDirty then return _rootID, _rootName end
     if not ns.Has.Map then return nil end

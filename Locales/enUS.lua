@@ -642,7 +642,9 @@ L["These are the quests showing now."] = true
 L["Click to show only these quests."] = true
 
 -- UI/Tracker.lua
+L["%s (reversed)"] = true
 L["Sort Order: %s"] = true
+L["Click the current order again to reverse it."] = true
 L["Open the options panel"] = true
 L["Tracker locked"] = true
 L["Use /eqot unlock to move it."] = true

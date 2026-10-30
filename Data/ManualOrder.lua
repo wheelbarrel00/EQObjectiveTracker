@@ -117,6 +117,7 @@ function ManualOrder:DebugLine()
     end
     local DB = ns:GetModule("DB")
     local t  = DB and DB:Tracker()
-    return ("manual order: %d ranked, %d still in log, sort mode %s")
-        :format(ranked, live, tostring(t and t.sortMode or "?"))
+    local reversed = t and t.sortReverse and ns:GetModule("Sort"):Reversible(t.sortMode)
+    return ("manual order: %d ranked, %d still in log, sort mode %s%s")
+        :format(ranked, live, tostring(t and t.sortMode or "?"), reversed and " reversed" or "")
 end

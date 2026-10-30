@@ -5,6 +5,26 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-10-30
+
+### New Features
+
+- Every sort order except Zone and Manual can now be reversed. On the sort button's menu (turn on Show the sort button on the tracker), pick the order already in use again to reverse it, and once more to turn it back: Level then runs from highest to lowest, Title from Z to A, Distance from farthest to nearest, and so on. Quests that tie on the order stay in alphabetical order, quests with no known distance stay at the bottom, and the sort button's tooltip says when the order is reversed. Picking another order, on the sort button or on the Tracker tab's Sort Order list, or hiding the sort button turns the reverse off. Requested by Hermonii.
+
+### Bug Fixes
+
+- During Abundance, the Abundance Bag bar now shows under the event's objective, as it does in Blizzard's tracker. Blizzard's scenario tracker draws two groups of event widgets under a scenario's objectives, and EQ Objective Tracker never drew either, so anything placed there was missing. Other events and delves that use them now show them too. Reported by hohoook.
+- With Questie installed and Hide Questie's quest tracker on, killing quest mobs in a fight no longer causes a blocked action error ("Interface action failed because of an AddOn", which error reports named as Questie's). EQ Objective Tracker now waits for the fight to end before hiding Questie's tracker, and unticking the box during a fight brings Questie's tracker back when the fight ends. Unticking it now brings back only a tracker EQ Objective Tracker hid, so a Questie tracker that Questie had already hidden itself, with no quests tracked or by its own option to hide in instances, stays hidden.
+- The zone progress bar now shows in Eversong Woods outside Silvermoon City on game clients that are not in English. It found that zone by its English name, so on every other language it drew nothing there.
+- In a scenario or delve, an objective whose text only just wraps onto a second line no longer overlaps the objectives around it. Its height was worked out for a slightly wider line than the one drawn.
+- `/eqot status` no longer prints the word twice in its scenario spells reading ("spells spells secret").
+- On Russian game clients, the font lists now offer the 25 bundled fonts that have Russian letters, plus WoW Default (Friz Quadrata) and WoW Arial Narrow. Until now none of the bundled fonts was offered there, so the tracker's default font, GothamXNarrow Black, could not load, and the tracker quietly used Friz Quadrata instead. If you play on a Russian client and never picked a font, your tracker now shows GothamXNarrow Black, the default font it was always meant to have. Fonts without Russian letters stay out of the lists there, so no font can turn Russian text into blanks. Korean and Chinese clients are unchanged: none of the bundled fonts has Korean or Chinese characters, so the game's own fonts for those languages stay in use.
+
+### Improvements
+
+- `/eqot status` now names the two groups of event widgets under a scenario's objectives on its widgets line, lists a widget type it cannot read instead of leaving it out, and says when the sort order is reversed.
+- Updated for World of Warcraft patch 12.1.7.
+
 ## [2.9.0] - 2026-10-24
 
 ### New Features

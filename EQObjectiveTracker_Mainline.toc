@@ -1,8 +1,8 @@
-## Interface: 120100, 120105, 120007
+## Interface: 120100, 120105, 120107, 120007
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 2.9.0
+## Version: 2.10.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker

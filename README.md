@@ -66,7 +66,8 @@ focusing a quest also points a TomTom arrow at it.
 
 If Questie is loaded, EQ Objective Tracker offers once to hide Questie's own tracker, and
 that choice becomes a permanent toggle on the General tab. It only hides the frame, and
-Questie's own disable path is never called.
+Questie's own disable path is never called. The game blocks hiding it during a fight, so
+if Questie shows its tracker then, it is hidden again as soon as the fight ends.
 
 Tracking and untracking from this tracker's row menu go through its own list rather than the
 game's watch functions, so the hooks Questie places on those do not fire for anything you do
@@ -184,7 +185,10 @@ button that locks the tracker again, and a gold outline shows its edges. Right-c
 the cogwheel for Unlock or Lock position, Reset position and size, and Open the options panel. Tick
 Show the sort button on the tracker, on the Tracker tab, for a small button at the tracker's top
 left that opens a list of the sort orders, so switching between Level and Distance, or any other
-two, takes two clicks. Show the filter button on the tracker adds a funnel beside it whose list
+two, takes two clicks. Pick the order already in use again to reverse it, so Level runs from
+highest to lowest or Distance from farthest to nearest, and once more to turn it back. Every order
+but Zone and Manual can be reversed, the button's tooltip says when one is, and picking another
+order or hiding the button turns the reverse off. Show the filter button on the tracker adds a funnel beside it whose list
 holds Show only quests in current zone, the quest types and Reset filters to defaults, and stays
 open while you change them. The funnel turns gold while any of them is set to hide quests. While
 To-Do Mode is on, the list leaves out the current-zone line and that box no longer turns the funnel
@@ -228,11 +232,13 @@ keeps the tracker on screen by itself, including world quests, achievements, the
 bar, and the delve or scenario panel.
 
 Almost everything is configurable: fonts (42 bundled, plus anything from LibSharedMedia, each
-shown in its own typeface in the picker), sizes, spacing, colors, opacity (back to full under
+shown in its own typeface in the picker; a Russian game client offers the 25 with Russian letters,
+and a Korean or Chinese client none, so the game's own fonts stay in use there), sizes, spacing, colors, opacity (back to full under
 the mouse, with the quest you are following kept solid), a background that fades in while the
 mouse is over the tracker, at an opacity you pick, the progress bars, the scroll bar's
 width and texture, a card layout that can wrap the delve and scenario panel as well as your quests, section
-order, visibility and tabs, filters by quest type, and eight sort modes including by distance and by hand.
+order, visibility and tabs, filters by quest type, and eight sort modes including by distance and by hand, all but Zone and Manual reversible from
+the sort button.
 The current-zone filter shows only quests with an objective on the map you are standing on.
 If that map lists none of its own, such as a building interior, a covenant sanctum or a
 dungeon, it asks the zone around it instead, so you still get that zone's quests rather

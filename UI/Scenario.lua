@@ -538,8 +538,9 @@ function Scenario:_DrawCriteria(container, cfg, lines)
             row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
             row.text:SetJustifyH("LEFT")
             -- GetStringHeight below is stale off anchors alone, so the wrap width is set
-            -- explicitly or a wrapped criterion measures as one line and rows overlap
-            row.text:SetWidth(math.max(1, rowWidth - 18))
+            -- explicitly or a wrapped criterion measures as one line and rows overlap. It must
+            -- match the anchors: the icon's 8 inset and 12 width, the 6 gap and the 4 pad.
+            row.text:SetWidth(math.max(1, rowWidth - 30))
 
             -- Completed criteria drop the meter, matching the default tracker. An
             -- unfinished one keeps it here, which is the only place it survives when bars
@@ -636,7 +637,10 @@ function Scenario:Render(container, cfg, info, entry, topOffset)
     local SS = ns:GetModule("ScenarioSpells")
     local spellH = SS and SS:Place(container, info, (self.topOffset or 0) + h) or 0
 
-    return h + spellH + 6
+    -- Then the scenario tracker's two fixed widget sets, as Blizzard lays them out
+    local belowH = WB and WB:RenderBelowCriteria(container, cfg, (self.topOffset or 0) + h + spellH) or 0
+
+    return h + spellH + belowH + 6
 end
 
 function Scenario:BannerLine()

@@ -60,16 +60,19 @@ local INFO_SUFFIXES = { "VisualizationInfo", "WidgetVisualizationInfo" }
 
 local apiReads = 0
 
+-- The second answer says whether any getter exists for the type at all
 local function visualizationInfo(typeName, widgetID)
+    local asked = false
     for i = 1, #INFO_SUFFIXES do
         local fn = C_UIWidgetManager["Get" .. typeName .. INFO_SUFFIXES[i]]
         if fn then
+            asked = true
             apiReads = apiReads + 1
             local ok, info = pcall(fn, widgetID)
-            if ok and type(info) == "table" then return info end
+            if ok and type(info) == "table" then return info, true end
         end
     end
-    return nil
+    return nil, asked
 end
 
 -- Some types keep shownState on their payload table rather than at the top level. Measured on
@@ -105,7 +108,7 @@ end
 local pool, out, outN = {}, {}, 0
 local skipped, skippedN = {}, 0
 
--- setID -> { gen, n, list }. Pruned in Invalidate down to the two sets a render can ask for.
+-- setID -> { gen, n, list }. Pruned in Invalidate down to the sets a render can ask for.
 local snaps = {}
 
 -- Handed back when there is nothing to read, so no caller is ever given the shared pool
@@ -113,7 +116,8 @@ local EMPTY = {}
 
 -- Read runs once per set and each caller draws its own slice, so one pair of counters would
 -- only ever describe whichever set ran last. Recorded per set instead, and DebugLine reports
--- the live sets only, so a finished scenario's numbers cannot linger.
+-- the live sets only, so a finished scenario's numbers cannot linger. The two fixed sets under the
+-- criteria are always live, so the scenario panel forgets them when it clears.
 local stats = {}
 
 local function acquire(order, tooltip)
@@ -365,6 +369,13 @@ end
 -- and read the note on the event list before adding to it.
 local generation = 1
 local idGen, trackerID, scenarioID
+
+-- Blizzard's scenario tracker lays out two FIXED sets under its criteria, its top block then its
+-- bottom block (SCENARIO_TRACKER_TOP_WIDGET_SET and SCENARIO_TRACKER_WIDGET_SET in its source). They
+-- go off screen with the tracker this addon hides. Read in an Abundance cave on 2026-10-29: 514 held
+-- the Abundance Bag bar and 252 a text widget.
+local BELOW_TOP, BELOW_BOTTOM = 514, 252
+
 -- Set by whatever can MOVE a widget set id, and cleared by the render that re-reads the pair.
 -- A widget ticking inside a set moves no id, so a burst leaves this alone and the filter stays
 -- tight; a scenario starting or a zone change does move one, and until the next render the pair
@@ -425,23 +436,29 @@ function Widgets:ScenarioSetID()
     return scenarioID
 end
 
+function Widgets:BelowCriteriaSetIDs()
+    return BELOW_TOP, BELOW_BOTTOM
+end
+
 -- The seam the events below drive, and the one a test drives by hand. Nothing else may bump
 -- the generation, or a snapshot can go stale without an event having said so.
 function Widgets:Invalidate()
     generation = generation + 1
-    -- Only the two sets a render can ASK for are worth keeping, which holds this at two entries
+    -- Only the sets a render can ASK for are worth keeping, which holds this at four entries
     -- however many zones and scenarios a session visits. Pruning on AGE instead threw the pooled
     -- tables away on every burst of UPDATE_UI_WIDGET - it fires per widget, so a busy delve bumps
     -- the generation several times inside one debounced repaint - and that burst is precisely the
     -- case the reuse exists for.
     for id in pairs(snaps) do
-        if id ~= trackerID and id ~= scenarioID then snaps[id] = nil end
+        if id ~= trackerID and id ~= scenarioID and id ~= BELOW_TOP and id ~= BELOW_BOTTOM then
+            snaps[id] = nil
+        end
     end
 end
 
--- Copied out of the shared pool rather than handed straight back. The two callers ask for
+-- Copied out of the shared pool rather than handed straight back. The callers ask for up to four
 -- different sets inside ONE render pass, so a list handed back from the pool would be rewritten
--- under the first caller by the second.
+-- under an earlier caller by a later one.
 local function snapshot(setID)
     local snap = snaps[setID]
     if not snap then snap = { gen = -1, n = 0, list = {} }; snaps[setID] = snap end
@@ -480,7 +497,8 @@ function Widgets:Read(setID)
         for w = 1, #widgets do
             local widget = widgets[w]
             local tname  = typeByValue[widget.widgetType]
-            local info   = tname and visualizationInfo(tname, widget.widgetID)
+            local info, asked
+            if tname then info, asked = visualizationInfo(tname, widget.widgetID) end
             if info and not isHidden(info) then
                 local reader = READERS[tname]
                 if reader then
@@ -489,6 +507,11 @@ function Widgets:Read(setID)
                     skippedN = skippedN + 1
                     skipped[skippedN] = tname
                 end
+            elseif not asked then
+                -- A type with no enum name or no getter cannot even be asked whether it is shown,
+                -- and used to vanish here without a trace. A getter answering nil, or raising, stays out.
+                skippedN = skippedN + 1
+                skipped[skippedN] = tname or ("type " .. tostring(widget.widgetType))
             end
         end
     end
@@ -522,7 +545,7 @@ function Widgets:DebugLine()
     if not self:IsAvailable() then return "widgets: api absent" end
     local tid, sid = self:TrackerSetID(), self:ScenarioSetID()
     for id in pairs(stats) do
-        if id ~= tid and id ~= sid then stats[id] = nil end
+        if id ~= tid and id ~= sid and id ~= BELOW_TOP and id ~= BELOW_BOTTOM then stats[id] = nil end
     end
 
     local drawn, names, nNames = 0, {}, 0
@@ -537,6 +560,9 @@ function Widgets:DebugLine()
     end
     add(tid)
     if sid ~= tid then add(sid) end
+    for _, id in ipairs({ BELOW_TOP, BELOW_BOTTOM }) do
+        if id ~= tid and id ~= sid then add(id) end
+    end
 
     local skips = ""
     if nNames > 0 then
@@ -550,8 +576,8 @@ function Widgets:DebugLine()
             nemesisHeld and " held" or "", tostring(seenSpell),
             #spellIDs > 0 and table.concat(spellIDs, ",") or "none")
     end
-    return ("widgets: tracker set %s, scenario set %s | %d drawn | %d api reads this session%s%s")
-        :format(tostring(tid), tostring(sid), drawn, apiReads, skips, delve)
+    return ("widgets: tracker set %s, scenario set %s, below the criteria %d and %d | %d drawn | %d api reads this session%s%s")
+        :format(tostring(tid), tostring(sid), BELOW_TOP, BELOW_BOTTOM, drawn, apiReads, skips, delve)
 end
 
 local dirtyListeners = {}
@@ -571,7 +597,7 @@ function Widgets:OnEnable()
         end
     end
 
-    -- UPDATE_UI_WIDGET carries the SET its widget belongs to, and this addon reads exactly two.
+    -- UPDATE_UI_WIDGET carries the SET its widget belongs to, and this addon reads only four.
     -- The payload used to be discarded, so a widget changing anywhere in the game - top center,
     -- below minimap, another addon's - rebuilt the whole feed. OnEnable returns above on a
     -- client with no C_UIWidgetManager, so Classic registers none of this at all.
@@ -591,7 +617,7 @@ function Widgets:OnEnable()
         local setID = num(widgetInfo.widgetSetID)
         if not setID then return true end
         if idsStale or not (trackerID or scenarioID) then return true end
-        return setID == trackerID or setID == scenarioID
+        return setID == trackerID or setID == scenarioID or setID == BELOW_TOP or setID == BELOW_BOTTOM
     end
 
     -- Coalesced rather than repainting once per widget, because UPDATE_UI_WIDGET fires per

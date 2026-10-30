@@ -88,7 +88,8 @@ local function leftButtonX(cfg, pastFilter)
 end
 
 -- Above the drag handle's frame level so the handle does not eat the click. A tooltip given as a
--- function is read on each hover, for text that names a setting's current value.
+-- function is read on each hover, for text that names a setting's current value, and a second
+-- value it returns is drawn under it as a wrapped gray hint.
 local function makeHeaderIcon(f, texture, tooltip, onClick, anchor)
     local b = CreateFrame("Button", nil, f)
     b:SetSize(HEADER_ICON_SZ, HEADER_ICON_SZ)
@@ -101,12 +102,13 @@ local function makeHeaderIcon(f, texture, tooltip, onClick, anchor)
     b:SetScript("OnEnter", function(btn)
         if Tracker:IsClickThrough() then return end
         tex:SetAlpha(1)
-        local text = tooltip
-        if type(text) == "function" then text = text() end
+        local text, hint = tooltip, nil
+        if type(text) == "function" then text, hint = text() end
         if not text then return end
         local tip = ns.Util.Tooltip()
         tip:SetOwner(btn, anchor or "ANCHOR_BOTTOMLEFT")
         tip:AddLine(text)
+        if hint then tip:AddLine(hint, 0.7, 0.7, 0.7, true) end
         tip:Show()
     end)
     b:SetScript("OnLeave", function()
@@ -134,7 +136,19 @@ function Tracker:SortLine()
     for _, o in ipairs(sortOptions() or {}) do
         if o.value == mode then name = o.label end
     end
+    if cfg and cfg.sortReverse and ns:GetModule("Sort"):Reversible(mode) then
+        name = L["%s (reversed)"]:format(name)
+    end
     return L["Sort Order: %s"]:format(name)
+end
+
+-- The sort button's second tooltip line, while the order in use has a reverse
+function Tracker:SortHint()
+    local cfg = ns:GetModule("DB"):Tracker()
+    if ns:GetModule("Sort"):Reversible(cfg and cfg.sortMode or "zone") then
+        return L["Click the current order again to reverse it."]
+    end
+    return nil
 end
 
 function Tracker:OpenSortMenu(owner)
@@ -147,7 +161,12 @@ function Tracker:OpenSortMenu(owner)
         items[#items + 1] = { text = o.label, onClick = function()
             local cfg = ns:GetModule("DB"):Tracker()
             if not cfg then return end
-            cfg.sortMode = value
+            if (cfg.sortMode or "zone") == value and ns:GetModule("Sort"):Reversible(value) then
+                cfg.sortReverse = not cfg.sortReverse
+            else
+                cfg.sortMode = value
+                cfg.sortReverse = false
+            end
             Tracker:Render()
             Options:RefreshIfShown("tracker")
         end }
@@ -901,7 +920,7 @@ function Tracker:BuildFrame()
     f.headerIcons = { cog }
     -- Kept out of the cogwheel's right-to-left run, at the left end.
     local sort = makeHeaderIcon(f, "Interface\\AddOns\\EQObjectiveTracker\\Media\\Textures\\sort.tga",
-        function() return Tracker:SortLine() end, function(b) Tracker:OpenSortMenu(b) end,
+        function() return Tracker:SortLine(), Tracker:SortHint() end, function(b) Tracker:OpenSortMenu(b) end,
         "ANCHOR_BOTTOMRIGHT")
     sort:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -1)
     f.sortButton = sort

@@ -645,7 +645,9 @@ L["These are the quests showing now."] = "当前显示的就是这些任务。"
 L["Click to show only these quests."] = "点击只显示这些任务。"
 
 -- UI/Tracker.lua
+L["%s (reversed)"] = "%s（倒序）"
 L["Sort Order: %s"] = "排序方式：%s"
+L["Click the current order again to reverse it."] = "再次点击当前排序方式即可倒序排列。"
 L["Open the options panel"] = "打开设置面板"
 L["Tracker locked"] = "追踪框已锁定"
 L["Use /eqot unlock to move it."] = "输入 /eqot unlock 解锁移动追踪框。"

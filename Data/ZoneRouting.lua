@@ -25,11 +25,12 @@ ns.CAT = {
 }
 
 -- Eversong Woods lists Silvermoon City (2393) on purpose so the city shows the zone's
--- progress. Eversong itself (2395) resolves by name.
+-- progress. Eversong itself (2395) is listed too, unlike Everything Quests' copy: the name
+-- match compares English names, so it found Eversong on English clients only. Keep 2395 on a sync.
 ns.ZONE_CATEGORIES = {
     [ns.CAT.CAMPAIGN]          = { name = "Midnight Campaign",           mapIDs = {},       campaignID = 270 },
     [ns.CAT.WAR_LIGHT_SHADOW]  = { name = "The War of Light and Shadow", mapIDs = {},       campaignID = 284 },
-    [ns.CAT.EVERSONG_WOODS]    = { name = "Eversong Woods",              mapIDs = { 2393 } },
+    [ns.CAT.EVERSONG_WOODS]    = { name = "Eversong Woods",              mapIDs = { 2393, 2395 } },
     [ns.CAT.ZULAMAN]           = { name = "Zul'Aman",                    mapIDs = { 2437 } },
     [ns.CAT.HARANDAR]          = { name = "Harandar",                    mapIDs = { 2413 } },
     [ns.CAT.ARATOR]            = { name = "Arator",                      mapIDs = {} },

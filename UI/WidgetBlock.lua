@@ -8,10 +8,10 @@ local Util        = ns.Util
 -- the information is simply gone - which is what a user reported for delves and for the events
 -- that borrow the scenario panel.
 --
--- Two runs, drawn in the two places Blizzard draws them: the tracker's own set at the top of
--- the container, and the scenario's set between the banner and the criteria. They keep
--- separate pools because both are on screen at once and each releases its own frames, so one
--- pool would have each draw retire the other's.
+-- Four runs, drawn where Blizzard draws them: the tracker's own set at the top of the container,
+-- the scenario's step set between the banner and the criteria, and the scenario tracker's two
+-- fixed sets under the criteria. They keep separate pools because several are on screen at once
+-- and each releases its own frames, so one pool would have each draw retire the others'.
 --
 -- The frames here are our own. Nothing registers a UIWidgetContainer against a Blizzard widget
 -- set, and nothing may - see the note in UI/Scenario.lua.
@@ -125,8 +125,10 @@ local function newState()
     return { barPool = {}, bars = {}, textPool = {}, texts = {}, delvePool = {}, delves = {} }
 end
 
-WidgetBlock.top      = newState()
-WidgetBlock.scenario = newState()
+WidgetBlock.top         = newState()
+WidgetBlock.scenario    = newState()
+WidgetBlock.belowTop    = newState()
+WidgetBlock.belowBottom = newState()
 
 -- Texture, background and border come from Media's shared progress bar block in Render below,
 -- so a widget bar matches the criteria bars it draws beside. The fill color does NOT: it is
@@ -425,6 +427,32 @@ function WidgetBlock:RenderScenario(container, cfg, top)
     return draw(self.scenario, container, cfg, top or 0, W and W:ScenarioSetID())
 end
 
+-- The scenario tracker's two fixed sets, top block then bottom block, under the criteria and the
+-- spells. Driven from UI/Scenario.lua, so they draw only while a scenario does, as Blizzard's do.
+function WidgetBlock:RenderBelowCriteria(container, cfg, top)
+    if widgetsOff(cfg) then
+        release(self.belowTop)
+        release(self.belowBottom)
+        return 0
+    end
+    local W = ns:GetModule("Widgets")
+    local topID, bottomID
+    if W then topID, bottomID = W:BelowCriteriaSetIDs() end
+    local y = (top or 0) + ROW_GAP
+    local h = draw(self.belowTop, container, cfg, y, topID)
+    h = h + draw(self.belowBottom, container, cfg, y + h, bottomID)
+    return h > 0 and h + ROW_GAP or 0
+end
+
 function WidgetBlock:ClearScenario()
     release(self.scenario)
+    release(self.belowTop)
+    release(self.belowBottom)
+    -- These two ids never change, so only this keeps the status line off a finished scenario's read
+    local W = ns:GetModule("Widgets")
+    if W and W.Forget then
+        local topID, bottomID = W:BelowCriteriaSetIDs()
+        W:Forget(topID)
+        W:Forget(bottomID)
+    end
 end

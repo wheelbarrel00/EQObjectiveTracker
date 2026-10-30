@@ -256,6 +256,8 @@ Options:RegisterTab({
             SORT_OPTIONS,
             function() return DB().sortMode or "zone" end,
             function(v)
+                -- A reverse belongs to the order it was picked on, as on the sort button
+                if DB().sortMode ~= v then DB().sortReverse = false end
                 DB().sortMode = v
                 render()
                 syncManualHint(v)
@@ -592,6 +594,11 @@ Options:RegisterTab({
             function() return DB().showSortButton == true end,
             function(v)
                 DB().showSortButton = v
+                -- Only the button shows a reverse or turns one on, so hiding it ends one
+                if not v and DB().sortReverse then
+                    DB().sortReverse = false
+                    render()
+                end
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
             L["A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default."]))

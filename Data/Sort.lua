@@ -98,13 +98,63 @@ local MODES = {
     distance = byDistance,
 }
 
-function Sort:For(mode, orderMap)
+-- The same orders with only the main key turned around. Entries the main key cannot tell apart
+-- keep the normal order, so same-level quests still read A to Z, and a quest with no known distance
+-- stays last either way. Zone has none: with zone headers on a reverse changes nothing, since they
+-- order their own zones, and with them off it only flipped the log's headings, so it was left out.
+-- Manual is the player's own.
+local REVERSED = {
+    title = function(a, b)
+        local ta, tb = a.title or "", b.title or ""
+        if ta ~= tb then return ta > tb end
+        return tostring(a.id) < tostring(b.id)
+    end,
+    status = function(a, b)
+        local ca = (a.state == "complete")
+        local cb = (b.state == "complete")
+        if ca ~= cb then return cb end
+        return byTitle(a, b)
+    end,
+    type = function(a, b)
+        local ra, rb = typeRank(a), typeRank(b)
+        if ra ~= rb then return ra < rb end
+        return byTitle(a, b)
+    end,
+    level = function(a, b)
+        local la, lb = a.level or 0, b.level or 0
+        if la ~= lb then return la > lb end
+        return byTitle(a, b)
+    end,
+    recent = function(a, b)
+        local fa, fb = a.addedAt or 0, b.addedAt or 0
+        if fa ~= fb then return fa < fb end
+        return byTitle(a, b)
+    end,
+    distance = function(a, b)
+        local da = (distances and distances[a.id]) or INF
+        local db = (distances and distances[b.id]) or INF
+        if da ~= db then
+            if da == INF or db == INF then return db == INF end
+            return da > db
+        end
+        local za, zb = a.zone or "~", b.zone or "~"
+        if za ~= zb then return za < zb end
+        return byTitle(a, b)
+    end,
+}
+
+function Sort:For(mode, orderMap, reversed)
     if mode == "manual" then
         activeOrder = orderMap
         return byManual
     end
     activeOrder = nil
-    return MODES[mode or "zone"] or byZone
+    mode = mode or "zone"
+    return (reversed and REVERSED[mode]) or MODES[mode] or byZone
+end
+
+function Sort:Reversible(mode)
+    return REVERSED[mode or "zone"] ~= nil
 end
 
 function Sort:Modes()

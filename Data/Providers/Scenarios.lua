@@ -170,11 +170,11 @@ local function readStepSpells()
     local list = step.spells
     if list == nil then return end
     if _issecret and _issecret(list) then
-        spellsNote = "spells secret"
+        spellsNote = "secret"
         return
     end
     if type(list) ~= "table" then
-        spellsNote = "spells " .. type(list)
+        spellsNote = type(list)
         return
     end
 
@@ -657,6 +657,12 @@ function Scenarios:WidgetProbeLines(showAll)
     dumpScenarioSpells(out)
     dumpSet(out, "scenario step",     stepSet, showAll)
     dumpSet(out, "objective tracker", setID("GetObjectiveTrackerWidgetSetID"), showAll)
+    local W = ns:GetModule("Widgets")
+    if W and W.BelowCriteriaSetIDs then
+        local topID, bottomID = W:BelowCriteriaSetIDs()
+        dumpSet(out, "below the criteria, top",    topID, showAll)
+        dumpSet(out, "below the criteria, bottom", bottomID, showAll)
+    end
     dumpSet(out, "top center",        setID("GetTopCenterWidgetSetID"), showAll)
     dumpSet(out, "below minimap",     setID("GetBelowMinimapWidgetSetID"), showAll)
     return out

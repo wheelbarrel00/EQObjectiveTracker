@@ -36,14 +36,41 @@ function Coexist:Apply()
     end
     if not (c and c.hideQuestieTracker) then return end
 
-    f:Hide()
+    -- Hide on that frame is blocked in combat (ADDON_ACTION_BLOCKED on Era, 2026-10-28), so
+    -- a hide due mid-fight waits for PLAYER_REGEN_ENABLED.
+    if f:IsShown() and not InCombatLockdown() then
+        f:Hide()
+        self._hidByUs = true
+    end
     if self._hookedFrame ~= f then
         self._hookedFrame = f
         f:HookScript("OnShow", function(frame)
             local live = cfg()
-            if live and live.hideQuestieTracker then frame:Hide() end
+            if live and live.hideQuestieTracker and not InCombatLockdown() then
+                frame:Hide()
+                self._hidByUs = true
+            end
         end)
     end
+end
+
+-- Unticking stops this addon hiding it. It comes back only if this addon hid it and that addon
+-- itself wants it shown, so one that addon had already hidden itself (nothing tracked, its
+-- instance hide) stays hidden.
+function Coexist:Release()
+    local c = cfg()
+    local f = trackerFrame()
+    if (c and c.hideQuestieTracker) or not f or not self._hidByUs then return end
+    if InCombatLockdown() then
+        self._showAfterCombat = true
+        return
+    end
+    self._showAfterCombat, self._hidByUs = nil, nil
+    local q = Questie
+    local wanted = not (type(q) == "table" and type(q.db) == "table"
+                        and type(q.db.profile) == "table")
+                   or q.db.profile.trackerEnabled ~= false
+    if wanted and type(f.Show) == "function" then f:Show() end
 end
 
 function Coexist:MaybePrompt()
@@ -161,6 +188,11 @@ function Coexist:OnEnable()
     -- client does no work for a feature that can never apply there.
     Events:On("QUEST_LOG_UPDATE", function()
         if self._present then self:Apply() end
+    end)
+    Events:On("PLAYER_REGEN_ENABLED", function()
+        if not self._present then return end
+        self:Apply()
+        if self._showAfterCombat then self:Release() end
     end)
     restart()
 end

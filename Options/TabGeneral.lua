@@ -135,19 +135,8 @@ Options:RegisterTab({
                 function(v)
                     DB:General().hideQuestieTracker = v
                     local Q = ns:GetModule("QuestieCoexist")
-                    if v then
-                        if Q then Q:Apply() end
-                        return
-                    end
-                    -- Unticking stops this addon hiding it, but showing it again is only
-                    -- correct if that addon itself wants it shown.
-                    local q, f = Questie, Questie_BaseFrame
-                    local wanted = not (type(q) == "table" and type(q.db) == "table"
-                                        and type(q.db.profile) == "table")
-                                   or q.db.profile.trackerEnabled ~= false
-                    if wanted and type(f) == "table" and type(f.Show) == "function" then
-                        f:Show()
-                    end
+                    if not Q then return end
+                    if v then Q:Apply() else Q:Release() end
                 end,
                 L["Hides Questie's tracker frame while EQ Objective Tracker is running. It only hides the frame, and Questie's own disable path is never called."]))
         end

@@ -630,7 +630,9 @@ L["These are the quests showing now."] = "Diese Quests werden gerade angezeigt."
 L["Click to show only these quests."] = "Klicke, um nur diese Quests anzuzeigen."
 
 -- UI/Tracker.lua
+L["%s (reversed)"] = "%s (umgekehrt)"
 L["Sort Order: %s"] = "Sortierreihenfolge: %s"
+L["Click the current order again to reverse it."] = "Klicke erneut auf die aktuelle Reihenfolge, um sie umzukehren."
 L["Open the options panel"] = "Optionsfenster öffnen"
 L["Tracker locked"] = "Tracker gesperrt"
 L["Use /eqot unlock to move it."] = "Verwende /eqot unlock, um ihn zu verschieben."
