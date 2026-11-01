@@ -487,7 +487,7 @@ function Quests:DebugLine()
         if e.isTracked then cached = cached + 1 end
         if now then live = live + 1 end
         -- Whatever the whole log was baselined to reads 0 here, so a nonzero stamp is a quest
-        -- accepted since login and is exactly what the NEW tag draws off.
+        -- accepted since then, and the NEW tag draws off it for an hour.
         if e.addedAt and e.addedAt > 0 then
             stamped = stamped + 1
             if not newest or e.addedAt > newest then newest = e.addedAt end
@@ -677,6 +677,13 @@ function Quests:Enable(notify)
         dirtyAll = true
         notifyDirty()
     end
+    -- A session starting on an empty log has no baseline, so the walk alone would save its first
+    -- quest at 0. Classic fires (questLogIndex, questID), retail (questID): read the last argument.
+    local function questAccepted(_, a, b)
+        local id, firstSeen = b or a, stamps()
+        if id and not firstSeen[id] then firstSeen[id] = time() end
+        markAll()
+    end
 
     -- A focused quest can leave the log by being turned in or abandoned, and nothing else would
     -- ever announce the clear, so a listener's arrow would keep pointing at a quest the player
@@ -727,7 +734,7 @@ function Quests:Enable(notify)
         end)
     end
 
-    Events:On("QUEST_ACCEPTED",          markAll)
+    Events:On("QUEST_ACCEPTED",          questAccepted)
     Events:On("QUEST_REMOVED",           markRemoved)
     Events:On("QUEST_TURNED_IN",         markRemoved)
     Events:On("PLAYER_ENTERING_WORLD",   enterWorld)

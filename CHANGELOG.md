@@ -5,6 +5,13 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.1] - 2026-11-01
+
+### Bug Fixes
+
+- The first quest you accept after logging in with an empty quest log, such as a new character's first quest, now shows its NEW tag. It was being saved as a quest you already had, so it never got one.
+- The first click on the About tab after logging in could end in a "script ran too long" error on Classic Era. Its changelog now lists the 30 newest versions instead of all of them, which makes that click far lighter, and the rest are on CurseForge.
+
 ## [2.10.0] - 2026-10-30
 
 ### New Features

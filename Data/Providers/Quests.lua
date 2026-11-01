@@ -831,6 +831,13 @@ function Quests:Enable(notifyDirty)
         dirtyAll, zoneDirty = true, true
         notifyDirty()
     end
+    -- A session starting on an empty log has no baseline, so the walk alone would save its first
+    -- quest at 0. Classic fires (questLogIndex, questID), retail (questID): read the last argument.
+    local function questAccepted(_, a, b)
+        local id, firstSeen = b or a, stamps()
+        if id and not firstSeen[id] then firstSeen[id] = time() end
+        markAll()
+    end
     local function markDynamic()
         if not primed then dirtyAll = true else dirtyObjectives = true end
         zoneDirty = true
@@ -841,7 +848,7 @@ function Quests:Enable(notifyDirty)
         notifyDirty()
     end
 
-    Events:On("QUEST_ACCEPTED",           markAll)
+    Events:On("QUEST_ACCEPTED",           questAccepted)
     Events:On("QUEST_REMOVED",            markAll)
     Events:On("QUEST_TURNED_IN",          markAll)
     Events:On("PLAYER_ENTERING_WORLD",    markAll)

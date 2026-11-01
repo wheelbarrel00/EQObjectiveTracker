@@ -28,6 +28,11 @@ SRC = 'CHANGELOG.md'
 DST = 'Core/Changelog.lua'
 SKIP_VERSIONS = {'0.1.0'}
 
+# The About tab builds every line it shows in one script on its first click. With all 61
+# versions that read 313 ms on Classic Era (2026-11-01), and the client had ended the same
+# click with "script ran too long". The tab's CurseForge button covers what this leaves out.
+MAX_VERSIONS = 30
+
 # The prerelease suffix is deliberate: a tag such as v1.4.0-beta1 is how a risky release
 # ships to the beta channel, so a matching heading is a live case. Without it the whole
 # version silently vanished from the in-game changelog.
@@ -150,7 +155,7 @@ def render(entries):
 def main():
     check = '--check' in sys.argv[1:]
 
-    entries = parse(io.open(SRC, encoding='utf-8').read().splitlines())
+    entries = parse(io.open(SRC, encoding='utf-8').read().splitlines())[:MAX_VERSIONS]
     if not entries:
         sys.exit('no released versions found in %s' % SRC)
     text = render(entries)
