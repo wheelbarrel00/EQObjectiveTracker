@@ -35,6 +35,25 @@ local function enabled(cfg)
     return not cfg or cfg.showItemButtons ~= false
 end
 
+local function paint(b, questID)
+    local _, icon, charges = ns:GetModule("QuestItems"):Get(questID)
+    if not icon then return end
+    b.icon:SetTexture(icon)
+    if charges and charges > 1 then
+        b.count:SetText(charges)
+        b.count:Show()
+    else
+        b.count:SetText("")
+        b.count:Hide()
+    end
+    local s, d = ns:GetModule("QuestItems"):Cooldown(questID)
+    if not (s and d and d > 0) then s, d = 0, 0 end
+    -- The range tick paints four times a second, so only a change reaches the cooldown frame.
+    if s == b._cdStart and d == b._cdLength then return end
+    b._cdStart, b._cdLength = s, d
+    if d > 0 then b.cd:SetCooldown(s, d) else b.cd:Clear() end
+end
+
 local function onRangeUpdate(self, elapsed)
     local t = (self._rangeTimer or 0) - elapsed
     if t > 0 then self._rangeTimer = t; return end
@@ -48,6 +67,8 @@ local function onRangeUpdate(self, elapsed)
     else
         self.icon:SetVertexColor(1.0, 1.0, 1.0)
     end
+    -- Nothing here hears a cooldown start, so this tick is what reads the cooldown and charges.
+    paint(self, qid)
 end
 
 local function buildButton()
@@ -72,21 +93,6 @@ local function buildButton()
     b:Hide()
     ItemButtons:Adopt(b)
     return b
-end
-
-local function paint(b, questID)
-    local _, icon, charges = ns:GetModule("QuestItems"):Get(questID)
-    if not icon then return end
-    b.icon:SetTexture(icon)
-    if charges and charges > 1 then
-        b.count:SetText(charges)
-        b.count:Show()
-    else
-        b.count:SetText("")
-        b.count:Hide()
-    end
-    local s, d = ns:GetModule("QuestItems"):Cooldown(questID)
-    if s and d and d > 0 then b.cd:SetCooldown(s, d) else b.cd:Clear() end
 end
 
 local function retire(self, questID)
@@ -129,6 +135,8 @@ function ItemButtons:_Apply(questID)
     if cl and ct and rl and rt then
         local padX, padY = ns:GetModule("Row"):Padding(cfg)
         b:SetPoint("TOPLEFT", container, "TOPLEFT", (rl - cl) + padX, (rt - ct) - padY)
+        -- Whether a hidden Cooldown frame keeps its sweep is unmeasured, so send it again.
+        if not b:IsShown() then b._cdStart, b._cdLength = nil, nil end
         b:Show()
     else
         b:Hide()
@@ -143,8 +151,7 @@ local function deferFn(questID)
             -- it on quest ID with no release grows for the session.
             deferFns[questID] = nil
             ItemButtons:_Apply(questID)
-            -- Paint on the flush too, or a button created at combat end stays blank
-            -- until some unrelated render happens to repaint it.
+            -- Paint now, or a button created at combat end is blank until its first range tick.
             local b = ItemButtons.buttons[questID]
             if b and b:IsShown() then paint(b, questID) end
         end

@@ -634,12 +634,12 @@ end
 -- With no chat box focused the same press untracks the row instead, which is what Blizzard's own
 -- tracker does with this modifier. The quest stays in the quest log, so unlike the gesture this
 -- one shares a modifier with there is nothing to recover and nothing to warn about.
--- The IsShiftKeyDown fallback is UI/QuestLogChecks.lua's, for its reason: QUESTWATCHTOGGLE's
--- presence on 1.15.9 is unmeasured, and without it the gesture would be absent from the tracker
--- on that flavor. That file is one step looser - its own QUESTWATCHTOGGLE branch toggles with
--- chat open, where the chat test here runs first for every branch. Note it fails OPEN if
--- ChatEdit_GetActiveWindow is ever absent, where chatLinkClick above fails closed on the same
--- global, so "cannot fire while typing" holds only on a client that has it.
+-- The IsShiftKeyDown fallback is UI/QuestLogChecks.lua's, for its reason: it keeps Shift working for
+-- a player who moved QUESTWATCHTOGGLE. That file is one step looser - a toggle rebound off the
+-- link's modifier still works there with chat open, where the chat test here runs first for every
+-- branch. Note untrackClick fails OPEN if ChatEdit_GetActiveWindow is ever absent, where
+-- chatLinkClick above fails closed on the same global, so "cannot fire while typing" holds only on
+-- a client that has it.
 --
 -- The provider's own menu is the capability test, so this path names no provider and calls no
 -- tracking API. A row falls through to its ordinary click rather than being swallowed either

@@ -128,7 +128,10 @@ end
 -- nothing but rank-2 or rank-3 still counts. Reading reagents[1] alone reports zero.
 local function reagentHave(e)
     if ProfessionsUtil and ProfessionsUtil.AccumulateReagentsInPossession and e.reagents then
-        return ProfessionsUtil.AccumulateReagentsInPossession(e.reagents) or 0
+        -- Raises on a currency that answers nothing or a tier with no id, and nothing between here
+        -- and Tracker:Render catches it, so one recipe would stop the whole tracker drawing.
+        local ok, have = pcall(ProfessionsUtil.AccumulateReagentsInPossession, e.reagents)
+        if ok then return have or 0 end
     end
     if e.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
         local info = C_CurrencyInfo.GetCurrencyInfo(e.currencyID)
@@ -252,10 +255,12 @@ function Professions:Enable(notifyDirty)
     Events:On("TRACKED_RECIPE_UPDATE",   recipesChanged)
     Events:On("TRADE_SKILL_LIST_UPDATE", recipesChanged)
     Events:On("PLAYER_ENTERING_WORLD",   recipesChanged)
-    -- Bag traffic is constant, so only repaint when a tracked recipe could care
-    Events:On("BAG_UPDATE_DELAYED", function()
+    -- Bag and currency traffic is constant, so only repaint when a tracked recipe could care
+    local function reagentsMoved()
         if #recipes > 0 then notifyDirty() end
-    end)
+    end
+    Events:On("BAG_UPDATE_DELAYED",      reagentsMoved)
+    Events:On("CURRENCY_DISPLAY_UPDATE", reagentsMoved)
 end
 
 Registry:Register(Professions)

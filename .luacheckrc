@@ -38,6 +38,7 @@ read_globals = {
     -- Blizzard's Classic quest log, whose tracked checkmarks UI/QuestLogChecks.lua repaints.
     -- UI/Row.lua reads ChatEdit_GetActiveWindow too, to tell a link click from an ordinary one.
     "QuestLog_Update", "IsShiftKeyDown", "ChatEdit_GetActiveWindow", "NONE",
+    "FauxScrollFrame_GetOffset", "QuestLogListScrollFrame", "ChatFrameUtil",
     -- Data/Providers/QuestsClassic.lua switches an open log to a clicked title with QuestLog_SetSelection
     -- and QuestLog_Update, the pair Blizzard's own title buttons call, and reads whether the log is open.
     "QuestLog_SetSelection", "QuestLogFrame",

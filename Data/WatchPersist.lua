@@ -65,12 +65,14 @@ local function restore()
             if live == false then
                 list[questID] = nil
             elseif live then
-                if watchType(questID) == nil and ns.Has.WorldQuestWatchAdd then
+                -- Automatic is 0, so a nil test reads an auto-watch as restored and the next mirror()
+                -- drops it. A manual add promotes one.
+                if watchType(questID) ~= MANUAL and ns.Has.WorldQuestWatchAdd then
                     C_QuestLog.AddWorldQuestWatch(questID, MANUAL)
                     -- The add is silently rejected once Blizzard's watch cap is full, which
                     -- proximity auto-watch can reach before this runs. Retry on a watch that
                     -- did not land, or mirror() drops the entry at the next watch change.
-                    if watchType(questID) == nil then
+                    if watchType(questID) ~= MANUAL then
                         stillUnknown = stillUnknown or {}
                         stillUnknown[questID] = true
                     end

@@ -5,6 +5,18 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.2] - 2026-11-01
+
+### Bug Fixes
+
+- Classic Era and TBC: with the quest log scrolled, its tracked checks landed on the wrong rows and Shift-clicking a quest could toggle a different one. Checks now stay on their own quests, and Shift-click toggles the quest you clicked.
+- Classic Era and TBC: Shift-clicking a quest in the quest log to link it with a chat box open also changed whether it was tracked. It now only links.
+- A world quest you tracked yourself could be lost at login if the game had auto-watched it first, such as when you log in standing in its area. It now stays tracked.
+- A quest item button now updates its cooldown sweep and charges right after you use the item, rather than at the tracker's next update.
+- Under the Distance sort, a quest accepted while standing still now takes its place right away rather than sitting at the bottom until you move.
+- A tracked recipe's currency reagent count now updates when the currency changes.
+- A tracked recipe with a reagent the game could not answer for could stop the whole tracker from drawing. The tracker now keeps drawing, though that reagent's count may read low.
+
 ## [2.10.1] - 2026-11-01
 
 ### Bug Fixes

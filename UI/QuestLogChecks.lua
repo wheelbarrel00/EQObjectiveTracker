@@ -7,6 +7,21 @@ local QuestLogChecks = ns:RegisterModule("QuestLogChecks", {})
 -- constant, because the constant form silently carries the title's 20px indent inside it.
 local CHECK_PAD = 4
 
+-- A row's id is its fixed slot, never the quest it draws: the index is the id plus the list's scroll
+-- offset, as in Blizzard's own handlers. Measured on Era: offset 17, top row id 1, drawing entry 18.
+local function rowIndex(row)
+    local offset = FauxScrollFrame_GetOffset and QuestLogListScrollFrame
+                   and FauxScrollFrame_GetOffset(QuestLogListScrollFrame)
+    return row:GetID() + (offset or 0)
+end
+
+-- ChatEdit_GetActiveWindow is an alias that only exists under the loadDeprecationFallbacks CVar, and
+-- Blizzard's own log asks ChatFrameUtil. With neither, nothing can say a chat box is open.
+local function chatWindow()
+    if ChatFrameUtil and ChatFrameUtil.GetActiveWindow then return ChatFrameUtil.GetActiveWindow() end
+    return ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+end
+
 -- Measured on 1.15.9: shift-clicking a quest log row calls NEITHER AddQuestWatch NOR
 -- RemoveQuestWatch. Temporary print hooks on both globals stayed silent across clicks that
 -- visibly did nothing, with Blizzard's own watch list already empty. Whatever makes its handler
@@ -20,19 +35,19 @@ local function hookRow(row)
     row._eqotClickHooked = true
     row:HookScript("OnClick", function(self, button)
         if button and button ~= "LeftButton" then return end
-        -- The IsShiftKeyDown fallback overrides a rebound QUESTWATCHTOGGLE, so a player who has
-        -- moved that modifier to Ctrl still gets shift toggling. Kept because the gesture is
-        -- confirmed working in game this way and QUESTWATCHTOGGLE's presence on 1.15.9 has not
-        -- been measured, so dropping it risks removing the gesture entirely.
         -- With the chat edit box open, shift-click is the link gesture, and toggling there
-        -- materializes the whole tracked set behind the player's back. The explicit
-        -- QUESTWATCHTOGGLE branch is left unconditional, since that one was asked for.
-        local linking = ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow()
+        -- materializes the whole tracked set behind the player's back. This has to come first:
+        -- QUESTWATCHTOGGLE defaults to SHIFT (read on Era), so that test alone is true on every
+        -- link. A toggle rebound off the link's modifier still works with chat open.
+        local linking = chatWindow()
+        if linking and IsModifiedClick and IsModifiedClick("CHATLINK") then return end
+        -- The IsShiftKeyDown fallback overrides a rebound QUESTWATCHTOGGLE, so a player who has
+        -- moved that modifier to Ctrl still gets shift toggling.
         local wantsToggle = (IsModifiedClick and IsModifiedClick("QUESTWATCHTOGGLE"))
                             or (not linking and IsShiftKeyDown and IsShiftKeyDown())
         if not wantsToggle then return end
         local TrackedSet = ns:GetModule("TrackedSet")
-        if TrackedSet then TrackedSet:ToggleAtIndex(self:GetID()) end
+        if TrackedSet then TrackedSet:ToggleAtIndex(rowIndex(self)) end
     end)
 end
 
@@ -45,10 +60,9 @@ end
 -- game's, and an addon that stashes the original at load would capture ours instead - which is
 -- the failure that made three recorded "client facts" in this project wrong for months, from the
 -- other direction. Only this frame's display changes here, and nothing is told anything.
--- Rows are discovered by walking QuestLogTitle1, 2, 3 ... until one is missing, and each row's
--- quest log index is read off its own GetID rather than recomputed from a scroll offset. Both
--- avoid a named constant: an earlier version bounded the loop by QUESTS_DISPLAYED, and if that
--- global is absent the loop runs zero times and repaints nothing, silently.
+-- Rows are discovered by walking QuestLogTitle1, 2, 3 ... until one is missing. That avoids a named
+-- constant: an earlier version bounded the loop by QUESTS_DISPLAYED, and if that global is absent
+-- the loop runs zero times and repaints nothing, silently.
 local function repaint()
     local TrackedSet = ns:GetModule("TrackedSet")
     if not TrackedSet then return end
@@ -60,7 +74,7 @@ local function repaint()
         if not row then break end
         hookRow(row)
         local check = _G["QuestLogTitle" .. i .. "Check"]
-        if check and row:IsShown() and TrackedSet:IsTrackedAtIndex(row:GetID()) then
+        if check and row:IsShown() and TrackedSet:IsTrackedAtIndex(rowIndex(row)) then
             -- Positioning is not optional. Blizzard only moves this texture for rows IT decided
             -- were watched and leaves every other one at a default offset of 50, which sits ON TOP
             -- of the title text - so showing a check without re-anchoring it draws a faint smudge

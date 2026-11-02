@@ -9,6 +9,20 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.10.2", date = "2026-11-01",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "Classic Era and TBC: with the quest log scrolled, its tracked checks landed on the wrong rows and Shift-clicking a quest could toggle a different one. Checks now stay on their own quests, and Shift-click toggles the quest you clicked.",
+                "Classic Era and TBC: Shift-clicking a quest in the quest log to link it with a chat box open also changed whether it was tracked. It now only links.",
+                "A world quest you tracked yourself could be lost at login if the game had auto-watched it first, such as when you log in standing in its area. It now stays tracked.",
+                "A quest item button now updates its cooldown sweep and charges right after you use the item, rather than at the tracker's next update.",
+                "Under the Distance sort, a quest accepted while standing still now takes its place right away rather than sitting at the bottom until you move.",
+                "A tracked recipe's currency reagent count now updates when the currency changes.",
+                "A tracked recipe with a reagent the game could not answer for could stop the whole tracker from drawing. The tracker now keeps drawing, though that reagent's count may read low.",
+            } },
+        },
+    },
+    {
         version = "2.10.1", date = "2026-11-01",
         sections = {
             { head = "Bug Fixes", items = {
@@ -421,22 +435,6 @@ ns.Changelog = {
                 "Progress bars can be styled. A new Progress Bars group on the Appearance tab sets the fill texture, the fill color, the background, the border and the height, and applies to the bars on quest rows and the ones under a scenario or delve banner alike. Textures from other media addons, such as SharedMedia, ElvUI or Details, appear in the list.",
                 "Quest rows and scenario criteria now have a switch each, under the same Show progress bars box that has always controlled them together. Turning that box off still turns off both, so nothing changes for anyone who had already switched progress bars off.",
                 "Show progress bars has moved from the Tracker tab to the new Progress Bars group on the Appearance tab, so the switch that turns the bars on sits with the settings that style them. This is the same move the zone progress bar's own switches made.",
-            } },
-        },
-    },
-    {
-        version = "1.17.0", date = "2026-08-30",
-        sections = {
-            { head = "Bug Fixes", items = {
-                "The sound for a quest being ready to turn in now plays when its last objective falls, which is what it was always meant to do and what the option has always said. On Classic Era and Burning Crusade it had never done that: it was reading three quest log functions that only exist on retail, so it found nothing to read at all and the sound was left to a chat message that arrives at the quest giver instead. Reported by the author on Classic Era.",
-                "A quest counts as ready when all of its objectives are finished, whether or not the game has marked the quest itself complete. Blizzard leaves stray empty objectives on some quests and never flips their flag, so those quests used to pass in silence.",
-                "A failed quest no longer chimes as though it were ready to turn in. The game reports it as not complete and the tracker agreed, but a second check asking whether every objective was finished could still answer yes for a failed escort and the sound played anyway.",
-                "The tracker used far more memory than it needed to on retail, climbing steadily until the game collected it and then climbing again. A widget changing anywhere in the game, on any bar or timer the tracker does not even draw, made it rebuild everything it tracks several times a second. It now listens only for the two it actually reads. Classic was never affected, since it has none of those widgets to begin with.",
-                "A quest that fills a percentage bar now draws one, the way the default tracker does. World quests are where you will see this most, but it reaches any quest with an objective of that kind. These objectives report themselves as nothing more than 0 or 1 done, so the tracker read them as a plain yes or no and drew the text alone, with the percentage the game bakes into the wording as the only sign there was a bar to draw. The real figure is asked for directly now. This is the first time a progress bar has appeared on a quest row at all. An objective of that kind that does carry a real count, such as 3 of 5, now reads as a percentage too, which is how the default tracker has always drawn them. Turning off \"Show progress bars\" under Tracker still returns them to text, worded exactly as before.",
-            } },
-            { head = "New Features", items = {
-                "A sound can play when you hand a quest in at the quest giver, with its own switch and its own sound under Tracker. It is off by default. This is the moment the ready to turn in sound was landing on by accident, on every version of the game rather than only on Classic, so if you liked hearing it there this is the one to switch on and you can now have both. If you had the ready to turn in sound on and never changed it, that chime moves to the last objective where it belongs, and this switch is how you get the one at the quest giver back. It does not play for a world quest or a bonus objective, which hand themselves in wherever you happen to be standing.",
-                "The Endeavors section now shows the neighborhood tasks you have tracked, which is what the default tracker draws under its own Endeavors header. These come from the Midnight housing initiative and are a separate thing from the Traveler's Log monthly activities the section already showed, so the two now sit together under one header exactly as they do in the default tracker. Nothing to switch on, and the section stays hidden when you have neither.",
             } },
         },
     },

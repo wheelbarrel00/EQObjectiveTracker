@@ -91,8 +91,17 @@ function Distance:Sync(sortMode)
     self:_StartTicker()
 end
 
+local function questAccepted()
+    -- A quest accepted standing still has no distance until a harvest, so it would sort last.
+    Distance._harvested = nil
+end
+
 function Distance:_StartTicker()
     if self._ticker then return end
+    if not self._listening then
+        self._listening = true
+        ns:GetModule("Events"):On("QUEST_ACCEPTED", questAccepted)
+    end
     self._ticker = C_Timer.NewTicker(TICK, function()
         local DB  = ns:GetModule("DB")
         local cfg = DB and DB:Tracker()
