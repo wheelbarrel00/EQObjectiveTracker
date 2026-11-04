@@ -9,6 +9,14 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.10.3", date = "2026-11-03",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "With Simplify tracked achievements on, an achievement with more than twelve criteria and its first twelve done showed a single finished criterion instead of the ones still left to do. Finished criteria that Simplify hides no longer use up the twelve lines an achievement shows, so up to twelve unfinished ones now appear, and Simplify Mode, which did the same, now shows the first unfinished one. Reported by Rubio9.",
+            } },
+        },
+    },
+    {
         version = "2.10.2", date = "2026-11-01",
         sections = {
             { head = "Bug Fixes", items = {
@@ -423,18 +431,6 @@ ns.Changelog = {
                 "Hiding individual entries has been removed. Nothing on the tracker ever showed that an entry was hidden, the only way in was a shift-click and the only way back was a slash command, and untracking a quest, the seven category filters and the two only-show rules all do the same job in a place you can find. Anything you had hidden comes back on its own, and /eqot unhide is gone with it.",
                 "Shift-clicking a row that is not a quest now does whatever an ordinary left-click on it does, so a tracked achievement opens the achievement and a recipe opens the recipe. That gesture used to hide the row instead.",
                 "Reset to Defaults on the Appearance tab now also restores the three Show progress bars switches. It used to leave them alone while its tooltip said it restored every control on the tab. All three are on by default, so a reset turns the bars back on rather than off.",
-            } },
-        },
-    },
-    {
-        version = "1.18.0", date = "2026-08-31",
-        sections = {
-            { head = "Improvements", items = {
-                "A progress bar no longer draws its objective's text inside itself. The text sits on its own line above the bar and the bar shows only its percentage or count, centered, which is how the default tracker draws it and how this tracker has always drawn the scenario criteria. On a long objective the text used to run into the numbers at the other end of the bar.",
-                "There is more room between an objective's text and its bar. The bar's border is drawn just outside the bar itself, so the old spacing left a single pixel showing and the bar read as though it were touching the line above it. Scenario and delve criteria gained the same room.",
-                "Progress bars can be styled. A new Progress Bars group on the Appearance tab sets the fill texture, the fill color, the background, the border and the height, and applies to the bars on quest rows and the ones under a scenario or delve banner alike. Textures from other media addons, such as SharedMedia, ElvUI or Details, appear in the list.",
-                "Quest rows and scenario criteria now have a switch each, under the same Show progress bars box that has always controlled them together. Turning that box off still turns off both, so nothing changes for anyone who had already switched progress bars off.",
-                "Show progress bars has moved from the Tracker tab to the new Progress Bars group on the Appearance tab, so the switch that turns the bars on sits with the settings that style them. This is the same move the zone progress bar's own switches made.",
             } },
         },
     },

@@ -25,6 +25,7 @@ local store = Entry.NewStore({
     groupID   = "achievements",
     icon      = { kind = ICON.TEXTURE },
     isTracked = true,
+    maxLines  = MAX_CRITERIA,
 })
 
 local ids = {}
@@ -48,9 +49,8 @@ end
 
 local function fillCriteria(e, id)
     Entry.BeginLines(e)
-    local num, shown = GetAchievementNumCriteria(id) or 0, 0
+    local num = GetAchievementNumCriteria(id) or 0
     for c = 1, num do
-        if shown >= MAX_CRITERIA then break end
         local text, _, done, quantity, required, _, flags = GetAchievementCriteriaInfo(id, c)
         local isBar    = flags and bit.band(flags, PROGRESS_BAR_FLAG) ~= 0
         local hasMeter = required and required > 1
@@ -66,7 +66,6 @@ local function fillCriteria(e, id)
             else
                 ln.kind = LINE.NOTE
             end
-            shown = shown + 1
         end
     end
     Entry.EndLines(e)

@@ -338,12 +338,16 @@ local function buildBlocks(entry, cfg)
 
     local groups   = cfg and cfg.simplifyGroups
     local hideDone = simple or (groups and entry.groupID and groups[entry.groupID]) or false
+    local cap, drawn = entry.maxLines, 0
 
     _nBlocks, _nText = 0, 0
 
     for i = 1, #lines do
         local ln = lines[i]
         if not (hideDone and ln.completed) then
+            -- Counted after the filter, so a hidden finished line takes no slot
+            if cap and drawn >= cap then break end
+            drawn = drawn + 1
             if isBarLine(ln, cfg) then
                 -- The label sits ABOVE the bar as an ordinary objective line, matching the
                 -- default tracker and matching what UI/Scenario.lua has always done. It joins

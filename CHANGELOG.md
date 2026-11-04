@@ -5,6 +5,12 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.3] - 2026-11-03
+
+### Bug Fixes
+
+- With Simplify tracked achievements on, an achievement with more than twelve criteria and its first twelve done showed a single finished criterion instead of the ones still left to do. Finished criteria that Simplify hides no longer use up the twelve lines an achievement shows, so up to twelve unfinished ones now appear, and Simplify Mode, which did the same, now shows the first unfinished one. Reported by Rubio9.
+
 ## [2.10.2] - 2026-11-01
 
 ### Bug Fixes
