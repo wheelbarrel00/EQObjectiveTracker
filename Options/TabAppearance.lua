@@ -184,6 +184,14 @@ local function satellite(ui, row, picker)
     picker:SetPoint("RIGHT", row, "RIGHT", -ui:Spacing("rowPadding"), 0)
 end
 
+local headerSize
+
+-- The To-Do card's button lands here. Selecting the tab builds it first, which is what sets headerSize.
+function Options:ShowHeaderSize()
+    self:SelectTab("appearance")
+    self.ui:ScrollIntoView(headerSize)
+end
+
 Options:RegisterTab({
     id    = "appearance",
     title = L["Appearance"],
@@ -257,7 +265,7 @@ Options:RegisterTab({
             function() return DB().headerSizeDelta or 4 end,
             function(v) relayout("headerSizeDelta", v) end,
             L["Sizes the section headers (Quests, Campaign, and so on) independently of the quest text. Added on top of the Font Size above: the default 4 keeps headers at their current size, lower shrinks them (handy on a low UI scale), higher enlarges them."])
-        look:Add(headerSizeSlider)
+        headerSize = look:Add(headerSizeSlider)
 
         look:Add(self:CreateDropdown(content, L["Font Outline"],
             OUTLINES,

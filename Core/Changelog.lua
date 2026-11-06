@@ -9,6 +9,14 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.11.0", date = "2026-11-05",
+        sections = {
+            { head = "New Features", items = {
+                "To-Do Mode's card on the Tracker tab has a new Show section names box. Untick it and the Quests header, and the Campaign header on retail, keep their counts and the collapse sign without their names, so the counts sit on their own. Zone headers keep theirs. To make the names smaller instead, the Header Size Offset button beside the box opens the Appearance tab at that slider. The counts follow it, and Count Size Offset sizes them back. The box starts ticked, so nothing changes until you untick it. Requested by Tjuv.",
+            } },
+        },
+    },
+    {
         version = "2.10.3", date = "2026-11-03",
         sections = {
             { head = "Bug Fixes", items = {
@@ -415,22 +423,6 @@ ns.Changelog = {
             { head = "Bug Fixes", items = {
                 "The zone progress bar now draws in a zone that sits inside another zone. Standing anywhere in Voidstorm it stayed blank, because the tracker stopped at the first zone it found and a sub-area like Slayer's Rise has no quest routing of its own. It now looks past a zone that nothing is routed to and uses the one that is. Zones that already showed a bar are unchanged.",
                 "A world quest you are tracking in a different zone no longer disappears from the tracker. It worked out whether a world quest was still live from its timer, the map you are standing on and your quest log, so a lair quest with no timer, in a zone you have since left, failed all three tests and the row was dropped while Blizzard's own tracker kept showing it. It now asks the game whether the quest is active, so the row stays until the quest really ends.",
-            } },
-        },
-    },
-    {
-        version = "1.19.0", date = "2026-09-02",
-        sections = {
-            { head = "New Features", items = {
-                "Shift-clicking a quest on the tracker now puts it into an open chat box, the way the modifier works everywhere else in the game. On retail it shares the client's own quest link. On Classic Era and TBC Anniversary it sends the same readable text that Everything Quests' quest browser uses, so a quest shared from either addon reads the same and anyone running Everything Quests sees it as a clickable link. It only fires while a chat box is actually open, so an ordinary shift-click still does whatever your left-click normally does.",
-            } },
-            { head = "Bug Fixes", items = {
-                "Shift-clicking a quest on the tracker no longer hides it. That gesture removed the quest from the tracker for that character, with nothing on screen to say what had happened and no way back except a slash command, and people trying to link a quest into chat lost quests to it.",
-            } },
-            { head = "Improvements", items = {
-                "Hiding individual entries has been removed. Nothing on the tracker ever showed that an entry was hidden, the only way in was a shift-click and the only way back was a slash command, and untracking a quest, the seven category filters and the two only-show rules all do the same job in a place you can find. Anything you had hidden comes back on its own, and /eqot unhide is gone with it.",
-                "Shift-clicking a row that is not a quest now does whatever an ordinary left-click on it does, so a tracked achievement opens the achievement and a recipe opens the recipe. That gesture used to hide the row instead.",
-                "Reset to Defaults on the Appearance tab now also restores the three Show progress bars switches. It used to leave them alone while its tooltip said it restored every control on the tab. All three are on by default, so a reset turns the bars back on rather than off.",
             } },
         },
     },

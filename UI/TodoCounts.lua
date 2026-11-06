@@ -116,17 +116,21 @@ function TodoCounts:Paint(header, group)
     local made = not t
     if made then t = build(header) end
     header._todoGroup = group
-    local picked = TodoMode:View()
+    local picked, any = TodoMode:View(), false
     for i, b in ipairs(t.counts) do
         local shown = TodoMode:Shown(cfg, i)
         b:SetShown(shown)
         if shown then
+            any = true
             b.text:SetText(tostring(group.todo[i] or 0))
             local lit = b.view == picked
             b:SetAlpha(lit and 1 or DIM_ALPHA)
             b.line:SetShown(lit)
         end
     end
+    -- Faded, not hidden: ApplyStyle sizes headers off this string's height, unmeasured on a hidden string.
+    -- With no count shown the name stays, or the header would be a blank bar.
+    header.text:SetAlpha((any and cfg and cfg.todoShowNames == false) and 0 or 1)
     -- Styled once when made, or a header's first counts wear the stock font until the next render.
     if made then self:Style(header, cfg) end
     layout(header, t)
@@ -134,6 +138,7 @@ end
 
 function TodoCounts:Clear(header)
     header._todoGroup = nil
+    header.text:SetAlpha(1)
     local t = header.todo
     if not t then return end
     for _, b in ipairs(t.counts) do b:Hide() end

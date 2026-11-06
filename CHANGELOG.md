@@ -5,6 +5,12 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] - 2026-11-05
+
+### New Features
+
+- To-Do Mode's card on the Tracker tab has a new Show section names box. Untick it and the Quests header, and the Campaign header on retail, keep their counts and the collapse sign without their names, so the counts sit on their own. Zone headers keep theirs. To make the names smaller instead, the Header Size Offset button beside the box opens the Appearance tab at that slider. The counts follow it, and Count Size Offset sizes them back. The box starts ticked, so nothing changes until you untick it. Requested by Tjuv.
+
 ## [2.10.3] - 2026-11-03
 
 ### Bug Fixes

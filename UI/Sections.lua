@@ -210,8 +210,8 @@ local function build(parent, groupID, title)
     return h
 end
 
--- A header outside the pool, for the Appearance preview. The pool holds one header per section,
--- so borrowing the tracker's own would pull it off the tracker.
+-- A header outside the pool, for the Appearance preview and the sticky band. The pool holds one header
+-- per section, so borrowing the tracker's own would pull it off the tracker.
 function Sections:NewHeader(parent, groupID)
     return build(parent, groupID, self:Title(groupID))
 end

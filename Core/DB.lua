@@ -209,8 +209,9 @@ DB.defaults = {
                 campaignAnyZone = false,
             },
 
-            -- The pick (char.todoView), the four show boxes and todoCountSizeDelta have no default:
-            -- absent reads as the unfinished view, every count shown and the header count's own size.
+            -- The pick (char.todoView), the four show boxes, todoShowNames and todoCountSizeDelta have no
+            -- default: absent reads as the unfinished view, every count and name shown and the header
+            -- count's own size.
             todoMode            = false,
             todoColorUnfinished = { r = 238 / 255, g = 170 / 255, b = 0 },
             todoColorReady      = { r = 68 / 255, g = 1, b = 68 / 255 },

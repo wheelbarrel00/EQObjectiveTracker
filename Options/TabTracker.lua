@@ -149,6 +149,16 @@ local function buildTodoCard(ui, content, above, zoneOnly)
     card:Add(size, { dependent = true })
     rows[#rows + 1] = size
 
+    local names = ui:CreateCheckbox(content, L["Show section names"],
+        function() return DB().todoShowNames ~= false end,
+        function(v) DB().todoShowNames = v; render() end,
+        L["Shows the names Quests and Campaign on the quest headers. Untick it to keep only the counts. To make the names smaller instead, use Header Size Offset on the Appearance tab, which the button beside this box opens. The counts follow it, and Count Size Offset sizes them back."])
+    local namesRow = card:Add(names, { dependent = true })
+    local jump = ui:CreateButton(content, L["Header Size Offset"], nil, function() Options:ShowHeaderSize() end)
+    jump:SetPoint("RIGHT", namesRow, "RIGHT", -ui:Spacing("rowPadding"), 0)
+    rows[#rows + 1] = names
+    rows[#rows + 1] = jump
+
     sync()
     content._syncTodo = sync
     return card

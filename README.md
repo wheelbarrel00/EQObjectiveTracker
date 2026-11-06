@@ -257,7 +257,10 @@ zone is dimmed and keeps your own setting for later, while the quest type filter
 tracked quests, pinned quests and the other sections stay as they are. Always show campaign quests
 keeps working too, so your campaign quests from other zones show, and count, in the views for your
 zone. The card can hide any of the four counts, color each one, with the Class button, and size them.
-Hiding the box of the count you picked keeps that view, with nothing underlined.
+Hiding the box of the count you picked keeps that view, with nothing underlined. Unticking Show
+section names leaves only the counts on those headers, without the words Quests and Campaign (zone
+headers keep theirs), and the Header Size Offset button beside it opens the slider that makes the
+words smaller instead. The counts follow that slider, and Count Size Offset sizes them back.
 
 Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick,
 or in Original Style, the way the game's own tracker colors them on your version of the game. The
