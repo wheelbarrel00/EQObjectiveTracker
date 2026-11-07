@@ -5,6 +5,14 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2026-11-07
+
+### New Features
+
+- On WoW Forever, Shortest Path Forever's journey column now sits right under the tracker's quests rather than over them, or above or beside the tracker when there is no room below. It follows the list as it grows and shrinks. With Background or Border on, or move mode's outline showing, it keeps clear of the whole tracker box. This needs Shortest Path Forever 1.22.35 or later. Reported by AnotherDamnDave.
+- On WoW Forever, EllesmereUI's Custom Quest Tracker, a quest tracker window of its own, now hides while this tracker is in use, as EllesmereUI's tracker did before that option existed, so the two no longer sit side by side. If a fight is on, it hides when the fight ends. With Use Blizzard's quest tracker on, EllesmereUI's tracker is left alone.
+- Other addons can keep their own frames clear of the quest list through new calls on the public API: `GetListBounds`, which says where the list is drawn, and `AddLayoutListener`, which registers a function called whenever that changes (`RemoveLayoutListener` takes it back).
+
 ## [2.11.0] - 2026-11-05
 
 ### New Features

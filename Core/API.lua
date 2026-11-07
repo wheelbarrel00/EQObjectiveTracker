@@ -1,16 +1,17 @@
 local _, ns = ...
 
 -- The public surface another addon reaches through _G.EQObjectiveTracker. EQOT declares no
--- dependency on anything, so both lists here are empty in the standalone case.
+-- dependency on anything, so every list here is empty in the standalone case.
 --
 -- Registrations carry an entry ID and a provider ID, never the entry table itself - entries are
 -- rebuilt on every quest event and handing one to a foreign addon would leak a table that is
 -- invalid by the time it is read.
 local API = ns:RegisterModule("API", {})
 
-API.headerIcons    = {}
-API.menuItems      = {}
-API.focusListeners = {}
+API.headerIcons     = {}
+API.menuItems       = {}
+API.focusListeners  = {}
+API.layoutListeners = {}
 
 local function slotFor(list, id)
     for i = 1, #list do
@@ -141,6 +142,56 @@ function API:GetFocus()
     return Focus:Get()
 end
 
+-- For an addon that keeps its own frames clear of the quest list (Shortest Path Forever's journey
+-- column). Left, right, top and bottom in UIParent units, or nil while nothing is drawn.
+function API:GetListBounds()
+    local Tracker = ns:GetModule("Tracker")
+    if not Tracker then return nil end
+    return Tracker:ListBounds()
+end
+
+local layoutQueued = false
+local lastL, lastR, lastT, lastB
+
+function API:AddLayoutListener(spec)
+    if type(spec) ~= "table" or type(spec.id) ~= "string" then return false end
+    if type(spec.onLayout) ~= "function" then return false end
+    self.layoutListeners[slotFor(self.layoutListeners, spec.id)] = {
+        id = spec.id, onLayout = spec.onLayout,
+    }
+    -- Nothing flushes while no one listens, so the last answer can be stale: the next flush calls everyone.
+    lastL = false
+    return true
+end
+
+function API:RemoveLayoutListener(id)
+    for i = #self.layoutListeners, 1, -1 do
+        if self.layoutListeners[i].id == id then table.remove(self.layoutListeners, i) end
+    end
+end
+
+-- One flush a frame later however many calls came first, and silent unless the answer moved or a
+-- listener was added, since a render runs on every quest event. Walked backwards for the reason
+-- NotifyFocus is.
+local function flushLayout()
+    layoutQueued = false
+    local list = API.layoutListeners
+    local l, r, t, b = API:GetListBounds()
+    if l == lastL and r == lastR and t == lastT and b == lastB then return end
+    lastL, lastR, lastT, lastB = l, r, t, b
+    for i = #list, 1, -1 do
+        local it = list[i]
+        if it then pcall(it.onLayout) end
+    end
+end
+
+-- Shortest Path Forever runs no timer of its own, so whatever moves, sizes or hides the list calls this.
+function API:NotifyLayout()
+    if layoutQueued or #self.layoutListeners == 0 then return end
+    layoutQueued = true
+    C_Timer.After(0, flushLayout)
+end
+
 -- Two answers on purpose: the mode this session runs in, fixed at login, and the saved choice,
 -- which only a reload applies. A caller reading Blizzard's watch list needs the first.
 function API:UsesBlizzardTracker()
@@ -163,7 +214,10 @@ function API:DebugLine()
     local providerID, entryID = self:GetFocus()
     local Focus = ns:GetModule("Focus")
     local follows = Focus and Focus:FollowsSuperTrack()
-    return ("api: %d header icon(s), %d menu item(s), %d focus listener(s) | focus %s:%s%s")
-        :format(#self.headerIcons, #self.menuItems, #self.focusListeners,
-                tostring(providerID), tostring(entryID), follows and ", follows super-track" or "")
+    local l, r, t, b = self:GetListBounds()
+    local list = l and ("%.0f,%.0f,%.0f,%.0f"):format(l, r, t, b) or "none"
+    return ("api: %d header icon(s), %d menu item(s), %d focus listener(s), %d layout listener(s)"
+            .. " | focus %s:%s%s | list %s")
+        :format(#self.headerIcons, #self.menuItems, #self.focusListeners, #self.layoutListeners,
+                tostring(providerID), tostring(entryID), follows and ", follows super-track" or "", list)
 end

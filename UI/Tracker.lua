@@ -65,6 +65,7 @@ function Tracker:_ApplyPosition(anchor, relativePoint, x, y)
     f:ClearAllPoints()
     f:SetPoint(anchor or "CENTER", UIParent, relativePoint or anchor or "CENTER",
                (x or 0) / scale, (y or 0) / scale)
+    ns:GetModule("API"):NotifyLayout()
 end
 
 local function applyScaleWhenSafe() Tracker:ApplyScale() end
@@ -638,6 +639,27 @@ function Tracker:IsClickThrough()
     return (f and f._eqotHidden and f:IsShown()) and true or false
 end
 
+-- Quests draw from the top of a fixed box, so its bottom counts only while Background, Border or
+-- the move outline is on. Every rect here is in the frame's own units, so one factor serves.
+function Tracker:ListBounds()
+    local f = self.frame
+    if not f or f._eqotHidden or not f:IsShown() then return nil end
+    local cfg = ns:GetModule("DB"):Tracker()
+    local bottom
+    if cfg.showBackground or cfg.showBorder or f.moveOutline:IsShown() then
+        bottom = f:GetBottom()
+    else
+        bottom = f.scroll:GetBottom()
+        local region = f.eventsRegion
+        local below = region:IsShown() and region:GetBottom()
+        if bottom and below and below < bottom then bottom = below end
+    end
+    local left, right, top = f:GetLeft(), f:GetRight(), f:GetTop()
+    if not (left and right and top and bottom) then return nil end
+    local k = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    return left * k, right * k, top * k, bottom * k
+end
+
 local function renderWhenSafe() Tracker:Render() end
 local function applyWQPosWhenSafe() Tracker:ApplyWorldQuestsPosition() end
 local function resetPositionWhenSafe() Tracker:ResetPosition() end
@@ -746,6 +768,7 @@ function Tracker:ApplyMoveMode()
     f.moveBar:SetShown(on)
     f.moveOutline:SetShown(on)
     paintDragHint(f)
+    ns:GetModule("API"):NotifyLayout()
 end
 
 -- The done button and label sit between the left-end buttons and the cogwheel's run, so neither
@@ -941,6 +964,7 @@ function Tracker:BuildFrame()
         f._dragging = nil
         pcall(f.StopMovingOrSizing, f)
         if secureLocked() then
+            ns:GetModule("API"):NotifyLayout()
             ns:GetModule("Events"):RunWhenOutOfCombat("eqot.stopDrag", finishDrag)
             return
         end
@@ -2242,13 +2266,14 @@ function Tracker:Render()
     self:_EnsureTimerTicker(hasTimed, soonestExpiry)
     self:_ArmHeightCheck()
 
-    -- Last, so the layout is settled before a rule is allowed to paint over it. Apply is only
+    -- After the layout, so it is settled before a rule is allowed to paint over it. Apply is only
     -- re-entered when the count crosses zero, so this is a no-op on almost every render.
     local Visibility = ns:GetModule("Visibility")
     if Visibility then
         Visibility:SetFocus(focusRow, focusQuestID)
         Visibility:SetQuestRows(questRows)
     end
+    ns:GetModule("API"):NotifyLayout()
 end
 
 -- Row's change gate keys on the formatted time string, so a plain Render only repaints

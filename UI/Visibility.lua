@@ -284,6 +284,7 @@ function Visibility:Apply()
     local wasHidden   = f._eqotHidden
     local hidden, why = shouldHide(f)
     setVisible(f, not hidden)
+    ns:GetModule("API"):NotifyLayout()
 
     -- Two states need the tracker to keep rendering while it is off screen, and both belong to
     -- the empty rule. The hide itself, because the render IS what counts the quests and a

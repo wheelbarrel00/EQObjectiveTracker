@@ -73,6 +73,22 @@ Tracking and untracking from this tracker's row menu go through its own list rat
 game's watch functions, so the hooks Questie places on those do not fire for anything you do
 here.
 
+### Shortest Path Forever
+
+On WoW Forever, Shortest Path Forever 1.22.35 or later puts its journey column right under the
+tracker's quests, or above or beside the tracker when there is no room below, and moves it as the
+list grows and shrinks. With Background or Border on, or move mode's outline showing, it keeps
+clear of the whole tracker box. An older version draws the column over the quests, so update it.
+
+### EllesmereUI
+
+On WoW Forever, EllesmereUI's Custom Quest Tracker option draws a quest tracker window of its own
+instead of using the game's tracker. While this tracker's window is in use, EQ Objective
+Tracker asks EllesmereUI to hide that window, through the call EllesmereUI uses for the same thing
+itself, so the two do not sit side by side. It waits for a fight to end before asking. With Use
+Blizzard's quest tracker on, EllesmereUI's tracker is left alone. Without that option, EllesmereUI
+uses the game's tracker, which this addon hides already.
+
 ### Everything Quests, the companion addon
 
 Everything Quests adds the other half of the picture, map pins and a TomTom waypoint arrow
@@ -330,7 +346,8 @@ on an annotated `v` tag. A tag whose name carries a prerelease suffix, such as
 ## Extending it
 
 Another addon can add its own entries to a quest's right-click menu and its own icons to the
-tracker header, and follow whichever quest is focused, through the global `EQObjectiveTracker`:
+tracker header, follow whichever quest is focused, and keep its own frames clear of the quest
+list, through the global `EQObjectiveTracker`:
 
 ```lua
 local API = EQObjectiveTracker:GetModule("API")
@@ -340,6 +357,8 @@ API:AddHeaderIcon{ id = "mine", texture = [[Interface\Icons\INV_Misc_QuestionMar
                    tooltip = "Do a thing", order = 20, onClick = function() end }
 API:AddFocusListener{ id = "mine",
                       onFocus = function(providerID, questID) end }
+API:AddLayoutListener{ id = "mine", onLayout = function() end }
+local left, right, top, bottom = API:GetListBounds()
 ```
 
 A header icon's tooltip must be a string. Any other value is ignored, and the icon is added
@@ -353,6 +372,15 @@ follow, or with a nil quest ID when Click a focused quest to unfocus it is on, s
 clears the focus. On retail it never fires. `/eqot status` reports what is registered. Everything Quests uses this
 for two header icons, its Chain Guide and its own options, for its "Get Directions" and "Open
 Chain Guide" menu entries, and for its TomTom arrow.
+
+`GetListBounds` returns the left, right, top and bottom of what the tracker draws, in UIParent
+units, or nil while it is hidden or the game's own tracker is in use. The bottom is where the
+last quest ends, or the world quests under them, not the bottom of the window, unless
+Background, Border or move mode's outline is on. `onLayout` is called with no arguments a frame
+after the list moves, changes size, or is hidden or shown, only when the answer changed, and
+once more after any listener is added, so read `GetListBounds` from it. `RemoveLayoutListener(id)` takes a
+listener back, as `RemoveFocusListener(id)` does. Shortest Path Forever uses these to keep its
+journey column clear of the list.
 
 ## License
 
