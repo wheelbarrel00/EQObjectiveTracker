@@ -16,16 +16,16 @@ lands in both places at once.
 
 ## Status
 
-**Retail, Classic Era (1.15.9) and TBC Anniversary (2.5.6) are all supported.** The Classic
-gaps listed below are real ones rather than a disclaimer. Please report anything you find
-rather than assuming it is known.
+**Retail, Classic Era (1.15.9), TBC Anniversary (2.5.6) and WoW Forever (1.60.1) are all
+supported.** The Classic gaps listed below are real ones rather than a disclaimer. Please report
+anything you find rather than assuming it is known.
 
-**WoW Forever support is a work in progress, so expect bugs.** The tracker shows your quests
-there, and with Everything Quests and TomTom installed the quest you are following gets a TomTom
-arrow, as on Classic. With Everything Quests 2.10.0 or later installed, the zone progress bar
-counts the quests of the zone you are in, once Show zone progress bar is turned on in the
-Appearance tab. The retail-only sections, such as world quests and scenarios, have stayed empty
-there so far.
+**WoW Forever support is stable**: the tracker has been tested there from Forever's beta through
+its launch. It shows your quests there, and with Everything Quests and TomTom installed the quest
+you are following gets a TomTom arrow, as on Classic. With Everything Quests 2.10.0 or later
+installed, the zone progress bar counts the quests of the zone you are in, once Show zone
+progress bar is turned on in the Appearance tab. The retail-only sections, such as world quests
+and scenarios, have stayed empty there so far.
 
 On retail it tracks quests and campaign quests, world quests and bonus objectives, scenarios
 and delves, achievements, professions, and endeavors, covering both the Traveler's Log monthly
