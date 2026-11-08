@@ -268,7 +268,8 @@ end
 
 -- Era and TBC have one quest section, so a second tab could hold only the zone bar. The Tracker
 -- tab offers its box by this too, so a profile with tabs on cannot show a strip nothing turns off.
--- Forever loads every retail section, but only its quests ever fill.
+-- Forever loads every retail section, but only its quests and, with Everything Quests, the zone
+-- bar ever fill.
 function Tracker:TabsOffered()
     if ns.IsForever() then return false end
     local Sections = ns:GetModule("Sections")

@@ -22,7 +22,9 @@ rather than assuming it is known.
 
 **WoW Forever support is a work in progress, so expect bugs.** The tracker shows your quests
 there, and with Everything Quests and TomTom installed the quest you are following gets a TomTom
-arrow, as on Classic. The retail-only sections, such as world quests and scenarios, have stayed empty
+arrow, as on Classic. With Everything Quests 2.10.0 or later installed, the zone progress bar
+counts the quests of the zone you are in, once Show zone progress bar is turned on in the
+Appearance tab. The retail-only sections, such as world quests and scenarios, have stayed empty
 there so far.
 
 On retail it tracks quests and campaign quests, world quests and bonus objectives, scenarios
@@ -58,7 +60,8 @@ focusing a quest also points a TomTom arrow at it.
 - World quests and bonus objectives, scenarios, achievements, endeavors and tracked recipes
   have no section. Most need APIs these clients do not have.
 - **No Find Group button.** These clients have no group finder for quests.
-- The zone progress bar stays empty. Its zone routing data covers Midnight only.
+- The zone progress bar stays empty. Its zone routing data covers Midnight only, and Everything
+  Quests counts zones for it on WoW Forever alone so far.
 - Distance sorting does nothing, because the distance API is retail-only.
 - Some options still appear that cannot do anything on Classic, for the same reasons.
 
@@ -92,7 +95,8 @@ uses the game's tracker, which this addon hides already.
 ### Everything Quests, the companion addon
 
 Everything Quests adds the other half of the picture, map pins and a TomTom waypoint arrow
-among them. It carries the quest database, so it is what turns a focused row into an arrow.
+among them. It carries the quest database, so it is what turns a focused row into an arrow, and
+on WoW Forever it is what counts a zone's quests for the zone progress bar.
 Its Classic support is still growing - check its own page for what it covers today.
 Installing it pulls this tracker in automatically. Without it, this addon is the tracker only.
 
@@ -346,8 +350,8 @@ on an annotated `v` tag. A tag whose name carries a prerelease suffix, such as
 ## Extending it
 
 Another addon can add its own entries to a quest's right-click menu and its own icons to the
-tracker header, follow whichever quest is focused, and keep its own frames clear of the quest
-list, through the global `EQObjectiveTracker`:
+tracker header, follow whichever quest is focused, keep its own frames clear of the quest
+list, and count a zone for the zone progress bar, through the global `EQObjectiveTracker`:
 
 ```lua
 local API = EQObjectiveTracker:GetModule("API")
@@ -359,6 +363,9 @@ API:AddFocusListener{ id = "mine",
                       onFocus = function(providerID, questID) end }
 API:AddLayoutListener{ id = "mine", onLayout = function() end }
 local left, right, top, bottom = API:GetListBounds()
+API:AddZoneCounter{ id = "mine", count = function(mapID) return done, total end }
+API:ZoneCountChanged()
+local shown = API:ZoneBarShown()
 ```
 
 A header icon's tooltip must be a string. Any other value is ignored, and the icon is added
@@ -381,6 +388,22 @@ after the list moves, changes size, or is hidden or shown, only when the answer 
 once more after any listener is added, so read `GetListBounds` from it. `RemoveLayoutListener(id)` takes a
 listener back, as `RemoveFocusListener(id)` does. Shortest Path Forever uses these to keep its
 journey column clear of the list.
+
+`count` is called with the uiMapID of the zone the player is in (a cave or building gives the
+zone around it, and a map with no zone above it gives its own) and returns how many of its
+quests are done and how many there are, or nil for a zone it does not know, which passes the
+zone to the next counter and then to the tracker's own Midnight count.
+Counters are asked first, and numbers are final: a total of 0 shows no bar. A counter that
+raises, or returns anything but two numbers with a finite total of 0 or more, counts as nil, and
+`/eqot status` names the raise. Fractions are rounded down. The answer is kept until the zone
+changes, a loading screen ends, a quest is turned in or removed, the game's questlines update, a
+counter is added or removed, or `ZoneCountChanged()` is called, which drops the kept answer a
+frame later however many times it was called, so call it after your own data has caught up.
+Never call it from inside `count`, or the count is redone every frame. `RemoveZoneCounter(id)`
+takes a counter back.
+`ZoneBarShown()` returns true while Show zone progress bar is on and false while it is off. It
+reads the option when called, so it stays true in an instance or a zone with no count.
+Everything Quests uses these on WoW Forever, where the game has no questlines to count.
 
 ## License
 

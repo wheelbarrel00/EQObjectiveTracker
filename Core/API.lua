@@ -12,6 +12,7 @@ API.headerIcons     = {}
 API.menuItems       = {}
 API.focusListeners  = {}
 API.layoutListeners = {}
+API.zoneCounters    = {}
 
 local function slotFor(list, id)
     for i = 1, #list do
@@ -192,6 +193,72 @@ function API:NotifyLayout()
     C_Timer.After(0, flushLayout)
 end
 
+-- For an addon that can count a zone's quests where the game has no questlines (Everything Quests
+-- on WoW Forever). count(mapID) gets the map the zone walk answers (a cave gives the Zone around
+-- it, a map with no Zone above gives itself) and answers done, total, or nil for a zone it does
+-- not know. Counters are asked before the Midnight routing.
+function API:AddZoneCounter(spec)
+    if type(spec) ~= "table" or type(spec.id) ~= "string" then return false end
+    if type(spec.count) ~= "function" then return false end
+    self.zoneCounters[slotFor(self.zoneCounters, spec.id)] = { id = spec.id, count = spec.count }
+    self:ZoneCountChanged()
+    return true
+end
+
+function API:RemoveZoneCounter(id)
+    for i = #self.zoneCounters, 1, -1 do
+        if self.zoneCounters[i].id == id then table.remove(self.zoneCounters, i) end
+    end
+    self:ZoneCountChanged()
+end
+
+-- In registration order, nil passing the zone on. A raise or a malformed answer reads as nil, so
+-- another addon's bug costs its bar and never the render.
+function API:CountZone(mapID)
+    self.zoneCounterError = nil
+    local list = self.zoneCounters
+    for i = 1, #list do
+        -- A counter may remove itself or another while it counts, which shortens the list.
+        local it = list[i]
+        if it then
+            local okCall, done, total = pcall(it.count, mapID)
+            if not okCall then
+                -- tostring on a raised table can raise again, outside the pcall.
+                self.zoneCounterError = it.id .. " raised: " .. (type(done) == "string" and done or type(done))
+            elseif type(done) == "number" and type(total) == "number" and total >= 0 and total < math.huge then
+                total = math.floor(total)
+                -- done ~= done holds only for a NaN, and <= catches a -0 that would print as "-0".
+                if done ~= done or done <= 0 then done = 0 elseif done > total then done = total
+                else done = math.floor(done) end
+                return done, total, it.id
+            end
+        end
+    end
+    return nil
+end
+
+local zoneQueued = false
+
+local function flushZone()
+    zoneQueued = false
+    local ZoneProgress = ns:GetModule("ZoneProgress")
+    if ZoneProgress then ZoneProgress:Recount() end
+end
+
+-- A counter calls this when its numbers move. The cached count drops a frame later, once however
+-- many calls came, and the bar asks again when it next draws.
+function API:ZoneCountChanged()
+    if zoneQueued then return end
+    zoneQueued = true
+    C_Timer.After(0, flushZone)
+end
+
+-- The setting, not a drawn bar: an instance or a zone with no count still reads true.
+function API:ZoneBarShown()
+    local t = ns:GetModule("DB"):Tracker()
+    return t ~= nil and t.showZoneProgressBar == true
+end
+
 -- Two answers on purpose: the mode this session runs in, fixed at login, and the saved choice,
 -- which only a reload applies. A caller reading Blizzard's watch list needs the first.
 function API:UsesBlizzardTracker()
@@ -217,7 +284,8 @@ function API:DebugLine()
     local l, r, t, b = self:GetListBounds()
     local list = l and ("%.0f,%.0f,%.0f,%.0f"):format(l, r, t, b) or "none"
     return ("api: %d header icon(s), %d menu item(s), %d focus listener(s), %d layout listener(s)"
-            .. " | focus %s:%s%s | list %s")
+            .. ", %d zone counter(s) | focus %s:%s%s | list %s")
         :format(#self.headerIcons, #self.menuItems, #self.focusListeners, #self.layoutListeners,
-                tostring(providerID), tostring(entryID), follows and ", follows super-track" or "", list)
+                #self.zoneCounters, tostring(providerID), tostring(entryID),
+                follows and ", follows super-track" or "", list)
 end

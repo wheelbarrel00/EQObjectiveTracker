@@ -454,6 +454,7 @@ L["HUD Scale"] = true
 L["Sizes the bonus objectives HUD."] = true
 L["Zone Progress Bar"] = true
 L["Show zone progress bar"] = true
+L["Approximate questline progress. On WoW Forever this needs Everything Quests."] = true
 L["Approximate questline progress."] = true
 L["Float as a movable bar"] = true
 L["Drag to move, right-click to lock or reset. Unticked, the bar becomes an ordinary tracker section instead and only Bar Texture and Bar Color still apply to it."] = true

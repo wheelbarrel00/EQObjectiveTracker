@@ -5,6 +5,13 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] - 2026-11-07
+
+### New Features
+
+- On WoW Forever, the zone progress bar now works when Everything Quests 2.10.0 or later is installed. It shows how many of the zone's quests you have turned in, counted by Everything Quests from its own quest data: the quests its Chain Guide lists for the zone and any other quest that starts there, only those your character can take, with dungeon and raid, repeatable, profession and holiday quests left out, as are the quests of the Ahn'Qiraj war effort, which WoW Forever may never run. Most quests the game will no longer offer you, such as the other half of an either-or pair, leave the total, so in most zones the bar can reach 100%. A cave or building counts toward the zone around it, and each capital city is a zone of its own. Without Everything Quests the bar still shows nothing on WoW Forever, and the option's tooltip there now says so. Turn the bar on with Show zone progress bar on the Appearance tab.
+- Other addons can now supply the zone progress bar's count, which is asked for before the tracker's own, through new calls on the public API: `AddZoneCounter`, which registers a function asked for the zone's done and total, and `ZoneCountChanged`, which asks for a recount when those numbers move (`RemoveZoneCounter` takes the function back). `ZoneBarShown` says whether Show zone progress bar is turned on.
+
 ## [2.12.0] - 2026-11-07
 
 ### New Features

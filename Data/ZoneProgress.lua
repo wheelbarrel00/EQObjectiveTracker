@@ -5,8 +5,8 @@ local ZoneProgress = ns:RegisterModule("ZoneProgress", {})
 local MAX_HOPS = 5
 
 local _rootID, _rootName, _rootDirty = nil, nil, true
--- The map the walk STARTED from, recorded only when it actually climbed past it. The one
--- line a "my zone bar vanished" report is read from cannot otherwise say that the zone it
+-- The first Zone the walk met, recorded only when the walk climbed past it to a routed one. The
+-- one line a "my zone bar vanished" report is read from cannot otherwise say that the zone it
 -- names is not the zone underfoot. Cleared on every walk, or it announces a climb that did
 -- not happen on the next pass that stays put.
 local _rootVia = nil
@@ -51,11 +51,12 @@ end
 -- its parent Voidstorm (2405). Stopping at the first Zone therefore answered Slayer's Rise,
 -- which no category names, and Voidstorm's own routed questlines drew no bar at all. So a
 -- Zone that resolves to no category is passed THROUGH rather than accepted, and the first
--- Zone seen is kept as the answer for when nothing above it resolves either. Every zone that
--- works today resolves on its own hop and never climbs.
+-- Zone seen is kept as the answer for when nothing above it resolves either. A routed Zone answers
+-- on its own hop, so the climb changes only zones that drew no bar before it.
 --
--- The per-hop test is Count's: a mapID match, else a name match. The name half compares
--- English names, so a zone reached by name alone draws no bar on any other client.
+-- The per-hop test is the routing half of Count's: a mapID match, else a name match. The name
+-- half compares English names, so a zone reached by name alone draws no bar on any other client.
+-- Zone counters are not asked here, so where nothing is routed they get the first Zone met.
 local function zoneRoot()
     if not _rootDirty then return _rootID, _rootName end
     if not ns.Has.Map then return nil end
@@ -149,6 +150,11 @@ function ZoneProgress:Invalidate()
     _count.rootID = nil
 end
 
+function ZoneProgress:Recount()
+    self:Invalidate()
+    fireDirty()
+end
+
 -- silent is passed by Count alone. Count owns _seen and is not re-entrant, and a listener
 -- fired mid-walk calls straight back into it, so an inline fill must never announce itself.
 -- The caller already has the filled data. Only the async retry has news worth telling.
@@ -188,7 +194,14 @@ local _seen = {}
 
 -- Deduplicated by quest id: a quest can appear in more than one routed questline, and
 -- counting it twice would inflate both halves of the bar.
+-- A counter's answer is final, 0 included, so a zone it knows never falls back to the routing.
 function ZoneProgress:Count(rootID, rootName)
+    local API = ns:GetModule("API")
+    if API then
+        local cDone, cTotal, counterID = API:CountZone(rootID)
+        if cTotal then return cDone, cTotal, nil, counterID end
+    end
+
     local catID = categoryByMapID(rootID) or categoryByName(rootName)
     local lines = catID and categoryQuestLines(catID)
     if not lines then return nil, nil, catID end
@@ -226,8 +239,9 @@ function ZoneProgress:Current()
 
     if _count.rootID ~= rootID then
         local done, total, catID = self:Count(rootID, rootName)
-        _count.rootID, _count.done, _count.total, _count.name, _count.catID =
-            rootID, done, total, rootName, catID
+        local API = ns:GetModule("API")
+        _count.rootID, _count.done, _count.total, _count.name, _count.catID, _count.err =
+            rootID, done, total, rootName, catID, API and API.zoneCounterError
     end
 
     if not _count.total or _count.total == 0 then return nil end
@@ -246,24 +260,34 @@ function ZoneProgress:DebugLines()
         return lines
     end
 
-    local done, total, catID = self:Count(rootID, rootName)
+    local API = ns:GetModule("API")
+    local done, total, catID, counterID = self:Count(rootID, rootName)
     local cat = catID and ns.ZONE_CATEGORIES and ns.ZONE_CATEGORIES[catID]
-    if not total then
-        lines[1] = ("zone progress: %s (%d)%s -> NO ROUTING, no bar here")
-            :format(rootName or "?", rootID, viaText())
-        return lines
-    end
+    if counterID then
+        lines[1] = ("zone progress: %s (%d)%s -> counter %s, %d/%d complete")
+            :format(rootName or "?", rootID, viaText(), counterID, done, total)
+    elseif not total then
+        lines[1] = ("zone progress: %s (%d)%s -> NO ROUTING, no bar here, %d zone counter(s)")
+            :format(rootName or "?", rootID, viaText(), API and #API.zoneCounters or 0)
+    else
+        local qls = categoryQuestLines(catID) or {}
+        local loaded = 0
+        for i = 1, #qls do
+            if qlQuests[qls[i]] then loaded = loaded + 1 end
+        end
 
-    local qls = categoryQuestLines(catID) or {}
-    local loaded = 0
-    for i = 1, #qls do
-        if qlQuests[qls[i]] then loaded = loaded + 1 end
+        lines[1] = ("zone progress: %s (%d)%s -> %s, %d/%d complete")
+            :format(rootName or "?", rootID, viaText(),
+                    (cat and cat.name) or tostring(catID), done, total)
+        lines[2] = ("  %d/%d routed questlines loaded"):format(loaded, #qls)
     end
-
-    lines[1] = ("zone progress: %s (%d)%s -> %s, %d/%d complete")
-        :format(rootName or "?", rootID, viaText(),
-                (cat and cat.name) or tostring(catID), done, total)
-    lines[2] = ("  %d/%d routed questlines loaded"):format(loaded, #qls)
+    if API and API.zoneCounterError then
+        lines[#lines + 1] = "  zone counter " .. API.zoneCounterError
+    end
+    -- The lines above come from a fresh walk, so a raise the bar's cached count still shows is named here.
+    if _count.rootID == rootID and _count.err and _count.err ~= (API and API.zoneCounterError) then
+        lines[#lines + 1] = "  the bar's last count: zone counter " .. _count.err
+    end
     return lines
 end
 

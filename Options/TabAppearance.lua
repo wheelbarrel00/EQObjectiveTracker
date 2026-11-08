@@ -1039,7 +1039,8 @@ Options:RegisterTab({
         zone:Add(self:CreateCheckbox(content, L["Show zone progress bar"],
             function() return DB().showZoneProgressBar end,
             function(v) ns:GetModule("ZoneProgressBar"):SetEnabled(v); syncDependents(); refreshPreview() end,
-            L["Approximate questline progress."]))
+            ns.IsForever() and L["Approximate questline progress. On WoW Forever this needs Everything Quests."]
+                or L["Approximate questline progress."]))
 
         w.zbFloat = self:CreateCheckbox(content, L["Float as a movable bar"],
             function() return (DB().zoneProgressLocation or "floating") == "floating" end,
