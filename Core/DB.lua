@@ -170,6 +170,8 @@ DB.defaults = {
             showOptionsIcon      = true,
             showSortButton       = false,
             showFilterButton     = false,
+            buttonBarBottom      = false,
+            buttonsOnMouseover   = false,
             splitQuestClick      = false,
             clickToUnfocus       = false,
             -- On is the game's own behavior: it focuses a quest accepted while nothing is focused.

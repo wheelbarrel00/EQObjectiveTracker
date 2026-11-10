@@ -5,6 +5,19 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] - 2026-11-09
+
+### New Features
+
+- Show the button bar at the bottom of the tracker, a new box on the Tracker tab's Headers and Buttons card, moves the bar along the top of the tracker, the one you drag it by and where the cogwheel, the sort and filter buttons and other addons' buttons sit, to the bottom edge beside the corner grip. The quests then start right at the top of the tracker, so it can sit flush against the top of the screen, and section tabs, if you use them, move up to the very top. The bar sits at the bottom of the tracker's box, where the corner grip is, so with Background off and a short quest list it can sit some way below the last quest. Off by default. Requested by Azazel.
+- Show the buttons only on mouseover, on the same card, hides the cogwheel, the sort and filter buttons and other addons' buttons on the tracker until you point at the bar they sit on, at the top or the bottom, and keeps them up for half a second after you move away. Off by default.
+
+### Improvements
+
+- The cogwheel, sort button and filter button tooltips on the Tracker tab now say where each sits on the button bar, wherever the bar is.
+- `/eqot status` now has a button bar line saying whether the bar sits at the top or the bottom, and whether its buttons are always shown or wait for the mouse.
+- Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover both new options and the reworded tooltips.
+
 ## [2.13.0] - 2026-11-07
 
 ### New Features

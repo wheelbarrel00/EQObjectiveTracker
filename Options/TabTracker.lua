@@ -598,7 +598,7 @@ Options:RegisterTab({
                 DB().showOptionsIcon = v
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
-            L["A small cogwheel at the top-right of the tracker that opens the options panel."]))
+            L["A small cogwheel at the right end of the tracker's button bar that opens the options panel."]))
 
         headers:Add(self:CreateCheckbox(content, L["Show the sort button on the tracker"],
             function() return DB().showSortButton == true end,
@@ -611,7 +611,7 @@ Options:RegisterTab({
                 end
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
-            L["A small button at the top-left of the tracker that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default."]))
+            L["A small button at the left end of the tracker's button bar that opens a list of the sort orders, so you can switch between them in two clicks. It changes the same Sort Order as the On-Screen Tracker card. Off by default."]))
 
         headers:Add(self:CreateCheckbox(content, L["Show the filter button on the tracker"],
             function() return DB().showFilterButton == true end,
@@ -619,7 +619,23 @@ Options:RegisterTab({
                 DB().showFilterButton = v
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
-            L["A small funnel at the top-left of the tracker that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default."]))
+            L["A small funnel at the left end of the tracker's button bar that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default."]))
+
+        headers:Add(self:CreateCheckbox(content, L["Show the button bar at the bottom of the tracker"],
+            function() return DB().buttonBarBottom == true end,
+            function(v)
+                DB().buttonBarBottom = v
+                ns:GetModule("Tracker"):ApplyButtonBar()
+            end,
+            L["Moves the bar along the top of the tracker, the one you drag it by, with the cogwheel and the other buttons on it, to the bottom edge beside the corner grip. The quests then start at the very top, so the tracker can sit flush against the top of the screen. Off by default."]))
+
+        headers:Add(self:CreateCheckbox(content, L["Show the buttons only on mouseover"],
+            function() return DB().buttonsOnMouseover == true end,
+            function(v)
+                DB().buttonsOnMouseover = v
+                ns:GetModule("Tracker"):ApplyHeaderIcons()
+            end,
+            L["Hides the cogwheel, the sort and filter buttons and any buttons other addons add to the tracker until you point at the bar they sit on, at the top or the bottom of the tracker. Off by default."]))
         -- EQ's Show Chain Guide icon is deliberately not ported: it opens EQ's Chain Guide, which
         -- EQOT does not have.
 

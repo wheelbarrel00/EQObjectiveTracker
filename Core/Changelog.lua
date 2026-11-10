@@ -9,6 +9,20 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.14.0", date = "2026-11-09",
+        sections = {
+            { head = "New Features", items = {
+                "Show the button bar at the bottom of the tracker, a new box on the Tracker tab's Headers and Buttons card, moves the bar along the top of the tracker, the one you drag it by and where the cogwheel, the sort and filter buttons and other addons' buttons sit, to the bottom edge beside the corner grip. The quests then start right at the top of the tracker, so it can sit flush against the top of the screen, and section tabs, if you use them, move up to the very top. The bar sits at the bottom of the tracker's box, where the corner grip is, so with Background off and a short quest list it can sit some way below the last quest. Off by default. Requested by Azazel.",
+                "Show the buttons only on mouseover, on the same card, hides the cogwheel, the sort and filter buttons and other addons' buttons on the tracker until you point at the bar they sit on, at the top or the bottom, and keeps them up for half a second after you move away. Off by default.",
+            } },
+            { head = "Improvements", items = {
+                "The cogwheel, sort button and filter button tooltips on the Tracker tab now say where each sits on the button bar, wherever the bar is.",
+                "/eqot status now has a button bar line saying whether the bar sits at the top or the bottom, and whether its buttons are always shown or wait for the mouse.",
+                "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover both new options and the reworded tooltips.",
+            } },
+        },
+    },
+    {
         version = "2.13.0", date = "2026-11-07",
         sections = {
             { head = "New Features", items = {
@@ -397,15 +411,6 @@ ns.Changelog = {
         sections = {
             { head = "New Features", items = {
                 "Find Group is now on a quest's right-click menu, so you no longer have to hit the small eye icon on the row to reach it. It is there on ordinary quests and on world quests, and only on a quest the game will actually form a group for, so the menu does not offer it where it cannot work. Asked for by AIR.",
-            } },
-        },
-    },
-    {
-        version = "1.20.1", date = "2026-09-05",
-        sections = {
-            { head = "Bug Fixes", items = {
-                "Fixed the tracker going stale and staying that way until you reloaded. Accepting a quest, finishing an objective or handing a quest in would all leave it showing whatever it showed before, and the only way back was to force a redraw yourself by toggling a setting, opening the options window or reloading. Reported by AIR.",
-                "Behind it, the tracker gathers up a burst of game events and redraws once a fraction of a second later, rather than redrawing for every event on its own. If the game ever dropped that scheduled redraw, nothing noticed and nothing scheduled another, so every later request to redraw was folded into one that was never coming. The tracker went quiet for the rest of the session with no error on screen to explain it, and the quest completion sound could stop the same way. A redraw asked for well past its due time now schedules a fresh one, so a dropped redraw costs you one or two rather than all of them.",
             } },
         },
     },

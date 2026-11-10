@@ -88,6 +88,46 @@ local function leftButtonX(cfg, pastFilter)
     return x
 end
 
+local function barAtBottom(cfg)
+    return cfg ~= nil and cfg.buttonBarBottom == true
+end
+
+-- How far the content starts below the frame's top: the drag strip's height while it sits there.
+local function stripInset(cfg)
+    if barAtBottom(cfg) then return 0 end
+    return DRAG_HANDLE_H
+end
+
+-- The tracker's own mouseover holds this long too (UI/Visibility.lua).
+local BAR_HOLD = 0.5
+
+local function concealBar(f)
+    f.drag:SetScript("OnUpdate", nil)
+    f._barShown, f._barLeft = nil, nil
+    Tracker:PaintBarButtons()
+end
+
+local function watchBar(drag)
+    local f = Tracker.frame
+    if drag:IsMouseOver() then
+        f._barLeft = nil
+        return
+    end
+    local now = GetTime()
+    f._barLeft = f._barLeft or now
+    if now - f._barLeft < BAR_HOLD then return end
+    concealBar(f)
+end
+
+-- Every button sits inside the strip, so one watch on the strip's rect covers moving between them.
+local function revealBar(f)
+    local cfg = ns:GetModule("DB"):Tracker()
+    if not (cfg and cfg.buttonsOnMouseover == true) then return end
+    f._barShown, f._barLeft = true, nil
+    Tracker:PaintBarButtons()
+    f.drag:SetScript("OnUpdate", watchBar)
+end
+
 -- Above the drag handle's frame level so the handle does not eat the click. A tooltip given as a
 -- function is read on each hover, for text that names a setting's current value, and a second
 -- value it returns is drawn under it as a wrapped gray hint.
@@ -102,6 +142,7 @@ local function makeHeaderIcon(f, texture, tooltip, onClick, anchor)
     b.icon = tex
     b:SetScript("OnEnter", function(btn)
         if Tracker:IsClickThrough() then return end
+        revealBar(f)
         tex:SetAlpha(1)
         local text, hint = tooltip, nil
         if type(text) == "function" then text, hint = text() end
@@ -540,6 +581,13 @@ function Tracker:RebuildHeaderIcons()
     self:ApplyHeaderIcons()
 end
 
+-- The grip keeps the bottom right corner, so a strip along the bottom stops short of it.
+local function anchorStrip(strip, edge, gripRoom)
+    strip:ClearAllPoints()
+    strip:SetPoint(edge .. "LEFT")
+    strip:SetPoint(edge .. "RIGHT", gripRoom, 0)
+end
+
 -- Visibility and anchoring together, because a hidden icon has to drop out of the run rather
 -- than leave a gap in it - so toggling the cogwheel off slides the rest right.
 function Tracker:ApplyHeaderIcons()
@@ -548,12 +596,22 @@ function Tracker:ApplyHeaderIcons()
     local DB  = ns:GetModule("DB")
     local cfg = DB and DB:Tracker()
 
-    if f.sortButton then f.sortButton:SetShown(cfg ~= nil and cfg.showSortButton == true) end
+    local drag, edge, y, gripRoom = f.drag, "TOP", -1, 0
+    if barAtBottom(cfg) then edge, y, gripRoom = "BOTTOM", 1, -(GRIP_SIZE + 2) end
+    anchorStrip(drag, edge, gripRoom)
+    anchorStrip(f.moveBar, edge, gripRoom)
+
+    local sort = f.sortButton
+    if sort then
+        sort:SetShown(cfg ~= nil and cfg.showSortButton == true)
+        sort:ClearAllPoints()
+        sort:SetPoint(edge .. "LEFT", drag, edge .. "LEFT", 4, y)
+    end
     local filter = f.filterButton
     if filter then
         filter:SetShown(cfg ~= nil and cfg.showFilterButton == true)
         filter:ClearAllPoints()
-        filter:SetPoint("TOPLEFT", f, "TOPLEFT", leftButtonX(cfg, false), -1)
+        filter:SetPoint(edge .. "LEFT", drag, edge .. "LEFT", leftButtonX(cfg, false), y)
         self:PaintFilterButton()
     end
 
@@ -568,13 +626,33 @@ function Tracker:ApplyHeaderIcons()
             if prev then
                 b:SetPoint("RIGHT", prev, "LEFT", -3, 0)
             else
-                b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -1)
+                b:SetPoint(edge .. "RIGHT", drag, edge .. "RIGHT", -4, y)
             end
             prev = b
         end
     end
     f._lastIcon = prev
     self:LayoutMoveBar()
+    self:PaintBarButtons()
+end
+
+-- Hidden buttons keep the mouse: each sits inside the strip, so entering one reveals them all. The
+-- move bar's check stays drawn, the author's call.
+function Tracker:PaintBarButtons()
+    local f = self.frame
+    if not (f and f.headerIcons) then return end
+    local cfg = ns:GetModule("DB"):Tracker()
+    local a = (cfg and cfg.buttonsOnMouseover == true and not f._barShown) and 0 or 1
+    if f.sortButton then f.sortButton:SetAlpha(a) end
+    if f.filterButton then f.filterButton:SetAlpha(a) end
+    for i = 1, #f.headerIcons do f.headerIcons[i]:SetAlpha(a) end
+end
+
+-- The list moves with the strip, so it is laid out again and its bounds change.
+function Tracker:ApplyButtonBar()
+    self:ApplyHeaderIcons()
+    self:Refresh()
+    ns:GetModule("API"):NotifyLayout()
 end
 
 -- Blizzard's scroll bar keeps its own handlers, so a click in the invisible gutter scrolled
@@ -641,13 +719,14 @@ function Tracker:IsClickThrough()
 end
 
 -- Quests draw from the top of a fixed box, so its bottom counts only while Background, Border or
--- the move outline is on. Every rect here is in the frame's own units, so one factor serves.
+-- the move outline is on, or the drag strip sits along it. Every rect here is in the frame's own
+-- units, so one factor serves.
 function Tracker:ListBounds()
     local f = self.frame
     if not f or f._eqotHidden or not f:IsShown() then return nil end
     local cfg = ns:GetModule("DB"):Tracker()
     local bottom
-    if cfg.showBackground or cfg.showBorder or f.moveOutline:IsShown() then
+    if cfg.showBackground or cfg.showBorder or f.moveOutline:IsShown() or barAtBottom(cfg) then
         bottom = f:GetBottom()
     else
         bottom = f.scroll:GetBottom()
@@ -846,9 +925,11 @@ function Tracker:BuildFrame()
     -- OnLeave. The shared tooltip used to be cleared by the next hover anywhere.
     f:HookScript("OnHide", function() ns.Util.Tooltip():Hide() end)
 
+    -- Stored now, and anchored by the header pass with the buttons on it.
     local drag = CreateFrame("Frame", nil, f)
-    drag:SetPoint("TOPLEFT")
-    drag:SetPoint("TOPRIGHT")
+    f.drag = drag
+    -- The strip's watch cannot run on a hidden frame, so a reveal would come back with the tracker.
+    f:HookScript("OnHide", function() concealBar(f) end)
     drag:SetHeight(DRAG_HANDLE_H)
     drag:EnableMouse(true)
     drag:RegisterForDrag("LeftButton")
@@ -860,6 +941,7 @@ function Tracker:BuildFrame()
 
     drag:SetScript("OnEnter", function()
         if Tracker:IsClickThrough() then return end
+        revealBar(f)
         f._dragHover = true
         paintDragHint(f)
         local tip = ns.Util.Tooltip()
@@ -884,8 +966,6 @@ function Tracker:BuildFrame()
     -- Not mouse-enabled itself, so a drag on the label still reaches the strip below it.
     local moveBar = CreateFrame("Frame", nil, f)
     moveBar:SetFrameLevel(f:GetFrameLevel() + 11)
-    moveBar:SetPoint("TOPLEFT")
-    moveBar:SetPoint("TOPRIGHT")
     moveBar:SetHeight(DRAG_HANDLE_H)
     moveBar:Hide()
     local done = CreateFrame("Button", nil, moveBar)
@@ -898,6 +978,7 @@ function Tracker:BuildFrame()
     doneTex:SetAlpha(0.85)
     done:SetScript("OnEnter", function(btn)
         if Tracker:IsClickThrough() then return end
+        revealBar(f)
         doneTex:SetAlpha(1)
         local tip = ns.Util.Tooltip()
         tip:SetOwner(btn, "ANCHOR_BOTTOMRIGHT")
@@ -946,7 +1027,6 @@ function Tracker:BuildFrame()
     local sort = makeHeaderIcon(f, "Interface\\AddOns\\EQObjectiveTracker\\Media\\Textures\\sort.tga",
         function() return Tracker:SortLine(), Tracker:SortHint() end, function(b) Tracker:OpenSortMenu(b) end,
         "ANCHOR_BOTTOMRIGHT")
-    sort:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -1)
     f.sortButton = sort
     self:RebuildHeaderIcons()
 
@@ -1004,18 +1084,19 @@ function Tracker:BuildFrame()
     f.background:SetAllPoints()
     f.background:Hide()
 
+    local top = stripInset(cfg)
     local scenarioContainer = CreateFrame("Frame", nil, f)
-    scenarioContainer:SetPoint("TOPLEFT", CONTENT_PAD, -DRAG_HANDLE_H)
+    scenarioContainer:SetPoint("TOPLEFT", CONTENT_PAD, -top)
     -- Reserve the quest list's scroll bar gutter so the banner lines up with scrolled text
-    scenarioContainer:SetPoint("TOPRIGHT", -(scrollGutter(cfg) - CONTENT_PAD), -DRAG_HANDLE_H)
+    scenarioContainer:SetPoint("TOPRIGHT", -(scrollGutter(cfg) - CONTENT_PAD), -top)
     scenarioContainer:SetHeight(1)
     f.scenarioContainer = scenarioContainer
     scenarioContainer:SetScript("OnSizeChanged", function() Tracker:Refresh() end)
 
     -- Shown only while two tabs hold a section, when ApplyContentInset moves the content below it.
     local tabStrip = CreateFrame("Frame", nil, f)
-    tabStrip:SetPoint("TOPLEFT", CONTENT_PAD, -DRAG_HANDLE_H)
-    tabStrip:SetPoint("TOPRIGHT", -CONTENT_PAD, -DRAG_HANDLE_H)
+    tabStrip:SetPoint("TOPLEFT", CONTENT_PAD, -top)
+    tabStrip:SetPoint("TOPRIGHT", -CONTENT_PAD, -top)
     tabStrip:SetHeight(TAB_STRIP_H)
     tabStrip:Hide()
     tabStrip.tabs = {}
@@ -1098,7 +1179,7 @@ function Tracker:BuildFrame()
 
     f:SetScript("OnSizeChanged", function() Tracker:Refresh() end)
 
-    f.drag, f.grip, f.scroll, f.content = drag, grip, scroll, content
+    f.grip, f.scroll, f.content = grip, scroll, content
     self:ApplyWorldQuestsPosition()
     self:ApplyLockState()
 end
@@ -1308,7 +1389,7 @@ function Tracker:ScrollGutter(cfg)
 end
 
 function Tracker:Insets()
-    return CONTENT_PAD, DRAG_HANDLE_H, GRIP_SIZE + 2
+    return CONTENT_PAD, stripInset(ns:GetModule("DB"):Tracker()), GRIP_SIZE + 2
 end
 
 local function backgroundHover()
@@ -1344,10 +1425,14 @@ end
 function Tracker:ApplyContentInset()
     local f = self.frame
     if not (f and f.scenarioContainer) then return end
-    local gutter = scrollGutter(ns:GetModule("DB"):Tracker())
-    -- The tab strip, while it shows, sits between the drag strip and the content.
-    local top = DRAG_HANDLE_H + (self:TabsInUse() and self:TabStripHeight() or 0)
-    if f._scrollGutter == gutter and f._contentTop == top then return end
+    local cfg = ns:GetModule("DB"):Tracker()
+    local gutter = scrollGutter(cfg)
+    -- The tab strip, while it shows, sits at the drag strip's inset with the content under it. The
+    -- drag strip's inset is guarded too: at the bottom with a Tab Height of 14 the total is 14, as at
+    -- the top with no tabs.
+    local strip = stripInset(cfg)
+    local top = strip + (self:TabsInUse() and self:TabStripHeight() or 0)
+    if f._scrollGutter == gutter and f._contentTop == top and f._stripTop == strip then return end
 
     -- The quest scroll anchors to this container, so re-anchoring it is a protected move once
     -- a secure button exists anywhere in the chain - a quest item button, or one of the
@@ -1358,7 +1443,9 @@ function Tracker:ApplyContentInset()
         return
     end
 
-    f._scrollGutter, f._contentTop = gutter, top
+    f._scrollGutter, f._contentTop, f._stripTop = gutter, top, strip
+    f.tabStrip:SetPoint("TOPLEFT", CONTENT_PAD, -strip)
+    f.tabStrip:SetPoint("TOPRIGHT", -CONTENT_PAD, -strip)
     f.scenarioContainer:SetPoint("TOPLEFT",  CONTENT_PAD, -top)
     f.scenarioContainer:SetPoint("TOPRIGHT", -(gutter - CONTENT_PAD), -top)
 end
@@ -1822,8 +1909,9 @@ function Tracker:StickyLine()
                 f._stickyZoned and tostring(self._stickyZone) or "row off")
 end
 
--- "showing nil" with tabs in use is the strip waiting for combat to end (content top short of the
--- strip), or no render since tabs came on while the tracker was hidden.
+-- "showing nil" with tabs in use is the strip waiting for combat to end (the content top, or the
+-- button bar line's applied inset, not yet where the setting puts them), or no render since tabs came
+-- on while the tracker was hidden.
 function Tracker:TabsLine()
     local cfg = ns:GetModule("DB"):Tracker()
     if not (cfg and cfg.showTabs == true) then return "tabs: off" end
@@ -1838,6 +1926,18 @@ function Tracker:TabsLine()
     return ("tabs: on, in use %s, showing %s, saved %s, queued %s, content top %s"):format(
         table.concat(list, ","), tostring(self._activeTab), tostring(char and char.activeTab),
         tostring(self._pendingTab), tostring(self.frame and self.frame._contentTop))
+end
+
+-- "applied" is the drag strip's own inset as last applied, without any tab strip, which a fight once a
+-- secure button exists, or a hidden tracker, can leave behind the setting.
+function Tracker:BarLine()
+    local cfg = ns:GetModule("DB"):Tracker()
+    local f = self.frame
+    local hover = cfg ~= nil and cfg.buttonsOnMouseover == true
+    local buttons = "always shown"
+    if hover then buttons = (f and f._barShown) and "on mouseover, shown" or "on mouseover, hidden" end
+    return ("button bar: %s, applied inset %s | buttons %s"):format(
+        barAtBottom(cfg) and "bottom" or "top", tostring(f and f._stripTop), buttons)
 end
 
 function Tracker:_RenderScenario(group, cfg)
@@ -2088,8 +2188,10 @@ function Tracker:Render()
     local stickyZ = 0
 
     local activeTab = self:ActiveTab()
-    -- Combat defers moving the content down under the strip, and the tabs wait for it.
-    if activeTab and f._contentTop ~= DRAG_HANDLE_H + self:TabStripHeight() then activeTab = nil end
+    -- Combat defers moving the content to the strip's inset, and the tabs wait for both the total
+    -- and the drag strip's own inset, which can differ with the same total.
+    local stripTop = stripInset(cfg)
+    if activeTab and (f._contentTop ~= stripTop + self:TabStripHeight() or f._stripTop ~= stripTop) then activeTab = nil end
     self._activeTab = activeTab
     self:LayoutTabs(activeTab)
     -- Only the zone section's own pass hides its docked bar, and a tab without it skips that pass.
@@ -2212,7 +2314,7 @@ function Tracker:Render()
         end
     end
 
-    local available = math.max(1, (f:GetHeight() or 0) - (f._contentTop or DRAG_HANDLE_H) - scenarioH - 2
+    local available = math.max(1, (f:GetHeight() or 0) - (f._contentTop or stripInset(cfg)) - scenarioH - 2
                                   - (GRIP_SIZE + 2))
     local fraction  = (cfg and cfg.worldQuestsPinnedMaxFraction) or WQ_PIN_FRACTION
     local band      = headerBand()

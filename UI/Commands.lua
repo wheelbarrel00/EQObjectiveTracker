@@ -174,6 +174,7 @@ handlers.status = function()
     debugLine("Tracker", nil, "HeightLine")
     debugLine("Tracker", nil, "StickyLine")
     debugLine("Tracker", nil, "TabsLine")
+    debugLine("Tracker", nil, "BarLine")
     debugLine("ZoneGroups")
 
     debugLine("ItemButtons")

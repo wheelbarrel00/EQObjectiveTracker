@@ -80,8 +80,9 @@ here.
 
 On WoW Forever, Shortest Path Forever 1.22.35 or later puts its journey column right under the
 tracker's quests, or above or beside the tracker when there is no room below, and moves it as the
-list grows and shrinks. With Background or Border on, or move mode's outline showing, it keeps
-clear of the whole tracker box. An older version draws the column over the quests, so update it.
+list grows and shrinks. With Background or Border on, move mode's outline showing, or the button
+bar at the bottom of the tracker, it keeps clear of the whole tracker box. An older version draws
+the column over the quests, so update it.
 
 ### EllesmereUI
 
@@ -202,9 +203,15 @@ one opens that tab, scrolls to the setting and flashes it.
 While the tracker is unlocked, drag the strip along the top to move it and the corner grip to
 resize it. With the options window open, or after an unlock, that strip turns gold with a check
 button that locks the tracker again, and a gold outline shows its edges. Right-click the strip or
-the cogwheel for Unlock or Lock position, Reset position and size, and Open the options panel. Tick
-Show the sort button on the tracker, on the Tracker tab, for a small button at the tracker's top
-left that opens a list of the sort orders, so switching between Level and Distance, or any other
+the cogwheel for Unlock or Lock position, Reset position and size, and Open the options panel. The
+strip is the tracker's button bar: the cogwheel sits at its right end and the sort and filter
+buttons at its left. Show the button bar at the bottom of the tracker, on the Tracker tab's Headers
+and Buttons card, moves it to the bottom edge beside the corner grip, so the quests start at the
+very top and the tracker can sit flush against the top of the screen. Show the buttons only on
+mouseover, on the same card, hides the cogwheel, the sort and filter buttons and other addons'
+buttons until you point at the bar. Tick
+Show the sort button on the tracker, on the Tracker tab, for a small button at the left end of
+the button bar that opens a list of the sort orders, so switching between Level and Distance, or any other
 two, takes two clicks. Pick the order already in use again to reverse it, so Level runs from
 highest to lowest or Distance from farthest to nearest, and once more to turn it back. Every order
 but Zone and Manual can be reversed, the button's tooltip says when one is, and picking another
@@ -383,7 +390,7 @@ Chain Guide" menu entries, and for its TomTom arrow.
 `GetListBounds` returns the left, right, top and bottom of what the tracker draws, in UIParent
 units, or nil while it is hidden or the game's own tracker is in use. The bottom is where the
 last quest ends, or the world quests under them, not the bottom of the window, unless
-Background, Border or move mode's outline is on. `onLayout` is called with no arguments a frame
+Background, Border or move mode's outline is on or the button bar sits at the bottom. `onLayout` is called with no arguments a frame
 after the list moves, changes size, or is hidden or shown, only when the answer changed, and
 once more after any listener is added, so read `GetListBounds` from it. `RemoveLayoutListener(id)` takes a
 listener back, as `RemoveFocusListener(id)` does. Shortest Path Forever uses these to keep its

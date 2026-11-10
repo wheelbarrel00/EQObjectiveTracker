@@ -289,7 +289,7 @@ function Preview:Refresh(again)
     if panelH <= 0 then panelH = FALLBACK_H end
     local scale = (panelW > 0) and math.min(1, (panelW - MARGIN * 2) / width) or 1
 
-    -- The strip sits under the drag strip and pushes the list down, as on the tracker.
+    -- The tab strip sits at the content's top inset and pushes the list down, as on the tracker.
     local tabH = 0
     if cfg.showTabs == true and Tracker:TabsOffered() then
         tabH = Tracker:TabStripHeight()

@@ -127,7 +127,8 @@ local function overBar(sf)
 end
 
 -- Only what is drawn counts, so the empty part of the frame below the last quest does not bring
--- the tracker up. The quest list is the scroll viewport clipped to the content laid out in it.
+-- the tracker up. The drag strip counts wherever it sits, the bottom edge included, since it holds
+-- the buttons. The quest list is the scroll viewport clipped to the content laid out in it.
 local function mouseOverDrawn(f)
     if over(f.drag) or over(f.scenarioContainer) or over(f.eventsRegion) then return true end
     if over(f.tabStrip) then return true end
