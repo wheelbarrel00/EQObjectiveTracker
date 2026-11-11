@@ -32,6 +32,11 @@ handlers.toggle = function()
     tracker():Toggle()
 end
 
+handlers.whatsnew = function()
+    local WN = ns:GetModule("WhatsNew")
+    if WN then WN:Show() end
+end
+
 handlers.debug = function()
     ns.DEBUG = not ns.DEBUG
     ns:Print("debug validation " .. (ns.DEBUG and "on" or "off") .. ".")
@@ -187,6 +192,7 @@ handlers.status = function()
     debugLine("ManualOrder")
     debugLine("Distance")
     debugLine("Migrate")
+    debugLine("WhatsNew")
     debugLine("API")
     debugLine("AutoQuestPopups")
     debugLine("WatchPersist")
@@ -509,7 +515,7 @@ function Commands:OnEnable()
         else
             -- The subcommands are literals the dispatcher matches, so they stay outside
             -- L. Only the word introducing them is translated.
-            ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, status, debug, "
+            ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, whatsnew, status, debug, "
                 .. "bonushud [test], mplus [test|late], popup [test], timer [test], importeq, modules, disable <m>, enable <m>")
         end
     end

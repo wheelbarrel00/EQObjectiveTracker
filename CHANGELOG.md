@@ -5,6 +5,18 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.0] - 2026-11-10
+
+### New Features
+
+- What's New. After an update that brings new features, a What's New window opens a few seconds after you log in, listing every update since the last one you read, newest first, with the same notes as the About tab's changelog. From this update on, if you skip a few updates it catches you up on all of them at once. Updates without new features stay quiet and are listed in the next window. It is on by default. The first window starts with a short note and a Go to this setting button that opens the option to change it, and Don't show these again, at the bottom of every window, turns it off. A fresh install opens nothing.
+- A new Updates card on the General tab sets what happens after an update: Popup window, Chat link (one clickable line in chat instead of the window) or Off, shared by every character on your account. Its Show What's New button, the About tab's What's New button and `/eqot whatsnew` open the window any time. Reset all settings puts it back to Popup window. If Everything Quests has its own What's New to show when you log in, its window opens too, set slightly apart from this one.
+
+### Improvements
+
+- `/eqot status` now has a what's new line saying how you are told after an update, the last update you read and the last one announced in chat, and how many are still to tell.
+- Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover the new window and its settings, mostly in the words Cooldown Master and Everything Quests already use for their own What's New.
+
 ## [2.14.0] - 2026-11-09
 
 ### New Features

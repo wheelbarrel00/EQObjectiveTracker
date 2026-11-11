@@ -310,6 +310,9 @@ DB.defaults = {
     global = {
         schemaVersion       = 1,
         optionsWindowScale  = 1.0,
+        -- What's New's markers whatsNewSeen, whatsNewAnnounced and whatsNewIntroShown are absence flags and get no
+        -- default: with no marker, every release after 2.14.0 counts as unread.
+        whatsNewMode        = "popup",
     },
 }
 
@@ -388,7 +391,7 @@ function DB:ResetTrackerAppearance()
 end
 
 -- ResetProfile only clears the profile scope, so on its own it leaves the per-character
--- display state and the one global key behind - both of which a user reads as "a setting".
+-- display state and the global settings behind - both of which a user reads as "a setting".
 -- trackedWorldQuests is deliberately spared: it mirrors the player's own manual world quest
 -- watches, so clearing it untracks their quests rather than restoring a default.
 --
@@ -413,6 +416,9 @@ function DB:ResetAll()
         -- off, and Commands recreates the tables on the next use.
         g.safeMode, g.disabledModules, g.disabledProviders = nil, nil, nil
         g.enabledModules, g.enabledProviders               = nil, nil
+        -- The read markers stay, as schemaVersion does, or a reset would show every release since 2.14.0 again.
+        g.whatsNewMode          = self.defaults.global.whatsNewMode
+        g.whatsNewModeBeforeOff = nil
     end
 
     local c = self.db.char
@@ -432,6 +438,7 @@ function DB:OnInitialize()
     -- config: overwriting a profile somebody has already tuned is indistinguishable from
     -- data loss. Must be read BEFORE AceDB:New, which creates the table.
     local freshInstall = (_G.EQObjectiveTrackerDB == nil)
+    self.freshInstall = freshInstall
 
     -- Ships off on Classic by the author's decision. The original reason has since been removed
     -- by the addon owning its own tracked set: there is no five-quest cap any more and auto-track

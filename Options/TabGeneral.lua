@@ -3,6 +3,14 @@ local _, ns = ...
 local Options = ns:GetModule("Options")
 local L       = ns.L
 
+local afterUpdate
+
+-- What's New's Go to this setting button lands here. Selecting the tab builds it first, which is what sets afterUpdate.
+function Options:ShowWhatsNewSetting()
+    self:SelectTab("general")
+    self.ui:ScrollIntoView(afterUpdate)
+end
+
 Options:RegisterTab({
     id    = "general",
     title = L["General"],
@@ -34,7 +42,7 @@ Options:RegisterTab({
                     ReloadUI()
                 end,
             })
-        end, L["Restores every setting on every tab to its default and reloads the interface. This also clears the Options Window Scale, which every character shares, and this character's collapsed sections and pinned entries."])
+        end, L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale and After an update, which every character shares, and clears this character's collapsed sections and pinned entries."])
         resetAll:SetPoint("RIGHT")
 
         local resetPos = self:CreateButton(bar, L["Reset position and size"], nil, function()
@@ -155,9 +163,35 @@ Options:RegisterTab({
             owScale.slider:HookScript("OnMouseUp", function() Options:ApplyWindowScale() end)
         end
 
+        local updates = self:CreateGroup(content, L["Updates"])
+        updates:SetPoint("TOPLEFT", general, "BOTTOMLEFT", 0, -self:Spacing("groupGap"))
+        updates:SetPoint("TOPRIGHT", general, "BOTTOMRIGHT", 0, -self:Spacing("groupGap"))
+        afterUpdate = self:CreateRadioGroup(content, L["After an update"], {
+                { value = "popup", label = L["Popup window"] },
+                { value = "chat",  label = L["Chat link"] },
+                { value = "none",  label = L["Off"] },
+            },
+            function() return (DB:Global() and DB:Global().whatsNewMode) or "popup" end,
+            function(v)
+                local g = DB:Global()
+                if not g then return end
+                g.whatsNewMode = v
+                -- The mode the What's New window's own checkbox puts back
+                if v ~= "none" then g.whatsNewModeBeforeOff = v end
+                local WN = ns:GetModule("WhatsNew")
+                if WN then WN:Refresh() end
+            end,
+            nil, nil, L["After an update"],
+            L["How EQ Objective Tracker tells you about a version that brings new features: a Popup window, a quiet clickable Chat link in your chat, or Off. Releases with only fixes stay quiet, and the next feature release shows them too. Reopen the notes any time with /eqot whatsnew."])
+        updates:Add(afterUpdate)
+        updates:Add(self:CreateButton(content, L["Show What's New"], nil, function()
+            local WN = ns:GetModule("WhatsNew")
+            if WN then WN:Show() end
+        end))
+
         local profiles = self:CreateGroup(content, L["Profiles"])
-        profiles:SetPoint("TOPLEFT", general, "BOTTOMLEFT", 0, -self:Spacing("groupGap"))
-        profiles:SetPoint("TOPRIGHT", general, "BOTTOMRIGHT", 0, -self:Spacing("groupGap"))
+        profiles:SetPoint("TOPLEFT", updates, "BOTTOMLEFT", 0, -self:Spacing("groupGap"))
+        profiles:SetPoint("TOPRIGHT", updates, "BOTTOMRIGHT", 0, -self:Spacing("groupGap"))
         self:AttachTooltip(profiles.label, L["Profiles"],
             L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot."])
 

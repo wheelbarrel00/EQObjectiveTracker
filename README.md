@@ -181,6 +181,7 @@ events, which would otherwise not appear anywhere.
 | `/eqot lock` / `unlock` | Lock or unlock moving and resizing |
 | `/eqot reset` | Restore the default position and size |
 | `/eqot toggle` | Show or hide the tracker |
+| `/eqot whatsnew` | Open the What's New window |
 | `/eqot status` | Print what each provider emitted and what reached the screen |
 | `/eqot bonushud` | Print what the bonus objectives HUD can see, or `test` to place it |
 | `/eqot mplus` | Print what the tracker read for the current Mythic+ key, or `test` or `late` to draw a sample key |
@@ -199,6 +200,14 @@ opens the window. The Appearance tab
 draws a sample tracker beside its settings that changes as you adjust them. A search field at the
 top of the sidebar finds any setting as you type: each match shows its tab and card, and clicking
 one opens that tab, scrolls to the setting and flashes it.
+
+After an update that brings new features, a What's New window opens a few seconds after you log
+in and lists every update since the last one you read, newest first, so from 2.15.0 on a player
+who skips a few catches up on all of them. Updates without new features stay quiet and are
+listed in the next window, and a fresh install opens nothing. The Updates card on the General tab
+sets what happens after an update, a Popup window, a Chat link or Off, for every character on the
+account, and the first window starts with a short note and a button that opens that setting. `/eqot whatsnew`, the
+card's Show What's New button and the About tab's What's New button open the window any time.
 
 While the tracker is unlocked, drag the strip along the top to move it and the corner grip to
 resize it. With the options window open, or after an unlock, that strip turns gold with a check

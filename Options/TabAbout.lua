@@ -16,6 +16,7 @@ local COMMANDS = {
     { "/eqot unlock",   L["Unlock moving and resizing"] },
     { "/eqot reset",    L["Restore the default position and size"] },
     { "/eqot toggle",   L["Show or hide the tracker"] },
+    { "/eqot whatsnew", L["Reopen the What's New window"] },
     { "/eqot importeq", L["Import your Everything Quests settings"] },
     { "/eqot status",   L["Print provider status to chat"] },
     { "/eqot debug",    L["Toggle entry validation warnings"] },
@@ -74,6 +75,10 @@ Options:RegisterTab({
             { label = L["CurseForge"],       onClick = function() ns:ShowURL(CURSEFORGE_URL) end },
             { label = L["GitHub"],           onClick = function() ns:ShowURL(GITHUB_URL) end },
             { label = L["Report a Bug"],     onClick = function() ns:ShowURL(BUG_URL) end },
+            { label = L["What's New"],       onClick = function()
+                local WN = ns:GetModule("WhatsNew")
+                if WN then WN:Show() end
+            end },
         }) do
             local b = self:CreateButton(content, lk.label, nil, lk.onClick)
             if prev then

@@ -270,8 +270,8 @@ function Migrate:ImportFromEQ(db)
         end
     end
 
-    -- The only global-scope key the two addons share. Both windows are 1020x720 and both
-    -- sliders run 0.7-1.4, so an imported value is always representable.
+    -- Both windows are 1020x720 and both sliders run 0.7-1.4, so an imported value is always
+    -- representable. EQ's whatsNewMode is left out on purpose: it is about EQ's own notices.
     local sgl = eqGlobal()
     if db.global and sgl and type(sgl.optionsWindowScale) == "number" then
         db.global.optionsWindowScale = sgl.optionsWindowScale

@@ -9,6 +9,19 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.15.0", date = "2026-11-10",
+        sections = {
+            { head = "New Features", items = {
+                "What's New. After an update that brings new features, a What's New window opens a few seconds after you log in, listing every update since the last one you read, newest first, with the same notes as the About tab's changelog. From this update on, if you skip a few updates it catches you up on all of them at once. Updates without new features stay quiet and are listed in the next window. It is on by default. The first window starts with a short note and a Go to this setting button that opens the option to change it, and Don't show these again, at the bottom of every window, turns it off. A fresh install opens nothing.",
+                "A new Updates card on the General tab sets what happens after an update: Popup window, Chat link (one clickable line in chat instead of the window) or Off, shared by every character on your account. Its Show What's New button, the About tab's What's New button and /eqot whatsnew open the window any time. Reset all settings puts it back to Popup window. If Everything Quests has its own What's New to show when you log in, its window opens too, set slightly apart from this one.",
+            } },
+            { head = "Improvements", items = {
+                "/eqot status now has a what's new line saying how you are told after an update, the last update you read and the last one announced in chat, and how many are still to tell.",
+                "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover the new window and its settings, mostly in the words Cooldown Master and Everything Quests already use for their own What's New.",
+            } },
+        },
+    },
+    {
         version = "2.14.0", date = "2026-11-09",
         sections = {
             { head = "New Features", items = {
@@ -403,14 +416,6 @@ ns.Changelog = {
                 "The stage name inside the scenario banner wraps instead of being cut short. \"Defeat the Looming Mutagenitor\" read \"Defeat the Looming Mutageni...\" where the default tracker showed it in full. A name too long for the banner art is still shortened, since there is only so much room on it.",
                 "The text inside the scenario banner is centered properly. It was lined up on the banner's frame rather than on the banner art itself, and the two are not the same width, so the stage and its name both sat noticeably to the left of the plaque they are drawn on. Reported by Entmoot.",
                 "Banner Alignment now puts the banner where it says it will. The banner art is wider than the invisible frame it hangs in, and Left, Center and Right all lined up that frame rather than the art you actually see. Right pushed the banner well off the side of the tracker, Center sat noticeably right of center, and Left was the only setting that looked correct. The frame follows the art now, so all three land where you would expect.",
-            } },
-        },
-    },
-    {
-        version = "1.21.0", date = "2026-09-07",
-        sections = {
-            { head = "New Features", items = {
-                "Find Group is now on a quest's right-click menu, so you no longer have to hit the small eye icon on the row to reach it. It is there on ordinary quests and on world quests, and only on a quest the game will actually form a group for, so the menu does not offer it where it cannot work. Asked for by AIR.",
             } },
         },
     },
