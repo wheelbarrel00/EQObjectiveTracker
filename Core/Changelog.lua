@@ -9,6 +9,17 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.15.1", date = "2026-11-13",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "The Quest Sound could play a minute or more after a quest became ready to turn in. This is the late Quest Sound on WoW Forever that 1.26.0's /eqot status lines were added to track down, though every version of the game could be affected. The tracker waits a fifth of a second before checking the quest log, and now and then a rounding error made that wait read a hair short of done when it ended, so the check waited for a later quest log update, which could be minutes away. The tracker now waits out that last moment instead, so the sound plays when the quest is ready. A change to the event and scenario widgets in the tracker could wait the same way, until something else redrew the tracker.",
+            } },
+            { head = "Improvements", items = {
+                "/eqot status's debounce line now ends with a waited out count: the waits that came up a moment short and were finished rather than dropped, so the fix above can be seen working.",
+            } },
+        },
+    },
+    {
         version = "2.15.0", date = "2026-11-10",
         sections = {
             { head = "New Features", items = {
@@ -402,20 +413,6 @@ ns.Changelog = {
                 "Quests you have had for a while no longer turn up marked as new after a slow login. The tracker decided what you already had from the first quest log it managed to read, and the game hands that log back a piece at a time when you first log in, so anything that had not arrived yet was recorded as brand new. It carried the New tag for an hour, and it sat at the top of the Recent order until you turned it in, because that first reading is saved per character. It now waits for the game to say the log is all there before taking that reading.",
                 "The tracker no longer trusts the quest log for the moment after a loading screen, while the game is still rebuilding it. A reading taken in that window could show a completed quest as unfinished and an objective as further from done than it is, which is enough to play the objectives sound again for a quest you had finished long before you zoned.",
                 "Quests that are simply slow to arrive are no longer mistaken for quests you have dropped. The tracker keeps a little state per quest and clears out anything that leaves your log, and a quest log still streaming in looks exactly like a log with quests missing from it, so a slow login could spend that patience on quests that were only late.",
-            } },
-        },
-    },
-    {
-        version = "1.22.0", date = "2026-09-08",
-        sections = {
-            { head = "New Features", items = {
-                "Bonus objectives now show up on the tracker. Walking into one, such as a Temple Patrol in the Vaults of Atal'Utek, gave you an objective the game was tracking and the tracker was not, with nothing on screen to say why and no setting that brought it back. They now have a Bonus Objectives section of their own, the way the default tracker gives them one, and the Bonus Objectives filter turns them off again. It arrives under Quests, or at the bottom of the run if you have already rearranged your sections, and you can move it wherever you want it under Tracker, Section Order, the same as any other. Reported by Entmoot.",
-            } },
-            { head = "Bug Fixes", items = {
-                "A long scenario name no longer runs off the side of the tracker. Names such as \"Temple Incursion: Cache of the Three\" were drawn on a single line that simply carried on past the edge of the frame. They wrap onto a second line now, and the header grows to fit. The category line above the name wraps with it. Reported by Entmoot.",
-                "The stage name inside the scenario banner wraps instead of being cut short. \"Defeat the Looming Mutagenitor\" read \"Defeat the Looming Mutageni...\" where the default tracker showed it in full. A name too long for the banner art is still shortened, since there is only so much room on it.",
-                "The text inside the scenario banner is centered properly. It was lined up on the banner's frame rather than on the banner art itself, and the two are not the same width, so the stage and its name both sat noticeably to the left of the plaque they are drawn on. Reported by Entmoot.",
-                "Banner Alignment now puts the banner where it says it will. The banner art is wider than the invisible frame it hangs in, and Left, Center and Right all lined up that frame rather than the art you actually see. Right pushed the banner well off the side of the tracker, Center sat noticeably right of center, and Left was the only setting that looked correct. The frame follows the art now, so all three land where you would expect.",
             } },
         },
     },

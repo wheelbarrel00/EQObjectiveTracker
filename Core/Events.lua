@@ -100,6 +100,7 @@ local _debTickFns   = {}
 local _debOrder     = {}
 local _debRecovered = 0
 local _debWorstLate = 0
+local _debWaited    = 0
 
 -- A key is disarmed only by its own timer callback, so before this a C_Timer.After that never
 -- fired left the key armed for the rest of the session and every later request on it was dropped
@@ -108,15 +109,27 @@ local _debWorstLate = 0
 -- notice its timer is overdue and schedule a fresh one.
 local LOST_SLACK = 3
 
+-- GetTime counts whole ms, so a shorter re-arm could fire on a frame that still reads short.
+local EARLY_FLOOR = 0.001
+
+local getDebTickFn
+
 local function debounceTick(key)
     local d = _debounce[key]
     if not d then return end
-    -- A recovery leaves the lost timer outstanding, so two ticks can be in flight on one key.
-    -- Only the one whose own arming is due may take the work. A tick arriving early still
-    -- disarms the key on its way past, so the next request arms a second timer of its own and
-    -- the pair then runs the key twice per window for the rest of the session - measured at a
-    -- sustained 2x, which is the render rate v1.17.0 was released to cut.
-    if GetTime() < d.at + d.delay then return end
+    -- After a recovery two ticks can be in flight on one key, so none may take the work before the
+    -- key's current deadline, or the key runs twice per window (measured at 2x). A tick a little early
+    -- waits out the rest, since returning stranded the key whenever its OWN tick read short, as a 0.2s
+    -- one can on its deadline frame (0.2 has no exact double, measured on Forever: 18 of 500). Half a
+    -- delay or more early can only be a recovery's leftover, and dropping it is what ends the pair.
+    local wait = d.at + d.delay - GetTime()
+    if wait > 0 then
+        if wait < d.delay / 2 then
+            _debWaited = _debWaited + 1
+            C_Timer.After(math.max(wait, EARLY_FLOOR), getDebTickFn(key))
+        end
+        return
+    end
     local fn = d.fn
     d.armed = false
     d.fn    = nil
@@ -126,7 +139,7 @@ local function debounceTick(key)
     end
 end
 
-local function getDebTickFn(key)
+function getDebTickFn(key)
     local fn = _debTickFns[key]
     if not fn then
         fn = function() debounceTick(key) end
@@ -182,9 +195,9 @@ function Events:DebugLine()
             armed[#armed + 1] = ("%s %.0fs"):format(key, now - d.at)
         end
     end
-    return first .. ("\n      debounce: %d keys | armed now: %s | recovered %d, worst %.0fs late")
+    return first .. ("\n      debounce: %d keys | armed now: %s | recovered %d, worst %.0fs late | waited out %d early")
         :format(#_debOrder, #armed > 0 and table.concat(armed, ", ") or "none",
-                _debRecovered, _debWorstLate)
+                _debRecovered, _debWorstLate, _debWaited)
 end
 
 ns.Events = Events

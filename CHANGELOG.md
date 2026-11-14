@@ -5,6 +5,16 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.1] - 2026-11-13
+
+### Bug Fixes
+
+- The Quest Sound could play a minute or more after a quest became ready to turn in. This is the late Quest Sound on WoW Forever that 1.26.0's `/eqot status` lines were added to track down, though every version of the game could be affected. The tracker waits a fifth of a second before checking the quest log, and now and then a rounding error made that wait read a hair short of done when it ended, so the check waited for a later quest log update, which could be minutes away. The tracker now waits out that last moment instead, so the sound plays when the quest is ready. A change to the event and scenario widgets in the tracker could wait the same way, until something else redrew the tracker.
+
+### Improvements
+
+- `/eqot status`'s debounce line now ends with a waited out count: the waits that came up a moment short and were finished rather than dropped, so the fix above can be seen working.
+
 ## [2.15.0] - 2026-11-10
 
 ### New Features
