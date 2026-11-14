@@ -192,20 +192,29 @@ function ItemButtons:Locked()
     return InCombatLockdown() and armed
 end
 
--- The tracker can only ever alpha-hide while a secure button is live, and an alpha-0
--- button still takes clicks, so its mouse goes off with the rest of the tracker's input.
-function ItemButtons:SetMouseSuspended(v)
-    v = v and true or false
-    if suspended == v then return end
-    suspended = v
+local function syncMouse()
     for i = 1, #adopted do
         local b = adopted[i]
         -- _eqotInert marks a button its own owner blanked, in combat or out, which must not get
         -- its mouse back just because the tracker became visible again. Do NOT clear it on
-        -- PLAYER_REGEN_ENABLED: every pooled button carries it, and they sit at alpha 0 over the
+        -- PLAYER_REGEN_ENABLED: every pooled spell button carries it, and they sit at alpha 0 over the
         -- tracker with a hit rect spanning most of its width.
-        b:EnableMouse(not v and not b._eqotInert)
+        local want = not suspended and not b._eqotInert
+        if b:IsMouseEnabled() ~= want then b:EnableMouse(want) end
     end
+end
+
+-- The client refuses EnableMouse on a secure button in a fight and blames the addon (measured
+-- 2026-11-14), so a fight queues this for its end.
+function ItemButtons:SyncMouse()
+    ns:GetModule("Events"):RunWhenOutOfCombat("eqot.itemMouse", syncMouse)
+end
+
+-- The tracker can only ever alpha-hide while a secure button is live, and an alpha-0
+-- button still takes clicks, so its mouse goes off with the rest of the tracker's input.
+function ItemButtons:SetMouseSuspended(v)
+    suspended = v and true or false
+    self:SyncMouse()
 end
 
 function ItemButtons:MouseSuspended()

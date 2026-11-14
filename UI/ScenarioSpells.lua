@@ -13,10 +13,10 @@ local ScenarioSpells = ns:RegisterModule("ScenarioSpells", {})
 -- size, anchor, Show or Hide call on its own frame chain, so a second owner of a secure button
 -- that kept its own flag would leave every one of those calls unguarded in combat.
 --
--- Anchoring and showing are protected. Whether rebinding is has not been measured here, so the
--- combat path never rebinds either way. Alpha and mouse are not, which is the shape of that
--- path: a button whose spell goes away is blanked where it stands, and one whose spell comes
--- back is revived there rather than waiting for the fight to end.
+-- Anchoring, showing and the mouse are protected. Whether rebinding is has not been measured here,
+-- so the combat path never rebinds either way. Alpha is not, which is the shape of that path: a
+-- button whose spell goes away is blanked where it stands, and one whose spell comes back is
+-- revived there rather than waiting for the fight to end. Its mouse follows when the fight ends.
 
 local BTN_SIZE  = 26
 local ROW_GAP   = 4
@@ -103,22 +103,26 @@ local function stale(y, w)
     return false
 end
 
+local function syncMouse()
+    local IB = itemButtons()
+    if IB then IB:SyncMouse() end
+end
+
 local function blank(b)
     b:SetAlpha(0)
-    b:EnableMouse(false)
     b._eqotInert = true
+    syncMouse()
 end
 
 local function revive(b)
-    local IB = itemButtons()
     b._eqotInert = nil
     b:SetAlpha(1)
-    b:EnableMouse(not (IB and IB:MouseSuspended()))
+    syncMouse()
 end
 
--- Blanked rather than hidden and unbound, so it makes no protected call and a spell that
--- comes back can be shown again with alpha alone. The cost is one invisible, mouse-dead
--- button parked in the container.
+-- Blanked rather than hidden and unbound, so it makes no protected call in a fight and a spell
+-- that comes back can be shown again with alpha alone. The cost is one invisible button parked
+-- in the container, mouse dead once ItemButtons:SyncMouse runs.
 local function retire(i)
     local b = live[i]
     if not b then return end
@@ -143,11 +147,11 @@ local function reclaim(i)
     return nil
 end
 
--- The only function here that makes a protected call, and it never runs in combat.
+-- The only function here that makes a protected call outside the mouse sync, and it never runs
+-- in combat.
 local function applyLayout(container, y, w)
     for i = MAX, wantN + 1, -1 do retire(i) end
 
-    local IB   = itemButtons()
     local span = LABEL_GAP + labelWidth(w)
     for i = 1, wantN do
         local b = live[i]
@@ -163,7 +167,6 @@ local function applyLayout(container, y, w)
             end
             b._eqotInert = nil
             b:SetAlpha(1)
-            b:EnableMouse(not (IB and IB:MouseSuspended()))
             -- The label is the readable half of the control, so it has to be clickable too
             b:SetHitRectInsets(0, -span, 0, 0)
             b:ClearAllPoints()
@@ -172,6 +175,7 @@ local function applyLayout(container, y, w)
             b:Show()
         end
     end
+    syncMouse()
     lastY, lastW = y, w
 end
 
@@ -247,7 +251,7 @@ function ScenarioSpells:Place(container, info, y)
     return TOP_GAP + wantN * BTN_SIZE + (wantN - 1) * ROW_GAP
 end
 
--- No combat branch, because retiring one of these makes no protected call.
+-- No combat branch, because retiring one of these makes no protected call in a fight.
 function ScenarioSpells:Clear()
     for i = 1, MAX do ids[i], names[i], icons[i] = nil, nil, nil end
     wantN = 0

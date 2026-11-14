@@ -5,6 +5,17 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.2] - 2026-11-14
+
+### Bug Fixes
+
+- A hidden tracker no longer blocks the mouse. Once a quest item button or a delve or scenario spell button had shown up, hiding the tracker, with `/eqot toggle` or any of the hide options on the General tab, only made it invisible, and its quest rows, headers, buttons and the bar you drag it by were still there catching clicks and the mouse wheel, so you could not click or target anything behind them. Every part of a hidden tracker now lets the mouse through to whatever is behind it, and takes it back when the tracker shows again. One exception, which the game sets: during a fight an addon cannot change whether the quest item and spell buttons take the mouse, so a tracker hidden mid-fight lets go of them, and of the quest list's mouse wheel, when the fight ends, and one shown mid-fight gets them back then. Reported by ccff00cf0.
+- Hiding or showing the tracker in the middle of a fight, once a quest item or a delve or scenario spell button had shown up, or a delve or scenario spell button coming or going in a fight, no longer causes a blocked-action error naming EQ Objective Tracker ('Button:EnableMouse()' in BugSack).
+
+### Improvements
+
+- `/eqot status`'s visibility line now says how many parts of a hidden tracker let go of the mouse and the mouse wheel.
+
 ## [2.15.1] - 2026-11-13
 
 ### Bug Fixes

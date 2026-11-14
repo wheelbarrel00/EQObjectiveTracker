@@ -9,6 +9,18 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.15.2", date = "2026-11-14",
+        sections = {
+            { head = "Bug Fixes", items = {
+                "A hidden tracker no longer blocks the mouse. Once a quest item button or a delve or scenario spell button had shown up, hiding the tracker, with /eqot toggle or any of the hide options on the General tab, only made it invisible, and its quest rows, headers, buttons and the bar you drag it by were still there catching clicks and the mouse wheel, so you could not click or target anything behind them. Every part of a hidden tracker now lets the mouse through to whatever is behind it, and takes it back when the tracker shows again. One exception, which the game sets: during a fight an addon cannot change whether the quest item and spell buttons take the mouse, so a tracker hidden mid-fight lets go of them, and of the quest list's mouse wheel, when the fight ends, and one shown mid-fight gets them back then. Reported by ccff00cf0.",
+                "Hiding or showing the tracker in the middle of a fight, once a quest item or a delve or scenario spell button had shown up, or a delve or scenario spell button coming or going in a fight, no longer causes a blocked-action error naming EQ Objective Tracker ('Button:EnableMouse()' in BugSack).",
+            } },
+            { head = "Improvements", items = {
+                "/eqot status's visibility line now says how many parts of a hidden tracker let go of the mouse and the mouse wheel.",
+            } },
+        },
+    },
+    {
         version = "2.15.1", date = "2026-11-13",
         sections = {
             { head = "Bug Fixes", items = {
@@ -399,20 +411,6 @@ ns.Changelog = {
         sections = {
             { head = "New Features", items = {
                 "The event title above the scenario banner can be sized and colored. That is the line naming the scenario itself, and it had no controls of its own while the banner text below it had several. Both settings live in the Scenario group on the Appearance tab, named Event Title Text Size and Event Title Color, and both start at exactly what the tracker already drew, so nothing on your screen moves until you change one. The color is set separately from Section Header Color even though it matches it by default, because the scenario panel is not one of the tracker's sections. Asked for by Entmoot.",
-            } },
-        },
-    },
-    {
-        version = "1.23.0", date = "2026-09-11",
-        sections = {
-            { head = "New Features", items = {
-                "Timed quests count down on the tracker in Classic Era and Burning Crusade. An escort or a bombing run shows the time left on its row, in the same place a world quest shows its expiry on retail, and the last minute counts down in seconds rather than dropping off.",
-            } },
-            { head = "Bug Fixes", items = {
-                "The game's own floating quest timer box no longer sits beside the tracker. It is a separate frame from the quest tracker, so hiding the tracker never hid it, and it left you with a Blizzard timer next to an EQOT row that said nothing about the timer. It is hidden now, and only where the tracker draws the countdown itself, so nobody loses a timer without getting one back. If you would rather keep the game's own box, /eqot disable Blizzard and a reload turns this addon's suppression off. That switch covers the game's whole tracker rather than just the timer box, so its quest watch frame comes back with it.",
-                "Quests you have had for a while no longer turn up marked as new after a slow login. The tracker decided what you already had from the first quest log it managed to read, and the game hands that log back a piece at a time when you first log in, so anything that had not arrived yet was recorded as brand new. It carried the New tag for an hour, and it sat at the top of the Recent order until you turned it in, because that first reading is saved per character. It now waits for the game to say the log is all there before taking that reading.",
-                "The tracker no longer trusts the quest log for the moment after a loading screen, while the game is still rebuilding it. A reading taken in that window could show a completed quest as unfinished and an objective as further from done than it is, which is enough to play the objectives sound again for a quest you had finished long before you zoned.",
-                "Quests that are simply slow to arrive are no longer mistaken for quests you have dropped. The tracker keeps a little state per quest and clears out anything that leaves your log, and a quest log still streaming in looks exactly like a log with quests missing from it, so a slow login could spend that patience on quests that were only late.",
             } },
         },
     },

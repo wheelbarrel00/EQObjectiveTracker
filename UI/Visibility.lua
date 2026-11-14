@@ -244,11 +244,53 @@ local function syncExempt(visible)
     end
 end
 
--- A real Hide until a secure quest-item button has been built, and alpha from then on for the
--- rest of the session - HasSecureButtons latches, so this is not scoped to combat. Unlike EQ
--- the invisible frame is also made click-through: Tracker:IsClickThrough gates every mouse
--- handler and the item buttons give up their own mouse, so an alpha-0 tracker cannot take
--- clicks, tooltips or the wheel.
+-- Every mouse and wheel a hidden tracker let go of, so a show hands back exactly those.
+local tookMouse, tookWheel = {}, {}
+
+-- An alpha-0 frame still takes the mouse (GitHub issue 7). Secure buttons answer to ItemButtons,
+-- so their branch is skipped. The client refused EnableMouse on a secure button in a fight
+-- (2026-11-14) and the API docs mark EnableMouseWheel protected too, so a protected frame waits
+-- for PLAYER_REGEN_ENABLED's Apply while the walk goes on into its children.
+local function release(...)
+    local locked = InCombatLockdown()
+    for i = 1, select("#", ...) do
+        local r = select(i, ...)
+        local protected, explicit = r:IsProtected()
+        if not explicit then
+            if not (locked and protected) then
+                if r:IsMouseEnabled() then
+                    r:EnableMouse(false)
+                    tookMouse[r] = true
+                end
+                if r:IsMouseWheelEnabled() then
+                    r:EnableMouseWheel(false)
+                    tookWheel[r] = true
+                end
+            end
+            release(r:GetChildren())
+        end
+    end
+end
+
+local function giveBack(took, enable)
+    local locked = InCombatLockdown()
+    for r in pairs(took) do
+        if not (locked and r:IsProtected()) then
+            r[enable](r, true)
+            took[r] = nil
+        end
+    end
+end
+
+local function restore()
+    giveBack(tookMouse, "EnableMouse")
+    giveBack(tookWheel, "EnableMouseWheel")
+end
+
+-- A real Hide until a secure button has been built, and alpha from then on for the rest of the
+-- session - HasSecureButtons latches, so this is not scoped to combat. The alpha-0 tracker lets go
+-- of every mouse and wheel, a fight holding the protected ones to its end, and
+-- Tracker:IsClickThrough gates every handler.
 local function setVisible(f, visible)
     local IB = ns:GetModule("ItemButtons")
     -- The alpha-only path fires no OnHide, so the frame's own hook cannot catch this one
@@ -269,8 +311,18 @@ local function setVisible(f, visible)
     if Tracker and Tracker.SetScrollInputSuspended then
         Tracker:SetScrollInputSuspended(not visible)
     end
+    if visible then restore() else release(f) end
+    -- After the sweep or the give back, so a lock changed while hidden wins over what was recorded.
+    if Tracker and Tracker.ApplyGripInput then Tracker:ApplyGripInput() end
     syncDriver(visible)
     syncExempt(visible)
+end
+
+-- A render or another addon's header icon can build a part while the tracker is hidden.
+function Visibility:ReleaseInput()
+    local Tracker = ns:GetModule("Tracker")
+    local f = Tracker and Tracker.frame
+    if f and f._eqotHidden then release(f) end
 end
 
 function Visibility:Apply()
@@ -408,11 +460,17 @@ function Visibility:QuestRowsLine()
         questRows == nil and "never counted" or tostring(questRows))
 end
 
+local function count(set)
+    local n = 0
+    for _ in pairs(set) do n = n + 1 end
+    return n
+end
+
 function Visibility:DebugLine()
     local g = cfg() or {}
     local Tracker = ns:GetModule("Tracker")
     local f = Tracker and Tracker.frame
-    return ("visibility: ruleHide=%s | cfg combat=%s inst=%s m+=%s map=%s | now combat=%s inst=%s m+=%s map=%s | frame %s alpha=%.2f pending=%s | %s")
+    return ("visibility: ruleHide=%s | cfg combat=%s inst=%s m+=%s map=%s | now combat=%s inst=%s m+=%s map=%s | frame %s alpha=%.2f pending=%s | released %d mouse, %d wheel | %s")
         :format(tostring(self:IsRuleHiding()),
                 tostring(g.hideInCombat), tostring(g.hideInInstances),
                 tostring(g.hideInMythicPlus), tostring(g.hideOnMapOpen),
@@ -423,6 +481,7 @@ function Visibility:DebugLine()
                 f and (f:IsShown() and "shown" or "hidden") or "none",
                 f and f:GetAlpha() or -1,
                 tostring((f and f._eqotPendingRender) and true or false),
+                count(tookMouse), count(tookWheel),
                 self:QuestRowsLine())
 end
 

@@ -579,6 +579,8 @@ function Tracker:RebuildHeaderIcons()
     end
 
     self:ApplyHeaderIcons()
+    local Visibility = ns:GetModule("Visibility")
+    if Visibility then Visibility:ReleaseInput() end
 end
 
 -- The grip keeps the bottom right corner, so a strip along the bottom stops short of it.
@@ -711,8 +713,9 @@ function Tracker:ScrollZoneIntoView(zoneKey)
 end
 
 -- True whenever the tracker is alpha-hidden but still on screen. Every mouse handler in the
--- tracker checks this. Without it an alpha-0 tracker keeps taking clicks, tooltips and the
--- wheel, which is the trap EQ leaves open on all but two of its paths.
+-- tracker checks this, so a part that still has its mouse acts on nothing. It does not stop the
+-- part taking the click from the world behind it: Visibility's release does that. The secure
+-- buttons have no handler to gate, and a fight leaves them their mouse until it ends.
 function Tracker:IsClickThrough()
     local f = self.frame
     return (f and f._eqotHidden and f:IsShown()) and true or false
@@ -805,6 +808,12 @@ function Tracker:IsLocked()
     return (gen and gen.lockTracker) and true or false
 end
 
+function Tracker:ApplyGripInput()
+    local f = self.frame
+    if not (f and f.grip) then return end
+    f.grip:EnableMouse(not self:IsLocked() and not f._eqotHidden)
+end
+
 function Tracker:ApplyLockState(startMove)
     local f = self.frame
     if not (f and f.grip) then return end
@@ -814,7 +823,7 @@ function Tracker:ApplyLockState(startMove)
         f._dragging = nil
     end
     f.grip:SetAlpha(locked and 0 or 1)
-    f.grip:EnableMouse(not locked)
+    self:ApplyGripInput()
     -- An unlock after load keeps move mode up until the next lock, options window or not.
     if not locked and (startMove or f._wasLocked) then f._moveSession = true end
     f._wasLocked = locked
@@ -1053,7 +1062,7 @@ function Tracker:BuildFrame()
     end
 
     drag:SetScript("OnDragStart", function()
-        if InCombatLockdown() or Tracker:IsLocked() then return end
+        if Tracker:IsClickThrough() or InCombatLockdown() or Tracker:IsLocked() then return end
         f:StartMoving()
         f._dragging = true
     end)
@@ -1069,7 +1078,7 @@ function Tracker:BuildFrame()
         g:SetPoint("BOTTOMRIGHT", -2, 2 + (i - 1) * 3)
     end
     grip:SetScript("OnMouseDown", function()
-        if InCombatLockdown() or Tracker:IsLocked() then return end
+        if Tracker:IsClickThrough() or InCombatLockdown() or Tracker:IsLocked() then return end
         f:StartSizing("BOTTOMRIGHT")
         f._dragging = true
     end)
@@ -2375,6 +2384,7 @@ function Tracker:Render()
     if Visibility then
         Visibility:SetFocus(focusRow, focusQuestID)
         Visibility:SetQuestRows(questRows)
+        Visibility:ReleaseInput()
     end
     ns:GetModule("API"):NotifyLayout()
 end
