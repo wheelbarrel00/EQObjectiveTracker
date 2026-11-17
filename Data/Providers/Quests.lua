@@ -219,6 +219,22 @@ local function fillTags(e, id, info)
     if CLASS_LEGENDARY and e.icon.classification == CLASS_LEGENDARY then tags.legendary = true end
 end
 
+-- Forever only, read as Blizzard's Forever tracker reads them (Camelot QuestUtilsOverrides). Retail draws
+-- neither, and there tag 1 is Group rather than Elite.
+local function typeWord(tagID)
+    if tagID == 1 then return ELITE
+    elseif tagID == 81 then return CALENDAR_TYPE_DUNGEON
+    elseif tagID == 41 then return CALENDAR_TYPE_PVP
+    elseif tagID == 62 then return RAID
+    end
+end
+
+local function fillType(e, id)
+    local forever = ns.IsForever()
+    e.elite = forever and C_QuestLog.IsEliteQuest ~= nil and C_QuestLog.IsEliteQuest(id)
+    e.typeTag = forever and typeWord(getTagID(id)) or nil
+end
+
 local function superTrackedID()
     if not (ns.Has.SuperTrack and C_SuperTrack.GetSuperTrackedQuestID) then return nil end
     return C_SuperTrack.GetSuperTrackedQuestID()
@@ -375,6 +391,7 @@ local function fullRebuild()
                 -- elite quest in the ordinary Quests section never showed one.
                 e.canGroup  = QuestGroups:CanCreate(id)
                 fillTags(e, id, info)
+                fillType(e, id)
                 e.groupID = e.tags.campaign and "campaign" or "quests"
                 fillTimer(e, id)
                 fillLines(e, id)
@@ -440,6 +457,10 @@ end
 
 function Quests:IsAvailable()
     return ns.Has.QuestLog
+end
+
+function Quests:HasTypeTags()
+    return ns.IsForever()
 end
 
 function Quests:GetEntries()

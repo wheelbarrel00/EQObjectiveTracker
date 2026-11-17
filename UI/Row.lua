@@ -534,8 +534,8 @@ local function placeCheck(fs, on)
     tex:Show()
 end
 
--- EQ applies all three of these inside _RenderQuestGroup, so only quest and campaign rows
--- get them - the same set that pays for the item-button gutter, for the same reason.
+-- Only quest and campaign rows are decorated, as EQ decorated them inside _RenderQuestGroup - the
+-- same set that pays for the item-button gutter, for the same reason.
 local TITLE_META_PROVIDER = "quests"
 local NEW_WINDOW = 3600
 local NEW_TAG    = "|cff6bafffNEW|r "
@@ -560,7 +560,10 @@ local function decorateTitle(entry, cfg)
     if not cfg or entry.providerID ~= TITLE_META_PROVIDER then return text end
 
     if cfg.showLevelInTracker and entry.level and entry.level > 0 then
-        text = ("[%d] %s"):format(entry.level, text)
+        text = ("[%d%s] %s"):format(entry.level, entry.elite and "+" or "", text)
+    end
+    if cfg.showQuestTypeTag ~= false and entry.typeTag then
+        text = text .. " " .. (PARENS_TEMPLATE or "(%s)"):format(entry.typeTag)
     end
     if cfg.showQuestID and entry.id then
         text = text .. (" |cff666666(#%d)|r"):format(entry.id)

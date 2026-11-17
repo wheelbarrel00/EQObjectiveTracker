@@ -5,6 +5,12 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.0] - 2026-11-17
+
+### New Features
+
+- Elite quests and quest types can now show in the tracker on WoW Forever, Classic Era and TBC Anniversary, the way Blizzard's own tracker shows them on WoW Forever. With Show quest level prefix ticked, on the Tracker tab's Quest Row Details card, an elite quest's level reads [21+], and a new box under it, Show quest type tags, adds the quest's type after its title, such as (Elite), (Dungeon), (Raid) or (PvP), in your game's own words. On TBC Anniversary the game calls elite quests group quests, so there they read (Group). Show quest type tags is on by default, because Blizzard's own quest log shows these, so untick it on the Tracker tab if you would rather not see them. Retail's own tracker shows neither for ordinary quests, so the box is not on the Tracker tab there. Requested by jaerb.
+
 ## [2.15.2] - 2026-11-14
 
 ### Bug Fixes

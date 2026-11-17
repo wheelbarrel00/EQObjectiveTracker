@@ -9,6 +9,14 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.16.0", date = "2026-11-17",
+        sections = {
+            { head = "New Features", items = {
+                "Elite quests and quest types can now show in the tracker on WoW Forever, Classic Era and TBC Anniversary, the way Blizzard's own tracker shows them on WoW Forever. With Show quest level prefix ticked, on the Tracker tab's Quest Row Details card, an elite quest's level reads [21+], and a new box under it, Show quest type tags, adds the quest's type after its title, such as (Elite), (Dungeon), (Raid) or (PvP), in your game's own words. On TBC Anniversary the game calls elite quests group quests, so there they read (Group). Show quest type tags is on by default, because Blizzard's own quest log shows these, so untick it on the Tracker tab if you would rather not see them. Retail's own tracker shows neither for ordinary quests, so the box is not on the Tracker tab there. Requested by jaerb.",
+            } },
+        },
+    },
+    {
         version = "2.15.2", date = "2026-11-14",
         sections = {
             { head = "Bug Fixes", items = {
@@ -403,14 +411,6 @@ ns.Changelog = {
                 "Colors you set no longer come back invisible when ElvUI is loaded on Classic Era or Burning Crusade. ElvUI adds its own controls to the game's color picker, and its opacity box and the opacity slider disagreed about which end meant opaque, so clicking its Class button stored a color with nothing left of it to draw. Header bars were the clearest casualty: they vanished the moment you changed their color, nothing brought them back, and ElvUI's own box went on reporting the color as perfectly normal. The picker now agrees with the opacity ElvUI is showing you, and a color already stored invisible comes back as soon as you set it once more. Nothing about how opacity is read changes on a client whose color picker is the game's own.",
                 "Opening a second color swatch without closing the color picker first no longer carries the previous swatch's opacity across. The picker loads its opacity control only when it opens, so aiming an already open picker at a different setting left the old value sitting in it, and whatever color you then picked was stored with an opacity you never chose. On Classic that could also leave the picker with no opacity control visible at all.",
                 "The tracker no longer adds a second Class button to the color picker when another addon has already put one there. It stood down for ElvUI alone, so anyone running Color Picker Plus itself, or another fork of it, got two.",
-            } },
-        },
-    },
-    {
-        version = "1.24.0", date = "2026-09-12",
-        sections = {
-            { head = "New Features", items = {
-                "The event title above the scenario banner can be sized and colored. That is the line naming the scenario itself, and it had no controls of its own while the banner text below it had several. Both settings live in the Scenario group on the Appearance tab, named Event Title Text Size and Event Title Color, and both start at exactly what the tracker already drew, so nothing on your screen moves until you change one. The color is set separately from Section Header Color even though it matches it by default, because the scenario panel is not one of the tracker's sections. Asked for by Entmoot.",
             } },
         },
     },

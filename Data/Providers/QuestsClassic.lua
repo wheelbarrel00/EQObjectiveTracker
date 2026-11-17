@@ -25,8 +25,9 @@ local Quests = {
 }
 
 -- GetQuestLogTitle returns the full modern tuple on 1.15.9 and 2.5.6, measured on both:
--- 1 title, 2 level, 4 isHeader, 6 isComplete, 7 frequency, 8 questID.
-local T_TITLE, T_LEVEL, T_HEADER, T_COMPLETE, T_FREQ, T_ID = 1, 2, 4, 6, 7, 8
+-- 1 title, 2 level, 4 isHeader, 6 isComplete, 7 frequency, 8 questID. 3 is the tag word (tag 1 reads
+-- Elite on Era, Group on TBC).
+local T_TITLE, T_LEVEL, T_TAG, T_HEADER, T_COMPLETE, T_FREQ, T_ID = 1, 2, 3, 4, 6, 7, 8
 
 -- Ceiling for the quest log walk. The real cap is far lower, so this only has to be safely
 -- above it.
@@ -303,6 +304,13 @@ local function fillTags(e, id, frequency)
     end
 end
 
+-- Tag 1 is the tag Era words Elite and TBC words Group, and the log's third return is that word,
+-- which Blizzard's own quest log prints in parentheses (read on both, 2026-11-17).
+local function fillType(e, id, questTag)
+    e.elite = getTagID(id) == 1
+    e.typeTag = (type(questTag) == "string" and questTag ~= "") and questTag or nil
+end
+
 -- Quest-log headers ARE zone names on Classic, unlike retail where they are campaign
 -- groupings, so comparing the header to the player's zone is correct here.
 function Quests:IsCurrentZone(entry)
@@ -356,6 +364,7 @@ local function fullRebuild()
                 e.icon.classification = nil
                 e.hasItem   = QuestItems:Has(id)
                 fillTags(e, id, t[T_FREQ])
+                fillType(e, id, t[T_TAG])
                 fillTimer(e, timers, i)
                 e.groupID = "quests"
                 fillLines(e, id, i)
@@ -437,6 +446,10 @@ end
 function Quests:IsAvailable()
     return type(GetNumQuestLogEntries) == "function"
        and type(GetQuestLogTitle) == "function"
+end
+
+function Quests:HasTypeTags()
+    return true
 end
 
 -- Watch state is re-read here, outside any GetQuestLogTitle walk and on every call, because

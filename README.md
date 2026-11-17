@@ -163,6 +163,10 @@ back.
   rows and scenario criteria each have their own switch, and the bar's texture, fill color,
   background, border and height are all yours to set
 - **Quest items**, as a button on the row of any quest that carries one
+- **Elite quests and quest types** on WoW Forever, Classic Era and TBC Anniversary, as WoW Forever's
+  own tracker shows them: the quest's type after its title in the game's own words, such as (Elite),
+  (Dungeon), (Raid) or (PvP), with (Group) in place of (Elite) on TBC Anniversary, and an elite
+  quest's level as [21+] with the level prefix on
 - **Quest popups** for newly discovered quests and ones ready to hand in remotely
 - **Hover any quest** for its objectives and full rewards, including item level
   comparisons against what you have equipped. World quests and timed quests also show their

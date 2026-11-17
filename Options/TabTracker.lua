@@ -526,10 +526,21 @@ Options:RegisterTab({
         questRows:SetPoint("TOPLEFT", order, "BOTTOMLEFT", 0, -gap)
         questRows:SetPoint("TOPRIGHT", order, "BOTTOMRIGHT", 0, -gap)
 
+        -- The quest provider fills the elite + and the type tag on Forever, Era and TBC only.
+        local questsProvider = Registry:Get("quests")
+        local typed = questsProvider and questsProvider.HasTypeTags and questsProvider:HasTypeTags()
         local lvl = self:CreateCheckbox(content, L["Show quest level prefix"],
             rowSetting("showLevelInTracker"))
         questRows:Add(lvl)
-        self:AttachTooltip(lvl, L["Show quest level prefix"], L["For example, [60] Title."])
+        self:AttachTooltip(lvl, L["Show quest level prefix"], typed
+            and L["For example, [60] Title, or [60+] for an elite or group quest."] or L["For example, [60] Title."])
+
+        if typed then
+            local typeTag = self:CreateCheckbox(content, L["Show quest type tags"], rowSetting("showQuestTypeTag", true))
+            questRows:Add(typeTag)
+            self:AttachTooltip(typeTag, L["Show quest type tags"],
+                L["Adds the quest's type after its title, such as (Elite), (Group) or (Dungeon), in your game's own words."])
+        end
 
         local zoneCheck = self:CreateCheckbox(content, L["Show zone label under quest titles"],
             rowSetting("showZoneTag"))

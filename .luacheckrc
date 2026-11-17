@@ -91,6 +91,8 @@ read_globals = {
     "SelectQuestLogEntry", "GetNumQuestLeaderBoards", "GetQuestLogLeaderBoard",
     "IsQuestWatched", "AddQuestWatch", "RemoveQuestWatch", "GetQuestTagInfo",
     "GetQuestLogSelection",
+    -- Forever's quest type tag words, and the parentheses UI/Row.lua puts around any client's tag.
+    "ELITE", "CALENDAR_TYPE_DUNGEON", "CALENDAR_TYPE_PVP", "RAID", "PARENS_TEMPLATE",
     -- Blizzard's own Vanilla and TBC QuestWatch_OnLogin walks its watch list with these two.
     "GetNumQuestWatches", "GetQuestIndexForWatch",
     -- The pair Blizzard's own QuestTimerFrame reads. Asking these rather than selecting each

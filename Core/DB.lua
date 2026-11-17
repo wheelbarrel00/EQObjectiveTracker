@@ -165,6 +165,7 @@ DB.defaults = {
             showQuestTotal       = true,
             stickySectionHeaders = true,
             showLevelInTracker   = false,
+            showQuestTypeTag     = true,
             showQuestID          = false,
             showRecentlyAddedTag = true,
             showOptionsIcon      = true,
