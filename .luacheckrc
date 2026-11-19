@@ -126,6 +126,11 @@ read_globals = {
     "QuestMapFrame_UpdateQuestDetailsButtons",
     "QuestLogPopupDetailFrame_Update",
     "StaticPopup_Show", "StaticPopup_Hide", "StaticPopupDialogs",
+    -- Share Quest on every client, and Classic's selection-based share and abandon
+    "IsInGroup", "QuestLogPushQuest", "SHARE_QUEST",
+    "GetQuestLogPushable", "SetAbandonQuest", "GetAbandonQuestName", "GetAbandonQuestItems",
+    -- The party's progress in a quest row's tooltip, retail and WoW Forever
+    "GetNumSubgroupMembers", "C_TooltipInfo", "PARTY_QUEST_STATUS_ON",
 
     -- Libraries
     "LibStub",

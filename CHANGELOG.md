@@ -5,6 +5,15 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.0] - 2026-11-19
+
+### New Features
+
+- Share Quest is now in the right-click menu. While you are in a group, right-click a quest the game lets you share and pick Share Quest to offer it to your party, as the Share button in the quest log does. It works on every version of the game, Classic Era and TBC Anniversary included. It cannot be used during a fight, and says so in chat.
+- Abandon Quest is now in the right-click menu on Classic Era and TBC Anniversary too, as it already was on retail and WoW Forever. It asks first with the game's own confirmation, which warns you about any quest items you would lose, and it cannot be used during a fight.
+- On retail and WoW Forever, hovering a quest while you are in a group now also lists your party members' progress on it, under the game's own heading, whenever one of them has the quest, as Blizzard's quest log does. Classic Era and TBC Anniversary do not give addons this information, so nothing changes there.
+- A new Hide finished objectives box on the Tracker tab, under Simplify Mode, hides the objectives you have already finished and keeps every one still left to do. It is off by default. Simplify Mode, which shows only the first objective left, works as before, and the new box is dimmed while it is on.
+
 ## [2.16.0] - 2026-11-17
 
 ### New Features

@@ -204,6 +204,24 @@ function RT:_DrawEntry(owner, questID, title, expiresAt, clickHint)
         tip:AddLine(L["Click the title to open the quest log."], 0.7, 0.7, 0.7, true)
     end
 
+    -- The quest log's shape, a gap, the heading and the party, appended as data, since
+    -- SetQuestPartyProgress clears the lines above it. The template never rebuilds this frame from its
+    -- data (no OnUpdate), so the pre-call only guards against something else doing it.
+    if PARTY_QUEST_STATUS_ON and tip.ProcessInfo and not ns:SafeMode() and QR:PartyOnQuest(questID) > 0 then
+        tip:AddLine(" ")
+        tip:AddLine(PARTY_QUEST_STATUS_ON)
+        tip:ProcessInfo({
+            getterName = "GetQuestPartyProgress", getterArgs = { questID, true, true, n = 3 }, append = true,
+            rebuildPreCall = function()
+                local e = owner._entry
+                if not (e and e.id ~= questID) then
+                    self:_DrawEntry(owner, questID, title, expiresAt, clickHint)
+                end
+                return true
+            end,
+        })
+    end
+
     tip:Show()
     if not sawReward then
         armRedraw(owner, questID, function()

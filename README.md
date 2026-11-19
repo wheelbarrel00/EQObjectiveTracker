@@ -60,6 +60,8 @@ focusing a quest also points a TomTom arrow at it.
 - World quests and bonus objectives, scenarios, achievements, endeavors and tracked recipes
   have no section. Most need APIs these clients do not have.
 - **No Find Group button.** These clients have no group finder for quests.
+- **No party progress on hover.** These clients do not give addons your party's progress on a
+  quest.
 - The zone progress bar stays empty. Its zone routing data covers Midnight only, and Everything
   Quests counts zones for it on WoW Forever alone so far.
 - Distance sorting does nothing, because the distance API is retail-only.
@@ -251,9 +253,13 @@ shows a click to complete line, and left-clicking it should open the reward wind
 not be tested on a finished hunt before release, so please report anything that looks wrong.
 Shift-click a quest
 while a chat box is open to drop it into chat, or with no chat box open to untrack it. Right-click
-opens a menu to pin, track, focus, open the quest log, pop out the details, find a group, look
-the quest up on Wowhead, or abandon it - the Classic menu is shorter, since those clients have no
-group finder and popping out and abandoning need frames they do not have. A pinned quest stays
+opens a menu to pin, track, focus, open the quest log, pop out the details, find a group, share
+it with your group, look the quest up on Wowhead, or abandon it - the Classic menu is shorter,
+since those clients have no group finder for quests and no pop-out details window. Share Quest
+shows while you are in a group, on a quest the game lets you share, and Abandon Quest asks first
+with the game's own confirmation. Neither works from the tracker during a fight, and each says so in
+chat. On retail and WoW Forever, hovering a quest while you are in a group also lists your party
+members' progress on it, as Blizzard's quest log does. A pinned quest stays
 on the tracker whatever your filters say. In manual sort mode you can also drag quests into
 whatever order you like, and with zone headers on a quest moves within its own zone, as a dungeon
 quest does within the Dungeons header.
@@ -263,7 +269,8 @@ is clear which settings are actually in effect. Always show campaign quests is t
 stays lit, and only acts while Show only quests in current zone is on. The zone label box on the
 Tracker tab works the other way around: it is dimmed while zone headers are on, since the header
 above a quest already names its zone, and lit again while the Dungeons header is on too, since a
-quest under that header keeps its label.
+quest under that header keeps its label. Hide finished objectives is dimmed while Simplify Mode
+is on, since Simplify Mode already shows only the first objective left.
 
 The tracker can hide itself while you are in combat, inside an instance, on a Mythic+ run,
 while the world map is open, or while you have no quests showing. Each is its own toggle, and
@@ -277,7 +284,7 @@ and a Korean or Chinese client none, so the game's own fonts stay in use there),
 the mouse, with the quest you are following kept solid), a background that fades in while the
 mouse is over the tracker, at an opacity you pick, the progress bars, the scroll bar's
 width and texture, a card layout that can wrap the delve and scenario panel as well as your quests, section
-order, visibility and tabs, filters by quest type, and eight sort modes including by distance and by hand, all but Zone and Manual reversible from
+order, visibility and tabs, filters by quest type, finished objectives hidden or shown, and eight sort modes including by distance and by hand, all but Zone and Manual reversible from
 the sort button.
 The current-zone filter shows only quests with an objective on the map you are standing on.
 If that map lists none of its own, such as a building interior, a covenant sanctum or a

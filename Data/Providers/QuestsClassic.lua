@@ -603,13 +603,78 @@ function Quests:OnEntryOpenLog(entry)
     openLogOn(i)
 end
 
+-- Fails closed, unlike the XP read's row check: sharing or abandoning the wrong quest cannot be undone.
+local function holdsQuest(index, id)
+    if type(GetQuestLogTitle) ~= "function" then return false end
+    local okTitle, _, _, _, _, _, _, _, rowID = pcall(GetQuestLogTitle, index)
+    return okTitle and rowID == id
+end
+
+-- Share and Abandon act on the quest log SELECTION here, as the log's own buttons do, so the quest
+-- is selected only for fn and the old selection goes back on every path, a raise in fn included.
+local function withSelected(id, fn)
+    local index = logIndex(id)
+    if not index or type(SelectQuestLogEntry) ~= "function"
+       or type(GetQuestLogSelection) ~= "function" then
+        return "stale"
+    end
+    local okOld, old = pcall(GetQuestLogSelection)
+    if not (okOld and type(old) == "number") then return "stale" end
+    local okFn, res = true, "stale"
+    if pcall(SelectQuestLogEntry, index) then
+        local okNow, now = pcall(GetQuestLogSelection)
+        if okNow and now == index and holdsQuest(index, id) then okFn, res = pcall(fn, index) end
+    end
+    pcall(SelectQuestLogEntry, old)
+    if not okFn then error(res, 0) end
+    return res
+end
+
+-- Row's shift-click untrack builds the menu too, so safe mode is honored here and not only in RowMenu.
+local function canShare(id)
+    if ns:SafeMode() or type(IsInGroup) ~= "function" or type(QuestLogPushQuest) ~= "function"
+       or type(GetQuestLogPushable) ~= "function" or not IsInGroup() then
+        return false
+    end
+    -- Asked on every right-click in a group, so a raise costs only the Share item, never the menu.
+    return withSelected(id, function()
+        local okAsk, can = pcall(GetQuestLogPushable)
+        return okAsk and can and true or false
+    end) == true
+end
+
+local function shareQuest(id)
+    -- The call retail blocks in a fight, so the same refusal here, before the log is touched.
+    if InCombatLockdown() then return "shareCombat" end
+    return withSelected(id, function() QuestLogPushQuest() end)
+end
+
+-- Blizzard's own quest log Abandon button, step for step, item-loss warning included.
+local function abandonQuest(id)
+    if type(SetAbandonQuest) ~= "function" or type(StaticPopup_Show) ~= "function" then
+        return "unavailable"
+    end
+    if InCombatLockdown() then return "combat" end
+    return withSelected(id, function(index)
+        SetAbandonQuest()
+        local name = type(GetAbandonQuestName) == "function" and GetAbandonQuestName() or nil
+        if type(name) ~= "string" or name == "" then name = GetQuestLogTitle(index) end
+        local items = type(GetAbandonQuestItems) == "function" and GetAbandonQuestItems() or nil
+        if items then
+            StaticPopup_Hide("ABANDON_QUEST")
+            StaticPopup_Show("ABANDON_QUEST_WITH_ITEMS", name, items)
+        else
+            StaticPopup_Hide("ABANDON_QUEST_WITH_ITEMS")
+            StaticPopup_Show("ABANDON_QUEST", name)
+        end
+    end)
+end
+
 local menuOut = {}
 local pinShim = {}
 
--- Still shorter than the retail menu. Pop out and Abandon both need a Blizzard popup, and Data/
--- may not open one - the two calls that already do in Quests.lua are recorded debt, not a
--- precedent to copy. Named indirectly so the layering grep's output stays a known
--- set. Focus is here at retail's own order 30 now that this client has a focus concept.
+-- Shorter than the retail menu: these clients have no quest group finder and no pop-out details window.
+-- Focus is here at retail's own order 30 now that this client has a focus concept.
 function Quests:GetEntryMenu(entry)
     local Filter = ns:GetModule("Filter")
     local id = entry.id
@@ -627,11 +692,15 @@ function Quests:GetEntryMenu(entry)
     menuOut[#menuOut + 1] = { id = watched and "untrack" or "track",             order = 20 }
     menuOut[#menuOut + 1] = { id = Focus:Is(self.id, id) and "unfocus" or "focus", order = 30 }
     menuOut[#menuOut + 1] = { id = "openlog", order = 40 }
+    if canShare(id) then menuOut[#menuOut + 1] = { id = "share", order = 57 } end
     menuOut[#menuOut + 1] = { id = "wowhead", order = 60 }
+    menuOut[#menuOut + 1] = { kind = "divider", order = 70 }
+    menuOut[#menuOut + 1] = { id = "abandon", order = 80, danger = true }
     return menuOut
 end
 
 function Quests:OnEntryMenuSelect(entryID, itemID)
+    local refused
     if itemID == "pin" or itemID == "unpin" then
         pinShim.id, pinShim.providerID = entryID, self.id
         ns:GetModule("Filter"):SetPinned(pinShim, itemID == "pin")
@@ -645,8 +714,13 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
         Focus:Set(nil, nil)
     elseif itemID == "openlog" then
         openLogOn(logIndex(entryID))
+    elseif itemID == "share" then
+        refused = shareQuest(entryID)
+    elseif itemID == "abandon" then
+        refused = abandonQuest(entryID)
     end
     if self._notifyDirty then self._notifyDirty() end
+    return refused
 end
 
 -- While Questie's tracker runs it keeps Blizzard's list empty itself, so there is nothing to

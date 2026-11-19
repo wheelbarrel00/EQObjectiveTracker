@@ -9,6 +9,17 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.17.0", date = "2026-11-19",
+        sections = {
+            { head = "New Features", items = {
+                "Share Quest is now in the right-click menu. While you are in a group, right-click a quest the game lets you share and pick Share Quest to offer it to your party, as the Share button in the quest log does. It works on every version of the game, Classic Era and TBC Anniversary included. It cannot be used during a fight, and says so in chat.",
+                "Abandon Quest is now in the right-click menu on Classic Era and TBC Anniversary too, as it already was on retail and WoW Forever. It asks first with the game's own confirmation, which warns you about any quest items you would lose, and it cannot be used during a fight.",
+                "On retail and WoW Forever, hovering a quest while you are in a group now also lists your party members' progress on it, under the game's own heading, whenever one of them has the quest, as Blizzard's quest log does. Classic Era and TBC Anniversary do not give addons this information, so nothing changes there.",
+                "A new Hide finished objectives box on the Tracker tab, under Simplify Mode, hides the objectives you have already finished and keeps every one still left to do. It is off by default. Simplify Mode, which shows only the first objective left, works as before, and the new box is dimmed while it is on.",
+            } },
+        },
+    },
+    {
         version = "2.16.0", date = "2026-11-17",
         sections = {
             { head = "New Features", items = {
@@ -401,16 +412,6 @@ ns.Changelog = {
         sections = {
             { head = "Bug Fixes", items = {
                 "A quest's tooltip on Classic shows the XP that quest actually awards. On Classic Era the game only reports XP for whichever quest is selected in your quest log, so every quest showed that one quest's figure, and the number jumped whenever something changed the selection. Each quest's XP is now read once with the selection moved onto it and then put back, so your quest log stays where you left it, and it is read again when you level up, since a quest pays less once you outlevel it. Right after logging in or a reload, the XP line can take a little while to appear.",
-            } },
-        },
-    },
-    {
-        version = "1.24.1", date = "2026-09-13",
-        sections = {
-            { head = "Bug Fixes", items = {
-                "Colors you set no longer come back invisible when ElvUI is loaded on Classic Era or Burning Crusade. ElvUI adds its own controls to the game's color picker, and its opacity box and the opacity slider disagreed about which end meant opaque, so clicking its Class button stored a color with nothing left of it to draw. Header bars were the clearest casualty: they vanished the moment you changed their color, nothing brought them back, and ElvUI's own box went on reporting the color as perfectly normal. The picker now agrees with the opacity ElvUI is showing you, and a color already stored invisible comes back as soon as you set it once more. Nothing about how opacity is read changes on a client whose color picker is the game's own.",
-                "Opening a second color swatch without closing the color picker first no longer carries the previous swatch's opacity across. The picker loads its opacity control only when it opens, so aiming an already open picker at a different setting left the old value sitting in it, and whatever color you then picked was stored with an opacity you never chose. On Classic that could also leave the picker with no opacity control visible at all.",
-                "The tracker no longer adds a second Class button to the color picker when another addon has already put one there. It stood down for ElvUI alone, so anyone running Color Picker Plus itself, or another fork of it, got two.",
             } },
         },
     },

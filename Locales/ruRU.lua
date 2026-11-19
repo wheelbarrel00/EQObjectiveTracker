@@ -132,6 +132,8 @@ L["Show only tracked quests"] = "Показывать только отслеж�
 L["Hides quests that are in your log but not tracked. Matches Blizzard's default tracker."] = "Скрывает задания, которые есть в журнале, но не отслеживаются. Соответствует стандартному трекеру Blizzard."
 L["Simplify Mode"] = "Упрощённый режим"
 L["Show only the first incomplete objective per quest."] = "Показывать только первое невыполненное условие задания."
+L["Hide finished objectives"] = "Скрывать выполненные цели"
+L["Hides objectives you have already finished and keeps every one still left to do. A quest with all of them finished keeps its last one. Simplify Mode shows only the first one left, so this box is dimmed while Simplify Mode is on."] = "Скрывает уже выполненные цели и оставляет все невыполненные. У задания, все цели которого выполнены, остаётся последняя. «Упрощённый режим» показывает только первую оставшуюся цель, поэтому этот флажок затемнён, пока «Упрощённый режим» включён."
 L["Simplify tracked achievements"] = "Упрощать отслеживаемые достижения"
 L["Show only incomplete criteria for tracked achievements."] = "Показывать только невыполненные критерии для отслеживаемых достижений."
 L["Sort Order"] = "Порядок сортировки"
@@ -626,6 +628,7 @@ L["Open the Premade Group Finder for this quest."] = "Открыть поиск 
 
 -- UI/RowMenu.lua
 L["You cannot abandon a quest while in combat."] = "Нельзя отменить задание, находясь в бою."
+L["You cannot share a quest while in combat."] = "Нельзя поделиться заданием, находясь в бою."
 L["This game version cannot abandon quests from the tracker."] = "В этой версии игры нельзя отменять задания из трекера."
 L["That quest is no longer in your quest log."] = "Этого задания больше нет в вашем журнале заданий."
 L["Pin to tracker"] = "Закрепить в трекере"

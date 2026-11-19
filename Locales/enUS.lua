@@ -131,6 +131,8 @@ L["Show only tracked quests"] = true
 L["Hides quests that are in your log but not tracked. Matches Blizzard's default tracker."] = true
 L["Simplify Mode"] = true
 L["Show only the first incomplete objective per quest."] = true
+L["Hide finished objectives"] = true
+L["Hides objectives you have already finished and keeps every one still left to do. A quest with all of them finished keeps its last one. Simplify Mode shows only the first one left, so this box is dimmed while Simplify Mode is on."] = true
 L["Simplify tracked achievements"] = true
 L["Show only incomplete criteria for tracked achievements."] = true
 L["Sort Order"] = true
@@ -625,6 +627,7 @@ L["Open the Premade Group Finder for this quest."] = true
 
 -- UI/RowMenu.lua
 L["You cannot abandon a quest while in combat."] = true
+L["You cannot share a quest while in combat."] = true
 L["This game version cannot abandon quests from the tracker."] = true
 L["That quest is no longer in your quest log."] = true
 L["Pin to tracker"] = true

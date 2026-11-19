@@ -132,6 +132,8 @@ L["Show only tracked quests"] = "추적 중인 퀘스트만 표시"
 L["Hides quests that are in your log but not tracked. Matches Blizzard's default tracker."] = "일지에는 있지만 추적하지 않는 퀘스트를 숨깁니다. 블리자드 기본 추적기와 동일합니다."
 L["Simplify Mode"] = "간소화 모드"
 L["Show only the first incomplete objective per quest."] = "퀘스트당 첫 미완료 목표만 표시."
+L["Hide finished objectives"] = "완료한 목표 숨기기"
+L["Hides objectives you have already finished and keeps every one still left to do. A quest with all of them finished keeps its last one. Simplify Mode shows only the first one left, so this box is dimmed while Simplify Mode is on."] = "이미 완료한 목표를 숨기고 남은 목표는 모두 표시합니다. 목표를 모두 완료한 퀘스트는 마지막 목표를 남겨 둡니다. '간소화 모드'는 남은 첫 목표만 표시하므로, '간소화 모드'가 켜져 있는 동안 이 체크 상자는 흐리게 표시됩니다."
 L["Simplify tracked achievements"] = "추적 업적 간소화"
 L["Show only incomplete criteria for tracked achievements."] = "추적 업적의 미완료 조건만 표시."
 L["Sort Order"] = "정렬 순서"
@@ -626,6 +628,7 @@ L["Open the Premade Group Finder for this quest."] = "이 퀘스트의 사전 �
 
 -- UI/RowMenu.lua
 L["You cannot abandon a quest while in combat."] = "전투 중에는 퀘스트를 포기할 수 없습니다."
+L["You cannot share a quest while in combat."] = "전투 중에는 퀘스트를 공유할 수 없습니다."
 L["This game version cannot abandon quests from the tracker."] = "이 버전의 게임에서는 추적기에서 퀘스트를 포기할 수 없습니다."
 L["That quest is no longer in your quest log."] = "그 퀘스트는 더 이상 퀘스트 일지에 없습니다."
 L["Pin to tracker"] = "추적기에 고정"

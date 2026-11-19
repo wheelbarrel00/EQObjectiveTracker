@@ -134,6 +134,8 @@ L["Show only tracked quests"] = "仅显示被追踪的任务"
 L["Hides quests that are in your log but not tracked. Matches Blizzard's default tracker."] = "隐藏任务日志内但未手动追踪的任务，和暴雪原生追踪器行为一致。"
 L["Simplify Mode"] = "简化模式"
 L["Show only the first incomplete objective per quest."] = "每个任务只显示第一个未完成目标。"
+L["Hide finished objectives"] = "隐藏已完成目标"
+L["Hides objectives you have already finished and keeps every one still left to do. A quest with all of them finished keeps its last one. Simplify Mode shows only the first one left, so this box is dimmed while Simplify Mode is on."] = "隐藏已完成的目标，保留所有尚未完成的目标。所有目标都已完成的任务会保留最后一个。“简化模式”只显示第一个未完成目标，因此开启“简化模式”时此选项会变灰。"
 L["Simplify tracked achievements"] = "简化已追踪成就显示"
 L["Show only incomplete criteria for tracked achievements."] = "追踪的成就仅显示未完成条件。"
 L["Sort Order"] = "排序方式"
@@ -628,6 +630,7 @@ L["Open the Premade Group Finder for this quest."] = "为该任务打开预创�
 
 -- UI/RowMenu.lua
 L["You cannot abandon a quest while in combat."] = "战斗中无法放弃任务。"
+L["You cannot share a quest while in combat."] = "战斗中无法共享任务。"
 L["This game version cannot abandon quests from the tracker."] = "此版本的游戏无法从追踪框放弃任务。"
 L["That quest is no longer in your quest log."] = "该任务已不在你的任务日志中。"
 L["Pin to tracker"] = "固定到追踪器"

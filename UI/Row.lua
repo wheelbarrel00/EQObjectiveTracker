@@ -337,7 +337,8 @@ local function buildBlocks(entry, cfg)
     local simple = cfg and cfg.simplifyMode
 
     local groups   = cfg and cfg.simplifyGroups
-    local hideDone = simple or (groups and entry.groupID and groups[entry.groupID]) or false
+    local hideDone = simple or (cfg and cfg.hideFinishedObjectives)
+                     or (groups and entry.groupID and groups[entry.groupID]) or false
     local cap, drawn = entry.maxLines, 0
 
     _nBlocks, _nText = 0, 0

@@ -784,6 +784,21 @@ end
 local menuOut = {}
 local pinShim = {}
 
+-- The two questions Blizzard's own tracker asks before it offers Share Quest.
+local function canShare(id)
+    return type(IsInGroup) == "function" and type(QuestLogPushQuest) == "function"
+       and C_QuestLog.IsPushableQuest ~= nil and IsInGroup() and C_QuestLog.IsPushableQuest(id)
+       and true or false
+end
+
+local function shareQuest(id)
+    -- Blocked from addon code in a fight (ADDON_ACTION_BLOCKED, measured on Forever and retail).
+    if InCombatLockdown() then return "shareCombat" end
+    local index = C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(id)
+    if not index then return "stale" end
+    QuestLogPushQuest(index)
+end
+
 function Quests:GetEntryMenu(entry)
     local Filter = ns:GetModule("Filter")
     local id = entry.id
@@ -800,6 +815,7 @@ function Quests:GetEntryMenu(entry)
     menuOut[#menuOut + 1] = { id = "popout",  order = 50 }
     -- Not 35, which EQ claims above: a collision does not raise, it reorders by id spelling.
     if entry.canGroup then menuOut[#menuOut + 1] = { id = "findgroup", order = 55 } end
+    if canShare(id) then menuOut[#menuOut + 1] = { id = "share", order = 57 } end
     menuOut[#menuOut + 1] = { id = "wowhead", order = 60 }
     menuOut[#menuOut + 1] = { kind = "divider", order = 70 }
     menuOut[#menuOut + 1] = { id = "abandon", order = 80, danger = true }
@@ -825,6 +841,8 @@ function Quests:OnEntryMenuSelect(entryID, itemID)
         openQuestDetailsPopup(entryID)
     elseif itemID == "findgroup" then
         self:OnEntryGroupFinder({ id = entryID })
+    elseif itemID == "share" then
+        refused = shareQuest(entryID)
     elseif itemID == "abandon" then
         refused = abandonQuest(entryID)
     end

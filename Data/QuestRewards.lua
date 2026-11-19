@@ -268,6 +268,21 @@ function QR:CollectXP(indices, ids, n)
     end
 end
 
+-- 0 wherever the game cannot draw the party's progress (Era and TBC have no GetQuestPartyProgress),
+-- so those clients never draw the heading.
+function QR:PartyOnQuest(questID)
+    if not (type(IsInGroup) == "function" and type(GetNumSubgroupMembers) == "function"
+            and C_QuestLog and C_QuestLog.IsUnitOnQuest
+            and C_TooltipInfo and C_TooltipInfo.GetQuestPartyProgress and IsInGroup()) then
+        return 0
+    end
+    local n = 0
+    for i = 1, GetNumSubgroupMembers() or 0 do
+        if C_QuestLog.IsUnitOnQuest("party" .. i, questID) then n = n + 1 end
+    end
+    return n
+end
+
 function QR:DebugLine()
     if not xpBySelection then return nil end
     local figures, refusals = 0, 0

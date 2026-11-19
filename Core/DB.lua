@@ -64,6 +64,7 @@ DB.defaults = {
             sortReverse          = false,
             manualOrder          = {},
             simplifyMode         = false,
+            hideFinishedObjectives = false,
             simplifyGroups       = {},
 
             font               = "GothamXNarrow Black",

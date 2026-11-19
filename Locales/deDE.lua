@@ -119,6 +119,8 @@ L["Show only tracked quests"] = "Nur verfolgte Quests anzeigen"
 L["Hides quests that are in your log but not tracked. Matches Blizzard's default tracker."] = "Blendet Quests aus, die sich in deinem Questlog befinden, aber nicht verfolgt werden. Entspricht dem Blizzard-Standardtracker."
 L["Simplify Mode"] = "Vereinfachter Modus"
 L["Show only the first incomplete objective per quest."] = "Nur das erste nicht abgeschlossene Ziel pro Quest anzeigen."
+L["Hide finished objectives"] = "Erfüllte Ziele ausblenden"
+L["Hides objectives you have already finished and keeps every one still left to do. A quest with all of them finished keeps its last one. Simplify Mode shows only the first one left, so this box is dimmed while Simplify Mode is on."] = "Blendet bereits erfüllte Ziele aus und zeigt alle, die noch offen sind. Bei einer Quest, deren Ziele alle erfüllt sind, bleibt das letzte stehen. „Vereinfachter Modus“ zeigt nur das erste offene Ziel, daher ist dieses Kästchen ausgegraut, solange „Vereinfachter Modus“ aktiviert ist."
 L["Simplify tracked achievements"] = "Verfolgte Erfolge vereinfachen"
 L["Show only incomplete criteria for tracked achievements."] = "Nur nicht erfüllte Kriterien für verfolgte Erfolge anzeigen."
 L["Sort Order"] = "Sortierreihenfolge"
@@ -613,6 +615,7 @@ L["Open the Premade Group Finder for this quest."] = "Öffnet die Gruppensuche f
 
 -- UI/RowMenu.lua
 L["You cannot abandon a quest while in combat."] = "Im Kampf kannst du keine Quest abbrechen."
+L["You cannot share a quest while in combat."] = "Im Kampf kannst du keine Quest teilen."
 L["This game version cannot abandon quests from the tracker."] = "In dieser Spielversion können Quests nicht über den Tracker abgebrochen werden."
 L["That quest is no longer in your quest log."] = "Diese Quest befindet sich nicht mehr in deinem Questlog."
 L["Pin to tracker"] = "An Tracker anheften"

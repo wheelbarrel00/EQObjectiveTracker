@@ -7,6 +7,7 @@ local L       = ns.L
 -- reason token and this is where it becomes something the player can read.
 local REFUSALS = {
     combat      = L["You cannot abandon a quest while in combat."],
+    shareCombat = L["You cannot share a quest while in combat."],
     unavailable = L["This game version cannot abandon quests from the tracker."],
     stale       = L["That quest is no longer in your quest log."],
 }
@@ -25,6 +26,8 @@ local LABELS = {
     openlog    = L["Open in Map & Quest Log"],
     popout     = L["Pop Out Quest Details"],
     findgroup  = L["Find Group"],
+    -- The game's own words, as Blizzard's tracker menu and Classic's quest log label Share.
+    share      = SHARE_QUEST or "Share Quest",
     wowhead    = L["Search on Wowhead"],
     abandon    = L["Abandon Quest"],
 }

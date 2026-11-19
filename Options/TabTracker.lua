@@ -237,11 +237,22 @@ Options:RegisterTab({
             watchedGet, watchedSet,
             L["Hides quests that are in your log but not tracked. Matches Blizzard's default tracker."]))
 
-        local simplify = self:CreateCheckbox(content, L["Simplify Mode"],
-            trackerSetting("simplifyMode"))
+        local simplifyGet, simplifySet = trackerSetting("simplifyMode")
+        local simplify = self:CreateCheckbox(content, L["Simplify Mode"], simplifyGet,
+            function(v)
+                simplifySet(v)
+                content._syncHideFinished()
+            end)
         onScreen:Add(simplify)
         self:AttachTooltip(simplify, L["Simplify Mode"],
             L["Show only the first incomplete objective per quest."])
+
+        local hideGet, hideSet = trackerSetting("hideFinishedObjectives")
+        local hideFinished = self:CreateCheckbox(content, L["Hide finished objectives"], hideGet, hideSet,
+            L["Hides objectives you have already finished and keeps every one still left to do. A quest with all of them finished keeps its last one. Simplify Mode shows only the first one left, so this box is dimmed while Simplify Mode is on."])
+        onScreen:Add(hideFinished)
+        content._syncHideFinished = function() self:SetDependent(hideFinished, not DB().simplifyMode) end
+        content._syncHideFinished()
 
         onScreen:Add(self:CreateCheckbox(content, L["Simplify tracked achievements"],
             function() return DB().simplifyGroups and DB().simplifyGroups.achievements end,
@@ -799,6 +810,7 @@ Options:RegisterTab({
         if content._syncZoneTag then content._syncZoneTag() end
         if content._syncTodo then content._syncTodo() end
         if content._syncManualHint then content._syncManualHint() end
+        if content._syncHideFinished then content._syncHideFinished() end
         if content._syncDelveRows then content._syncDelveRows() end
         if content._renderOrderRows then content._renderOrderRows() end
     end,
