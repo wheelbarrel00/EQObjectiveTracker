@@ -13,6 +13,7 @@ API.menuItems       = {}
 API.focusListeners  = {}
 API.layoutListeners = {}
 API.zoneCounters    = {}
+API.distanceSources = {}
 
 local function slotFor(list, id)
     for i = 1, #list do
@@ -259,6 +260,63 @@ function API:ZoneBarShown()
     return t ~= nil and t.showZoneProgressBar == true
 end
 
+-- For an addon that knows where quests are on a client with no distance call of its own (Everything
+-- Quests on Classic Era and TBC). distance(questID) answers yards to the quest's nearest point on the
+-- player's continent, or nil, which sorts the quest last.
+function API:AddDistanceSource(spec)
+    if type(spec) ~= "table" or type(spec.id) ~= "string" then return false end
+    if type(spec.distance) ~= "function" then return false end
+    self.distanceSources[slotFor(self.distanceSources, spec.id)] = { id = spec.id, distance = spec.distance }
+    self.distanceSourceError = nil
+    self:DistanceChanged()
+    return true
+end
+
+function API:RemoveDistanceSource(id)
+    for i = #self.distanceSources, 1, -1 do
+        if self.distanceSources[i].id == id then table.remove(self.distanceSources, i) end
+    end
+    self.distanceSourceError = nil
+    self:DistanceChanged()
+end
+
+-- In registration order, nil passing the quest on. A raise or a bad number reads as nil, so another
+-- addon's bug costs that quest its place and never the render. The last raise stays for /eqot status.
+function API:DistanceFor(questID)
+    local list = self.distanceSources
+    for i = 1, #list do
+        -- A source may remove itself or another while it answers, which shortens the list, so the
+        -- next one can be passed over for this quest. The removal asks for a re-read anyway.
+        local it = list[i]
+        if it then
+            local okCall, d = pcall(it.distance, questID)
+            if not okCall then
+                self.distanceSourceError = it.id .. " raised: " .. (type(d) == "string" and d or type(d))
+            elseif type(d) == "number" and d >= 0 and d < math.huge then
+                return d
+            end
+        end
+    end
+    return nil
+end
+
+local distanceQueued = false
+
+local function flushDistance()
+    distanceQueued = false
+    local Distance = ns:GetModule("Distance")
+    if Distance then Distance:SourceChanged() end
+end
+
+-- A source calls this when its answers move while the player stands still. A frame later, however many
+-- calls came, the kept answers drop and the next redraw re-reads them. Never call it from inside distance,
+-- or the tracker re-reads and redraws without end.
+function API:DistanceChanged()
+    if distanceQueued then return end
+    distanceQueued = true
+    C_Timer.After(0, flushDistance)
+end
+
 -- Two answers on purpose: the mode this session runs in, fixed at login, and the saved choice,
 -- which only a reload applies. A caller reading Blizzard's watch list needs the first.
 function API:UsesBlizzardTracker()
@@ -284,8 +342,8 @@ function API:DebugLine()
     local l, r, t, b = self:GetListBounds()
     local list = l and ("%.0f,%.0f,%.0f,%.0f"):format(l, r, t, b) or "none"
     return ("api: %d header icon(s), %d menu item(s), %d focus listener(s), %d layout listener(s)"
-            .. ", %d zone counter(s) | focus %s:%s%s | list %s")
+            .. ", %d zone counter(s), %d distance source(s) | focus %s:%s%s | list %s")
         :format(#self.headerIcons, #self.menuItems, #self.focusListeners, #self.layoutListeners,
-                #self.zoneCounters, tostring(providerID), tostring(entryID),
+                #self.zoneCounters, #self.distanceSources, tostring(providerID), tostring(entryID),
                 follows and ", follows super-track" or "", list)
 end

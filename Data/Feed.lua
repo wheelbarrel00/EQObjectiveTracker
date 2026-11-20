@@ -102,7 +102,7 @@ function Feed:Build()
 
     local ManualOrder = ns:GetModule("ManualOrder")
     local DistanceMod = ns:GetModule("Distance")
-    if DistanceMod then DistanceMod:Sync(cfg and cfg.sortMode) end
+    if DistanceMod then DistanceMod:Sync(cfg and cfg.sortMode, spaces.quest) end
     local cmp = Sort:For(cfg and cfg.sortMode, ManualOrder and ManualOrder:Get(), cfg and cfg.sortReverse)
     for _, g in pairs(self.byGroup) do
         table.sort(g.entries, cmp)

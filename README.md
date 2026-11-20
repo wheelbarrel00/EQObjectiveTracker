@@ -64,7 +64,8 @@ focusing a quest also points a TomTom arrow at it.
   quest.
 - The zone progress bar stays empty. Its zone routing data covers Midnight only, and Everything
   Quests counts zones for it on WoW Forever alone so far.
-- Distance sorting does nothing, because the distance API is retail-only.
+- **Distance sorting needs Everything Quests** (2.14.0 or later), since these clients cannot
+  measure how far away a quest is. Without it the Distance order does nothing.
 - Some options still appear that cannot do anything on Classic, for the same reasons.
 
 ### Questie
@@ -99,7 +100,8 @@ uses the game's tracker, which this addon hides already.
 
 Everything Quests adds the other half of the picture, map pins and a TomTom waypoint arrow
 among them. It carries the quest database, so it is what turns a focused row into an arrow, and
-on WoW Forever it is what counts a zone's quests for the zone progress bar.
+on WoW Forever it is what counts a zone's quests for the zone progress bar. On Classic Era and
+TBC Anniversary it is what tells the Distance sort order how far away each quest is.
 Its Classic support is still growing - check its own page for what it covers today.
 Installing it pulls this tracker in automatically. Without it, this addon is the tracker only.
 
@@ -378,7 +380,8 @@ on an annotated `v` tag. A tag whose name carries a prerelease suffix, such as
 
 Another addon can add its own entries to a quest's right-click menu and its own icons to the
 tracker header, follow whichever quest is focused, keep its own frames clear of the quest
-list, and count a zone for the zone progress bar, through the global `EQObjectiveTracker`:
+list, count a zone for the zone progress bar, and say how far away each quest is where the game
+cannot, through the global `EQObjectiveTracker`:
 
 ```lua
 local API = EQObjectiveTracker:GetModule("API")
@@ -393,6 +396,8 @@ local left, right, top, bottom = API:GetListBounds()
 API:AddZoneCounter{ id = "mine", count = function(mapID) return done, total end }
 API:ZoneCountChanged()
 local shown = API:ZoneBarShown()
+API:AddDistanceSource{ id = "mine", distance = function(questID) return yards end }
+API:DistanceChanged()
 ```
 
 A header icon's tooltip must be a string. Any other value is ignored, and the icon is added
@@ -431,6 +436,20 @@ takes a counter back.
 `ZoneBarShown()` returns true while Show zone progress bar is on and false while it is off. It
 reads the option when called, so it stays true in an instance or a zone with no count.
 Everything Quests uses these on WoW Forever, where the game has no questlines to count.
+
+`distance` is called with a quest ID and returns how many yards away the quest's nearest point is
+(an objective, or where it is handed in once finished), or nil when it does not know or the quest
+is on another continent, which sorts the quest last. Sources are asked only on versions of the game
+with no distance of their own (Classic Era and TBC Anniversary), only while the sort order is
+Distance, and only for the quests that pass the tracker's filters. Each answer is kept until the player
+moves, five seconds pass, a quest is accepted, a source is added or removed, or `DistanceChanged()`
+is called, which drops the kept answers a frame later however many times it was called, so the
+tracker's next redraw asks every one of those quests again. The
+first number answered in registration order wins. A source that raises, or answers anything but a
+finite number of 0 or more, counts as nil, and `/eqot status` names the last raise. Never call
+`DistanceChanged` from inside `distance`, or the tracker re-reads and redraws without end.
+`RemoveDistanceSource(id)` takes a source back. Everything Quests uses these on Classic Era and TBC
+Anniversary.
 
 ## License
 

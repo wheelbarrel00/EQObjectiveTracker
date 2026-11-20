@@ -9,6 +9,15 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.18.0", date = "2026-11-19",
+        sections = {
+            { head = "New Features", items = {
+                "On Classic Era and TBC Anniversary, the Distance sort order now works with Everything Quests 2.14.0 or later installed. The nearest quest comes first and the list re-sorts as you move, a quest ready to turn in is measured to where you hand it in, and quests on another continent, inside a dungeon or raid, or with no known location go to the bottom. Picking Distance again on the sort button reverses it, as on retail. These versions of the game cannot measure how far away a quest is, so without Everything Quests the order still does nothing there, and its tooltip now says so.",
+                "Other addons can now supply quest distances on versions of the game that have none of their own, through new calls on the public API: AddDistanceSource, which registers a function asked how many yards away a quest is, and DistanceChanged, which asks for a re-sort when those answers move (RemoveDistanceSource takes the function back). /eqot status counts them, and its distance line says where the distances come from.",
+            } },
+        },
+    },
+    {
         version = "2.17.0", date = "2026-11-19",
         sections = {
             { head = "New Features", items = {
@@ -404,14 +413,6 @@ ns.Changelog = {
             } },
             { head = "Known Issues", items = {
                 "Right now the Forever beta forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard, and until it is fixed the tracker starts from its default settings on each launch.",
-            } },
-        },
-    },
-    {
-        version = "1.24.2", date = "2026-09-16",
-        sections = {
-            { head = "Bug Fixes", items = {
-                "A quest's tooltip on Classic shows the XP that quest actually awards. On Classic Era the game only reports XP for whichever quest is selected in your quest log, so every quest showed that one quest's figure, and the number jumped whenever something changed the selection. Each quest's XP is now read once with the selection moved onto it and then put back, so your quest log stays where you left it, and it is read again when you level up, since a quest pays less once you outlevel it. Right after logging in or a reload, the XP line can take a little while to appear.",
             } },
         },
     },

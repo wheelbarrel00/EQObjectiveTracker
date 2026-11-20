@@ -5,6 +5,13 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.18.0] - 2026-11-19
+
+### New Features
+
+- On Classic Era and TBC Anniversary, the Distance sort order now works with Everything Quests 2.14.0 or later installed. The nearest quest comes first and the list re-sorts as you move, a quest ready to turn in is measured to where you hand it in, and quests on another continent, inside a dungeon or raid, or with no known location go to the bottom. Picking Distance again on the sort button reverses it, as on retail. These versions of the game cannot measure how far away a quest is, so without Everything Quests the order still does nothing there, and its tooltip now says so.
+- Other addons can now supply quest distances on versions of the game that have none of their own, through new calls on the public API: `AddDistanceSource`, which registers a function asked how many yards away a quest is, and `DistanceChanged`, which asks for a re-sort when those answers move (`RemoveDistanceSource` takes the function back). `/eqot status` counts them, and its distance line says where the distances come from.
+
 ## [2.17.0] - 2026-11-19
 
 ### New Features

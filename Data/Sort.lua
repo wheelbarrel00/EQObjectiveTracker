@@ -58,9 +58,8 @@ end
 local INF = math.huge
 local distances
 
--- Pushed by Data/Distance.lua rather than threaded through For, because the map is harvested
--- on a ticker independent of any sort call. ManualOrder's is read fresh per build instead, so
--- Feed passes that one as an argument.
+-- Pushed by Distance:Sync, which Feed:Build calls just before For, and kept between its re-reads.
+-- ManualOrder's is read fresh per build instead, so Feed passes that one as an argument.
 function Sort:SetDistances(map)
     distances = map
 end

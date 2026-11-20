@@ -92,6 +92,7 @@ L["Level"] = true
 L["Lowest quest level first."] = true
 L["Distance"] = true
 L["Nearest objective first, updated as you move. A quest ready to turn in measures to its turn-in point."] = true
+L["Nearest objective first, updated as you move. A quest ready to turn in measures to its turn-in point. On this version of the game, this order needs Everything Quests installed."] = true
 L["Recent"] = true
 L["Most recently accepted first."] = true
 L["Manual"] = true

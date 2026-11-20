@@ -17,7 +17,9 @@ local SORT_OPTIONS = {
     { value = "level",    label = L["Level"],
       tip = L["Lowest quest level first."] },
     { value = "distance", label = L["Distance"],
-      tip = L["Nearest objective first, updated as you move. A quest ready to turn in measures to its turn-in point."] },
+      tip = ns.Has.QuestDistance
+          and L["Nearest objective first, updated as you move. A quest ready to turn in measures to its turn-in point."]
+          or L["Nearest objective first, updated as you move. A quest ready to turn in measures to its turn-in point. On this version of the game, this order needs Everything Quests installed."] },
     { value = "recent",   label = L["Recent"],
       tip = L["Most recently accepted first."] },
     { value = "manual",   label = L["Manual"],
