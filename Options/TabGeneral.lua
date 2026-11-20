@@ -42,7 +42,7 @@ Options:RegisterTab({
                     ReloadUI()
                 end,
             })
-        end, L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale and After an update, which every character shares, and clears this character's collapsed sections and pinned entries."])
+        end, L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale and After an update, which every character shares, and clears this character's collapsed sections, folded quests and pinned entries."])
         resetAll:SetPoint("RIGHT")
 
         local resetPos = self:CreateButton(bar, L["Reset position and size"], nil, function()

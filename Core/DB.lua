@@ -65,6 +65,8 @@ DB.defaults = {
             manualOrder          = {},
             simplifyMode         = false,
             hideFinishedObjectives = false,
+            autoMinimizeFinished = false,
+            showFoldButtons      = false,
             simplifyGroups       = {},
 
             font               = "GothamXNarrow Black",
@@ -306,6 +308,7 @@ DB.defaults = {
     char = {
         sectionsCollapsed  = {},
         zonesCollapsed     = {},
+        folded             = {},
         pinned             = {},
         trackedWorldQuests = {},
     },
@@ -428,6 +431,7 @@ function DB:ResetAll()
         c.sectionsCollapsed = {}
         c.zonesCollapsed    = {}
         c.pinned            = {}
+        c.folded            = {}
         c.trackedQuests     = nil
         c.delveRun          = nil
         c.todoView          = nil

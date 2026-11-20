@@ -45,6 +45,7 @@ local store = Entry.NewStore({
     groupID = "quests",
     icon    = { kind = ICON.QUESTPOI },
     tags    = {},
+    clickToComplete = false,
 })
 
 -- Persisted per character. A session-local table stamped every quest that predated the
@@ -179,9 +180,12 @@ local function fillLines(e, id)
     end
 
     -- Blizzard's own string, so it arrives translated. Left unfinished, or simplify mode hides it.
+    -- Auto minimize reads clickToComplete and leaves such a quest open, line and all.
+    e.clickToComplete = false
     if e.state == STATE.COMPLETE and QUEST_WATCH_CLICK_TO_COMPLETE and isAutoComplete(id) then
         local ln = Entry.PushLine(e)
         ln.text = QUEST_WATCH_CLICK_TO_COMPLETE
+        e.clickToComplete = true
     end
 
     Entry.EndLines(e)

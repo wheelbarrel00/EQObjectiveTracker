@@ -30,7 +30,13 @@ local LABELS = {
     share      = SHARE_QUEST or "Share Quest",
     wowhead    = L["Search on Wowhead"],
     abandon    = L["Abandon Quest"],
+    minimize   = L["Minimize Quest"],
+    maximize   = L["Maximize Quest"],
 }
+
+-- Folding is a display action, so the menu adds it itself and no provider's menu changes.
+local MINIMIZE = { id = "minimize", order = 15 }
+local MAXIMIZE = { id = "maximize", order = 15 }
 
 local scratch = {}
 
@@ -71,11 +77,14 @@ end
 
 -- Dispatched against the entry ID rather than the entry table: the menu outlives the render
 -- that opened it, and entries are rebuilt on every quest event.
-local function run(providerID, entryID, item)
+local function run(providerID, entryID, item, snap)
     if item.external then
         item.external.onClick(providerID, entryID)
     elseif item.id == "wowhead" then
         wowhead(entryID)
+    elseif item == MINIMIZE or item == MAXIMIZE then
+        local DB = ns:GetModule("DB")
+        ns:GetModule("Fold"):Set(snap, item == MINIMIZE, DB and DB:Tracker())
     else
         local provider = ns:GetModule("Registry"):Get(providerID)
         if provider and provider.OnEntryMenuSelect then
@@ -107,6 +116,13 @@ function RowMenu:Show(row)
     for i = #scratch, 1, -1 do scratch[i] = nil end
     for i = 1, #items do scratch[#scratch + 1] = items[i] end
     ns:GetModule("API"):MenuItemsFor(providerID, entryID, scratch)
+    -- What the fold rule reads, kept as the menu opened: the row may show another quest by the click.
+    local Fold, snap = ns:GetModule("Fold"), nil
+    if Fold:Foldable(entry) then
+        snap = { id = entryID, providerID = providerID, state = entry.state, clickToComplete = entry.clickToComplete }
+        local DB = ns:GetModule("DB")
+        scratch[#scratch + 1] = Fold:IsFolded(snap, DB and DB:Tracker()) and MAXIMIZE or MINIMIZE
+    end
     table.sort(scratch, byOrder)
 
     -- Copied out because the callback runs long after this returns and the provider's list is
@@ -127,7 +143,7 @@ function RowMenu:Show(row)
             local label = it.label or LABELS[it.id]
             if label then
                 menu[#menu + 1] = { text = label, danger = it.danger and true or nil,
-                                    onClick = function() run(providerID, entryID, it) end }
+                                    onClick = function() run(providerID, entryID, it, snap) end }
             end
         end
     end

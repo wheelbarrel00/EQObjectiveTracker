@@ -15,6 +15,7 @@ ZoneGroups.DUNGEONS = DUNGEONS
 local state = {}
 
 local sortAlpha, currentFirst, dungeonsLast = false, false, false
+local hereZone
 -- What Begin was handed, so Note keys each quest the way Build will.
 local noteZones, noteDungeons = false, false
 
@@ -59,6 +60,8 @@ local function before(a, b)
         return a.zone < b.zone
     end
     if a.current ~= b.current then return a.current end
+    -- Two headings can both hold a quest on your map. The one named after the zone you stand in leads.
+    if a.current and a.named ~= b.named then return a.named end
     return a.rank < b.rank
 end
 
@@ -102,6 +105,7 @@ local function build(s, g, Registry, zones, dungeons)
                 s.pool[n] = run
             end
             run.zone, run.count, run.current = z, 0, false
+            run.named = z ~= "" and z == hereZone
             run.dungeon = dungeons and z == DUNGEONS
             run.rank  = s.rank[z] or math.huge
             run.total = s.total[z] or 0
@@ -140,6 +144,7 @@ function ZoneGroups:Build(byGroup, cfg)
     local dungeons = cfg ~= nil and cfg.dungeonHeader == true
     sortAlpha    = zones and cfg.zoneHeaderOrder == "alpha"
     currentFirst = zones and not sortAlpha
+    hereZone     = currentFirst and type(GetZoneText) == "function" and GetZoneText() or nil
     dungeonsLast = cfg ~= nil and cfg.dungeonHeaderLast == true
     local Registry = ns:GetModule("Registry")
     for id, g in pairs(byGroup) do

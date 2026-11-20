@@ -205,9 +205,40 @@ local function build(parent, groupID, title)
     h:SetScript("OnClick", function(self)
         local Tracker = ns:GetModule("Tracker")
         if Tracker and Tracker.IsClickThrough and Tracker:IsClickThrough() then return end
+        if IsShiftKeyDown() and not Sections:IsCollapsed(self.groupID) and Sections:ShiftFold(self.groupID) then
+            return
+        end
         Sections:ToggleCollapsed(self.groupID)
     end)
     return h
+end
+
+-- A Shift-click on a section or zone header (zone nil for a section) folds every foldable row the
+-- last render drew under it, or opens them all when every one is folded already. False when there
+-- was nothing to fold, so the click collapses the header instead.
+local drawnRows, underHeader = {}, {}
+function Sections:ShiftFold(groupID, zone)
+    local Fold = ns:GetModule("Fold")
+    local DB   = ns:GetModule("DB")
+    local cfg  = DB and DB:Tracker()
+    local ZoneGroups = ns:GetModule("ZoneGroups")
+    wipe(drawnRows)
+    wipe(underHeader)
+    ns:GetModule("RowPool"):Drawn(drawnRows)
+    local allFolded = true
+    for i = 1, #drawnRows do
+        local e = drawnRows[i]._entry
+        if e and e.groupID == groupID and Fold:Foldable(e)
+           and (zone == nil or ZoneGroups:RunKey(e, cfg) == zone) then
+            underHeader[#underHeader + 1] = e
+            if not Fold:IsFolded(e, cfg) then allFolded = false end
+        end
+    end
+    if #underHeader == 0 then return false end
+    Fold:SetAll(underHeader, not allFolded, cfg)
+    local Tracker = ns:GetModule("Tracker")
+    if Tracker then Tracker:Render() end
+    return true
 end
 
 -- A header outside the pool, for the Appearance preview and the sticky band. The pool holds one header

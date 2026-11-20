@@ -1776,7 +1776,7 @@ local function stickyHead(band, slot, groupID)
         h = Sections:NewHeader(band, groupID)
         band.heads[slot] = h
     end
-    -- The header's own click handler reads this, so a click collapses the section shown.
+    -- The header's own click handler reads this, so a click acts on the section shown.
     h.groupID = groupID
     local src = Sections.frames[groupID]
     if src then

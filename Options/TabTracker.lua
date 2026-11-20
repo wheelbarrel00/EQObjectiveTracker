@@ -71,7 +71,8 @@ local function trackerSetting(key)
 end
 
 -- Row memoizes on the fields in its repaint gate and returns early when they all match, so
--- anything that changes how a row READS has to invalidate or it silently never repaints.
+-- anything that changes how a row READS without moving a gate field has to invalidate or it
+-- silently never repaints.
 local function rowSetting(key, defaultOn)
     return function()
                local v = DB()[key]
@@ -255,6 +256,10 @@ Options:RegisterTab({
         onScreen:Add(hideFinished)
         content._syncHideFinished = function() self:SetDependent(hideFinished, not DB().simplifyMode) end
         content._syncHideFinished()
+
+        local autoGet, autoSet = trackerSetting("autoMinimizeFinished")
+        onScreen:Add(self:CreateCheckbox(content, L["Auto minimize finished quests"], autoGet, autoSet,
+            L["Folds every finished quest to its title and (Complete). Open one with its + or the right-click menu and it stays open. A quest you can hand in by clicking it stays open, so its line saying so still shows."]))
 
         onScreen:Add(self:CreateCheckbox(content, L["Simplify tracked achievements"],
             function() return DB().simplifyGroups and DB().simplifyGroups.achievements end,
@@ -584,6 +589,11 @@ Options:RegisterTab({
         questRows:Add(itemBtnCheck)
         self:AttachTooltip(itemBtnCheck, L["Show usable quest item buttons"],
             L["Puts a button on the tracker row of any quest that carries a usable item, so you can use it without opening your bags."])
+
+        local foldCheck = self:CreateCheckbox(content, L["Show a +/- on each quest"], rowSetting("showFoldButtons"))
+        questRows:Add(foldCheck)
+        self:AttachTooltip(foldCheck, L["Show a +/- on each quest"],
+            L["Puts a - at the end of each quest's title line. Click it to fold the quest to its title, and click the + to open it again. A folded quest always shows its +. Shift-click a zone or section header to fold or open every quest under it."])
 
         local newTagCheck = self:CreateCheckbox(content,
             L["Show NEW tag on recently accepted quests"],

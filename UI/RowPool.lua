@@ -48,6 +48,14 @@ function RowPool:Sweep(reset)
     end
 end
 
+-- Every row the last render drew, appended to out: Sweep has already let go of the rest.
+function RowPool:Drawn(out)
+    for _, byID in pairs(self.byProvider) do
+        for _, row in pairs(byID) do out[#out + 1] = row end
+    end
+    return out
+end
+
 function RowPool:Count()
     local active, free = 0, #self.free
     for _, byID in pairs(self.byProvider) do

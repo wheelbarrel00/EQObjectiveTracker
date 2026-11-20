@@ -255,9 +255,9 @@ shows a click to complete line, and left-clicking it should open the reward wind
 not be tested on a finished hunt before release, so please report anything that looks wrong.
 Shift-click a quest
 while a chat box is open to drop it into chat, or with no chat box open to untrack it. Right-click
-opens a menu to pin, track, focus, open the quest log, pop out the details, find a group, share
-it with your group, look the quest up on Wowhead, or abandon it - the Classic menu is shorter,
-since those clients have no group finder for quests and no pop-out details window. Share Quest
+opens a menu to pin, fold it to its title, track, focus, open the quest log, pop out the details,
+find a group, share it with your group, look the quest up on Wowhead, or abandon it - the Classic
+menu is shorter, since those clients have no group finder for quests and no pop-out details window. Share Quest
 shows while you are in a group, on a quest the game lets you share, and Abandon Quest asks first
 with the game's own confirmation. Neither works from the tracker during a fight, and each says so in
 chat. On retail and WoW Forever, hovering a quest while you are in a group also lists your party
@@ -273,6 +273,13 @@ Tracker tab works the other way around: it is dimmed while zone headers are on, 
 above a quest already names its zone, and lit again while the Dungeons header is on too, since a
 quest under that header keeps its label. Hide finished objectives is dimmed while Simplify Mode
 is on, since Simplify Mode already shows only the first objective left.
+
+Any quest can be folded down to its title: Minimize Quest and Maximize Quest in its right-click
+menu, a + at the end of a folded quest's title line, and, with Show a +/- on each quest ticked, a -
+on every quest you can fold. Shift-click a zone or section header to fold or open every quest
+under it. Auto minimize finished quests folds each finished quest to its title and (Complete),
+leaving open any you open again and any you can hand in by clicking it. Both boxes are off by
+default, and folds are saved per character until the quest is handed in or abandoned.
 
 The tracker can hide itself while you are in combat, inside an instance, on a Mythic+ run,
 while the world map is open, or while you have no quests showing. Each is its own toggle, and

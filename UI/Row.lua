@@ -30,10 +30,14 @@ local WQ_FALLBACK      = "Worldquest-icon"
 local POI_FALLBACK_ACTIVE    = "Interface/GossipFrame/ActiveQuestIcon"
 local POI_FALLBACK_AVAILABLE = "Interface/GossipFrame/AvailableQuestIcon"
 local GROUP_EYE_SIZE   = 16
+local SIGN_GAP         = 4
+-- How far past the +/- glyph a click still hits the sign, since the glyph is a few pixels wide.
+local SIGN_SLOP        = 3
 local TITLE_TO_SUB     = 1
 local SUB_TO_LINES     = 2
 local SUBTITLE_COLOR   = { 0.42, 0.69, 1.00 }
 local DEFAULT_DONE_HEX = "44ff44"
+local COMPLETE_SUFFIX  = " " .. (PARENS_TEMPLATE or "(%s)"):format(L["Complete"])
 
 -- Objective lines are drawn as an ordered run of blocks rather than one string, so a bar can
 -- sit between two text lines instead of being pushed under them. A finished line is a block of
@@ -279,10 +283,10 @@ end
 local function paintTitle(row)
     local hr, hg, hb
     if row._hovered and row._tLit then hr, hg, hb = Util.OriginalTitleHighlight() end
+    if not hr and row._tR then hr, hg, hb = row._tR, row._tG, row._tB end
     if hr then
         row.title:SetTextColor(hr, hg, hb)
-    elseif row._tR then
-        row.title:SetTextColor(row._tR, row._tG, row._tB)
+        row.foldSign:SetTextColor(hr, hg, hb)
     end
 end
 
@@ -330,7 +334,7 @@ local function isBarLine(ln, cfg)
 end
 
 -- Every user styling option is applied here, once, so it reaches every content type.
-local function buildBlocks(entry, cfg)
+local function buildBlocks(entry, cfg, folded)
     local lines  = entry.lines
     local hex    = doneHex(cfg)
     local hideN  = cfg and cfg.showObjectiveNumbers == false
@@ -342,6 +346,7 @@ local function buildBlocks(entry, cfg)
     local cap, drawn = entry.maxLines, 0
 
     _nBlocks, _nText = 0, 0
+    if folded then return end
 
     for i = 1, #lines do
         local ln = lines[i]
@@ -429,7 +434,7 @@ local function buildBlocks(entry, cfg)
     end
 end
 
--- One key for the whole run rather than a thirteenth gate field. A bar whose fill moved has to
+-- One key for the whole run rather than a gate field per block. A bar whose fill moved has to
 -- repaint even when every string on the row is identical, so the values are in here as well.
 -- A bar carries no label of its own any more, so only its numbers are keyed - the label it used
 -- to hold is a text block now and is keyed as one.
@@ -616,6 +621,17 @@ local function overIcon(row)
     return mx <= iconRight
 end
 
+local function overFold(row)
+    local s = row.foldSign
+    if not s:IsShown() then return false end
+    local l, r, t, b = s:GetLeft(), s:GetRight(), s:GetTop(), s:GetBottom()
+    if not (l and r and t and b) then return false end
+    local scale = row:GetEffectiveScale() or 1
+    local mx, my = GetCursorPosition()
+    mx, my = mx / scale, my / scale
+    return mx >= l - SIGN_SLOP and mx <= r + SIGN_SLOP and my >= b - SIGN_SLOP and my <= t + SIGN_SLOP
+end
+
 -- The chat-link modifier, shift by default, drops the quest into an open chat box, gated on
 -- the modifier AND a focused edit box the way Blizzard's frames and Everything Quests both are.
 -- Any button, because the hide gesture this replaced took any button too. With no edit box
@@ -690,6 +706,14 @@ local function onMouseUp(row, button, upInside)
     -- client that does not pass it still clicks.
     if upInside == false then return end
     if not row._entry or clickThrough() then return end
+
+    if button == "LeftButton" and overFold(row) then
+        local DB = ns:GetModule("DB")
+        ns:GetModule("Fold"):Toggle(row._entry, DB and DB:Tracker())
+        local Tracker = ns:GetModule("Tracker")
+        if Tracker then Tracker:Render() end
+        return
+    end
 
     if chatLinkClick(row) then return end
     if button == "LeftButton" and untrackClick(row) then return end
@@ -821,6 +845,10 @@ function Row:Build()
     r.lines = newTextBlock(r)
     r._textBlocks[1] = r.lines
 
+    r.foldSign = r:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    r.foldSign:SetWordWrap(false)
+    r.foldSign:Hide()
+
     r.timer = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     r.timer:SetJustifyH("RIGHT")
     r.timer:SetWordWrap(false)
@@ -869,7 +897,7 @@ function Row:Reset(row)
     row._sTitle, row._sSub, row._sState  = nil, nil, nil
     row._sFocus, row._sWidth, row._sText = nil, nil, nil
     row._sTime, row._sGen, row._sCardBg  = nil, nil, nil
-    row._sGroup, row._sIcon, row._sItem = nil, nil, nil
+    row._sGroup, row._sIcon, row._sItem, row._sFold = nil, nil, nil, nil
     row._mStr, row._mText, row._mTries = nil, nil, nil
     hideBlocks(row, 1, 1)
     ns:GetModule("Card"):Clear(row)
@@ -895,18 +923,30 @@ function Row:Rebase(row)
     if row._mStr then row._mStr = row._mStr + self:Drift(row) end
 end
 
-function Row:Render(row, entry, width, cfg)
+-- sample: the Appearance preview's made-up quest, which no saved fold or auto minimize may fold.
+function Row:Render(row, entry, width, cfg, sample)
     row._entry      = entry
     row._providerID = entry.providerID
 
+    -- Fold is nil only where a harness loads Row without it.
+    local Fold   = ns:GetModule("Fold")
+    local folded = Fold ~= nil and not sample and Fold:IsFolded(entry, cfg)
+    local sign
+    if folded then
+        sign = "+"
+    elseif Fold and cfg and cfg.showFoldButtons == true and Fold:Foldable(entry) then
+        sign = "-"
+    end
+
     local titleText = decorateTitle(entry, cfg)
+    if folded and entry.state == STATE.COMPLETE then titleText = titleText .. COMPLETE_SUFFIX end
     -- Zone headers name the heading already, so the label would say it twice. A quest in the
     -- Dungeons header is no longer under its zone's header, so it keeps the label.
     local headed = cfg and cfg.zoneHeaders and not (cfg.dungeonHeader == true and entry.tags and entry.tags.dungeon)
-    local subtitle = (cfg and cfg.showZoneTag ~= false and not headed) and entry.subtitle or nil
+    local subtitle = (not folded and cfg and cfg.showZoneTag ~= false and not headed) and entry.subtitle or nil
     -- Fills the shared block arrays. Nothing between here and the layout loop below may call
     -- buildBlocks again, which is the only thing that rewrites them.
-    buildBlocks(entry, cfg)
+    buildBlocks(entry, cfg, folded)
     local lineText = blocksKey()
     local showEye  = entry.canGroup and true or false
     -- The effective answer, not the raw field, so turning the option off drops the gutter
@@ -959,6 +999,7 @@ function Row:Render(row, entry, width, cfg)
        and row._sIcon  == iconKey
        and row._sItem  == hasItem
        and row._sGen   == self.generation
+       and row._sFold  == sign
     if unchanged then return row:GetHeight() end
 
     applyIcon(row, entry)
@@ -988,15 +1029,28 @@ function Row:Render(row, entry, width, cfg)
     row.iconHolder:ClearAllPoints()
     row.iconHolder:SetPoint("TOPLEFT", row, "TOPLEFT", padX + gutter, -padY)
 
-    -- The eye takes the right edge and the countdown shuffles left of it, so a world
-    -- quest that can form a group still shows how long is left on it.
+    local signW = 0
+    if sign then
+        Media:ApplyTitleFont(row.foldSign)
+        row.foldSign:SetText(sign)
+        row.foldSign:ClearAllPoints()
+        row.foldSign:SetPoint("TOPRIGHT", row, "TOPRIGHT", -padX, -padY + 1)
+        row.foldSign:Show()
+        signW = row.foldSign:GetStringWidth() + SIGN_GAP
+    else
+        row.foldSign:SetText("")
+        row.foldSign:Hide()
+    end
+
+    -- The eye takes the right edge, after the fold sign, and the countdown shuffles left of it,
+    -- so a world quest that can form a group still shows how long is left on it.
     row.groupFinder:ClearAllPoints()
-    row.groupFinder:SetPoint("TOPRIGHT", row, "TOPRIGHT", -padX, -padY)
+    row.groupFinder:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(padX + signW), -padY)
     row.groupFinder:SetShown(showEye)
     local eyeW = showEye and (GROUP_EYE_SIZE + 4) or 0
 
     row.timer:ClearAllPoints()
-    row.timer:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(padX + eyeW), -padY)
+    row.timer:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(padX + signW + eyeW), -padY)
     local timerW = 0
     if timeText then
         row.timer:SetText(timeText)
@@ -1039,7 +1093,7 @@ function Row:Render(row, entry, width, cfg)
     -- width change and rows overlap
     local textW = width - (iconW + iconGap + padX * 2 + gutter)
     if textW > 0 then
-        row.title:SetWidth(math.max(1, textW - timerW - eyeW))
+        row.title:SetWidth(math.max(1, textW - timerW - eyeW - signW))
         if row.subtitle:IsShown() then row.subtitle:SetWidth(textW) end
     end
     local blockW = math.max(1, textW)
@@ -1108,6 +1162,7 @@ function Row:Render(row, entry, width, cfg)
     row._sIcon = iconKey
     row._sItem = hasItem
     row._sGen = self.generation
+    row._sFold = sign
 
     return row:GetHeight()
 end

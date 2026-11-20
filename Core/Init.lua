@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EQObjectiveTracker = ns
 ns.NAME    = addonName
-ns.VERSION = "2.18.0"
+ns.VERSION = "2.19.0"
 
 ns.modules     = {}
 ns.moduleOrder = {}
@@ -75,8 +75,8 @@ local NEVER_SKIP = {
 -- Off while Blizzard's own tracker is in use: each one would double it, fight it for its watch
 -- list, draw only inside the tracker window, or hide another addon's tracker. What stays is what
 -- does not clash - Focus for Everything Quests' arrow, the quest sounds and their cache, the zone
--- bar, the flight map, the options window, What's New, and AutoTrack, which keeps Classic's own
--- set current for the way back.
+-- bar, the flight map, the options window, What's New, AutoTrack, which keeps Classic's own set
+-- current for the way back, and Fold, which forgets the folds of quests that left the log.
 -- Tracker is in NEVER_SKIP and stands down in its own OnEnable.
 local STAND_DOWN = {
     Blizzard = true, QuestLogChecks = true, QuestieCoexist = true, EllesmereCoexist = true,

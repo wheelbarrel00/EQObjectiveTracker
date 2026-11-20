@@ -5,6 +5,16 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.0] - 2026-11-20
+
+### New Features
+
+- You can now fold a quest down to its title. Right-click a quest and pick Minimize Quest to hide its objectives, and Maximize Quest to bring them back. A folded quest shows a + at the end of its title line, and clicking the + opens it again. Tick Show a +/- on each quest, on the Tracker tab's Quest Row Details card, to put a - on every quest you can fold. Shift-click a zone or section header to fold every quest under it, and Shift-click it again to open them all. A new Auto minimize finished quests box, on the On-Screen Tracker card, folds every finished quest to its title and (Complete): a quest you open stays open, and one you can hand in by clicking it stays open so its line saying so still shows. Both boxes are off by default. Folds are saved for each character and forgotten once a quest is handed in or abandoned, so a daily you folded comes back open.
+
+### Bug Fixes
+
+- With Show zone headers on and Zone Order set to Current zone first, the heading for the zone you are standing in now comes first. A quest from a neighboring zone whose map marker sits in your zone also counts as being here, and when that happened the two headings kept quest log order, so on WoW Forever Hillsbrad Foothills could sit above Silverpine Forest while you stood in Silverpine. The Dungeons header still goes to the top while one of its quests is in your zone, unless Keep Dungeons at the bottom is ticked.
+
 ## [2.18.0] - 2026-11-19
 
 ### New Features

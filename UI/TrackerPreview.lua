@@ -265,7 +265,7 @@ function Preview:Refresh(again)
                     row:ClearAllPoints()
                     row:SetPoint("TOPLEFT", content, "TOPLEFT", left, -y)
                     Row:Reset(row)
-                    y = y + Row:Render(row, entry, inner - left, cfg) + gap
+                    y = y + Row:Render(row, entry, inner - left, cfg, true) + gap
                     row:Show()
                     drawnRows[entry.id] = true
                 end

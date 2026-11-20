@@ -150,6 +150,7 @@ handlers.status = function()
     debugLine("Filter", nil, "FiltersLine")
     debugLine("TodoMode")
     debugLine("Filter")
+    debugLine("Fold")
 
     ns:Print("sections (in render order):")
     local trackerCfg = ns:GetModule("DB"):Tracker()

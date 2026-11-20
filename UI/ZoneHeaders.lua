@@ -76,7 +76,12 @@ local function build(parent)
     h:SetScript("OnClick", function(self)
         local Tracker = ns:GetModule("Tracker")
         if Tracker and Tracker.IsClickThrough and Tracker:IsClickThrough() then return end
-        if self.groupID and self.zone then ZoneHeaders:ToggleCollapsed(self.groupID, self.zone) end
+        if not (self.groupID and self.zone) then return end
+        if IsShiftKeyDown() and not ZoneHeaders:IsCollapsed(self.groupID, self.zone)
+           and ns:GetModule("Sections"):ShiftFold(self.groupID, self.zone) then
+            return
+        end
+        ZoneHeaders:ToggleCollapsed(self.groupID, self.zone)
     end)
     return h
 end

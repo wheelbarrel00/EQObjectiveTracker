@@ -9,6 +9,17 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.19.0", date = "2026-11-20",
+        sections = {
+            { head = "New Features", items = {
+                "You can now fold a quest down to its title. Right-click a quest and pick Minimize Quest to hide its objectives, and Maximize Quest to bring them back. A folded quest shows a + at the end of its title line, and clicking the + opens it again. Tick Show a +/- on each quest, on the Tracker tab's Quest Row Details card, to put a - on every quest you can fold. Shift-click a zone or section header to fold every quest under it, and Shift-click it again to open them all. A new Auto minimize finished quests box, on the On-Screen Tracker card, folds every finished quest to its title and (Complete): a quest you open stays open, and one you can hand in by clicking it stays open so its line saying so still shows. Both boxes are off by default. Folds are saved for each character and forgotten once a quest is handed in or abandoned, so a daily you folded comes back open.",
+            } },
+            { head = "Bug Fixes", items = {
+                "With Show zone headers on and Zone Order set to Current zone first, the heading for the zone you are standing in now comes first. A quest from a neighboring zone whose map marker sits in your zone also counts as being here, and when that happened the two headings kept quest log order, so on WoW Forever Hillsbrad Foothills could sit above Silverpine Forest while you stood in Silverpine. The Dungeons header still goes to the top while one of its quests is in your zone, unless Keep Dungeons at the bottom is ticked.",
+            } },
+        },
+    },
+    {
         version = "2.18.0", date = "2026-11-19",
         sections = {
             { head = "New Features", items = {
@@ -395,24 +406,6 @@ ns.Changelog = {
                 "A finished quest that is turned in from the objective tracker rather than at an NPC, such as a Prey hunt for Astalor Bloodsworn, can now be turned in with this tracker. Left-clicking it opens the reward window, as the default tracker does, and the quest shows the default tracker's \"click to complete\" line. Until now this tracker offered only the Quest Complete box, and a quest that never showed one could not be turned in without the default tracker. This one could not be tested on a finished hunt before release, so please report anything that looks wrong.",
                 "Pressing a quest in the tracker and letting go of the mouse button somewhere else no longer counts as clicking it.",
                 "A quest whose text wraps onto several lines is no longer drawn over by the quest below it. The tracker now measures each quest again once it has been drawn, and lays itself out again when a height has changed. This was seen on WoW Forever.",
-            } },
-        },
-    },
-    {
-        version = "1.25.0", date = "2026-09-18",
-        sections = {
-            { head = "New Features", items = {
-                "WoW Forever is now supported, as a work in progress, so expect bugs, and please report anything that looks wrong. The tracker follows your quests there. The retail-only sections, such as world quests and scenarios, have stayed empty there so far.",
-                "On WoW Forever, Search on Wowhead in a quest's right-click menu opens Wowhead's Forever pages.",
-            } },
-            { head = "Improvements", items = {
-                "Your tracked neighborhood tasks under Endeavors are now also requested when you enter a new zone, as the default tracker does, so they can appear without waiting for a loading screen.",
-            } },
-            { head = "Bug Fixes", items = {
-                "On WoW Forever, logging in or passing a loading screen with the tracker enabled no longer disconnects you, and neither does /eqot status. Each was asking for neighborhood initiative data, the tasks retail shows under Endeavors, which Forever reports as unavailable. The tracker now asks only when the initiative is available to your character, the same check it already made before showing those tasks.",
-            } },
-            { head = "Known Issues", items = {
-                "Right now the Forever beta forgets every addon's settings when the game restarts. That is a bug in the beta client itself, reported to Blizzard, and until it is fixed the tracker starts from its default settings on each launch.",
             } },
         },
     },
