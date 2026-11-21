@@ -9,6 +9,18 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.20.0", date = "2026-11-21",
+        sections = {
+            { head = "New Features", items = {
+                "A quest that is ready to turn in now shows one line in place of its finished objectives, saying where to hand it in, as Blizzard's own tracker does. On retail and WoW Forever it is the game's own line, such as \"Speak with Magatha in Thunder Bluff.\", and a quest the game gives no such line shows \"Ready for turn-in\". Classic Era and TBC Anniversary have no such line, so a finished quest there shows \"Ready for turn-in\". A failed quest now shows \"Failed\" in red in place of its objectives. It is on by default, and the new Show hand-in text on finished quests box, on the Tracker tab's On-Screen Tracker card, turns it off. Simplify Mode and Hide finished objectives keep the line, Auto minimize finished quests still folds a finished quest down to its title, and a quest you hand in by clicking it keeps its click to complete line as before.",
+                "Two new sounds on the Tracker tab's Sounds card, both off by default: Play a sound when an objective is finished, and Play a sound when you make progress on an objective, each with its own sound picker. They work for every quest the tracker can show, world quests and bonus objectives included, and a progress bar filling counts as progress. Only one sound plays at a time, the biggest one you have turned on, so the kill that finishes a quest plays only the quest's sound while Quest Sound is on. A new quiet Tick sound joins the sound lists as the progress sound's starting pick, and /eqot status has a new line counting what the two sounds heard and played.",
+                "A new Sound Channel choice at the top of the Sounds card picks which of the game's volume sliders every EQ Objective Tracker sound follows: Master Volume, which they have always used, Effects, Music, Ambience or Dialog. Picking one plays your quest sound on it. Every sound list now also offers the sounds other addons share through LibSharedMedia, after EQ Objective Tracker's own.",
+                "A new Show the quest log count on the tracker box, on the Tracker tab's Headers and Buttons card, shows how many quests are in your quest log and how many it can hold, such as 14/25, at the left end of the tracker's button bar. It turns red when your log is full and hides with the buttons while Show the buttons only on mouseover is on. On retail and WoW Forever it is the game's own count of your quests. It is off by default, and /eqot status has a new line for it.",
+                "A ninth sort order, Progress, puts the quests furthest along first, by how much of each objective is done, with finished quests at the top and failed ones at the bottom. It is in the Sort Order list and on the sort button, and picking it again on the sort button reverses it, as with the other orders. Achievements and the other sections sort by their own progress too.",
+            } },
+        },
+    },
+    {
         version = "2.19.0", date = "2026-11-20",
         sections = {
             { head = "New Features", items = {
@@ -396,16 +408,6 @@ ns.Changelog = {
             { head = "Improvements", items = {
                 "Every language is fully translated again. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese now cover the whole addon, including both new options, the quest accepted and turned in sounds, the progress bar settings, and the reworded Reset all settings tooltip.",
                 "/eqot status now shows when the tracker last asked the game to play one of its sounds and what the game answered, and, for the quests that are complete right now, how many the tracker has on record as complete, as unfinished, or not at all. Both are there to help find out why the Quest Sound can play minutes late on WoW Forever.",
-            } },
-        },
-    },
-    {
-        version = "1.25.1", date = "2026-09-19",
-        sections = {
-            { head = "Bug Fixes", items = {
-                "A finished quest that is turned in from the objective tracker rather than at an NPC, such as a Prey hunt for Astalor Bloodsworn, can now be turned in with this tracker. Left-clicking it opens the reward window, as the default tracker does, and the quest shows the default tracker's \"click to complete\" line. Until now this tracker offered only the Quest Complete box, and a quest that never showed one could not be turned in without the default tracker. This one could not be tested on a finished hunt before release, so please report anything that looks wrong.",
-                "Pressing a quest in the tracker and letting go of the mouse button somewhere else no longer counts as clicking it.",
-                "A quest whose text wraps onto several lines is no longer drawn over by the quest below it. The tracker now measures each quest again once it has been drawn, and lays itself out again when a height has changed. This was seen on WoW Forever.",
             } },
         },
     },

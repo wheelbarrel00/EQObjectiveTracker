@@ -12,6 +12,8 @@ local SORT_OPTIONS = {
       tip = L["Alphabetical by name."] },
     { value = "status",   label = L["Status"],
       tip = L["Puts everything that is ready to turn in at the top."] },
+    { value = "progress", label = L["Progress"],
+      tip = L["Furthest along first, by how much of each objective is done. Ties go in alphabetical order."] },
     { value = "type",     label = L["Type"],
       tip = L["Weekly first, then daily, then everything else. Only quests carry a type, so other sections fall back to alphabetical."] },
     { value = "level",    label = L["Level"],
@@ -261,6 +263,12 @@ Options:RegisterTab({
         onScreen:Add(self:CreateCheckbox(content, L["Auto minimize finished quests"], autoGet, autoSet,
             L["Folds every finished quest to its title and (Complete). Open one with its + or the right-click menu and it stays open. A quest you can hand in by clicking it stays open, so its line saying so still shows."]))
 
+        -- On by default, so an unset key reads ticked.
+        onScreen:Add(self:CreateCheckbox(content, L["Show hand-in text on finished quests"],
+            function() return DB().showHandInText ~= false end,
+            function(v) DB().showHandInText = v; render() end,
+            L["A quest ready to turn in shows one line in place of its finished objectives, saying where to hand it in when the game says, or that it is ready for turn-in. A failed quest shows that it failed. On by default."]))
+
         onScreen:Add(self:CreateCheckbox(content, L["Simplify tracked achievements"],
             function() return DB().simplifyGroups and DB().simplifyGroups.achievements end,
             function(v)
@@ -279,7 +287,7 @@ Options:RegisterTab({
             self:MeasureContent(content)
         end
 
-        -- Eight choices, so the library draws this as a dropdown with each choice's tip on its row.
+        -- Nine choices, so the library draws this as a dropdown with each choice's tip on its row.
         onScreen:Add(self:CreateRadioGroup(content, L["Sort Order"],
             SORT_OPTIONS,
             function() return DB().sortMode or "zone" end,
@@ -655,6 +663,14 @@ Options:RegisterTab({
             end,
             L["A small funnel at the left end of the tracker's button bar that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default."]))
 
+        headers:Add(self:CreateCheckbox(content, L["Show the quest log count on the tracker"],
+            function() return DB().showLogCount == true end,
+            function(v)
+                DB().showLogCount = v
+                ns:GetModule("Tracker"):ApplyHeaderIcons()
+            end,
+            L["Shows how many quests are in your quest log and how many it can hold, such as 14/25, at the left end of the tracker's button bar. It turns red when your log is full. Off by default."]))
+
         headers:Add(self:CreateCheckbox(content, L["Show the button bar at the bottom of the tracker"],
             function() return DB().buttonBarBottom == true end,
             function(v)
@@ -669,7 +685,7 @@ Options:RegisterTab({
                 DB().buttonsOnMouseover = v
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
-            L["Hides the cogwheel, the sort and filter buttons and any buttons other addons add to the tracker until you point at the bar they sit on, at the top or the bottom of the tracker. Off by default."]))
+            L["Hides the cogwheel, the sort and filter buttons, the quest log count and any buttons other addons add to the tracker until you point at the bar they sit on, at the top or the bottom of the tracker. Off by default."]))
         -- EQ's Show Chain Guide icon is deliberately not ported: it opens EQ's Chain Guide, which
         -- EQOT does not have.
 
@@ -760,7 +776,7 @@ Options:RegisterTab({
             ns:GetModule("Media"):Play(value)
         end
         -- The list is rebuilt on every open rather than captured, which is what CreateDropdown's
-        -- function form is for, and all three pickers want the identical one.
+        -- function form is for, and every picker wants the identical one.
         local function soundList()
             local labels, values = ns:GetModule("Media"):GetSoundList()
             local out = {}
@@ -770,7 +786,21 @@ Options:RegisterTab({
             return out
         end
 
-        -- Each picker sits under the switch it belongs to and is never dimmed: two of the three
+        local function channelList()
+            local Media, out = ns:GetModule("Media"), {}
+            for _, v in ipairs(Media.CHANNELS) do
+                out[#out + 1] = { value = v, label = Media:ChannelLabel(v) }
+            end
+            return out
+        end
+        -- Picking one plays the quest sound, so the player hears where their sounds now go.
+        sounds:Add(self:CreateDropdown(content, L["Sound Channel"],
+            channelList,
+            function() return DB().soundChannel or "Master" end,
+            function(v) DB().soundChannel = v; playSound(DB().questCompleteSound) end,
+            L["Which volume slider in the game's sound settings these sounds follow. Master Volume by default."]))
+
+        -- Each picker sits under the switch it belongs to and is never dimmed: most of the
         -- switches ship off, and a picker grayed out in the common state reads as broken (the
         -- author's call, 2026-10-01).
         sounds:Add(self:CreateCheckbox(content, L["Quest Sound"],
@@ -811,6 +841,30 @@ Options:RegisterTab({
             function() return DB().questTurnInSound or "NONE" end,
             function(v) DB().questTurnInSound = v; playSound(v) end,
             L["Which sound plays when you hand a quest in at the quest giver."],
+            nil, playSound), { dependent = true })
+
+        sounds:Add(self:CreateCheckbox(content,
+            L["Play a sound when an objective is finished"],
+            function() return DB().objectiveDoneSoundEnabled == true end,
+            function(v) DB().objectiveDoneSoundEnabled = v end,
+            L["Off by default. It has its own sound below. When the same moment also finishes a quest and Quest Sound is on, only the quest's sound plays."]))
+        sounds:Add(self:CreateDropdown(content, L["Objective Finished Sound"],
+            soundList,
+            function() return DB().objectiveDoneSound or "NONE" end,
+            function(v) DB().objectiveDoneSound = v; playSound(v) end,
+            L["Which sound plays when you finish one of a quest's objectives."],
+            nil, playSound), { dependent = true })
+
+        sounds:Add(self:CreateCheckbox(content,
+            L["Play a sound when you make progress on an objective"],
+            function() return DB().objectiveProgressSoundEnabled == true end,
+            function(v) DB().objectiveProgressSoundEnabled = v end,
+            L["Off by default. Plays for each step, such as 3/10 to 4/10. Only one sound plays at a time, so a step that also finishes an objective or a quest plays that sound instead, if it is turned on."]))
+        sounds:Add(self:CreateDropdown(content, L["Objective Progress Sound"],
+            soundList,
+            function() return DB().objectiveProgressSound or "NONE" end,
+            function(v) DB().objectiveProgressSound = v; playSound(v) end,
+            L["Which sound plays when an objective moves forward."],
             nil, playSound), { dependent = true })
 
         -- The zone progress bar's two toggles and the bonus objectives HUD's three used to be on

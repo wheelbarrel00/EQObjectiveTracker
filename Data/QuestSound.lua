@@ -25,6 +25,9 @@ local SCAN_DEBOUNCE  = 0.2
 local MAX_LOG_INDEX = 75
 
 local lastComplete = {}
+-- Per quest, how many objectives are finished and the sum of their counts, a bar's percentage
+-- included. Flat and swapped each scan, so keeping them needs no new table.
+local lastFin, lastSum, scratchFin, scratchSum = {}, {}, {}, {}
 -- Keys are prefixed per path. Accept and turn in are both quest IDs, and an auto-completing
 -- quest can pass through both inside the dedup window.
 local recentKeys   = {}
@@ -37,6 +40,7 @@ local armed        = false
 local stats = {
     scans = 0, walked = 0, done = 0, derived = 0, failed = 0, held = 0,
     scanSaw = 0, scanPlayed = 0, turnIns = 0,
+    finSeen = 0, finPlayed = 0, progSeen = 0, progPlayed = 0,
     surface = "no scan yet",
 }
 
@@ -73,11 +77,13 @@ local function recordRecent(key)
     recentKeys[key] = now + DEDUP_WINDOW_S
 end
 
--- Read before any work rather than only inside playObjectivesSound. The scan walks the whole
--- quest log, so gating at the end paid the feature's full cost while it was switched off.
+-- Read before any work rather than only at the play below. The scan walks the whole quest log, so
+-- gating at the end paid the feature's full cost while it was switched off.
 local function soundEnabled()
     local cfg = ns:GetModule("DB"):Tracker()
-    return (cfg and cfg.questSoundEnabled ~= false) and true or false
+    if not cfg then return false end
+    return cfg.questSoundEnabled ~= false or cfg.objectiveDoneSoundEnabled == true
+        or cfg.objectiveProgressSoundEnabled == true
 end
 
 -- No fallback name. Three paths share this now, so a default here would mean "if the turn in
@@ -86,10 +92,23 @@ local function playFile(name)
     ns:GetModule("Media"):Play(name)
 end
 
-local function playObjectivesSound()
-    local cfg = ns:GetModule("DB"):Tracker()
-    if not (cfg and cfg.questSoundEnabled ~= false) then return end
-    playFile(cfg.questCompleteSound)
+local function readObjectives(id)
+    if not ns.Has.QuestObjectives then return 0, 0, 0 end
+    local objs = C_QuestLog.GetQuestObjectives(id)
+    local n    = objs and #objs or 0
+    local fin, sum = 0, 0
+    for i = 1, n do
+        local o = objs[i]
+        if o.finished then fin = fin + 1 end
+        sum = sum + (tonumber(o.numFulfilled) or 0)
+        -- A bar reading 0 of 1 keeps its fill in neither count, so its percentage is the progress
+        if o.type == "progressbar" and o.numRequired ~= 100 then
+            local QP = ns:GetModule("QuestProgress")
+            local pct = QP and QP:PercentQuiet(id)
+            sum = sum + (tonumber(pct) or 0)
+        end
+    end
+    return n, fin, sum
 end
 
 -- Blizzard's own complete flag is not enough: it leaves empty objectives on some quests that
@@ -98,29 +117,27 @@ end
 -- because one whose objectives have not streamed in yet is indistinguishable from one that never
 -- had any.
 local function objectivesDone(id)
-    if not ns.Has.QuestObjectives then return false end
-    local objs = C_QuestLog.GetQuestObjectives(id)
-    local n    = objs and #objs or 0
-    if n == 0 then return false end
-    for i = 1, n do
-        if not objs[i].finished then return false end
-    end
-    return true
+    local n, fin = readObjectives(id)
+    return n > 0 and fin == n
 end
 
-local pending = 0
+-- pendingShown counts the completions of quests the tracker draws, the only ones the two
+-- objective sounds hear.
+local pending, pendingShown, pendingFin, pendingProg = 0, 0, 0, 0
 
-local function visit(id, title, flag, failed)
+local function visit(id, title, flag, failed, hidden)
     stats.walked = stats.walked + 1
     if failed then stats.failed = stats.failed + 1 end
 
     local now = flag
+    local n, fin, sum = 0, 0, 0
     -- A FAILED quest is refused the derived answer as well. Both surfaces already report it as
-    -- not complete - retail through IsComplete, Classic through the -1 in slot 6 - and asking
-    -- objectivesDone anyway hands back true for a failed escort whose objectives all read
-    -- finished, which is the one state where the two answers disagree.
+    -- not complete - retail through IsComplete, Classic through the -1 in slot 6 - and deriving
+    -- it anyway hands back true for a failed escort whose objectives all read finished, which is
+    -- the one state where the two answers disagree.
     if not now and not failed then
-        now = objectivesDone(id)
+        n, fin, sum = readObjectives(id)
+        now = n > 0 and fin == n
         if now then stats.derived = stats.derived + 1 end
     end
     -- Guards a complete quest reading incomplete across a loading screen: writing that in makes
@@ -138,12 +155,39 @@ local function visit(id, title, flag, failed)
     -- must stay silent, or a quest that arrives finished sounds as though it just finished
     if armed and now and lastComplete[id] == false then
         pending = pending + 1
+        if not hidden then pendingShown = pendingShown + 1 end
         stats.scanSaw = stats.scanSaw + 1
         -- "done", not "played": one chime plays per SCAN while this is written per QUEST,
         -- so three finishing together would otherwise read as three sounds on the very line
         -- someone checks to answer "did it play". The counters carry that.
         logEvent("scan", title, "done")
     end
+
+    -- A hidden quest is never drawn (world quests and bonus areas are not hidden here), and a failed
+    -- or flagged-complete one is not read, so their records go and a later reading starts fresh. An
+    -- empty reading keeps the record.
+    if hidden or failed or flag then return end
+    if n == 0 then
+        scratchFin[id], scratchSum[id] = lastFin[id], lastSum[id]
+        return
+    end
+    -- Until the log is confirmed a reading is recorded and never heard, and a drop is held, so a
+    -- login or a loading screen reading low first sounds nothing on the way back up.
+    local oldFin, oldSum = lastFin[id], lastSum[id]
+    local ready = QuestCache:IsReady()
+    if oldFin and not ready and (fin < oldFin or sum < oldSum) then
+        fin, sum = oldFin, oldSum
+    end
+    if armed and ready and oldFin ~= nil then
+        if fin > oldFin then
+            pendingFin = pendingFin + 1
+            stats.finSeen = stats.finSeen + 1
+        elseif sum > oldSum then
+            pendingProg = pendingProg + 1
+            stats.progSeen = stats.progSeen + 1
+        end
+    end
+    scratchFin[id], scratchSum[id] = fin, sum
 end
 
 -- Retail answers on C_QuestLog and Classic answers on the flat globals, and NONE of the three
@@ -161,7 +205,12 @@ local function walkQuestLog()
             if info and not info.isHeader and info.questID then
                 local flag   = ns.Has.QuestIsComplete and C_QuestLog.IsComplete(info.questID)
                 local failed = ns.Has.QuestIsFailed and C_QuestLog.IsFailed(info.questID)
-                visit(info.questID, info.title, flag and true or false, failed and true or false)
+                -- A bonus area and a world quest you stand in sit in the log hidden, and they are drawn
+                local hidden = info.isHidden and not (info.isTask
+                    or (C_QuestLog.IsQuestTask and C_QuestLog.IsQuestTask(info.questID))
+                    or (C_QuestLog.IsWorldQuest and C_QuestLog.IsWorldQuest(info.questID)))
+                visit(info.questID, info.title, flag and true or false, failed and true or false,
+                      hidden and true or false)
             end
         end
         return true
@@ -193,7 +242,7 @@ local function detectTransitions()
         return
     end
 
-    pending        = 0
+    pending, pendingShown, pendingFin, pendingProg = 0, 0, 0, 0
     stats.scans    = stats.scans + 1
     stats.scanAt   = GetTime()
     stats.walked   = 0
@@ -201,6 +250,8 @@ local function detectTransitions()
     stats.derived  = 0
     stats.failed   = 0
     wipe(scratch)
+    wipe(scratchFin)
+    wipe(scratchSum)
 
     if not walkQuestLog() then return end
 
@@ -215,6 +266,13 @@ local function detectTransitions()
         end
     end
     for id, v in pairs(scratch) do lastComplete[id] = v end
+    if holding then
+        for id, v in pairs(lastFin) do
+            if scratch[id] == nil then scratchFin[id], scratchSum[id] = v, lastSum[id] end
+        end
+    end
+    lastFin, scratchFin = scratchFin, lastFin
+    lastSum, scratchSum = scratchSum, lastSum
 
     -- Belt and braces. The gate in visit already refuses while armed is false, so this can
     -- never be what keeps a cold login quiet - it is a second floor under that gate.
@@ -222,10 +280,19 @@ local function detectTransitions()
         armed = true
         return
     end
-    if pending > 0 then
+    -- One sound a scan: the biggest that happened and is switched on. A completed quest the tracker
+    -- draws counts as a finished objective and as progress too, so a smaller switch still hears it.
+    local cfg = ns:GetModule("DB"):Tracker()
+    if pending > 0 and cfg.questSoundEnabled ~= false then
         stats.scanPlayed   = stats.scanPlayed + 1
         stats.scanPlayedAt = GetTime()
-        playObjectivesSound()
+        playFile(cfg.questCompleteSound)
+    elseif pendingShown + pendingFin > 0 and cfg.objectiveDoneSoundEnabled == true then
+        stats.finPlayed = stats.finPlayed + 1
+        playFile(cfg.objectiveDoneSound)
+    elseif pendingShown + pendingFin + pendingProg > 0 and cfg.objectiveProgressSoundEnabled == true then
+        stats.progPlayed = stats.progPlayed + 1
+        playFile(cfg.objectiveProgressSound)
     end
 end
 
@@ -362,13 +429,18 @@ function QuestSound:DebugLine()
     end
 
     local lines = {
-        ("quest sound: objectives %s (%s), accept %s (%s), turn in %s (%s)"):format(
+        ("quest sound: objectives %s (%s), accept %s (%s), turn in %s (%s), finished %s (%s), progress %s (%s)")
+            :format(
             (cfg.questSoundEnabled ~= false) and "on" or "off",
             tostring(cfg.questCompleteSound),
             cfg.questAcceptSoundEnabled and "on" or "off",
             tostring(cfg.questAcceptSound),
             cfg.questTurnInSoundEnabled and "on" or "off",
-            tostring(cfg.questTurnInSound)),
+            tostring(cfg.questTurnInSound),
+            cfg.objectiveDoneSoundEnabled == true and "on" or "off",
+            tostring(cfg.objectiveDoneSound),
+            cfg.objectiveProgressSoundEnabled == true and "on" or "off",
+            tostring(cfg.objectiveProgressSound)),
         ("objectives path: armed %s, log via %s, IsComplete api %s"):format(
             armed and "yes" or "no", stats.surface, tostring(ns.Has.QuestIsComplete)),
         ("%d scans, %d quests walked, %d read done (%d of them from the objectives), %d read failed, last scan %s")
@@ -377,6 +449,8 @@ function QuestSound:DebugLine()
         ("scan saw %d, played %d (last %s) | turn ins seen %d | %d held over a loading screen")
             :format(stats.scanSaw, stats.scanPlayed, ago(stats.scanPlayedAt), stats.turnIns,
                     stats.held),
+        ("objective sounds: finished seen %d, played %d | progress seen %d, played %d"):format(
+            stats.finSeen, stats.finPlayed, stats.progSeen, stats.progPlayed),
         ("done by objectives but not by Blizzard's flag right now: %d%s"):format(
             mismatch, firstMismatch and (" -> " .. firstMismatch) or ""),
         ("complete right now: %d recorded complete, %d recorded unfinished, %d unrecorded%s")

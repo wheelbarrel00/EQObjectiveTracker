@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 2.19.0
+## Version: 2.20.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -55,6 +55,7 @@ Data\WatchPersist.lua
 Data\SuperTrackPersist.lua
 Data\AutoTrack.lua
 Data\QuestSound.lua
+Data\LogCount.lua
 Data\QuestItems.lua
 Data\QuestRewards.lua
 Data\AutoQuestPopups.lua

@@ -348,6 +348,18 @@ local function buildBlocks(entry, cfg, folded)
     _nBlocks, _nText = 0, 0
     if folded then return end
 
+    -- A finished or failed quest's one line, in place of its objectives and ahead of every filter
+    if entry.handIn and not (cfg and cfg.showHandInText == false) then
+        if entry.state == STATE.FAILED then
+            _nText = 1
+            _scratch[1] = "|cffd94545" .. entry.handIn .. "|r"
+            flushText()
+        else
+            pushCheckLine("|cff" .. hex .. entry.handIn .. "|r")
+        end
+        return
+    end
+
     for i = 1, #lines do
         local ln = lines[i]
         if not (hideDone and ln.completed) then

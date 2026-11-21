@@ -286,6 +286,15 @@ local function fillLines(e, id, index)
         end
     end
 
+    -- Era's completion text call answers with a quest's special objective, not where to hand it in,
+    -- so the ready word stands alone here.
+    e.handIn = nil
+    if e.state == STATE.COMPLETE then
+        e.handIn = QUEST_WATCH_QUEST_READY
+    elseif e.state == STATE.FAILED then
+        e.handIn = FAILED
+    end
+
     Entry.EndLines(e)
 end
 

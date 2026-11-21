@@ -79,8 +79,8 @@ local function secureLocked()
 end
 
 -- The sort button sits 4 px in from the left edge and the filter button after it, each with a 3 px
--- gap. The x for the filter button, or with pastFilter the x just past both, where the move bar's
--- check button goes.
+-- gap. The x for the filter button, or with pastFilter the x just past both, where the quest log
+-- count goes, with the move bar's check after it.
 local function leftButtonX(cfg, pastFilter)
     local x = 4
     if cfg and cfg.showSortButton == true then x = x + HEADER_ICON_SZ + 3 end
@@ -616,6 +616,11 @@ function Tracker:ApplyHeaderIcons()
         filter:SetPoint(edge .. "LEFT", drag, edge .. "LEFT", leftButtonX(cfg, false), y)
         self:PaintFilterButton()
     end
+    local logCount = f.logCount
+    if logCount then
+        logCount:ClearAllPoints()
+        logCount:SetPoint("LEFT", drag, "LEFT", leftButtonX(cfg, true), 0)
+    end
 
     local prev
     for i = 1, #f.headerIcons do
@@ -636,6 +641,7 @@ function Tracker:ApplyHeaderIcons()
     f._lastIcon = prev
     self:LayoutMoveBar()
     self:PaintBarButtons()
+    self:PaintLogCount()
 end
 
 -- Hidden buttons keep the mouse: each sits inside the strip, so entering one reveals them all. The
@@ -647,7 +653,33 @@ function Tracker:PaintBarButtons()
     local a = (cfg and cfg.buttonsOnMouseover == true and not f._barShown) and 0 or 1
     if f.sortButton then f.sortButton:SetAlpha(a) end
     if f.filterButton then f.filterButton:SetAlpha(a) end
+    if f.logCount then f.logCount:SetAlpha(a) end
     for i = 1, #f.headerIcons do f.headerIcons[i]:SetAlpha(a) end
+end
+
+-- Shown in move mode too, since the options window starts it, so the move bar's check moves along.
+function Tracker:PaintLogCount()
+    local f = self.frame
+    local fs = f and f.logCount
+    if not fs then return end
+    local cfg = ns:GetModule("DB"):Tracker()
+    local LogCount = ns:GetModule("LogCount")
+    local count, cap
+    if cfg and cfg.showLogCount == true and LogCount then
+        count, cap = LogCount:Get()
+    end
+    if count and cap then
+        fs:SetText(("%d/%d"):format(count, cap))
+        if count >= cap then
+            fs:SetTextColor(0.85, 0.27, 0.27)
+        else
+            fs:SetTextColor(1, 1, 1)
+        end
+        fs:Show()
+    else
+        fs:Hide()
+    end
+    self:LayoutMoveBar()
 end
 
 -- The list moves with the strip, so it is laid out again and its bounds change.
@@ -867,6 +899,7 @@ function Tracker:LayoutMoveBar()
     if not (f and f.moveBar) then return end
     local done, label = f.moveDone, f.moveLabel
     local left = leftButtonX(ns:GetModule("DB"):Tracker(), true)
+    if f.logCount and f.logCount:IsShown() then left = left + f.logCount:GetStringWidth() + 4 end
     done:ClearAllPoints()
     done:SetPoint("LEFT", f.moveBar, "LEFT", left, 0)
     label:ClearAllPoints()
@@ -942,6 +975,9 @@ function Tracker:BuildFrame()
     drag:SetHeight(DRAG_HANDLE_H)
     drag:EnableMouse(true)
     drag:RegisterForDrag("LeftButton")
+    -- A FontString on the strip takes no mouse, so a drag that starts on it still moves the tracker.
+    f.logCount = drag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.logCount:Hide()
 
     local hint = drag:CreateTexture(nil, "OVERLAY")
     hint:SetAllPoints()
@@ -2386,6 +2422,7 @@ function Tracker:Render()
         Visibility:SetQuestRows(questRows)
         Visibility:ReleaseInput()
     end
+    self:PaintLogCount()
     ns:GetModule("API"):NotifyLayout()
 end
 

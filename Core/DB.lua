@@ -58,6 +58,13 @@ DB.defaults = {
             -- giver. The scan walks both quest log surfaces, so that is every flavor, not just
             -- Classic where the accident used to live.
             questTurnInSound        = "EQ: Ready Check",
+            -- Off, like the two pairs above. Progress plays on every step, so its seed is a short
+            -- click.
+            objectiveDoneSoundEnabled     = false,
+            objectiveDoneSound            = "EQ: Quest Open",
+            objectiveProgressSoundEnabled = false,
+            objectiveProgressSound        = "EQ: Tick",
+            soundChannel                  = "Master",
 
             showOnlyWatched      = true,
             sortMode             = "zone",
@@ -66,6 +73,7 @@ DB.defaults = {
             simplifyMode         = false,
             hideFinishedObjectives = false,
             autoMinimizeFinished = false,
+            showHandInText = true,
             showFoldButtons      = false,
             simplifyGroups       = {},
 
@@ -174,6 +182,7 @@ DB.defaults = {
             showOptionsIcon      = true,
             showSortButton       = false,
             showFilterButton     = false,
+            showLogCount         = false,
             buttonBarBottom      = false,
             buttonsOnMouseover   = false,
             splitQuestClick      = false,

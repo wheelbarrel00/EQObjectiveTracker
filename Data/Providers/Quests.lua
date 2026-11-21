@@ -138,6 +138,17 @@ local function isAutoComplete(id)
     return (info and info.isAutoComplete) and true or false
 end
 
+-- The game's own line saying where to hand the quest in, else its ready word. Tested for a secret
+-- before the compare, since a secret value raises when compared.
+local function handInText(id)
+    local index = GetQuestLogCompletionText and C_QuestLog.GetLogIndexForQuestID
+                  and C_QuestLog.GetLogIndexForQuestID(id)
+    local text = index and GetQuestLogCompletionText(index)
+    local secret = _G.issecretvalue
+    if type(text) == "string" and not (secret and secret(text)) and text ~= "" then return text end
+    return QUEST_WATCH_QUEST_READY
+end
+
 local function fillLines(e, id)
     Entry.BeginLines(e)
     local objs = ns.Has.QuestObjectives and C_QuestLog.GetQuestObjectives(id) or nil
@@ -186,6 +197,13 @@ local function fillLines(e, id)
         local ln = Entry.PushLine(e)
         ln.text = QUEST_WATCH_CLICK_TO_COMPLETE
         e.clickToComplete = true
+    end
+
+    e.handIn = nil
+    if e.state == STATE.COMPLETE and not e.clickToComplete then
+        e.handIn = handInText(id)
+    elseif e.state == STATE.FAILED then
+        e.handIn = FAILED
     end
 
     Entry.EndLines(e)

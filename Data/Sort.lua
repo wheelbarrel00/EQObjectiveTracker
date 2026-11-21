@@ -23,6 +23,37 @@ local function byStatus(a, b)
     return byTitle(a, b)
 end
 
+-- The average share done of the lines, a line with no count (an achievement criterion) done or not.
+-- Finished is whole and failed sorts below every live entry.
+local function progressOf(e)
+    if e.state == "complete" then return 1 end
+    if e.state == "failed" then return -1 end
+    local lines = e.lines
+    local sum, n = 0, 0
+    for i = 1, lines and #lines or 0 do
+        local ln = lines[i]
+        local share = 0
+        if ln.completed then
+            share = 1
+        elseif ln.percent then
+            share = ln.percent / 100
+        elseif ln.kind == "weighted" then
+            share = (ln.current or 0) / 100
+        elseif ln.required and ln.required > 0 then
+            share = (ln.current or 0) / ln.required
+        end
+        sum, n = sum + math.max(0, math.min(1, share)), n + 1
+    end
+    if n == 0 then return 0 end
+    return sum / n
+end
+
+local function byProgress(a, b)
+    local pa, pb = progressOf(a), progressOf(b)
+    if pa ~= pb then return pa > pb end
+    return byTitle(a, b)
+end
+
 -- Ranked on the tags rather than on entry.frequency, which the two flavors number
 -- differently: Classic's flat quest log calls daily 2 and weekly 3 where retail's enum
 -- calls them 1 and 2, so a raw descending compare agreed only by accident and retail's
@@ -90,6 +121,7 @@ local MODES = {
     zone     = byZone,
     title    = byTitle,
     status   = byStatus,
+    progress = byProgress,
     type     = byType,
     level    = byLevel,
     recent   = byRecent,
@@ -117,6 +149,11 @@ local REVERSED = {
     type = function(a, b)
         local ra, rb = typeRank(a), typeRank(b)
         if ra ~= rb then return ra < rb end
+        return byTitle(a, b)
+    end,
+    progress = function(a, b)
+        local pa, pb = progressOf(a), progressOf(b)
+        if pa ~= pb then return pa < pb end
         return byTitle(a, b)
     end,
     level = function(a, b)

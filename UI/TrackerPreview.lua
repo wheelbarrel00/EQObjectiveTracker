@@ -22,8 +22,9 @@ local ZONE_GROUP = { visibleCount = 0, totalCount = 0 }
 local TAB_SAMPLES = { "Campaign, Quests", "World Quests" }
 
 -- Made up to show each way a row can look. English on every client: they are sample data, like the
--- diagnostic lines on the About tab, so they carry no translation keys. Rebuilt per refresh, so the
--- NEW tag and the difficulty colors follow the clock and the player's level.
+-- diagnostic lines on the About tab, so they carry no translation keys. The finished one's hand-in
+-- line is the game's own word. Rebuilt per refresh, so the NEW tag and the difficulty colors follow
+-- the clock and the player's level.
 function Preview:Samples()
     local QC    = (Enum and Enum.QuestClassification) or {}
     local level = (UnitLevel and UnitLevel("player")) or 1
@@ -55,6 +56,7 @@ function Preview:Samples()
             }),
             quest(90004, "quests", "Supplies for the Outpost", {
                 state = STATE.COMPLETE, level = level - 4, zone = "Northern Vale",
+                handIn = QUEST_WATCH_QUEST_READY,
                 lines = { { text = "6/6 Crates delivered", kind = LINE.OBJECTIVE, completed = true } },
             }),
             quest(90005, "quests", "The Missing Scout", {

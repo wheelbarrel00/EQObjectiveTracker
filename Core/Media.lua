@@ -119,12 +119,13 @@ local KIT_SOUNDS = {
     { name = "EQ: Quest Open",   kit = "IG_QUEST_LIST_OPEN" },
     { name = "EQ: Ready Check",  kit = "READY_CHECK" },
     { name = "EQ: Raid Warning", kit = "RAID_WARNING" },
+    { name = "EQ: Tick",         kit = "IG_MAINMENU_OPTION_CHECKBOX_ON" },
 }
 
 -- Two questions, deliberately not one function. Answering "is this a kit name" with the kit's
 -- ID conflates it with "does this client know that kit", and every guard below asks the first
 -- while a client missing the kit answers the second - which sent a kit name through to
--- GetSoundFile's fallback and played the first voice line instead.
+-- a fallback that played the first voice line instead.
 local function isKitName(name)
     for i = 1, #KIT_SOUNDS do
         if KIT_SOUNDS[i].name == name then return true end
@@ -159,6 +160,29 @@ function Media:OnInitialize()
     self.LSM = LSM
 end
 
+-- The value is what PlaySound and PlaySoundFile take, and each label is the game's own slider name
+Media.CHANNELS = { "Master", "SFX", "Music", "Ambience", "Dialog" }
+local CHANNEL_LABELS = { Master = "MASTER_VOLUME", SFX = "FX_VOLUME", Music = "MUSIC_VOLUME",
+                         Ambience = "AMBIENCE_VOLUME", Dialog = "DIALOG_VOLUME" }
+
+function Media:Channel()
+    local DB  = ns:GetModule("DB")
+    local cfg = DB and DB:Tracker()
+    local ch  = cfg and cfg.soundChannel
+    return CHANNEL_LABELS[ch] and ch or "Master"
+end
+
+function Media:ChannelLabel(value)
+    local global = CHANNEL_LABELS[value]
+    return (global and _G[global]) or value
+end
+
+local function ownSound(name)
+    for _, s in ipairs(SOUNDS) do
+        if s.name == name then return s end
+    end
+end
+
 -- Labels drop the "EQ: " prefix, values keep it - the value is what a profile stores
 function Media:GetSoundList()
     -- The client's own word for it, so this reads right in every language the game ships and
@@ -178,6 +202,15 @@ function Media:GetSoundList()
         out[#out + 1] = label
         labels[label] = s.name
     end
+    -- Other addons' sounds, after EQOT's own. A name reading like one of EQOT's labels is left
+    -- out, or it would take that label's value.
+    local shared = self.LSM and self.LSM:List("sound")
+    for _, name in ipairs(shared or {}) do
+        if name ~= "None" and not ownSound(name) and not isKitName(name) and not labels[name] then
+            out[#out + 1] = name
+            labels[name] = name
+        end
+    end
     return out, labels
 end
 
@@ -190,11 +223,10 @@ end
 -- call keeps its time and the client's own willPlay answer.
 local lastPlay
 
--- Everything that makes a noise goes through here rather than reaching for a file, or a kit
--- sound falls through to the fallback at the bottom of GetSoundFile and the player hears the
--- wrong one. A kit name this client cannot resolve is SILENT rather than substituted, which is
--- the honest failure: the picker does not offer it either, so a substitute could not be
--- recognized or changed.
+-- Everything that makes a noise goes through here, so every sound follows the saved channel. A
+-- kit name this client cannot resolve is SILENT rather than substituted, which is the honest
+-- failure: the picker does not offer it either, so a substitute could not be recognized or
+-- changed.
 function Media:Play(name)
     if not name or name == "NONE" then return end
     local at = GetTime()
@@ -204,9 +236,10 @@ function Media:Play(name)
             lastPlay = { name = name, at = at, outcome = "no kit on this client" }
             return
         end
-        local ok, willPlay = pcall(PlaySound, kit, "Master")
+        local channel = self:Channel()
+        local ok, willPlay = pcall(PlaySound, kit, channel)
         lastPlay = { name = name, at = at, kit = kit,
-                     outcome = ok and ("willPlay " .. tostring(willPlay)) or "raised" }
+                     outcome = (ok and ("willPlay " .. tostring(willPlay)) or "raised") .. " on " .. channel }
         return
     end
     local file = self:GetSoundFile(name)
@@ -214,9 +247,10 @@ function Media:Play(name)
         lastPlay = { name = name, at = at, outcome = "no file" }
         return
     end
-    local ok, willPlay = pcall(PlaySoundFile, file, "Master")
+    local channel = self:Channel()
+    local ok, willPlay = pcall(PlaySoundFile, file, channel)
     lastPlay = { name = name, at = at, file = file,
-                 outcome = ok and ("willPlay " .. tostring(willPlay)) or "raised" }
+                 outcome = (ok and ("willPlay " .. tostring(willPlay)) or "raised") .. " on " .. channel }
 end
 
 -- Every Play shares one record, so an accept, a turn in or the options preview replaces the
@@ -230,17 +264,11 @@ function Media:LastPlayLine()
 end
 
 function Media:GetSoundFile(name)
-    if name == "NONE" then return nil end
-    -- A kit has no file, and the fallback below would hand back the first voice line for one
-    if isKitName(name) then return nil end
-    if self.LSM then
-        local f = self.LSM:Fetch("sound", name)
-        if f then return f end
-    end
-    for _, s in ipairs(SOUNDS) do
-        if s.name == name then return s.file end
-    end
-    return SOUNDS[1].file
+    if not name or name == "NONE" or isKitName(name) then return nil end
+    local own = ownSound(name)
+    if own then return own.file end
+    -- Another addon's sound. Gone with its addon is silence, never a stand-in.
+    return self.LSM and self.LSM:Fetch("sound", name, true) or nil
 end
 
 function Media:GetStatusBarList()

@@ -171,13 +171,18 @@ back.
   own tracker shows them: the quest's type after its title in the game's own words, such as (Elite),
   (Dungeon), (Raid) or (PvP), with (Group) in place of (Elite) on TBC Anniversary, and an elite
   quest's level as [21+] with the level prefix on
+- **Hand-in text** on a quest ready to turn in: one line in place of its finished objectives saying
+  where to hand it in, in the game's own words on retail and WoW Forever, or Ready for turn-in where
+  the game has none, and Failed in red on a failed quest. On by default
 - **Quest popups** for newly discovered quests and ones ready to hand in remotely
 - **Hover any quest** for its objectives and full rewards, including item level
   comparisons against what you have equipped. World quests and timed quests also show their
   faction and how long is left
 
-Also included: a zone progress bar, three optional sounds (when you accept a quest, when its
-last objective falls, and when you hand it in), a highlight on the flight point nearest your
+Also included: a zone progress bar, five optional sounds (when you accept a quest, when one of its
+objectives moves forward, when one of them is finished, when its last objective falls, and when you
+hand it in, the middle three playing only the biggest at once), on the game volume slider you pick
+and from any sound other addons share through LibSharedMedia, a highlight on the flight point nearest your
 tracked quest, and the extra bars and status lines the default tracker shows during world
 events, which would otherwise not appear anywhere.
 
@@ -225,8 +230,10 @@ strip is the tracker's button bar: the cogwheel sits at its right end and the so
 buttons at its left. Show the button bar at the bottom of the tracker, on the Tracker tab's Headers
 and Buttons card, moves it to the bottom edge beside the corner grip, so the quests start at the
 very top and the tracker can sit flush against the top of the screen. Show the buttons only on
-mouseover, on the same card, hides the cogwheel, the sort and filter buttons and other addons'
-buttons until you point at the bar. Tick
+mouseover, on the same card, hides the cogwheel, the sort and filter buttons, the quest log count and
+other addons' buttons until you point at the bar. Show the quest log count on the tracker, on the
+same card, puts how many quests your log holds and how many it can, such as 14/25, at the bar's
+left end, red once the log is full. Tick
 Show the sort button on the tracker, on the Tracker tab, for a small button at the left end of
 the button bar that opens a list of the sort orders, so switching between Level and Distance, or any other
 two, takes two clicks. Pick the order already in use again to reverse it, so Level runs from
@@ -293,7 +300,7 @@ and a Korean or Chinese client none, so the game's own fonts stay in use there),
 the mouse, with the quest you are following kept solid), a background that fades in while the
 mouse is over the tracker, at an opacity you pick, the progress bars, the scroll bar's
 width and texture, a card layout that can wrap the delve and scenario panel as well as your quests, section
-order, visibility and tabs, filters by quest type, finished objectives hidden or shown, and eight sort modes including by distance and by hand, all but Zone and Manual reversible from
+order, visibility and tabs, filters by quest type, finished objectives hidden or shown, and nine sort modes including by distance, by progress and by hand, all but Zone and Manual reversible from
 the sort button.
 The current-zone filter shows only quests with an objective on the map you are standing on.
 If that map lists none of its own, such as a building interior, a covenant sanctum or a

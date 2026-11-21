@@ -5,6 +5,16 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.0] - 2026-11-21
+
+### New Features
+
+- A quest that is ready to turn in now shows one line in place of its finished objectives, saying where to hand it in, as Blizzard's own tracker does. On retail and WoW Forever it is the game's own line, such as "Speak with Magatha in Thunder Bluff.", and a quest the game gives no such line shows "Ready for turn-in". Classic Era and TBC Anniversary have no such line, so a finished quest there shows "Ready for turn-in". A failed quest now shows "Failed" in red in place of its objectives. It is on by default, and the new Show hand-in text on finished quests box, on the Tracker tab's On-Screen Tracker card, turns it off. Simplify Mode and Hide finished objectives keep the line, Auto minimize finished quests still folds a finished quest down to its title, and a quest you hand in by clicking it keeps its click to complete line as before.
+- Two new sounds on the Tracker tab's Sounds card, both off by default: Play a sound when an objective is finished, and Play a sound when you make progress on an objective, each with its own sound picker. They work for every quest the tracker can show, world quests and bonus objectives included, and a progress bar filling counts as progress. Only one sound plays at a time, the biggest one you have turned on, so the kill that finishes a quest plays only the quest's sound while Quest Sound is on. A new quiet Tick sound joins the sound lists as the progress sound's starting pick, and `/eqot status` has a new line counting what the two sounds heard and played.
+- A new Sound Channel choice at the top of the Sounds card picks which of the game's volume sliders every EQ Objective Tracker sound follows: Master Volume, which they have always used, Effects, Music, Ambience or Dialog. Picking one plays your quest sound on it. Every sound list now also offers the sounds other addons share through LibSharedMedia, after EQ Objective Tracker's own.
+- A new Show the quest log count on the tracker box, on the Tracker tab's Headers and Buttons card, shows how many quests are in your quest log and how many it can hold, such as 14/25, at the left end of the tracker's button bar. It turns red when your log is full and hides with the buttons while Show the buttons only on mouseover is on. On retail and WoW Forever it is the game's own count of your quests. It is off by default, and `/eqot status` has a new line for it.
+- A ninth sort order, Progress, puts the quests furthest along first, by how much of each objective is done, with finished quests at the top and failed ones at the bottom. It is in the Sort Order list and on the sort button, and picking it again on the sort button reverses it, as with the other orders. Achievements and the other sections sort by their own progress too.
+
 ## [2.19.0] - 2026-11-20
 
 ### New Features

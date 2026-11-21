@@ -119,6 +119,7 @@ read_globals = {
 
     "GetNumAutoQuestPopUps", "GetAutoQuestPopUp", "RemoveAutoQuestPopUp",
     "ShowQuestComplete", "ShowQuestOffer", "QUEST_WATCH_CLICK_TO_COMPLETE",
+    "GetQuestLogCompletionText", "QUEST_WATCH_QUEST_READY", "FAILED",
     "QuestUtils_IsQuestWorldQuest", "QuestUtils_GetQuestName",
     "QuestMapFrame_OpenToQuestDetails", "QuestMapFrame_GetDetailQuestID", "QuestMapFrame", "ToggleQuestLog",
     "GetQuestLogQuestText",

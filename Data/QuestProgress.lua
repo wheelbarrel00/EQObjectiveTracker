@@ -80,6 +80,17 @@ function QuestProgress:Percent(questID)
     return nil
 end
 
+-- The sound scan reads the same bars every update, and its reads must not stand in for the providers'
+-- on the status line, so the counters are put back.
+function QuestProgress:PercentQuiet(questID)
+    local a, g, t, r = stats.asked, stats.byGlobal, stats.byTask, stats.refused
+    local src, pct0, quest = stats.lastSource, stats.lastPct, stats.lastQuest
+    local pct = self:Percent(questID)
+    stats.asked, stats.byGlobal, stats.byTask, stats.refused = a, g, t, r
+    stats.lastSource, stats.lastPct, stats.lastQuest = src, pct0, quest
+    return pct
+end
+
 -- Which source answered, because the two are tried in order and a client with only the second
 -- looks identical from the row. A bar that never appears is the report this exists to make
 -- readable: a non-zero `asked` beside `N refused` is a client neither API answers for, while
