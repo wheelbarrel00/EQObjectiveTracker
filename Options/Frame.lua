@@ -47,6 +47,16 @@ local ui = EUI:NewContext({
         local g = ns:GetModule("DB"):Global()
         if g then g.optionsWindowScale = v end
     end,
+    -- With the pair the library lets the window hang off the left, right and bottom edges, title bar kept on screen.
+    getWindowPosition = function()
+        local g = ns:GetModule("DB"):Global()
+        local p = g and g.optionsWindowPos
+        if type(p) == "table" then return p.x, p.y end
+    end,
+    setWindowPosition = function(x, y)
+        local g = ns:GetModule("DB"):Global()
+        if g then g.optionsWindowPos = { x = x, y = y } end
+    end,
 })
 Options.ui = ui
 

@@ -106,20 +106,17 @@ local function isCampaign(id, info)
     return (info and info.campaignID and info.campaignID > 0) and true or false
 end
 
+-- Read at the quest's log index, which answers for that quest (measured on Forever), so the quest
+-- log selection is never moved for it.
 local function getFallbackText(id)
     local cached = objTextCache[id]
     if cached ~= nil then return cached end
     local text = ""
-    if C_QuestLog.SetSelectedQuest and GetQuestLogQuestText then
-        local saved = C_QuestLog.GetSelectedQuest and C_QuestLog.GetSelectedQuest()
-        C_QuestLog.SetSelectedQuest(id)
-        local _, objText = GetQuestLogQuestText()
+    local index = GetQuestLogQuestText and C_QuestLog.GetLogIndexForQuestID
+                  and C_QuestLog.GetLogIndexForQuestID(id)
+    if index then
+        local _, objText = GetQuestLogQuestText(index)
         text = objText or ""
-        -- Restored unconditionally: GetSelectedQuest answers 0 when nothing is selected, and
-        -- skipping the restore there leaves Blizzard's quest log opening on whichever quest
-        -- this happened to probe last. Gated on the getter existing, or a flavor that has
-        -- only the setter would clear a selection it could never have read.
-        if C_QuestLog.GetSelectedQuest then C_QuestLog.SetSelectedQuest(saved or 0) end
     end
     -- Never memoize "" - the text may simply not have streamed in yet
     if text ~= "" then objTextCache[id] = text end
@@ -147,6 +144,21 @@ local function handInText(id)
     local secret = _G.issecretvalue
     if type(text) == "string" and not (secret and secret(text)) and text ~= "" then return text end
     return QUEST_WATCH_QUEST_READY
+end
+
+-- Asked only while the box is on: the cheap pass runs on every objective update.
+local function xpWanted()
+    local DB = ns:GetModule("DB")
+    local cfg = DB and DB:Tracker()
+    return cfg ~= nil and cfg.showQuestXP == true
+end
+
+-- Forever's call returns two numbers, so a tonumber() around it would read the second as a base.
+local function questXP(id)
+    if not xpWanted() or ns:GetModule("QuestRewards"):AtLevelCap() then return nil end
+    local xp = GetQuestLogRewardXP and GetQuestLogRewardXP(id)
+    if type(xp) == "number" then return xp end
+    return nil
 end
 
 local function fillLines(e, id)
@@ -417,6 +429,7 @@ local function fullRebuild()
                 e.groupID = e.tags.campaign and "campaign" or "quests"
                 fillTimer(e, id)
                 fillLines(e, id)
+                e.xp = questXP(id)
             end
         end
     end
@@ -473,6 +486,7 @@ local function refreshDynamic()
                            or nil
         fillTimer(e, id)
         fillLines(e, id)
+        e.xp = questXP(id)
     end
     dirtyObjectives = false
 end
@@ -483,6 +497,12 @@ end
 
 function Quests:HasTypeTags()
     return ns.IsForever()
+end
+
+-- The XP box reads the game only while it is on, so a toggle asks for the next pass to read again.
+function Quests:RefreshXP()
+    if primed then dirtyObjectives = true else dirtyAll = true end
+    if self._notifyDirty then self._notifyDirty() end
 end
 
 function Quests:GetEntries()
@@ -915,6 +935,10 @@ function Quests:Enable(notifyDirty)
     Events:On("PLAYER_ENTERING_WORLD",    markAll)
     Events:On("QUEST_LOG_UPDATE",         markDynamic)
     Events:On("QUEST_WATCH_LIST_CHANGED", markDynamic)
+    -- A quest pays less once outleveled, so a ding reads every figure again.
+    Events:On("PLAYER_LEVEL_UP",          markDynamic)
+    -- A second chance, if the level settles after the first pass.
+    Events:On("UNIT_LEVEL", function(_, unit) if unit == "player" then markDynamic() end end)
     Events:On("SUPER_TRACKING_CHANGED",   markDynamic)
     Events:On("ZONE_CHANGED_NEW_AREA",    markZone)
 

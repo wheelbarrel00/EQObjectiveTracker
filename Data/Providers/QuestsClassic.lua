@@ -484,6 +484,14 @@ local function syncFocus()
     end
 end
 
+-- After the walk, so a figure the reward sweep stored this pass shows this pass. The game call is never
+-- asked here: on Era it answers for the selected quest, and TBC is unmeasured.
+local function syncXP()
+    for id, e in store:Each() do
+        e.xp = QuestRewards:StoredXP(id)
+    end
+end
+
 function Quests:GetEntries()
     if dirtyAll then
         fullRebuild()
@@ -492,6 +500,7 @@ function Quests:GetEntries()
     end
     syncWatched()
     syncFocus()
+    syncXP()
     return store:Out()
 end
 

@@ -63,6 +63,7 @@ function TodoMode:Count(group, entry, cfg, provider)
     if not Filter:IsPinned(entry) then
         if not Filter:PassesWatched(entry, cfg) then return end
         if provider.filterCategories and not Filter:PassesCategory(entry, f) then return end
+        if provider.filterCategories and Filter:IsZoneHidden(entry) then return end
     end
     local here     = Filter:IsHere(entry, f, provider)
     local finished = self:IsFinished(entry)

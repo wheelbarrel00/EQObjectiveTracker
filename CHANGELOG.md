@@ -5,6 +5,20 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.21.0] - 2026-11-21
+
+### New Features
+
+- A new Show XP after quest titles box, on the Tracker tab's Quest Row Details card, adds the XP each quest gives after its title in gray, such as (450 XP). Nothing shows for a quest that gives no XP, as every quest does at the level cap. On Classic Era and TBC Anniversary a quest's XP shows once the tracker has read it, a moment after the quest joins your log. Off by default. Requested by Goreforged.
+- A new Show distance after quest titles box, right under it, adds how far away each quest is after its title in gray, such as (120 yd), updated as you move. A quest ready to turn in measures to its turn-in point, and a quest with no known place shows nothing. It does not change the order of your quests, which only the Distance sort order does. Like the XP, it shows on the quests in your quest log, not on world quests or bonus objectives. On Classic Era and TBC Anniversary distances need Everything Quests 2.14.0 or later, as the Distance sort order does. Off by default. The distance line of /eqot status says when the box is on. Requested by Goreforged.
+- You can now hide the quests of any zone you choose. The tracker's filter button lists every zone in your quest log with its number of quests, and a new Hide zones button on the Tracker tab's Filters card opens the same list. Untick a zone to hide its quests, and tick it again to bring them back. A pinned quest always shows, the filter button turns gold while a zone is hidden, and Reset filters to defaults shows every zone again. Hidden zones are kept for each character, and a zone is forgotten once its last quest leaves your log, so a quest you pick up there later shows as normal. The filters line of /eqot status counts the hidden zones. Requested by Vrgasek.
+- A new Button Size slider, on the Tracker tab's Headers and Buttons card, sets the size of the cogwheel, the sort and filter buttons and any buttons other addons add to the tracker, from 10 to 24. The bar they sit on is sized to fit them, and the quest log count's text grows with larger buttons. 13 is the size they have always been. The button bar line of /eqot status names the size. Requested by Vrgasek.
+- A new Show the quest text in its tooltip box, at the end of the Quest Row Details card, adds the quest log's own text to a quest's tooltip: the short paragraph saying what to do and who to go back to, right under the title, and the quest's story in gray after the rewards, so you can read a quest without opening the quest log. Off by default. /eqot status has a new quest text line. Requested by Vrgasek.
+
+### Improvements
+
+- The options window can now hang partly off the left, right or bottom edge of your screen, so it no longer has to cover the tracker while you set it up. Drag it by its title bar, and part of the title bar always stays on screen so you can drag it back. It opens where you left it, even after a /reload, on every character on your account, and Reset all settings puts it back in the middle.
+
 ## [2.20.0] - 2026-11-21
 
 ### New Features

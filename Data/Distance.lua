@@ -31,6 +31,11 @@ local function sourceAPI()
     return nil
 end
 
+-- The Distance sort, or Show distance after quest titles.
+local function wantedBy(cfg)
+    return cfg ~= nil and (cfg.sortMode == "distance" or cfg.showQuestDistance == true)
+end
+
 function Distance:IsAvailable()
     return (gameCall() or sourceAPI()) and true or false
 end
@@ -77,7 +82,7 @@ end
 -- [questID] = yards, or false for asked and not placed, so an unknown quest is not asked on every render
 local asked = {}
 
--- Only the quests Feed is about to sort, each once until the next full re-read.
+-- Only the quests Feed shows, each once until the next full re-read.
 local function askSources(API, questIDs)
     local n = 0
     if not questIDs then return n end
@@ -97,11 +102,12 @@ end
 -- Called from Feed:Build, which is the Data-side entry point that runs once per render and
 -- already knows the sort mode. EQ's old tracker drove this from Tracker:Render, which EQOT cannot copy -
 -- GetDistanceSqToQuest is a quest API and UI/ may not call one.
-function Distance:Sync(sortMode, questIDs)
+function Distance:Sync(sortMode, questIDs, showDistance)
     local Sort = ns:GetModule("Sort")
     -- No OnEnable to skip, so safe mode is honored here, as ItemButtons and DragDrop do it.
-    -- Otherwise a bisection session keeps harvesting and ticking with nothing to sort.
-    local wanted = (sortMode == "distance") and self:IsAvailable() and not ns:SafeMode()
+    -- Otherwise a bisection session keeps harvesting and ticking for a list it may not show.
+    local wanted = (sortMode == "distance" or showDistance == true) and self:IsAvailable() and not ns:SafeMode()
+    self._wanted = wanted and true or false
 
     if not wanted then
         if Sort then Sort:SetDistances(nil) end
@@ -124,10 +130,20 @@ function Distance:Sync(sortMode, questIDs)
         self._stamp     = GetTime()
         self._mapID, self._x, self._y = mapID, px, py
     end
+    self._fromSource = API and true or false
     if API then self._count = self._count + askSources(API, questIDs) end
 
-    if Sort then Sort:SetDistances(scratch) end
+    -- Only the Distance sort reorders the list. The titles read Yards.
+    if Sort then Sort:SetDistances(sortMode == "distance" and scratch or nil) end
     self:_StartTicker()
+end
+
+-- The game path keeps squared distances, which the sort compares as they are. Sources answer yards.
+function Distance:Yards(questID)
+    if not self._wanted then return nil end
+    local d = scratch[questID]
+    if d == nil or self._fromSource then return d end
+    return math.sqrt(d)
 end
 
 local function questAccepted()
@@ -142,7 +158,7 @@ function Distance:SourceChanged()
     self._harvested = nil
     local DB  = ns:GetModule("DB")
     local cfg = DB and DB:Tracker()
-    if cfg and cfg.sortMode == "distance" then fireDirty() end
+    if wantedBy(cfg) then fireDirty() end
 end
 
 function Distance:_StartTicker()
@@ -154,11 +170,11 @@ function Distance:_StartTicker()
     self._ticker = C_Timer.NewTicker(TICK, function()
         local DB  = ns:GetModule("DB")
         local cfg = DB and DB:Tracker()
-        if not cfg or cfg.sortMode ~= "distance" then
+        if not wantedBy(cfg) then
             Distance:_StopTicker()
             return
         end
-        -- Re-sorting the list under a player who is mid-fight is churn they cannot act on,
+        -- Re-sorting the list or redrawing its distances mid-fight is churn a player cannot act on,
         -- and the tracker may not even be on screen. Both were EQ's old tracker's gates.
         local Tracker = ns:GetModule("Tracker")
         local f = Tracker and Tracker.frame
@@ -188,8 +204,9 @@ end
 function Distance:DebugLine()
     local DB  = ns:GetModule("DB")
     local cfg = DB and DB:Tracker()
-    return ("distance: api %s, sort mode %s, %d harvested, ticker %s, age %.1fs, from %s")
+    return ("distance: api %s, sort mode %s, %d harvested, ticker %s, age %.1fs, from %s%s")
         :format(tostring(self:IsAvailable()), tostring(cfg and cfg.sortMode or "?"),
                 self._count or 0, self._ticker and "on" or "off",
-                GetTime() - (self._stamp or GetTime()), origin())
+                GetTime() - (self._stamp or GetTime()), origin(),
+                (cfg and cfg.showQuestDistance == true) and ", shown on titles" or "")
 end

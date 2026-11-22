@@ -19,18 +19,126 @@ Filter.CATEGORIES = {
 -- Feed reports "filtered N" and could never say why, which has cost a misdiagnosis: a stale
 -- isTracked and an active zone filter look identical from that number. One integer bump per
 -- rejected entry, so it stays on in release.
-Filter.rejects = { popup = 0, watched = 0, category = 0, zone = 0 }
+Filter.rejects = { popup = 0, watched = 0, category = 0, zone = 0, hiddenZone = 0 }
 -- The rows the zone rule would have hidden and the campaign exemption kept, so a "why is
 -- this quest showing" report is answered from the same line as the rejects.
 Filter.campaignKept = 0
 -- The rows To-Do Mode's view hid for being finished or not, read by its status line.
 Filter.todoHidden = 0
 
+-- The quest log headings a player hid, kept per character. Feed notes each pass's headings for the menus,
+-- and a heading is forgotten once its last quest leaves the log.
+local zoneCount, zoneNames, zoneOf, noted = {}, {}, {}, {}
+-- Quests that left the log since the last pass, with the heading each sat under. Never saved.
+local gone = {}
+local listNames, listCounts, stale = {}, {}, {}
+
 function Filter:BeginPass()
     local r = self.rejects
-    r.popup, r.watched, r.category, r.zone = 0, 0, 0, 0
+    r.popup, r.watched, r.category, r.zone, r.hiddenZone = 0, 0, 0, 0, 0
+    wipe(zoneCount)
+    wipe(zoneNames)
+    wipe(zoneOf)
+    wipe(noted)
     self.campaignKept = 0
     self.todoHidden = 0
+end
+
+local function hiddenSet(create)
+    local DB   = ns:GetModule("DB")
+    local char = DB and DB:Char()
+    if not char then return nil end
+    if create and type(char.hiddenZones) ~= "table" then char.hiddenZones = {} end
+    return type(char.hiddenZones) == "table" and char.hiddenZones or nil
+end
+
+function Filter:HidesZone(name)
+    local set = hiddenSet(false)
+    return set ~= nil and set[name] == true
+end
+
+function Filter:IsZoneHidden(entry)
+    local z = entry.zone
+    return type(z) == "string" and z ~= "" and self:HidesZone(z)
+end
+
+function Filter:SetZoneHidden(name, hidden)
+    if type(name) ~= "string" or name == "" then return end
+    local set = hiddenSet(true)
+    if set then set[name] = hidden and true or nil end
+end
+
+function Filter:HiddenZoneCount()
+    local n, set = 0, hiddenSet(false)
+    for _, v in pairs(set or {}) do
+        if v == true then n = n + 1 end
+    end
+    return n
+end
+
+function Filter:ShowAllZones()
+    local set = hiddenSet(false)
+    if set then wipe(set) end
+end
+
+function Filter:NoteZone(entry)
+    local z = entry.zone
+    if type(z) ~= "string" or z == "" then return end
+    local n = zoneCount[z]
+    if not n then
+        zoneNames[#zoneNames + 1] = z
+        n = 0
+    end
+    zoneCount[z] = n + 1
+    if entry.id then
+        zoneOf[entry.id] = z
+        noted[entry.id] = true
+    end
+end
+
+local function byName(a, b)
+    local c = strcmputf8i and strcmputf8i(a, b) or 0
+    if c ~= 0 then return c < 0 end
+    return a < b
+end
+
+-- The last pass's headings by name, then any hidden one with no quest left, so it can always be ticked back.
+function Filter:ZoneList()
+    wipe(listNames)
+    wipe(listCounts)
+    wipe(stale)
+    for i = 1, #zoneNames do listNames[i] = zoneNames[i] end
+    table.sort(listNames, byName)
+    for name, v in pairs(hiddenSet(false) or {}) do
+        if v == true and not zoneCount[name] then stale[#stale + 1] = name end
+    end
+    table.sort(stale, byName)
+    for i = 1, #stale do listNames[#listNames + 1] = stale[i] end
+    for i = 1, #listNames do listCounts[i] = zoneCount[listNames[i]] or 0 end
+    return listNames, listCounts
+end
+
+-- A quest still noted means the log has not caught up, so it waits for the next pass.
+function Filter:EndPass()
+    if next(gone) == nil then return end
+    local set = hiddenSet(false)
+    for id, zone in pairs(gone) do
+        if not noted[id] then
+            if set and not zoneCount[zone] then set[zone] = nil end
+            gone[id] = nil
+        end
+    end
+end
+
+function Filter:OnEnable()
+    local function left(_, id)
+        id = tonumber(id)
+        local zone = id and zoneOf[id]
+        if zone then gone[id] = zone end
+    end
+    local Events = ns:GetModule("Events")
+    Events:On("QUEST_REMOVED", left)
+    Events:On("QUEST_TURNED_IN", left)
 end
 
 -- Keyed by provider then entry id so two providers can never collide on a bare numeric id.
@@ -89,12 +197,12 @@ function Filter:FiltersLine()
         cats[i] = ("%s=%s"):format(key, tostring((f and f[key]) ~= false))
     end
 
-    return ("filters: onlyWatched=%s onlyCurrentZone=%s campaignAnyZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, popup %d | campaign kept from other zones %d")
+    return ("filters: onlyWatched=%s onlyCurrentZone=%s campaignAnyZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, popup %d | campaign kept from other zones %d | zone hidden %d (hiddenZones=%d)")
         :format(tostring(cfg and cfg.showOnlyWatched and true or false),
                 tostring(f and f.onlyCurrentZone and true or false),
                 tostring(f and f.campaignAnyZone and true or false),
                 f and table.concat(cats, " ") or "no filters table",
-                r.watched, r.category, r.zone, r.popup, self.campaignKept)
+                r.watched, r.category, r.zone, r.popup, self.campaignKept, r.hiddenZone, self:HiddenZoneCount())
 end
 
 function Filter:PassesCategory(entry, f)
@@ -155,6 +263,11 @@ function Filter:Visible(entry, cfg, provider, view)
         local f = cfg and cfg.filters
         if not self:PassesCategory(entry, f) then
             rejects.category = rejects.category + 1
+            return false
+        end
+        -- Below the pin check, so a pinned quest in a hidden zone still shows.
+        if self:IsZoneHidden(entry) then
+            rejects.hiddenZone = rejects.hiddenZone + 1
             return false
         end
         -- While To-Do Mode is on its view decides this, and the saved box is left alone.

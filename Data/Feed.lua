@@ -22,6 +22,8 @@ Feed.stats = {}
 -- Claims are also never taken against the quest log directly: GetLogIndexForQuestID
 -- returns non-nil for hidden task quests, so a log check would wrongly swallow them.
 local spaces = {}
+-- The shown entries of the quest id space. Each carries its distance, which only a quest row's title draws.
+local questShown, nQuestShown = {}, 0
 
 local function group(self, id)
     local g = self.byGroup[id]
@@ -48,6 +50,7 @@ function Feed:Build()
         g.todoOn = false
     end
     for _, s in pairs(spaces) do wipe(s) end
+    nQuestShown = 0
     Filter:BeginPass()
     local ZoneGroups = ns:GetModule("ZoneGroups")
     local zoned = ZoneGroups and ZoneGroups:Grouping(cfg)
@@ -87,11 +90,17 @@ function Feed:Build()
                         g.todoOn = true
                         Todo:Count(g, e, cfg, p)
                     end
+                    -- Before the filter, so a hidden zone's quests are counted and their leaving can forget it.
+                    Filter:NoteZone(e)
                     if Filter:Visible(e, cfg, p, pView) then
                         g.visibleCount = g.visibleCount + 1
                         g.entries[g.visibleCount] = e
                         st.shown = st.shown + 1
                         if claimed then claimed[e.id] = true end
+                        if p.idSpace == "quest" then
+                            nQuestShown = nQuestShown + 1
+                            questShown[nQuestShown] = e
+                        end
                     else
                         st.filtered = st.filtered + 1
                     end
@@ -100,9 +109,16 @@ function Feed:Build()
         end
     end
 
+    Filter:EndPass()
     local ManualOrder = ns:GetModule("ManualOrder")
     local DistanceMod = ns:GetModule("Distance")
-    if DistanceMod then DistanceMod:Sync(cfg and cfg.sortMode, spaces.quest) end
+    local showDistance = cfg ~= nil and cfg.showQuestDistance == true
+    if DistanceMod then DistanceMod:Sync(cfg and cfg.sortMode, spaces.quest, showDistance) end
+    -- Assigned on every pass, since entries are pooled.
+    for i = 1, nQuestShown do
+        local e = questShown[i]
+        e.distance = (showDistance and DistanceMod and DistanceMod:Yards(e.id)) or nil
+    end
     local cmp = Sort:For(cfg and cfg.sortMode, ManualOrder and ManualOrder:Get(), cfg and cfg.sortReverse)
     for _, g in pairs(self.byGroup) do
         table.sort(g.entries, cmp)

@@ -170,6 +170,41 @@ local xpStats = { sweeps = 0, reads = 0, refused = 0, unrestored = 0 }
 -- kept and asked again after the same wait.
 local itemCache, itemRetryAt = {}, {}
 
+-- The quest log's own text: the short paragraph (what to do, who to go back to) and the story, kept for the
+-- session. Era and TBC answer for the selected quest, so the sweep reads them there. Retail and Forever
+-- read the quest at a log index (measured on Forever), so nothing is selected.
+local textSummary, textStory = {}, {}
+local textStats = { reads = 0, refused = 0 }
+
+-- Tested for a secret before the compare, since a secret value raises when compared.
+local function usableText(s)
+    local secret = _G.issecretvalue
+    return type(s) == "string" and not (secret and secret(s)) and s ~= ""
+end
+
+-- A nil index reads the selected quest. Answers whether either part was kept.
+local function readText(id, index)
+    local okText, story, summary
+    if index then
+        okText, story, summary = pcall(GetQuestLogQuestText, index)
+    else
+        okText, story, summary = pcall(GetQuestLogQuestText)
+    end
+    local kept = false
+    if okText then
+        if usableText(summary) then textSummary[id], kept = summary, true end
+        if usableText(story) then textStory[id], kept = story, true end
+    end
+    if kept then textStats.reads = textStats.reads + 1 else textStats.refused = textStats.refused + 1 end
+    return kept
+end
+
+local function textWanted()
+    local DB = ns:GetModule("DB")
+    local cfg = DB and DB:Tracker()
+    return cfg ~= nil and cfg.showQuestText == true
+end
+
 local function readItems(id)
     local held, complete = { links = {}, choices = {} }, true
     local okN, n = pcall(GetNumQuestLogRewards, id)
@@ -212,6 +247,21 @@ local function needsRead(questID, clock)
     return at ~= nil and clock - at >= XP_RETRY_S
 end
 
+-- No figure at the cap, as Blizzard's XP alerts show none. Retail and Forever ask GameRulesUtil, Era and TBC
+-- a global of the same name.
+function QR:AtLevelCap()
+    local rules = _G.GameRulesUtil
+    local atCap = (rules and rules.IsPlayerAtEffectiveMaxLevel) or _G.IsPlayerAtEffectiveMaxLevel
+    local okCap, capped = pcall(atCap)
+    return okCap and capped == true
+end
+
+-- The figure a title shows on Classic. Read from the store only, and only while it belongs to this level.
+function QR:StoredXP(questID)
+    if xpLevel ~= UnitLevel("player") or self:AtLevelCap() then return nil end
+    return xpCache[questID]
+end
+
 function QR:NeedsXP(questID)
     if not xpBySelection then return false end
     if xpLevel ~= UnitLevel("player") then return true end
@@ -250,6 +300,8 @@ function QR:CollectXP(indices, ids, n)
             if okXP and type(xp) == "number" then
                 xpCache[id] = xp
                 local items, complete = readItems(id)
+                -- A read with no text is asked again only while a player wants it shown.
+                if not readText(id) and textWanted() then complete = false end
                 itemCache[id] = items
                 itemRetryAt[id] = (not complete) and clock or nil
                 xpRefusedAt[id] = nil
@@ -281,6 +333,29 @@ function QR:PartyOnQuest(questID)
         if C_QuestLog.IsUnitOnQuest("party" .. i, questID) then n = n + 1 end
     end
     return n
+end
+
+-- Retail and Forever read a quest with nothing stored on the hover, by log index. Era and TBC answer from
+-- the sweep's store alone, since their call reads the selection.
+function QR:QuestText(questID)
+    if not xpBySelection and textWanted() and textSummary[questID] == nil and textStory[questID] == nil then
+        local log = C_QuestLog
+        local index = log and log.GetLogIndexForQuestID and log.GetLogIndexForQuestID(questID)
+        local info = index and log.GetInfo and log.GetInfo(index)
+        -- A world quest or bonus objective sits in the log as a task, and a hidden log quest is never a quest row.
+        if index and not (info and (info.isTask or info.isHidden)) then readText(questID, index) end
+    end
+    return textSummary[questID], textStory[questID]
+end
+
+function QR:TextLine()
+    local held = 0
+    for _ in pairs(textStory) do held = held + 1 end
+    for id in pairs(textSummary) do
+        if textStory[id] == nil then held = held + 1 end
+    end
+    return ("quest text: %s | %d held, %d read, %d refused"):format(textWanted() and "on" or "off", held,
+        textStats.reads, textStats.refused)
 end
 
 function QR:DebugLine()

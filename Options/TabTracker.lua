@@ -102,6 +102,7 @@ function Options:ResetFilters()
     for i = 1, #cats do f[cats[i].key] = true end
     f.onlyCurrentZone = false
     f.campaignAnyZone = false
+    ns:GetModule("Filter"):ShowAllZones()
 end
 
 -- Each To-Do count's box and color, in the order the header draws them.
@@ -346,6 +347,10 @@ Options:RegisterTab({
             filters:Add(campaignZone)
         end
 
+        filters:Add(self:CreateButton(content, L["Hide zones"], nil,
+            function(button) ns:GetModule("Tracker"):OpenZoneMenu(button) end,
+            L["Opens a list of the zones in your quest log. Untick a zone to hide its quests from the tracker, and tick it again to bring them back. A pinned quest always shows. A zone stays hidden until you tick it again or its last quest leaves your log."]))
+
         -- Deliberately does NOT touch showOnlyWatched. That box sits under a different
         -- heading and is the most impactful setting on the tab, so silently turning it back
         -- on here hid quests with nothing connecting the two.
@@ -364,8 +369,8 @@ Options:RegisterTab({
             end,
             -- Without the campaign box the tooltip must not name it.
             campaignZone
-                and L["Turns every category filter back on, clears the current-zone filter and turns off Always show campaign quests. Nothing else on this tab is changed."]
-                or L["Turns every category filter back on and clears the current-zone filter. Nothing else on this tab is changed."])
+                and L["Turns every category filter back on, clears the current-zone filter, turns off Always show campaign quests and shows every zone again. Nothing else on this tab is changed."]
+                or L["Turns every category filter back on, clears the current-zone filter and shows every zone again. Nothing else on this tab is changed."])
         -- The last row of the card, after whichever filter ends the run.
         filters:Add(resetFilters)
 
@@ -592,6 +597,23 @@ Options:RegisterTab({
         questRows:Add(qidCheck)
         self:AttachTooltip(qidCheck, L["Show quest ID"], L["Useful for bug reports."])
 
+        local getXP, setXP = rowSetting("showQuestXP")
+        local xpCheck = self:CreateCheckbox(content, L["Show XP after quest titles"], getXP, function(v)
+            -- Asked first, so the redraw that follows carries the figures.
+            if questsProvider and questsProvider.RefreshXP then questsProvider:RefreshXP() end
+            setXP(v)
+        end)
+        questRows:Add(xpCheck)
+        self:AttachTooltip(xpCheck, L["Show XP after quest titles"],
+            L["Adds the XP each quest gives after its title, in gray, such as (450 XP). A quest that gives no XP, as every quest does at the level cap, shows nothing. Off by default."])
+
+        local distCheck = self:CreateCheckbox(content, L["Show distance after quest titles"],
+            rowSetting("showQuestDistance"))
+        questRows:Add(distCheck)
+        self:AttachTooltip(distCheck, L["Show distance after quest titles"], ns.Has.QuestDistance
+            and L["Adds how far away each quest is after its title, in gray, such as (120 yd), updated as you move. A quest ready to turn in measures to its turn-in point, and a quest with no known place shows nothing. Off by default."]
+            or L["Adds how far away each quest is after its title, in gray, such as (120 yd), updated as you move. A quest ready to turn in measures to its turn-in point, and a quest with no known place shows nothing. Off by default. On this version of the game, distances need Everything Quests installed."])
+
         local itemBtnCheck = self:CreateCheckbox(content, L["Show usable quest item buttons"],
             rowSetting("showItemButtons", true))
         questRows:Add(itemBtnCheck)
@@ -609,6 +631,12 @@ Options:RegisterTab({
         questRows:Add(newTagCheck)
         self:AttachTooltip(newTagCheck, L["Show NEW tag on recently accepted quests"],
             L["For about an hour after accepting."])
+
+        local textCheck = self:CreateCheckbox(content, L["Show the quest text in its tooltip"],
+            trackerSetting("showQuestText"))
+        questRows:Add(textCheck)
+        self:AttachTooltip(textCheck, L["Show the quest text in its tooltip"],
+            L["When you point at a quest, its tooltip also shows the quest log's own text: first the short paragraph saying what to do and who to go back to, then the quest's story in gray. Off by default."])
 
         local headers = self:CreateGroup(content, L["Headers and Buttons"])
         headers:SetPoint("TOPLEFT", questRows, "BOTTOMLEFT", 0, -gap)
@@ -661,7 +689,7 @@ Options:RegisterTab({
                 DB().showFilterButton = v
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
-            L["A small funnel at the left end of the tracker's button bar that opens a list of the filters, so you can turn quest types and the current-zone filter on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default."]))
+            L["A small funnel at the left end of the tracker's button bar that opens a list of the filters, so you can turn quest types, the current-zone filter and the zones in your quest log on and off in a couple of clicks. The list stays open while you check boxes, and the funnel turns gold while any filter in it is set to hide quests. It changes the same filters as the Filters card. Off by default."]))
 
         headers:Add(self:CreateCheckbox(content, L["Show the quest log count on the tracker"],
             function() return DB().showLogCount == true end,
@@ -686,6 +714,13 @@ Options:RegisterTab({
                 ns:GetModule("Tracker"):ApplyHeaderIcons()
             end,
             L["Hides the cogwheel, the sort and filter buttons, the quest log count and any buttons other addons add to the tracker until you point at the bar they sit on, at the top or the bottom of the tracker. Off by default."]))
+        headers:Add(self:CreateSlider(content, L["Button Size"], 10, 24, 1,
+            function() return ns:GetModule("Tracker"):ButtonSize(DB()) end,
+            function(v)
+                DB().buttonSize = v
+                ns:GetModule("Tracker"):ApplyButtonBar()
+            end,
+            L["How big the cogwheel, the sort and filter buttons and any buttons other addons add to the tracker's button bar are. The bar is sized to fit them, and the quest log count's text grows with larger buttons. 13 is the default."]))
         -- EQ's Show Chain Guide icon is deliberately not ported: it opens EQ's Chain Guide, which
         -- EQOT does not have.
 

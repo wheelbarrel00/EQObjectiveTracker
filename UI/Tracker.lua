@@ -5,7 +5,6 @@ local L       = ns.L
 
 local CONTENT_PAD      = 4
 local SCROLLBAR_GUTTER = 26
-local DRAG_HANDLE_H    = 14
 local TAB_STRIP_H      = 18
 local MAX_TABS         = 3
 local GRIP_SIZE        = 14
@@ -83,8 +82,9 @@ end
 -- count goes, with the move bar's check after it.
 local function leftButtonX(cfg, pastFilter)
     local x = 4
-    if cfg and cfg.showSortButton == true then x = x + HEADER_ICON_SZ + 3 end
-    if pastFilter and cfg and cfg.showFilterButton == true then x = x + HEADER_ICON_SZ + 3 end
+    local step = Tracker:ButtonSize(cfg) + 3
+    if cfg and cfg.showSortButton == true then x = x + step end
+    if pastFilter and cfg and cfg.showFilterButton == true then x = x + step end
     return x
 end
 
@@ -92,10 +92,27 @@ local function barAtBottom(cfg)
     return cfg ~= nil and cfg.buttonBarBottom == true
 end
 
+-- Button Size, held to its slider's 10 to 24. Anything that is not a number reads as the default.
+function Tracker:ButtonSize(cfg)
+    local s = tonumber(cfg and cfg.buttonSize)
+    if not s or s ~= s then return HEADER_ICON_SZ end
+    return math.max(10, math.min(24, math.floor(s + 0.5)))
+end
+
+local function stripHeight(cfg)
+    return Tracker:ButtonSize(cfg) + 1
+end
+
 -- How far the content starts below the frame's top: the drag strip's height while it sits there.
 local function stripInset(cfg)
     if barAtBottom(cfg) then return 0 end
-    return DRAG_HANDLE_H
+    return stripHeight(cfg)
+end
+
+-- The list's room above the box's bottom: the corner grip's, or a taller bar's while it sits there.
+local function bottomInset(cfg)
+    if barAtBottom(cfg) then return math.max(GRIP_SIZE, stripHeight(cfg)) + 2 end
+    return GRIP_SIZE + 2
 end
 
 -- The tracker's own mouseover holds this long too (UI/Visibility.lua).
@@ -226,6 +243,7 @@ function Tracker:FilterActive()
     local TodoMode = ns:GetModule("TodoMode")
     if f.onlyCurrentZone == true and not (TodoMode and TodoMode:IsOn(cfg)) then return true end
     local Filter, Registry = ns:GetModule("Filter"), ns:GetModule("Registry")
+    if Filter and Filter:HiddenZoneCount() > 0 then return true end
     if not (Filter and Registry) then return false end
     for _, c in ipairs(Filter.CATEGORIES) do
         if f[c.key] == false and ((not c.tag) or Registry:HasTag(c.tag)) then return true end
@@ -240,6 +258,19 @@ function Tracker:PaintFilterButton()
     if b._active == active then return end
     b._active = active
     if active then b.icon:SetVertexColor(GOLD_R, GOLD_G, GOLD_B) else b.icon:SetVertexColor(1, 1, 1) end
+end
+
+-- The zones in the quest log, each ticked while it shows. Shared by the funnel and the Filters card's button.
+local function zoneItems(items, changed)
+    local Filter = ns:GetModule("Filter")
+    local names, counts = Filter:ZoneList()
+    for i = 1, #names do
+        local name = names[i]
+        items[#items + 1] = { kind = "check", text = ("%s (%d)"):format(name, counts[i]),
+                              checked = not Filter:HidesZone(name),
+                              onClick = function(on) Filter:SetZoneHidden(name, not on); changed() end }
+    end
+    return #names
 end
 
 function Tracker:OpenFilterMenu(owner)
@@ -274,10 +305,29 @@ function Tracker:OpenFilterMenu(owner)
         end
     end
     items[#items + 1] = { kind = "divider" }
+    local zoneBlock = #items
+    items[#items + 1] = { kind = "title", text = L["Zones"] }
+    if zoneItems(items, changed) > 0 then
+        items[#items + 1] = { kind = "divider" }
+    else
+        items[zoneBlock + 1] = nil
+    end
     items[#items + 1] = { text = L["Reset filters to defaults"], onClick = function()
         Options:ResetFilters()
         changed()
     end }
+    Options.ui:ShowMenu(items, owner)
+end
+
+function Tracker:OpenZoneMenu(owner)
+    local Options = ns:GetModule("Options")
+    if not (Options and Options.ui) then return end
+    local items = { { kind = "title", text = L["Zones"] } }
+    zoneItems(items, function()
+        self:PaintFilterButton()
+        self:Render()
+        Options:RefreshIfShown("tracker")
+    end)
     Options.ui:ShowMenu(items, owner)
 end
 
@@ -598,19 +648,25 @@ function Tracker:ApplyHeaderIcons()
     local DB  = ns:GetModule("DB")
     local cfg = DB and DB:Tracker()
 
+    local size = self:ButtonSize(cfg)
     local drag, edge, y, gripRoom = f.drag, "TOP", -1, 0
     if barAtBottom(cfg) then edge, y, gripRoom = "BOTTOM", 1, -(GRIP_SIZE + 2) end
+    drag:SetHeight(stripHeight(cfg))
+    f.moveBar:SetHeight(stripHeight(cfg))
+    if f.moveDone then f.moveDone:SetSize(size, size) end
     anchorStrip(drag, edge, gripRoom)
     anchorStrip(f.moveBar, edge, gripRoom)
 
     local sort = f.sortButton
     if sort then
+        sort:SetSize(size, size)
         sort:SetShown(cfg ~= nil and cfg.showSortButton == true)
         sort:ClearAllPoints()
         sort:SetPoint(edge .. "LEFT", drag, edge .. "LEFT", 4, y)
     end
     local filter = f.filterButton
     if filter then
+        filter:SetSize(size, size)
         filter:SetShown(cfg ~= nil and cfg.showFilterButton == true)
         filter:ClearAllPoints()
         filter:SetPoint(edge .. "LEFT", drag, edge .. "LEFT", leftButtonX(cfg, false), y)
@@ -620,11 +676,24 @@ function Tracker:ApplyHeaderIcons()
     if logCount then
         logCount:ClearAllPoints()
         logCount:SetPoint("LEFT", drag, "LEFT", leftButtonX(cfg, true), 0)
+        -- The template itself until the buttons outgrow it, so a UI pack restyling the template still reaches it.
+        if not logCount._fontSize then logCount._font, logCount._fontSize, logCount._fontFlags = logCount:GetFont() end
+        local want = math.max(logCount._fontSize or 0, size - 3)
+        if want == logCount._fontSize then
+            if logCount._shownSize then
+                logCount:SetFontObject(GameFontHighlightSmall)
+                logCount._shownSize = nil
+            end
+        elseif logCount._font and logCount._shownSize ~= want then
+            logCount:SetFont(logCount._font, want, logCount._fontFlags)
+            logCount._shownSize = want
+        end
     end
 
     local prev
     for i = 1, #f.headerIcons do
         local b = f.headerIcons[i]
+        b:SetSize(size, size)
         if cfg and b._dbKey and cfg[b._dbKey] == false then
             b:Hide()
         else
@@ -972,7 +1041,6 @@ function Tracker:BuildFrame()
     f.drag = drag
     -- The strip's watch cannot run on a hidden frame, so a reveal would come back with the tracker.
     f:HookScript("OnHide", function() concealBar(f) end)
-    drag:SetHeight(DRAG_HANDLE_H)
     drag:EnableMouse(true)
     drag:RegisterForDrag("LeftButton")
     -- A FontString on the strip takes no mouse, so a drag that starts on it still moves the tracker.
@@ -1011,7 +1079,6 @@ function Tracker:BuildFrame()
     -- Not mouse-enabled itself, so a drag on the label still reaches the strip below it.
     local moveBar = CreateFrame("Frame", nil, f)
     moveBar:SetFrameLevel(f:GetFrameLevel() + 11)
-    moveBar:SetHeight(DRAG_HANDLE_H)
     moveBar:Hide()
     local done = CreateFrame("Button", nil, moveBar)
     done:SetSize(HEADER_ICON_SZ, HEADER_ICON_SZ)
@@ -1434,7 +1501,8 @@ function Tracker:ScrollGutter(cfg)
 end
 
 function Tracker:Insets()
-    return CONTENT_PAD, stripInset(ns:GetModule("DB"):Tracker()), GRIP_SIZE + 2
+    local cfg = ns:GetModule("DB"):Tracker()
+    return CONTENT_PAD, stripInset(cfg), bottomInset(cfg)
 end
 
 local function backgroundHover()
@@ -1981,8 +2049,8 @@ function Tracker:BarLine()
     local hover = cfg ~= nil and cfg.buttonsOnMouseover == true
     local buttons = "always shown"
     if hover then buttons = (f and f._barShown) and "on mouseover, shown" or "on mouseover, hidden" end
-    return ("button bar: %s, applied inset %s | buttons %s"):format(
-        barAtBottom(cfg) and "bottom" or "top", tostring(f and f._stripTop), buttons)
+    return ("button bar: %s, applied inset %s | buttons %s, size %d"):format(
+        barAtBottom(cfg) and "bottom" or "top", tostring(f and f._stripTop), buttons, self:ButtonSize(cfg))
 end
 
 function Tracker:_RenderScenario(group, cfg)
@@ -2176,6 +2244,7 @@ function Tracker:Render()
     Popups:Refresh()
 
     local byGroup  = Feed:Build()
+    self:PaintFilterButton()
     local Card     = ns:GetModule("Card")
     local DragDrop = ns:GetModule("DragDrop")
     local dragProvider = DragDrop and DragDrop.PROVIDER
@@ -2360,7 +2429,7 @@ function Tracker:Render()
     end
 
     local available = math.max(1, (f:GetHeight() or 0) - (f._contentTop or stripInset(cfg)) - scenarioH - 2
-                                  - (GRIP_SIZE + 2))
+                                  - bottomInset(cfg))
     local fraction  = (cfg and cfg.worldQuestsPinnedMaxFraction) or WQ_PIN_FRACTION
     local band      = headerBand()
 

@@ -64,8 +64,9 @@ focusing a quest also points a TomTom arrow at it.
   quest.
 - The zone progress bar stays empty. Its zone routing data covers Midnight only, and Everything
   Quests counts zones for it on WoW Forever alone so far.
-- **Distance sorting needs Everything Quests** (2.14.0 or later), since these clients cannot
-  measure how far away a quest is. Without it the Distance order does nothing.
+- **Distances need Everything Quests** (2.14.0 or later), for the Distance sort order and for Show
+  distance after quest titles, since these clients cannot measure how far away a quest is. Without
+  it the Distance order does nothing and no distance shows.
 - Some options still appear that cannot do anything on Classic, for the same reasons.
 
 ### Questie
@@ -101,7 +102,8 @@ uses the game's tracker, which this addon hides already.
 Everything Quests adds the other half of the picture, map pins and a TomTom waypoint arrow
 among them. It carries the quest database, so it is what turns a focused row into an arrow, and
 on WoW Forever it is what counts a zone's quests for the zone progress bar. On Classic Era and
-TBC Anniversary it is what tells the Distance sort order how far away each quest is.
+TBC Anniversary it is what tells the Distance sort order, and the distance after a quest's title,
+how far away each quest is.
 Its Classic support is still growing - check its own page for what it covers today.
 Installing it pulls this tracker in automatically. Without it, this addon is the tracker only.
 
@@ -174,10 +176,16 @@ back.
 - **Hand-in text** on a quest ready to turn in: one line in place of its finished objectives saying
   where to hand it in, in the game's own words on retail and WoW Forever, or Ready for turn-in where
   the game has none, and Failed in red on a failed quest. On by default
+- **XP and distance after a quest's title**, in gray, such as (450 XP, 120 yd), each behind its own
+  box on the Tracker tab and off by default. The distance follows you as you move and leaves the
+  order of your quests alone, and on Classic Era and TBC Anniversary it needs Everything Quests.
+  Neither shows on world quests or bonus objectives
 - **Quest popups** for newly discovered quests and ones ready to hand in remotely
 - **Hover any quest** for its objectives and full rewards, including item level
   comparisons against what you have equipped. World quests and timed quests also show their
-  faction and how long is left
+  faction and how long is left. With Show the quest text in its tooltip on, a quest's tooltip also
+  shows the quest log's own text: the short paragraph saying what to do and who to go back to, and
+  the quest's story
 
 Also included: a zone progress bar, five optional sounds (when you accept a quest, when one of its
 objectives moves forward, when one of them is finished, when its last objective falls, and when you
@@ -212,7 +220,9 @@ cogwheel, untick Show the options cogwheel on the tracker on the Tracker tab, an
 opens the window. The Appearance tab
 draws a sample tracker beside its settings that changes as you adjust them. A search field at the
 top of the sidebar finds any setting as you type: each match shows its tab and card, and clicking
-one opens that tab, scrolls to the setting and flashes it.
+one opens that tab, scrolls to the setting and flashes it. Drag the window by its title bar and it
+can hang partly off the left, right or bottom edge of the screen, part of its title bar kept on screen. It
+opens where you left it on every character, and Reset all settings puts it back in the middle.
 
 After an update that brings new features, a What's New window opens a few seconds after you log
 in and lists every update since the last one you read, newest first, so from 2.15.0 on a player
@@ -233,15 +243,18 @@ very top and the tracker can sit flush against the top of the screen. Show the b
 mouseover, on the same card, hides the cogwheel, the sort and filter buttons, the quest log count and
 other addons' buttons until you point at the bar. Show the quest log count on the tracker, on the
 same card, puts how many quests your log holds and how many it can, such as 14/25, at the bar's
-left end, red once the log is full. Tick
+left end, red once the log is full. Button Size, the card's last row, sets the size of every button on
+the bar, from 10 to 24. The bar is sized to fit them, and the count grows with larger buttons. Tick
 Show the sort button on the tracker, on the Tracker tab, for a small button at the left end of
 the button bar that opens a list of the sort orders, so switching between Level and Distance, or any other
 two, takes two clicks. Pick the order already in use again to reverse it, so Level runs from
 highest to lowest or Distance from farthest to nearest, and once more to turn it back. Every order
 but Zone and Manual can be reversed, the button's tooltip says when one is, and picking another
 order or hiding the button turns the reverse off. Show the filter button on the tracker adds a funnel beside it whose list
-holds Show only quests in current zone, the quest types and Reset filters to defaults, and stays
-open while you change them. The funnel turns gold while any of them is set to hide quests. While
+holds Show only quests in current zone, the quest types, the zones in your quest log and Reset
+filters to defaults, and stays open while you change them. Untick a zone to hide its quests until
+you tick it again or its last quest leaves your log. The Hide zones button on the Filters card opens
+the same list. The funnel turns gold while any of them is set to hide quests. While
 To-Do Mode is on, the list leaves out the current-zone line and that box no longer turns the funnel
 gold, since the mode decides which quests are in your zone.
 On retail, Show section tabs on the Section Order card splits the tracker into up
@@ -455,7 +468,8 @@ Everything Quests uses these on WoW Forever, where the game has no questlines to
 (an objective, or where it is handed in once finished), or nil when it does not know or the quest
 is on another continent, which sorts the quest last. Sources are asked only on versions of the game
 with no distance of their own (Classic Era and TBC Anniversary), only while the sort order is
-Distance, and only for the quests that pass the tracker's filters. Each answer is kept until the player
+Distance or Show distance after quest titles is on, and only for the quests that pass the tracker's
+filters. The title shows the answer rounded to 10 yards, and nothing for nil. Each answer is kept until the player
 moves, five seconds pass, a quest is accepted, a source is added or removed, or `DistanceChanged()`
 is called, which drops the kept answers a frame later however many times it was called, so the
 tracker's next redraw asks every one of those quests again. The

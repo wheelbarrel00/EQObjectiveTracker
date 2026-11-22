@@ -573,6 +573,24 @@ local function newTagFor(cfg)
     return newTag
 end
 
+local extras = {}
+-- The figures a player chose to see after a quest's title, in gray, or "" with none.
+local function titleExtras(entry, cfg)
+    local n = 0
+    if cfg.showQuestXP == true and type(entry.xp) == "number" and entry.xp > 0 then
+        n = n + 1
+        extras[n] = L["%d XP"]:format(entry.xp)
+    end
+    if cfg.showQuestDistance == true and type(entry.distance) == "number" then
+        n = n + 1
+        -- Rounded to 10 yards, for fewer repaints while walking.
+        extras[n] = L["%d yd"]:format(math.floor(entry.distance / 10 + 0.5) * 10)
+    end
+    if n == 0 then return "" end
+    for i = #extras, n + 1, -1 do extras[i] = nil end
+    return " |cff999999(" .. table.concat(extras, ", ") .. ")|r"
+end
+
 local function decorateTitle(entry, cfg)
     local text = entry.title or ""
     if not cfg or entry.providerID ~= TITLE_META_PROVIDER then return text end
@@ -596,7 +614,7 @@ local function decorateTitle(entry, cfg)
        and (time() - entry.addedAt) < NEW_WINDOW then
         text = newTagFor(cfg) .. text
     end
-    return text
+    return text .. titleExtras(entry, cfg)
 end
 
 local function clickThrough()

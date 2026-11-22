@@ -178,11 +178,15 @@ DB.defaults = {
             showLevelInTracker   = false,
             showQuestTypeTag     = true,
             showQuestID          = false,
+            showQuestXP          = false,
+            showQuestDistance    = false,
+            showQuestText        = false,
             showRecentlyAddedTag = true,
             showOptionsIcon      = true,
             showSortButton       = false,
             showFilterButton     = false,
             showLogCount         = false,
+            buttonSize           = 13,
             buttonBarBottom      = false,
             buttonsOnMouseover   = false,
             splitQuestClick      = false,
@@ -317,6 +321,7 @@ DB.defaults = {
     char = {
         sectionsCollapsed  = {},
         zonesCollapsed     = {},
+        hiddenZones        = {},
         folded             = {},
         pinned             = {},
         trackedWorldQuests = {},
@@ -424,6 +429,7 @@ function DB:ResetAll()
     local g = self.db.global
     if g then
         g.optionsWindowScale = self.defaults.global.optionsWindowScale
+        g.optionsWindowPos   = nil
         -- The bisection axis is not a setting, but a player who ran /eqot disable all and
         -- forgot is looking at an addon with most of it switched off, and this is the button
         -- they reach for. Cleared rather than defaulted: absence is what these five read as
@@ -441,6 +447,7 @@ function DB:ResetAll()
         c.zonesCollapsed    = {}
         c.pinned            = {}
         c.folded            = {}
+        c.hiddenZones       = {}
         c.trackedQuests     = nil
         c.delveRun          = nil
         c.todoView          = nil

@@ -185,7 +185,18 @@ function RT:_DrawEntry(owner, questID, title, expiresAt, clickHint)
         if faction then tip:AddLine(faction, 0.7, 0.7, 0.7) end
     end
 
+    local summary, story
+    local DB = ns:GetModule("DB")
+    local cfg = DB and DB:Tracker()
+    if cfg and cfg.showQuestText == true then summary, story = QR:QuestText(questID) end
+    if summary then tip:AddLine(summary, 1, 1, 1, true) end
+
     local drew, sawReward = renderLines(tip, questID)
+    if story then
+        if drew or summary then tip:AddLine(" ") end
+        tip:AddLine(story, 0.7, 0.7, 0.7, true)
+        drew = true
+    end
 
     if expiresAt then
         local secs = math.floor(expiresAt - time())
