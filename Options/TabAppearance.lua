@@ -405,6 +405,17 @@ Options:RegisterTab({
             L["Scales the whole tracker. Takes effect immediately out of combat."])
         tracker:Add(scaleSlider)
 
+        tracker:Add(self:CreateDropdown(content, L["Tracker Growth"],
+            { { value = "fixed", label = L["Fixed size"] }, { value = "down", label = L["Grow downward"] },
+              { value = "up", label = L["Grow upward"] } },
+            function() return ns:GetModule("Growth"):Mode(DB()) end,
+            function(v)
+                DB().trackerGrowth = v
+                ns:GetModule("Tracker"):ApplyGrowth()
+                refreshPreview()
+            end,
+            L["How the tracker's box changes size. Fixed size keeps the size you set with the corner grip. Grow downward and Grow upward fit the box to its quests, growing down from its top edge or up from its bottom edge, and never past the size you set or the edge of the screen. Grow upward suits a tracker at the bottom of the screen, and waits for the mouse to leave the tracker before it changes size. While this window is open and the tracker is unlocked, the box shows its full size and its corner grip, so you can set the room you are giving it."]))
+
         local syncFade
         -- Stored as a fraction and shown as a whole number, so no key carries a bare percent sign.
         local fadeSlider = self:CreateSlider(content, L["Tracker Opacity"], 10, 100, 5,

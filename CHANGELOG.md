@@ -5,6 +5,16 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.22.0] - 2026-11-22
+
+### New Features
+
+- A new Tracker Growth choice, on the Appearance tab's Tracker card right under Tracker Scale, lets the tracker's box fit its quests. Fixed size, the default, keeps the box at the size you set with the corner grip, as it has always been. Grow downward fits the box to its quests and grows it down from its top edge as quests are added, and Grow upward does the same from its bottom edge, which stays put, so a tracker at the bottom of the screen keeps its bottom where you put it. The box never grows past the size you set with the corner grip or past the edge of the screen, and Background and Border hug the quests. On Grow upward the corner grip moves to the top right corner, and the box waits until the mouse leaves the tracker before it changes size, so a header you click stays under the cursor. While the tracker is unlocked and the options window is open, or from the moment you unlock it until you lock it again, the box shows its full size and its corner grip, so you can set the room you are giving it. Outside those times the grip is hidden on a fitted box, and on an unlocked tracker the tooltip of the bar you drag it by says to open the options to resize it. The new growth line of /eqot status shows the choice, the box's height and the room it may take.
+
+### Notes
+
+- This was a big feature to add to the tracker, so there may be issues with something I missed. If you run into any, please let me know on CurseForge or on Discord.
+
 ## [2.21.0] - 2026-11-21
 
 ### New Features

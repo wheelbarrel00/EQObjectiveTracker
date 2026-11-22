@@ -92,6 +92,12 @@ local function barAtBottom(cfg)
     return cfg ~= nil and cfg.buttonBarBottom == true
 end
 
+-- Grow upward keeps the bottom edge still, so the grip sizes from the top corner there.
+local function gripAtTop(cfg)
+    local Growth = ns:GetModule("Growth")
+    return Growth ~= nil and Growth:GripCorner(cfg) == "TOPRIGHT"
+end
+
 -- Button Size, held to its slider's 10 to 24. Anything that is not a number reads as the default.
 function Tracker:ButtonSize(cfg)
     local s = tonumber(cfg and cfg.buttonSize)
@@ -103,14 +109,21 @@ local function stripHeight(cfg)
     return Tracker:ButtonSize(cfg) + 1
 end
 
--- How far the content starts below the frame's top: the drag strip's height while it sits there.
+-- How far the content starts below the frame's top: the drag strip's height while it sits there, or
+-- the corner grip's room while the grip sits there, whichever is taller.
 local function stripInset(cfg)
+    if gripAtTop(cfg) then
+        if barAtBottom(cfg) then return GRIP_SIZE + 2 end
+        return math.max(stripHeight(cfg), GRIP_SIZE + 2)
+    end
     if barAtBottom(cfg) then return 0 end
     return stripHeight(cfg)
 end
 
 -- The list's room above the box's bottom: the corner grip's, or a taller bar's while it sits there.
+-- With the grip at the top (Grow upward), only the bar's or a 2 px pad.
 local function bottomInset(cfg)
+    if gripAtTop(cfg) then return barAtBottom(cfg) and stripHeight(cfg) + 2 or 2 end
     if barAtBottom(cfg) then return math.max(GRIP_SIZE, stripHeight(cfg)) + 2 end
     return GRIP_SIZE + 2
 end
@@ -633,11 +646,31 @@ function Tracker:RebuildHeaderIcons()
     if Visibility then Visibility:ReleaseInput() end
 end
 
--- The grip keeps the bottom right corner, so a strip along the bottom stops short of it.
+-- A strip along the grip's edge stops short of it.
 local function anchorStrip(strip, edge, gripRoom)
     strip:ClearAllPoints()
     strip:SetPoint(edge .. "LEFT")
     strip:SetPoint(edge .. "RIGHT", gripRoom, 0)
+end
+
+-- The lines step away from the grip's corner, so on Grow upward the drawing turns over.
+function Tracker:ApplyGrip()
+    local f = self.frame
+    local Growth = ns:GetModule("Growth")
+    if not (f and f.grip and Growth) then return end
+    local cfg = ns:GetModule("DB"):Tracker()
+    local corner = Growth:GripCorner(cfg)
+    local dir = corner == "TOPRIGHT" and -1 or 1
+    f.grip:ClearAllPoints()
+    f.grip:SetPoint(corner, -2, 2 * dir)
+    for i, g in ipairs(f.gripLines or {}) do
+        g:ClearAllPoints()
+        g:SetPoint(corner, -2, (2 + (i - 1) * 3) * dir)
+    end
+    local sbBG = f.scrollBarBG
+    if sbBG and sbBG._fallback then
+        sbBG:SetPoint("BOTTOMRIGHT", f.bgFrame, "BOTTOMRIGHT", -2, dir > 0 and GRIP_SIZE + 2 or bottomInset(cfg))
+    end
 end
 
 -- Visibility and anchoring together, because a hidden icon has to drop out of the run rather
@@ -650,7 +683,8 @@ function Tracker:ApplyHeaderIcons()
 
     local size = self:ButtonSize(cfg)
     local drag, edge, y, gripRoom = f.drag, "TOP", -1, 0
-    if barAtBottom(cfg) then edge, y, gripRoom = "BOTTOM", 1, -(GRIP_SIZE + 2) end
+    if barAtBottom(cfg) then edge, y = "BOTTOM", 1 end
+    if barAtBottom(cfg) ~= gripAtTop(cfg) then gripRoom = -(GRIP_SIZE + 2) end
     drag:SetHeight(stripHeight(cfg))
     f.moveBar:SetHeight(stripHeight(cfg))
     if f.moveDone then f.moveDone:SetSize(size, size) end
@@ -708,6 +742,7 @@ function Tracker:ApplyHeaderIcons()
         end
     end
     f._lastIcon = prev
+    self:ApplyGrip()
     self:LayoutMoveBar()
     self:PaintBarButtons()
     self:PaintLogCount()
@@ -822,9 +857,9 @@ function Tracker:IsClickThrough()
     return (f and f._eqotHidden and f:IsShown()) and true or false
 end
 
--- Quests draw from the top of a fixed box, so its bottom counts only while Background, Border or
--- the move outline is on, or the drag strip sits along it. Every rect here is in the frame's own
--- units, so one factor serves.
+-- Quests draw from the box's top and can stop short of its bottom (always under Fixed size), so the
+-- bottom counts only while Background, Border or the move outline is on, or the drag strip sits
+-- along it. Every rect here is in the frame's own units, so one factor serves.
 function Tracker:ListBounds()
     local f = self.frame
     if not f or f._eqotHidden or not f:IsShown() then return nil end
@@ -848,6 +883,7 @@ local function renderWhenSafe() Tracker:Render() end
 local function applyWQPosWhenSafe() Tracker:ApplyWorldQuestsPosition() end
 local function resetPositionWhenSafe() Tracker:ResetPosition() end
 local function applyContentInsetWhenSafe() Tracker:ApplyContentInset() end
+local function applyGrowthWhenSafe() Tracker:ApplyGrowth() end
 
 -- One key for the whole render, so a combat full of quest events collapses into a single
 -- relayout when it ends rather than one per event.
@@ -881,27 +917,80 @@ function Tracker:ApplyScale()
     if not cfg then return end
     f:SetScale(cfg.scale or 1)
     self:_ApplyPosition(cfg.anchor, cfg.relativePoint, cfg.xOffset, cfg.yOffset)
+    -- Fitted at once, before the clamp draws a box taller than its new room.
+    local Growth = ns:GetModule("Growth")
+    if Growth and Growth:Mode(cfg) ~= "fixed" then self:Render() end
 end
 
-function Tracker:PersistPositionAndSize()
+-- A fitted box is not the cap, so only a resize, or Fixed size where the box is always full, writes
+-- the size. Under a Grow choice the anchor is rebuilt from the edge the box grows from, since the
+-- point the client re-anchors a dragged frame to is unmeasured.
+function Tracker:PersistPositionAndSize(sized)
     local f = self.frame
     if not f then return end
     local cfg = ns:GetModule("DB"):Tracker()
     if not cfg then return end
+    local Growth = ns:GetModule("Growth")
+    -- As laid out, not as picked: a drag ended in a fight saves before a choice made in it applies.
+    local mode = f._growthMode or "fixed"
 
-    cfg.width     = math.floor(f:GetWidth())
-    cfg.maxHeight = math.floor(f:GetHeight())
+    if sized or mode == "fixed" then
+        cfg.width = math.floor(f:GetWidth())
+        -- The screen can hold a Grow box under its cap, so a width-only resize keeps the cap.
+        local h = f:GetHeight()
+        if mode == "fixed" or math.abs(h - (f._grabH or -1)) > 0.5 then cfg.maxHeight = math.floor(h) end
+    end
 
-    local point, _, relativePoint, x, y = f:GetPoint()
-    if not point then return end
+    if mode ~= "fixed" then
+        cfg.anchor, cfg.relativePoint, cfg.xOffset, cfg.yOffset =
+            Growth:AnchorFor(mode, cfg.anchor, Growth:FullRect(f, mode, cfg.maxHeight))
+    else
+        local point, _, relativePoint, x, y = f:GetPoint()
+        if not point then return end
 
-    local scale = frameScale(f)
-    cfg.anchor        = point
-    cfg.relativePoint = relativePoint or point
-    cfg.xOffset       = math.floor((x or 0) * scale + 0.5)
-    cfg.yOffset       = math.floor((y or 0) * scale + 0.5)
+        local scale = frameScale(f)
+        cfg.anchor        = point
+        cfg.relativePoint = relativePoint or point
+        cfg.xOffset       = math.floor((x or 0) * scale + 0.5)
+        cfg.yOffset       = math.floor((y or 0) * scale + 0.5)
+    end
 
     self:_ApplyPosition(cfg.anchor, cfg.relativePoint, cfg.xOffset, cfg.yOffset)
+    -- The room moves with the box, and a move fires no OnSizeChanged.
+    if mode ~= "fixed" then self:Refresh() end
+end
+
+-- Leaving Fixed size converts from the box where the client draws it, so the tracker does not move,
+-- and so does a load whose anchor was never converted. Between the Grow choices only a mismatched
+-- anchor is rewritten, so an edge placed there never drifts.
+function Tracker:ApplyGrowth(atLoad)
+    local f = self.frame
+    if not f then return end
+    if secureLocked() then
+        ns:GetModule("Events"):RunWhenOutOfCombat("eqot.applyGrowth", applyGrowthWhenSafe)
+        return
+    end
+    local cfg = ns:GetModule("DB"):Tracker()
+    local Growth = ns:GetModule("Growth")
+    if not (cfg and Growth) then return end
+    local mode = Growth:Mode(cfg)
+    local laid = f._growthMode or "fixed"
+    if mode == "fixed" then
+        if laid ~= "fixed" then f:SetHeight(cfg.maxHeight) end
+    else
+        local fromFixed = laid == "fixed" and not atLoad
+        if fromFixed or not (cfg.anchor or ""):find(mode == "up" and "^BOTTOM" or "^TOP") then
+            cfg.anchor, cfg.relativePoint, cfg.xOffset, cfg.yOffset =
+                Growth:AnchorFor(mode, cfg.anchor, Growth:SavedRect(cfg, f, fromFixed or atLoad))
+            self:_ApplyPosition(cfg.anchor, cfg.relativePoint, cfg.xOffset, cfg.yOffset)
+        end
+    end
+    f._growthMode = mode
+    if atLoad then return end
+    self:ApplyHeaderIcons()
+    self:ApplyContentInset()
+    self:ApplyGripInput()
+    self:Render()
 end
 
 function Tracker:IsLocked()
@@ -909,10 +998,15 @@ function Tracker:IsLocked()
     return (gen and gen.lockTracker) and true or false
 end
 
+-- On a fitted box the grip's corner is not the cap's, so a Grow box offers it only while full.
 function Tracker:ApplyGripInput()
     local f = self.frame
     if not (f and f.grip) then return end
-    f.grip:EnableMouse(not self:IsLocked() and not f._eqotHidden)
+    local Growth = ns:GetModule("Growth")
+    local fixed = not Growth or Growth:Mode(ns:GetModule("DB"):Tracker()) == "fixed"
+    local live = (fixed or f._sizing or self:InMoveMode()) and not self:IsLocked()
+    f.grip:SetAlpha(live and 1 or 0)
+    f.grip:EnableMouse(live and not f._eqotHidden)
 end
 
 function Tracker:ApplyLockState(startMove)
@@ -921,9 +1015,8 @@ function Tracker:ApplyLockState(startMove)
     local locked = self:IsLocked()
     if locked and f._dragging then
         pcall(f.StopMovingOrSizing, f)
-        f._dragging = nil
+        f._dragging, f._sizing = nil, nil
     end
-    f.grip:SetAlpha(locked and 0 or 1)
     self:ApplyGripInput()
     -- An unlock after load keeps move mode up until the next lock, options window or not.
     if not locked and (startMove or f._wasLocked) then f._moveSession = true end
@@ -958,6 +1051,10 @@ function Tracker:ApplyMoveMode()
     f.moveBar:SetShown(on)
     f.moveOutline:SetShown(on)
     paintDragHint(f)
+    self:ApplyGripInput()
+    -- A Grow box is full in move mode and fitted out of it.
+    local Growth = ns:GetModule("Growth")
+    if Growth and Growth:Mode(ns:GetModule("DB"):Tracker()) ~= "fixed" then self:Refresh() end
     ns:GetModule("API"):NotifyLayout()
 end
 
@@ -1064,7 +1161,10 @@ function Tracker:BuildFrame()
             tip:AddLine(L["Tracker locked"], 1, 0.3, 0.3)
             tip:AddLine(L["Use /eqot unlock to move it."], 0.8, 0.8, 0.8)
         else
-            tip:AddLine(L["Drag to move, corner grip to resize."], 1, 1, 1)
+            -- A fitted Grow box shows its grip only in move mode.
+            local gripHidden = f.grip and f.grip:GetAlpha() == 0
+            tip:AddLine(gripHidden and L["Drag to move. Open the options to resize."]
+                or L["Drag to move, corner grip to resize."], 1, 1, 1)
             tip:AddLine(L["/eqot for options"], 0.8, 0.8, 0.8)
         end
         tip:Show()
@@ -1147,21 +1247,29 @@ function Tracker:BuildFrame()
     -- rest of the fight and then saved wherever the cursor had wandered to.
     local function finishDrag()
         pcall(f.StopMovingOrSizing, f)
-        Tracker:PersistPositionAndSize()
+        local sized = f._pendingSized
+        f._pendingSized = nil
+        f._savePending = nil
+        Tracker:PersistPositionAndSize(sized)
     end
 
     -- Whether StopMovingOrSizing is protected once secure buttons are armed has never been
     -- established, so it is attempted here and repeated by finishDrag if it was refused.
     local function stopDrag()
         if not f._dragging then return end
-        f._dragging = nil
+        local sized = f._sizing
+        f._dragging, f._sizing = nil, nil
         pcall(f.StopMovingOrSizing, f)
+        Tracker:ApplyGripInput()
         if secureLocked() then
+            f._pendingSized = sized
+            -- A render queued earlier in the fight runs first at its end, so the box holds until this saves.
+            f._savePending = true
             ns:GetModule("API"):NotifyLayout()
             ns:GetModule("Events"):RunWhenOutOfCombat("eqot.stopDrag", finishDrag)
             return
         end
-        Tracker:PersistPositionAndSize()
+        Tracker:PersistPositionAndSize(sized)
     end
 
     drag:SetScript("OnDragStart", function()
@@ -1172,6 +1280,7 @@ function Tracker:BuildFrame()
     drag:SetScript("OnDragStop", stopDrag)
 
     local grip = CreateFrame("Button", nil, f)
+    f.grip, f.gripLines = grip, {}
     grip:SetSize(GRIP_SIZE, GRIP_SIZE)
     grip:SetPoint("BOTTOMRIGHT", -2, 2)
     for i, len in ipairs({ 12, 8, 4 }) do
@@ -1179,11 +1288,13 @@ function Tracker:BuildFrame()
         g:SetColorTexture(1, 1, 1, 0.5)
         g:SetSize(len, 1)
         g:SetPoint("BOTTOMRIGHT", -2, 2 + (i - 1) * 3)
+        f.gripLines[i] = g
     end
     grip:SetScript("OnMouseDown", function()
         if Tracker:IsClickThrough() or InCombatLockdown() or Tracker:IsLocked() then return end
-        f:StartSizing("BOTTOMRIGHT")
-        f._dragging = true
+        f:StartSizing(ns:GetModule("Growth"):GripCorner(ns:GetModule("DB"):Tracker()))
+        f._dragging, f._sizing = true, true
+        f._grabH = f:GetHeight()
     end)
     grip:SetScript("OnMouseUp", stopDrag)
 
@@ -1285,15 +1396,17 @@ function Tracker:BuildFrame()
     else
         sbBG:SetPoint("TOPLEFT",     scroll, "TOPRIGHT",     0, 1)
         sbBG:SetPoint("BOTTOMRIGHT", bg,     "BOTTOMRIGHT", -2, GRIP_SIZE + 2)
+        sbBG._fallback = true
     end
     sbBG:Hide()
     f.scrollBarBG = sbBG
 
     f:SetScript("OnSizeChanged", function() Tracker:Refresh() end)
 
-    f.grip, f.scroll, f.content = grip, scroll, content
+    f.scroll, f.content = scroll, content
     self:ApplyWorldQuestsPosition()
     self:ApplyLockState()
+    self:ApplyGrowth(true)
 end
 
 -- Blizzard re-shows the bar whenever the scroll range changes, so this needs a
@@ -1605,6 +1718,7 @@ function Tracker:ApplyWorldQuestsPosition()
         region:SetPoint("TOPLEFT",  scroll, "BOTTOMLEFT",  0, -2)
         region:SetPoint("TOPRIGHT", scroll, "BOTTOMRIGHT", 0, -2)
     end
+    f._wqTop = pos == "top"
 
     -- Render lays the list out for the chain that is actually anchored, never for the live
     -- setting, which a deferred call here can leave disagreeing with the frames.
@@ -1643,8 +1757,9 @@ function Tracker:DebugScroll()
         f:GetScale() or 1, cfg.scale or 1, tostring(point), tostring(relPoint),
         px or 0, py or 0, cfg.xOffset or 0, cfg.yOffset or 0)
 
-    -- The live size beside the stored one. A reset that leaves the frame large reads here
-    -- as the two disagreeing, which says whether the config or the frame kept the old value.
+    -- The live size beside the stored one. Under Fixed size a reset that leaves the frame large reads
+    -- here as the two disagreeing, which says whether the config or the frame kept the old value. A
+    -- Grow box differs from its cap by design (the growth line).
     out[#out + 1] = ("size live %.0fx%.0f cfg %.0fx%.0f"):format(
         f:GetWidth() or 0, f:GetHeight() or 0, cfg.width or 0, cfg.maxHeight or 0)
 
@@ -2214,6 +2329,7 @@ function Tracker:Render()
     local PopupBoxes  = ns:GetModule("AutoQuestPopup")
     local Popups      = ns:GetModule("AutoQuestPopups")
     local TodoMode = ns:GetModule("TodoMode")
+    local Growth   = ns:GetModule("Growth")
     local cfg      = DB:Tracker()
 
     self:ApplyFrameSkin(cfg)
@@ -2428,7 +2544,8 @@ function Tracker:Render()
         end
     end
 
-    local available = math.max(1, (f:GetHeight() or 0) - (f._contentTop or stripInset(cfg)) - scenarioH - 2
+    local layoutH   = Growth:LayoutHeight(cfg, f)
+    local available = math.max(1, layoutH - (f._contentTop or stripInset(cfg)) - scenarioH - 2
                                   - bottomInset(cfg))
     local fraction  = (cfg and cfg.worldQuestsPinnedMaxFraction) or WQ_PIN_FRACTION
     local band      = headerBand()
@@ -2469,6 +2586,11 @@ function Tracker:Render()
         if f.scroll.UpdateScrollChildRect then f.scroll:UpdateScrollChildRect() end
         clampScroll(f.scroll)
     end
+    -- The world quest region's 2 px gap, which available leaves out. At Top a hidden region still holds
+    -- its 1 px and its gap in the chain (f._wqTop is the position as anchored).
+    local target = Growth:Target(cfg, f, locked, layoutH,
+        available - (wqH or 0) - bandH - scrollH - ((wqH or 0) > 0 and 2 or (f._wqTop and 3 or 0)))
+    if target then f:SetHeight(target) end
 
     self:_UpdateSticky()
     -- Styled here rather than per scroll step, and after the update so a header made for
@@ -2565,7 +2687,13 @@ function Tracker:ResetPosition()
     cfg.width, cfg.maxHeight      = d.width, d.maxHeight
     if self.frame then self.frame:SetSize(cfg.width, cfg.maxHeight) end
     self:_ApplyPosition(cfg.anchor, cfg.relativePoint, cfg.xOffset, cfg.yOffset)
-    self:Render()
+    local Growth = ns:GetModule("Growth")
+    if Growth and Growth:Mode(cfg) ~= "fixed" then
+        if self.frame then self.frame._growthMode = "fixed" end
+        self:ApplyGrowth()
+    else
+        self:Render()
+    end
 end
 
 function Tracker:OnEnable()

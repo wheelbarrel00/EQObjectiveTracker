@@ -138,10 +138,8 @@ local function mouseOverDrawn(f)
     local zoneHeads = f.stickyBand and f.stickyBand.zoneHeads
     if zoneHeads and (over(zoneHeads[1]) or over(zoneHeads[2]) or over(zoneHeads[3])) then return true end
     if overBar(f.scroll) or overBar(f.eventsScroll) then return true end
-    -- A locked grip sits at alpha 0 but still reads as visible.
-    if not over(f.grip) then return false end
-    local Tracker = ns:GetModule("Tracker")
-    return not (Tracker and Tracker:IsLocked())
+    -- A grip at alpha 0, locked or on a fitted Grow box, still reads as visible.
+    return over(f.grip) and f.grip:GetAlpha() > 0
 end
 
 local function held()

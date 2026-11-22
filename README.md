@@ -239,13 +239,25 @@ the cogwheel for Unlock or Lock position, Reset position and size, and Open the 
 strip is the tracker's button bar: the cogwheel sits at its right end and the sort and filter
 buttons at its left. Show the button bar at the bottom of the tracker, on the Tracker tab's Headers
 and Buttons card, moves it to the bottom edge beside the corner grip, so the quests start at the
-very top and the tracker can sit flush against the top of the screen. Show the buttons only on
+very top and the tracker can sit flush against the top of the screen. On Grow upward the corner
+grip sits at the top instead, just above the quests. Show the buttons only on
 mouseover, on the same card, hides the cogwheel, the sort and filter buttons, the quest log count and
 other addons' buttons until you point at the bar. Show the quest log count on the tracker, on the
 same card, puts how many quests your log holds and how many it can, such as 14/25, at the bar's
 left end, red once the log is full. Button Size, the card's last row, sets the size of every button on
-the bar, from 10 to 24. The bar is sized to fit them, and the count grows with larger buttons. Tick
-Show the sort button on the tracker, on the Tracker tab, for a small button at the left end of
+the bar, from 10 to 24. The bar is sized to fit them, and the count grows with larger buttons.
+
+Tracker Growth, on the Appearance tab's Tracker card, decides how the box sizes itself. Fixed size,
+the default, keeps the size you set with the corner grip. Grow downward and Grow upward fit the box
+to its quests and grow it from its top or bottom edge, never past the size you set with the grip or
+the edge of the screen, so Background and Border hug the quests and a tracker at the bottom of the
+screen keeps its bottom edge where you put it. On Grow upward the grip moves to the top right
+corner, and the box waits for the mouse to leave before it changes size, so a header you click stays
+under the cursor. While the tracker is unlocked and the options window is open, or from an unlock
+until the next lock, the box shows its full size and its corner grip, which is hidden on a fitted
+box. `/eqot status` has a growth line.
+
+Tick Show the sort button on the tracker, on the Tracker tab, for a small button at the left end of
 the button bar that opens a list of the sort orders, so switching between Level and Distance, or any other
 two, takes two clicks. Pick the order already in use again to reverse it, so Level runs from
 highest to lowest or Distance from farthest to nearest, and once more to turn it back. Every order

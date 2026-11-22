@@ -188,6 +188,7 @@ DB.defaults = {
             showLogCount         = false,
             buttonSize           = 13,
             buttonBarBottom      = false,
+            trackerGrowth        = "fixed",
             buttonsOnMouseover   = false,
             splitQuestClick      = false,
             clickToUnfocus       = false,
@@ -357,7 +358,7 @@ local APPEARANCE_KEYS = {
     -- The tabs' look. Show section tabs stays out, as the zone headers' switch does.
     "tabLineColor", "tabLineSize", "tabInactiveLineColor", "tabActiveColor", "tabInactiveColor",
     "tabActiveTextColor", "tabInactiveTextColor", "tabTextSize", "tabHeight",
-    "blockSpacing", "lineSpacing", "headerSpacing", "scale",
+    "blockSpacing", "lineSpacing", "headerSpacing", "scale", "trackerGrowth",
     "trackerAlpha", "trackerAlphaHover", "trackerAlphaFocus",
     "blockLayout", "cardColor", "cardBorderColor", "cardBorderSize", "cardPadding",
     "cardTintByType", "cardTintCampaign", "cardTintLegendary", "cardTintDungeon", "cardTintRaid",
