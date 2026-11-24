@@ -169,10 +169,12 @@ back.
   rows and scenario criteria each have their own switch, and the bar's texture, fill color,
   background, border and height are all yours to set
 - **Quest items**, as a button on the row of any quest that carries one
-- **Elite quests and quest types** on WoW Forever, Classic Era and TBC Anniversary, as WoW Forever's
-  own tracker shows them: the quest's type after its title in the game's own words, such as (Elite),
-  (Dungeon), (Raid) or (PvP), with (Group) in place of (Elite) on TBC Anniversary, and an elite
-  quest's level as [21+] with the level prefix on
+- **Quest types after the title** in the game's own words, such as (Dungeon), (Raid), (Delve) or
+  (PvP), with Daily or Weekly joined in the same brackets, as (Dungeon, Daily). On WoW Forever,
+  Classic Era and TBC Anniversary it is on, as WoW Forever's own tracker shows it, with (Elite) there
+  and (Group) in its place on TBC Anniversary, and an elite quest's level reads [21+] with the level
+  prefix on. On retail it is off until you tick Show quest type tags, and a group quest shows its
+  suggested size, such as (Group 3)
 - **Hand-in text** on a quest ready to turn in: one line in place of its finished objectives saying
   where to hand it in, in the game's own words on retail and WoW Forever, or Ready for turn-in where
   the game has none, and Failed in red on a failed quest. On by default
@@ -185,7 +187,10 @@ back.
   comparisons against what you have equipped. World quests and timed quests also show their
   faction and how long is left. With Show the quest text in its tooltip on, a quest's tooltip also
   shows the quest log's own text: the short paragraph saying what to do and who to go back to, and
-  the quest's story
+  the quest's story. On retail and WoW Forever, addons that add lines to quest tooltips add them at
+  the bottom of the tracker's too, unless you untick Let other addons add to quest tooltips on the
+  Tracker tab. Some addons only add lines to tooltips they know by name, and those need an update
+  on their side.
 
 Also included: a zone progress bar, five optional sounds (when you accept a quest, when one of its
 objectives moves forward, when one of them is finished, when its last objective falls, and when you
@@ -263,18 +268,23 @@ two, takes two clicks. Pick the order already in use again to reverse it, so Lev
 highest to lowest or Distance from farthest to nearest, and once more to turn it back. Every order
 but Zone and Manual can be reversed, the button's tooltip says when one is, and picking another
 order or hiding the button turns the reverse off. Show the filter button on the tracker adds a funnel beside it whose list
-holds Show only quests in current zone, the quest types, the zones in your quest log and Reset
-filters to defaults, and stays open while you change them. Untick a zone to hide its quests until
-you tick it again or its last quest leaves your log. The Hide zones button on the Filters card opens
-the same list. The funnel turns gold while any of them is set to hide quests. While
-To-Do Mode is on, the list leaves out the current-zone line and that box no longer turns the funnel
-gold, since the mode decides which quests are in your zone.
+holds Show only quests in current zone, the quest types with Select all and Deselect all, an
+Instance quests and Quests outside instances pair, an Unfinished quests and Finished quests pair,
+the zones in your quest log and Reset filters to defaults, and stays open where it is while you
+change them. A quest shows while its type box and both of its pairs' boxes are ticked, so unticking
+Quests outside instances leaves only your dungeon, raid and delve quests, whatever their type. The
+Filters card has the same boxes. Untick a zone to hide its quests until you tick it again or its
+last quest leaves your log. The Hide zones button on the Filters card opens the same list of zones.
+The funnel turns gold while any of them is set to hide quests. While To-Do Mode is on, the list
+leaves out the current-zone line and the Unfinished and Finished pair, and those no longer turn the
+funnel gold, since the mode decides which quests are in your zone and which are finished.
 On retail, Show section tabs on the Section Order card splits the tracker into up
 to three tabs. The number beside each section picks its tab, and once two tabs hold a section a
 strip under the top of the tracker switches between them. The scenario panel shows on every tab,
 and so does a quest popup box, under its own section's header, and each character keeps the tab it
 was on. The Section Tabs card on the Appearance tab styles the strip: the line under the tab you
 are on, the line under the others, the fills, the names' colors and size, and the tab height.
+World quests on a tab of their own, or alone on the tracker, use its whole height.
 Left-click a quest to super-track it on retail and WoW Forever, or to focus it on Classic. On
 retail and WoW Forever two options on the Tracker tab change how focusing works: Click a focused quest
 to unfocus it makes a click on the quest you are following unfocus it, and turning off Focus newly
@@ -340,8 +350,9 @@ Quests header, and the Campaign header on retail, into four counts: your unfinis
 zone you are in, the ones ready to turn in there, every quest there and every quest you have.
 Click a count and the section shows exactly those quests, with the count you picked underlined. It starts on your unfinished quests in
 the zone, which is the short to-do list it is named for, and each character remembers the count it
-picked. While it is on it decides which quests are in your zone, so Show only quests in current
-zone is dimmed and keeps your own setting for later, while the quest type filters, Show only
+picked. While it is on it decides which quests are in your zone and which are finished, so Show
+only quests in current zone and the Unfinished quests and Finished quests boxes are dimmed and keep
+your own settings for later, while the quest type filters, the Instance quests pair, Show only
 tracked quests, pinned quests and the other sections stay as they are. Always show campaign quests
 keeps working too, so your campaign quests from other zones show, and count, in the views for your
 zone. The card can hide any of the four counts, color each one, with the Class button, and size them.

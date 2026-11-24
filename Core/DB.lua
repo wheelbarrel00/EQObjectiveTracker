@@ -176,7 +176,8 @@ DB.defaults = {
             showQuestTotal       = true,
             stickySectionHeaders = true,
             showLevelInTracker   = false,
-            showQuestTypeTag     = true,
+            -- No showQuestTypeTag: an AceDB default would answer every unset read, and unset reads each
+            -- client's own default through the quests provider (off on retail).
             showQuestID          = false,
             showQuestXP          = false,
             showQuestDistance    = false,

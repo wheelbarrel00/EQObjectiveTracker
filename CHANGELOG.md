@@ -5,6 +5,20 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2026-11-23
+
+### New Features
+
+- The tracker's filter button has new rows, and the Tracker tab's Filters card the same new boxes. Select all and Deselect all tick or untick every quest type at once, and the list stays open where it is. A new Instance quests and Quests outside instances pair shows or hides dungeon, raid and delve quests whatever their type, so unticking Quests outside instances leaves only your instance quests on the tracker. A new Unfinished quests and Finished quests pair shows only the quests you are still working on, or only the ones ready to turn in. A quest shows while its type box and both of its new boxes are ticked, a pinned quest always shows, and Reset filters to defaults ticks them all again. While To-Do Mode is on its counts decide what is finished, so the Unfinished and Finished pair is left out of the list and dimmed on the card, and the counts leave out what the instance pair hides. The filters line of /eqot status names the new boxes and counts what each pair hid. Requested by Tyrial.
+- Show quest type tags now works on retail too, adding the game's own word for a quest's type after its title, such as (Dungeon), (Delve), (Raid), (Heroic), (Scenario), (PvP), or (Group 3) for a group quest with its suggested size. On retail it is off by default, so nothing changes until you tick it on the Tracker tab's Quest Row Details card. On every client the box now also adds Daily or Weekly in the game's own words, so a daily dungeon quest reads (Dungeon, Daily). On WoW Forever, Classic Era and TBC Anniversary the box stays on as before, so a daily quest there now shows (Daily) too. Requested by Tyrial.
+- Addons that add lines to quest tooltips can now add them to the tracker's quest tooltips too, at the bottom, on retail and WoW Forever. It is on by default, and a new Let other addons add to quest tooltips box, at the end of the Quest Row Details card, turns it off if another addon's lines cause trouble. Some addons only add lines to tooltips they know by name, and those need an update on their side. /eqot status has a new tooltip hooks line. Requested by Tyrial.
+
+### Bug Fixes
+
+- World quests that are the only thing on the tracker, or on a section tab of their own, now use the tracker's whole height instead of stopping at the Maximum Height share or the custom World Quests height. Both sliders' tooltips now say so. Reported by Tyrial.
+- A list that fits the tracker is no longer left scrolled part way down, with its first quest cut off at the top and a scroll bar showing. After the tracker changed size the game kept reporting the list as able to scroll, so the tracker now works out how far each list can scroll from its own heights, sends a list that fits back to its top, and asks the game to measure again a moment later. The mouse wheel no longer moves a list that fits. The scroll line of /eqot status now shows each list's scroll position and the game's own scroll range, and the Appearance tab's preview of the tracker scrolls by its own heights too. Reported by Tyrial.
+- A pinned quest's star now shows as the game's yellow raid marker star. With most fonts, the tracker's default font included, it showed as a small box.
+
 ## [2.22.0] - 2026-11-22
 
 ### New Features

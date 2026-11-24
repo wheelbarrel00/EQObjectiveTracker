@@ -61,6 +61,8 @@ read_globals = {
     -- ENDEAVORS header. A different system from the Traveler's Log above it.
     "C_NeighborhoodInitiative",
     "C_Scenario", "C_ScenarioInfo", "GetInstanceInfo", "C_Texture", "C_AddOns", "Enum",
+    -- Only probed, so the quest tooltip can run other addons' post-calls where the system exists.
+    "TooltipDataProcessor",
     "C_VignetteInfo", "C_UnitAuras", "C_UIWidgetManager", "C_Spell",
     "IsInInstance", "C_ChallengeMode", "WorldMapFrame",
     -- The Mythic+ key timer: the world timer it runs on, the current affixes for the sample
@@ -93,6 +95,8 @@ read_globals = {
     "GetQuestLogSelection",
     -- Forever's quest type tag words, and the parentheses UI/Row.lua puts around any client's tag.
     "ELITE", "CALENDAR_TYPE_DUNGEON", "CALENDAR_TYPE_PVP", "RAID", "PARENS_TEMPLATE",
+    -- The repeat words after a quest's title, joined to its type with Blizzard's list separator.
+    "DAILY", "WEEKLY", "LIST_DELIMITER",
     -- Blizzard's own Vanilla and TBC QuestWatch_OnLogin walks its watch list with these two.
     "GetNumQuestWatches", "GetQuestIndexForWatch",
     -- The pair Blizzard's own QuestTimerFrame reads. Asking these rather than selecting each

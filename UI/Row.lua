@@ -557,8 +557,8 @@ end
 local TITLE_META_PROVIDER = "quests"
 local NEW_WINDOW = 3600
 local NEW_TAG    = "|cff6bafffNEW|r "
--- Escaped U+2605 so this file stays ASCII, matching EQ's pinned marker.
-local PIN_TAG    = "|cffEBB706\226\152\133|r "
+-- The raid marker star texture, not U+2605, which drew as a box in the default font and most bundled ones.
+local PIN_TAG    = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:0|t "
 
 -- Rebuilt only when the picked color moves, since a NEW title is decorated again on every repaint.
 local newTag, newRGB = NEW_TAG, {}
@@ -591,6 +591,15 @@ local function titleExtras(entry, cfg)
     return " |cff999999(" .. table.concat(extras, ", ") .. ")|r"
 end
 
+-- Retail ships the box off and never stored it, so an unset box reads the provider's own default.
+local function typeTagsOn(cfg)
+    local v = cfg.showQuestTypeTag
+    if v ~= nil then return v ~= false end
+    local Registry = ns:GetModule("Registry")
+    local p = Registry and Registry.Get and Registry:Get(TITLE_META_PROVIDER)
+    return (p and p.TypeTagsDefault and p:TypeTagsDefault()) and true or false
+end
+
 local function decorateTitle(entry, cfg)
     local text = entry.title or ""
     if not cfg or entry.providerID ~= TITLE_META_PROVIDER then return text end
@@ -598,8 +607,10 @@ local function decorateTitle(entry, cfg)
     if cfg.showLevelInTracker and entry.level and entry.level > 0 then
         text = ("[%d%s] %s"):format(entry.level, entry.elite and "+" or "", text)
     end
-    if cfg.showQuestTypeTag ~= false and entry.typeTag then
-        text = text .. " " .. (PARENS_TEMPLATE or "(%s)"):format(entry.typeTag)
+    local word, rep = entry.typeTag, entry.repeatTag
+    if (word or rep) and typeTagsOn(cfg) then
+        local inner = (word and rep) and (word .. (LIST_DELIMITER or ", ") .. rep) or word or rep
+        text = text .. " " .. (PARENS_TEMPLATE or "(%s)"):format(inner)
     end
     if cfg.showQuestID and entry.id then
         text = text .. (" |cff666666(#%d)|r"):format(entry.id)

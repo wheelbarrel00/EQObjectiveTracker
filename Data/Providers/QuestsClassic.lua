@@ -318,6 +318,7 @@ end
 local function fillType(e, id, questTag)
     e.elite = getTagID(id) == 1
     e.typeTag = (type(questTag) == "string" and questTag ~= "") and questTag or nil
+    e.repeatTag = (e.tags.daily and DAILY) or (e.tags.weekly and WEEKLY) or nil
 end
 
 -- Quest-log headers ARE zone names on Classic, unlike retail where they are campaign
@@ -458,6 +459,10 @@ function Quests:IsAvailable()
 end
 
 function Quests:HasTypeTags()
+    return true
+end
+
+function Quests:TypeTagsDefault()
     return true
 end
 

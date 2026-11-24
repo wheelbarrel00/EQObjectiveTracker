@@ -43,6 +43,10 @@ Options.FILTER_ORDER = FILTER_ORDER
 -- names out loud, so the generic line below leaves the player guessing.
 local FILTER_TIPS = {
     showScheduled = L["Quests the game resets on its own schedule rather than daily or weekly. Special Assignments and some meta quests are what you will see here."],
+    showInstance = L["Shows your dungeon, raid and delve quests, as long as their type's box is ticked too. A pinned quest always shows."],
+    showOutsideInstance = L["Shows your other quests, as long as their type's box is ticked too. Untick it to see only your dungeon, raid and delve quests. A pinned quest always shows."],
+    showUnfinished = L["Shows the quests you are still working on. A pinned quest always shows. While To-Do Mode is on, this box is set aside and the quest sections follow its picked count."],
+    showFinished = L["Shows the quests ready to turn in. A pinned quest always shows. While To-Do Mode is on, this box is set aside and the quest sections follow its picked count."],
 }
 
 -- EQ exposes three of these. The author kept all five plus World Quests, so the shape is
@@ -98,8 +102,10 @@ end
 -- remembering to come back for it.
 function Options:ResetFilters()
     local f = DB().filters
-    local cats = ns:GetModule("Filter").CATEGORIES
-    for i = 1, #cats do f[cats[i].key] = true end
+    local Filter = ns:GetModule("Filter")
+    for _, run in ipairs({ Filter.CATEGORIES, Filter.PLACE, Filter.PROGRESS }) do
+        for i = 1, #run do f[run[i].key] = true end
+    end
     f.onlyCurrentZone = false
     f.campaignAnyZone = false
     ns:GetModule("Filter"):ShowAllZones()
@@ -114,8 +120,9 @@ local TODO_COUNTS = {
 }
 
 -- Its own function so the tab's build closes over one name, not every control on the card. It dims
--- its rows while the mode is off, and the current-zone box while it is on, since the mode decides that.
-local function buildTodoCard(ui, content, above, zoneOnly)
+-- its rows while the mode is off, and the current-zone box and the progress pair while it is on, since
+-- the mode decides those.
+local function buildTodoCard(ui, content, above, zoneOnly, progressBoxes)
     local gap  = ui:Spacing("groupGap")
     local card = ui:CreateGroup(content, L["To-Do Mode"])
     card:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
@@ -126,6 +133,7 @@ local function buildTodoCard(ui, content, above, zoneOnly)
         local on = DB().todoMode == true
         for _, r in ipairs(rows) do ui:SetDependent(r, on) end
         ui:SetDependent(zoneOnly, not on)
+        for _, b in ipairs(progressBoxes or {}) do ui:SetDependent(b, not on) end
     end
 
     card:Add(ui:CreateCheckbox(content, L["Turn on To-Do Mode"],
@@ -331,6 +339,20 @@ Options:RegisterTab({
             end
         end
 
+        -- The two pairs ANDed with the types. In filterBoxes so Reset re-ticks them.
+        local progressBoxes = {}
+        local function pairBox(c, list)
+            local get, set = filterSetting(c.key)
+            local cb = self:CreateCheckbox(content, c.label, get, set, FILTER_TIPS[c.key])
+            filters:Add(cb)
+            filterBoxes[#filterBoxes + 1] = { key = c.key, cb = cb }
+            if list then list[#list + 1] = cb end
+        end
+        if Filter:OffersPlace(Registry) then
+            for _, c in ipairs(Filter.PLACE) do pairBox(c) end
+        end
+        for _, c in ipairs(Filter.PROGRESS) do pairBox(c, progressBoxes) end
+
         local zoneOnly = self:CreateCheckbox(content, L["Show only quests in current zone"],
             function() return DB().filters.onlyCurrentZone end,
             function(v) DB().filters.onlyCurrentZone = v; render() end,
@@ -369,12 +391,12 @@ Options:RegisterTab({
             end,
             -- Without the campaign box the tooltip must not name it.
             campaignZone
-                and L["Turns every category filter back on, clears the current-zone filter, turns off Always show campaign quests and shows every zone again. Nothing else on this tab is changed."]
-                or L["Turns every category filter back on, clears the current-zone filter and shows every zone again. Nothing else on this tab is changed."])
+                and L["Turns every category filter back on, along with the four boxes under them, clears the current-zone filter, turns off Always show campaign quests and shows every zone again. Nothing else on this tab is changed."]
+                or L["Turns every category filter back on, along with the four boxes under them, clears the current-zone filter and shows every zone again. Nothing else on this tab is changed."])
         -- The last row of the card, after whichever filter ends the run.
         filters:Add(resetFilters)
 
-        local todoCard = buildTodoCard(self, content, filters, zoneOnly)
+        local todoCard = buildTodoCard(self, content, filters, zoneOnly, progressBoxes)
 
         local visibility = self:CreateGroup(content, L["Tracker Visibility"])
         visibility:SetPoint("TOPLEFT", todoCard, "BOTTOMLEFT", 0, -gap)
@@ -413,8 +435,8 @@ Options:RegisterTab({
                 L["Lists every WQ in your zone without tracking each."])
 
             -- The two sliders are mutually exclusive - UI/Tracker.lua reads the fixed height or
-            -- the fraction, never both - so exactly one of them is live at a time and the dead
-            -- one has to say so.
+            -- the fraction, never both, and neither while World Quests are drawn alone - so the
+            -- dead one has to say so.
             local wqHeightSlider, wqMaxSlider
             local function setWqHeightEnabled(on)
                 self:SetDependent(wqHeightSlider, on)
@@ -433,7 +455,7 @@ Options:RegisterTab({
             wqHeightSlider = self:CreateSlider(content, L["World Quests Height"], 40, 400, 10,
                 function() return DB().worldQuestsHeight or 200 end,
                 function(v) DB().worldQuestsHeight = v; render() end,
-                L["Height in pixels for the world quest area. Only used while Set a custom World Quests height is on."])
+                L["Height in pixels for the world quest area. Only used while Set a custom World Quests height is on. When world quests are the only thing on the tracker, or on their tab, they use all of its height."])
             visibility:Add(wqHeightSlider, { dependent = true })
 
             -- EQOT-only: EQ caps the world quest area by fixed height alone. Kept because it
@@ -444,7 +466,7 @@ Options:RegisterTab({
                     DB().worldQuestsPinnedMaxFraction = v / 100
                     render()
                 end,
-                L["The most of the tracker the world quest area may take. It is capped here first and your quest list takes the space that is left, scrolling for whatever does not fit. Only used while Set a custom World Quests height is off."])
+                L["The most of the tracker the world quest area may take. It is capped here first and your quest list takes the space that is left, scrolling for whatever does not fit. Only used while Set a custom World Quests height is off. When world quests are the only thing on the tracker, or on their tab, they use all of its height."])
             visibility:Add(wqMaxSlider, { dependent = true })
             setWqHeightEnabled(DB().worldQuestsHeightOverride)
         end
@@ -557,7 +579,7 @@ Options:RegisterTab({
         questRows:SetPoint("TOPLEFT", order, "BOTTOMLEFT", 0, -gap)
         questRows:SetPoint("TOPRIGHT", order, "BOTTOMRIGHT", 0, -gap)
 
-        -- The quest provider fills the elite + and the type tag on Forever, Era and TBC only.
+        -- The quest provider fills the elite + on Forever, Era and TBC only.
         local questsProvider = Registry:Get("quests")
         local typed = questsProvider and questsProvider.HasTypeTags and questsProvider:HasTypeTags()
         local lvl = self:CreateCheckbox(content, L["Show quest level prefix"],
@@ -566,11 +588,17 @@ Options:RegisterTab({
         self:AttachTooltip(lvl, L["Show quest level prefix"], typed
             and L["For example, [60] Title, or [60+] for an elite or group quest."] or L["For example, [60] Title."])
 
-        if typed then
-            local typeTag = self:CreateCheckbox(content, L["Show quest type tags"], rowSetting("showQuestTypeTag", true))
+        if questsProvider and questsProvider.TypeTagsDefault then
+            local _, setTypeTag = rowSetting("showQuestTypeTag")
+            local typeTag = self:CreateCheckbox(content, L["Show quest type tags"],
+                function()
+                    local v = DB().showQuestTypeTag
+                    if v == nil then return questsProvider:TypeTagsDefault() end
+                    return v ~= false
+                end, setTypeTag)
             questRows:Add(typeTag)
             self:AttachTooltip(typeTag, L["Show quest type tags"],
-                L["Adds the quest's type after its title, such as (Elite), (Group) or (Dungeon), in your game's own words."])
+                L["Adds the quest's type after its title in your game's own words, such as (Dungeon) or (Daily). A quest with two shows both, such as (Dungeon, Daily)."])
         end
 
         local zoneCheck = self:CreateCheckbox(content, L["Show zone label under quest titles"],
@@ -637,6 +665,16 @@ Options:RegisterTab({
         questRows:Add(textCheck)
         self:AttachTooltip(textCheck, L["Show the quest text in its tooltip"],
             L["When you point at a quest, its tooltip also shows the quest log's own text: first the short paragraph saying what to do and who to go back to, then the quest's story in gray. Off by default."])
+
+        local rewardTip = ns:GetModule("RewardTooltip")
+        if rewardTip and rewardTip:HooksAvailable() then
+            local hooksCheck = self:CreateCheckbox(content, L["Let other addons add to quest tooltips"],
+                function() return DB().otherAddonTooltipLines ~= false end,
+                function(v) DB().otherAddonTooltipLines = v end)
+            questRows:Add(hooksCheck)
+            self:AttachTooltip(hooksCheck, L["Let other addons add to quest tooltips"],
+                L["Addons that add lines to quest tooltips can add them at the bottom of a quest's tooltip here too. Turn this off if another addon's lines cause trouble. On by default."])
+        end
 
         local headers = self:CreateGroup(content, L["Headers and Buttons"])
         headers:SetPoint("TOPLEFT", questRows, "BOTTOMLEFT", 0, -gap)

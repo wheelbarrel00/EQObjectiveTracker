@@ -13,7 +13,7 @@ local Quests = {
     groups   = { "campaign", "quests" },
     priority = 10,
     idSpace  = "quest",
-    tags     = { "campaign", "daily", "weekly", "scheduled", "dungeon", "raid", "legendary",
+    tags     = { "campaign", "daily", "weekly", "scheduled", "dungeon", "raid", "delve", "legendary",
                  "worldquest" },
     filterCategories = true,
     -- The Quests and Campaign sections take To-Do Mode's view and counts.
@@ -38,6 +38,16 @@ local TAG_HEROIC  = (Enum and Enum.QuestTag and Enum.QuestTag.Heroic)  or 85
 local TAG_RAID    = (Enum and Enum.QuestTag and Enum.QuestTag.Raid)    or 62
 local TAG_RAID10  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid10)  or 88
 local TAG_RAID25  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid25)  or 89
+local TAG_DELVE   = (Enum and Enum.QuestTag and Enum.QuestTag.Delve)   or 288
+local TAG_GROUP   = (Enum and Enum.QuestTag and Enum.QuestTag.Group)   or 1
+
+-- Retail's type words, each the tag's own name. Account and Combat Ally are left out.
+local RETAIL_TYPE_TAGS = {
+    [TAG_GROUP] = true, [TAG_DUNGEON] = true, [TAG_HEROIC] = true, [TAG_RAID] = true, [TAG_RAID10] = true,
+    [TAG_RAID25] = true, [TAG_DELVE] = true,
+    [(Enum and Enum.QuestTag and Enum.QuestTag.PvP) or 41] = true,
+    [(Enum and Enum.QuestTag and Enum.QuestTag.Scenario) or 98] = true,
+}
 
 local CLASS_LEGENDARY = Enum and Enum.QuestClassification and Enum.QuestClassification.Legendary
 
@@ -75,17 +85,19 @@ local primed    = false
 local baselined = false
 
 local tagIDCache   = {}
+local tagNameCache = {}
 local objTextCache = {}
 
+-- The tag's id, then the game's own name for it.
 local function getTagID(id)
     local cached = tagIDCache[id]
-    if cached then return cached end
+    if cached then return cached, tagNameCache[id] end
     if not ns.Has.QuestTagInfo then return nil end
     local info  = C_QuestLog.GetQuestTagInfo(id)
     local tagID = info and info.tagID
     -- Memoize hits only - a miss can mean static data has not streamed in yet
-    if tagID then tagIDCache[id] = tagID end
-    return tagID
+    if tagID then tagIDCache[id], tagNameCache[id] = tagID, info.tagName end
+    return tagID, info and info.tagName
 end
 
 local function getClassification(id)
@@ -249,12 +261,14 @@ local function fillTags(e, id, info)
         tags.dungeon = true
     elseif tagID == TAG_RAID or tagID == TAG_RAID10 or tagID == TAG_RAID25 then
         tags.raid = true
+    elseif tagID == TAG_DELVE then
+        tags.delve = true
     end
     if CLASS_LEGENDARY and e.icon.classification == CLASS_LEGENDARY then tags.legendary = true end
 end
 
--- Forever only, read as Blizzard's Forever tracker reads them (Camelot QuestUtilsOverrides). Retail draws
--- neither, and there tag 1 is Group rather than Elite.
+-- Forever only, read as Blizzard's Forever tracker reads them (Camelot QuestUtilsOverrides). On retail tag 1
+-- is Group rather than Elite, and fillType words retail's tags by their own names.
 local function typeWord(tagID)
     if tagID == 1 then return ELITE
     elseif tagID == 81 then return CALENDAR_TYPE_DUNGEON
@@ -263,10 +277,21 @@ local function typeWord(tagID)
     end
 end
 
-local function fillType(e, id)
+local function fillType(e, id, info)
     local forever = ns.IsForever()
     e.elite = forever and C_QuestLog.IsEliteQuest ~= nil and C_QuestLog.IsEliteQuest(id)
-    e.typeTag = forever and typeWord(getTagID(id)) or nil
+    local tagID, tagName = getTagID(id)
+    if forever then
+        e.typeTag = typeWord(tagID)
+    elseif RETAIL_TYPE_TAGS[tagID] and type(tagName) == "string" and tagName ~= "" then
+        local size = info and tonumber(info.suggestedGroup)
+        if tagID == TAG_GROUP and size and size > 1 then tagName = tagName .. " " .. size end
+        e.typeTag = tagName
+    else
+        e.typeTag = nil
+    end
+    -- The words the game gives, after the tags the filters read, so title and filter agree.
+    e.repeatTag = (e.tags.daily and DAILY) or (e.tags.weekly and WEEKLY) or nil
 end
 
 local function superTrackedID()
@@ -425,7 +450,7 @@ local function fullRebuild()
                 -- elite quest in the ordinary Quests section never showed one.
                 e.canGroup  = QuestGroups:CanCreate(id)
                 fillTags(e, id, info)
-                fillType(e, id)
+                fillType(e, id, info)
                 e.groupID = e.tags.campaign and "campaign" or "quests"
                 fillTimer(e, id)
                 fillLines(e, id)
@@ -451,7 +476,7 @@ local function fullRebuild()
                 local n = (seenMisses[id] or 0) + 1
                 if n >= SEEN_STRIKES then
                     seenMisses[id] = nil
-                    firstSeen[id], tagIDCache[id], objTextCache[id] = nil, nil, nil
+                    firstSeen[id], tagIDCache[id], tagNameCache[id], objTextCache[id] = nil, nil, nil, nil
                 else
                     seenMisses[id] = n
                 end
@@ -496,6 +521,11 @@ function Quests:IsAvailable()
 end
 
 function Quests:HasTypeTags()
+    return ns.IsForever()
+end
+
+-- The type box ships off on retail, where its words are new, and on elsewhere as it always was.
+function Quests:TypeTagsDefault()
     return ns.IsForever()
 end
 

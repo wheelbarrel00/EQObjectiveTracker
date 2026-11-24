@@ -9,6 +9,21 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.23.0", date = "2026-11-23",
+        sections = {
+            { head = "New Features", items = {
+                "The tracker's filter button has new rows, and the Tracker tab's Filters card the same new boxes. Select all and Deselect all tick or untick every quest type at once, and the list stays open where it is. A new Instance quests and Quests outside instances pair shows or hides dungeon, raid and delve quests whatever their type, so unticking Quests outside instances leaves only your instance quests on the tracker. A new Unfinished quests and Finished quests pair shows only the quests you are still working on, or only the ones ready to turn in. A quest shows while its type box and both of its new boxes are ticked, a pinned quest always shows, and Reset filters to defaults ticks them all again. While To-Do Mode is on its counts decide what is finished, so the Unfinished and Finished pair is left out of the list and dimmed on the card, and the counts leave out what the instance pair hides. The filters line of /eqot status names the new boxes and counts what each pair hid. Requested by Tyrial.",
+                "Show quest type tags now works on retail too, adding the game's own word for a quest's type after its title, such as (Dungeon), (Delve), (Raid), (Heroic), (Scenario), (PvP), or (Group 3) for a group quest with its suggested size. On retail it is off by default, so nothing changes until you tick it on the Tracker tab's Quest Row Details card. On every client the box now also adds Daily or Weekly in the game's own words, so a daily dungeon quest reads (Dungeon, Daily). On WoW Forever, Classic Era and TBC Anniversary the box stays on as before, so a daily quest there now shows (Daily) too. Requested by Tyrial.",
+                "Addons that add lines to quest tooltips can now add them to the tracker's quest tooltips too, at the bottom, on retail and WoW Forever. It is on by default, and a new Let other addons add to quest tooltips box, at the end of the Quest Row Details card, turns it off if another addon's lines cause trouble. Some addons only add lines to tooltips they know by name, and those need an update on their side. /eqot status has a new tooltip hooks line. Requested by Tyrial.",
+            } },
+            { head = "Bug Fixes", items = {
+                "World quests that are the only thing on the tracker, or on a section tab of their own, now use the tracker's whole height instead of stopping at the Maximum Height share or the custom World Quests height. Both sliders' tooltips now say so. Reported by Tyrial.",
+                "A list that fits the tracker is no longer left scrolled part way down, with its first quest cut off at the top and a scroll bar showing. After the tracker changed size the game kept reporting the list as able to scroll, so the tracker now works out how far each list can scroll from its own heights, sends a list that fits back to its top, and asks the game to measure again a moment later. The mouse wheel no longer moves a list that fits. The scroll line of /eqot status now shows each list's scroll position and the game's own scroll range, and the Appearance tab's preview of the tracker scrolls by its own heights too. Reported by Tyrial.",
+                "A pinned quest's star now shows as the game's yellow raid marker star. With most fonts, the tracker's default font included, it showed as a small box.",
+            } },
+        },
+    },
+    {
         version = "2.22.0", date = "2026-11-22",
         sections = {
             { head = "New Features", items = {
@@ -398,18 +413,6 @@ ns.Changelog = {
             } },
             { head = "Notes", items = {
                 "Everything Quests is next in line for this overhaul, so its windows will get the same new look.",
-            } },
-        },
-    },
-    {
-        version = "1.28.0", date = "2026-09-30",
-        sections = {
-            { head = "New Features", items = {
-                "Use Blizzard's quest tracker, a new option at the top of the General tab, turns off the EQ Objective Tracker window and brings back the game's own quest tracker. The parts that do not need the window keep working, including quest sounds, the flight point highlight on retail and the zone progress bar, which floats on its own while the window is off, and on WoW Forever the TomTom arrow Everything Quests draws for the quest you follow. Settings for the window itself, such as its hide rules, the bonus objectives HUD and hiding Questie's tracker, wait until you switch back. The interface reloads to switch, in either direction. Everything Quests has the same checkbox in the Tracker section of its General tab. Requested by diana_winter.",
-                "On retail and WoW Forever both trackers use the game's own list of tracked quests, so what you track carries over when you switch. On Classic Era and TBC Anniversary the game's tracker starts with nothing watched, and you add quests from the quest log as usual. The EQ Objective Tracker window keeps its own list, which still auto-tracks quests you accept in the meantime, and switching back empties the game's watch list again so its five-quest limit never gets in the way.",
-            } },
-            { head = "Bug Fixes", items = {
-                "On Classic Era and TBC Anniversary with Questie installed, EQ Objective Tracker empties the game's watch list behind every quest the game adds to it, and Questie could take that for you untracking the quest, which could leave it marked as untracked in Questie's own settings. Those removals are now flagged the way Questie flags its own.",
             } },
         },
     },

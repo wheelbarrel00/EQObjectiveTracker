@@ -16,10 +16,22 @@ Filter.CATEGORIES = {
     { tag = nil,          key = "showNormal",   label = L["Normal quests"]    },
 }
 
+-- Two pairs ANDed with the type boxes rather than more types, so a campaign or daily dungeon
+-- quest still counts as an instance quest. Screen order.
+Filter.PLACE = {
+    { key = "showInstance",        label = L["Instance quests"]          },
+    { key = "showOutsideInstance", label = L["Quests outside instances"] },
+}
+Filter.PROGRESS = {
+    { key = "showUnfinished", label = L["Unfinished quests"] },
+    { key = "showFinished",   label = L["Finished quests"]   },
+}
+Filter.INSTANCE_TAGS = { "dungeon", "raid", "delve" }
+
 -- Feed reports "filtered N" and could never say why, which has cost a misdiagnosis: a stale
 -- isTracked and an active zone filter look identical from that number. One integer bump per
 -- rejected entry, so it stays on in release.
-Filter.rejects = { popup = 0, watched = 0, category = 0, zone = 0, hiddenZone = 0 }
+Filter.rejects = { popup = 0, watched = 0, category = 0, place = 0, progress = 0, zone = 0, hiddenZone = 0 }
 -- The rows the zone rule would have hidden and the campaign exemption kept, so a "why is
 -- this quest showing" report is answered from the same line as the rejects.
 Filter.campaignKept = 0
@@ -35,7 +47,7 @@ local listNames, listCounts, stale = {}, {}, {}
 
 function Filter:BeginPass()
     local r = self.rejects
-    r.popup, r.watched, r.category, r.zone, r.hiddenZone = 0, 0, 0, 0, 0
+    r.popup, r.watched, r.category, r.place, r.progress, r.zone, r.hiddenZone = 0, 0, 0, 0, 0, 0, 0
     wipe(zoneCount)
     wipe(zoneNames)
     wipe(zoneOf)
@@ -192,17 +204,20 @@ function Filter:FiltersLine()
     local r   = self.rejects
 
     local cats = {}
-    for i = 1, #self.CATEGORIES do
-        local key = self.CATEGORIES[i].key
-        cats[i] = ("%s=%s"):format(key, tostring((f and f[key]) ~= false))
+    for _, run in ipairs({ self.CATEGORIES, self.PLACE, self.PROGRESS }) do
+        for i = 1, #run do
+            local key = run[i].key
+            cats[#cats + 1] = ("%s=%s"):format(key, tostring((f and f[key]) ~= false))
+        end
     end
 
-    return ("filters: onlyWatched=%s onlyCurrentZone=%s campaignAnyZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, popup %d | campaign kept from other zones %d | zone hidden %d (hiddenZones=%d)")
+    return ("filters: onlyWatched=%s onlyCurrentZone=%s campaignAnyZone=%s | %s\n      rejected this pass: watched %d, category %d, zone %d, popup %d | campaign kept from other zones %d | zone hidden %d (hiddenZones=%d) | place %d, progress %d")
         :format(tostring(cfg and cfg.showOnlyWatched and true or false),
                 tostring(f and f.onlyCurrentZone and true or false),
                 tostring(f and f.campaignAnyZone and true or false),
                 f and table.concat(cats, " ") or "no filters table",
-                r.watched, r.category, r.zone, r.popup, self.campaignKept, r.hiddenZone, self:HiddenZoneCount())
+                r.watched, r.category, r.zone, r.popup, self.campaignKept, r.hiddenZone, self:HiddenZoneCount(),
+                r.place, r.progress)
 end
 
 function Filter:PassesCategory(entry, f)
@@ -215,6 +230,39 @@ function Filter:PassesCategory(entry, f)
         end
     end
     return f.showNormal ~= false
+end
+
+function Filter:IsInstance(entry)
+    local tags = entry.tags
+    if not tags then return false end
+    for i = 1, #self.INSTANCE_TAGS do
+        if tags[self.INSTANCE_TAGS[i]] then return true end
+    end
+    return false
+end
+
+-- No loaded provider tags an instance quest, so the pair would be dead.
+function Filter:OffersPlace(Registry)
+    for i = 1, #self.INSTANCE_TAGS do
+        if Registry:HasTag(self.INSTANCE_TAGS[i]) then return true end
+    end
+    return false
+end
+
+function Filter:PassesPlace(entry, f)
+    if not f then return true end
+    if self:IsInstance(entry) then return f.showInstance ~= false end
+    return f.showOutsideInstance ~= false
+end
+
+-- While To-Do Mode is on its counts decide progress, so the pair is not asked. Its switch, not a
+-- view, since World Quests are handed no view.
+function Filter:PassesProgress(entry, f, cfg)
+    if not f then return true end
+    local TodoMode = ns:GetModule("TodoMode")
+    if TodoMode:IsOn(cfg) then return true end
+    if TodoMode:IsFinished(entry) then return f.showFinished ~= false end
+    return f.showUnfinished ~= false
 end
 
 function Filter:PassesWatched(entry, cfg)
@@ -263,6 +311,14 @@ function Filter:Visible(entry, cfg, provider, view)
         local f = cfg and cfg.filters
         if not self:PassesCategory(entry, f) then
             rejects.category = rejects.category + 1
+            return false
+        end
+        if not self:PassesPlace(entry, f) then
+            rejects.place = rejects.place + 1
+            return false
+        end
+        if not self:PassesProgress(entry, f, cfg) then
+            rejects.progress = rejects.progress + 1
             return false
         end
         -- Below the pin check, so a pinned quest in a hidden zone still shows.

@@ -74,8 +74,15 @@ function Preview:Samples()
     }
 end
 
+-- Off the heights, as the tracker's own lists: the game's range was measured stale after a resize.
+local function rangeOf(sf)
+    local child = sf:GetScrollChild()
+    if not child then return 0 end
+    return math.max(0, (child:GetHeight() or 0) - (sf:GetHeight() or 0))
+end
+
 local function wheel(sf, delta)
-    local range = sf:GetVerticalScrollRange() or 0
+    local range = rangeOf(sf)
     if range <= 0 then return end
     local new = (sf:GetVerticalScroll() or 0) - delta * WHEEL_STEP
     sf:SetVerticalScroll(math.max(0, math.min(new, range)))
@@ -314,7 +321,7 @@ function Preview:Refresh(again)
     scroll:SetPoint("TOPLEFT", box, "TOPLEFT", pad, -(top + tabH + SCENARIO_GAP))
     scroll:SetSize(inner, view)
     if scroll.UpdateScrollChildRect then scroll:UpdateScrollChildRect() end
-    local range = math.max(0, scroll:GetVerticalScrollRange() or 0)
+    local range = rangeOf(scroll)
     if (scroll:GetVerticalScroll() or 0) > range then scroll:SetVerticalScroll(range) end
 
     Tracker:SkinBackdrop(self.bg, self.background, cfg)

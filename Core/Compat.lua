@@ -32,6 +32,9 @@ Has.AutoQuestPopUp      = global("GetNumAutoQuestPopUps") and global("GetAutoQue
 -- than assumed present - no reading has been taken on 2.5.6 or on retail.
 Has.QuestLink           = global("GetQuestLink")
 Has.QuestDistance       = method(C_QuestLog, "GetDistanceSqToQuest")
+-- The tooltip data system's table. Era and TBC carry it too, so RewardTooltip:HooksAvailable also asks for ProcessInfo.
+Has.TooltipDataHooks    = type(TooltipDataProcessor) == "table" and type(Enum) == "table"
+                          and type(Enum.TooltipDataType) == "table" and type(Enum.TooltipDataType.Quest) == "number"
 Has.QuestsOnMap         = method(C_QuestLog, "GetQuestsOnMap")
 Has.NextWaypoint        = method(C_QuestLog, "GetNextWaypoint")
 Has.QuestClassification = method(C_QuestInfoSystem, "GetQuestClassification")

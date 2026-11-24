@@ -215,22 +215,36 @@ function RT:_DrawEntry(owner, questID, title, expiresAt, clickHint)
         tip:AddLine(L["Click the title to open the quest log."], 0.7, 0.7, 0.7, true)
     end
 
+    -- A rebuild from data replays it with the lines above cleared and asks only the first data's pre-call, so
+    -- every data appended here carries this redraw. The template never rebuilds this frame from its data (no
+    -- OnUpdate), so it only guards against something else doing it.
+    local function redraw()
+        local e = owner._entry
+        if not (e and e.id ~= questID) then
+            self:_DrawEntry(owner, questID, title, expiresAt, clickHint)
+        end
+        return true
+    end
+
     -- The quest log's shape, a gap, the heading and the party, appended as data, since
-    -- SetQuestPartyProgress clears the lines above it. The template never rebuilds this frame from its
-    -- data (no OnUpdate), so the pre-call only guards against something else doing it.
+    -- SetQuestPartyProgress clears the lines above it.
     if PARTY_QUEST_STATUS_ON and tip.ProcessInfo and not ns:SafeMode() and QR:PartyOnQuest(questID) > 0 then
         tip:AddLine(" ")
         tip:AddLine(PARTY_QUEST_STATUS_ON)
         tip:ProcessInfo({
             getterName = "GetQuestPartyProgress", getterArgs = { questID, true, true, n = 3 }, append = true,
-            rebuildPreCall = function()
-                local e = owner._entry
-                if not (e and e.id ~= questID) then
-                    self:_DrawEntry(owner, questID, title, expiresAt, clickHint)
-                end
-                return true
-            end,
+            rebuildPreCall = redraw,
         })
+    end
+
+    -- Other addons add their quest lines through the tooltip data post-calls, which this private tooltip
+    -- never ran. Empty Quest data, appended last, so their lines end the tooltip and no line of the game's comes in.
+    if self:HooksAvailable() and not ns:SafeMode()
+       and not (cfg and cfg.otherAddonTooltipLines == false) then
+        self.hooksRan, self.hookQuest = (self.hooksRan or 0) + 1, questID
+        local info = { tooltipData = { type = Enum.TooltipDataType.Quest, id = questID, lines = {} }, append = true,
+                       rebuildPreCall = redraw }
+        xpcall(function() tip:ProcessInfo(info) end, geterrorhandler())
     end
 
     tip:Show()
@@ -239,6 +253,19 @@ function RT:_DrawEntry(owner, questID, title, expiresAt, clickHint)
             self:_DrawEntry(owner, questID, title, expiresAt, clickHint)
         end)
     end
+end
+
+-- Era and TBC carry the tooltip data table, but their tooltips have no ProcessInfo to run the hooks with.
+function RT:HooksAvailable()
+    return (ns.Has and ns.Has.TooltipDataHooks and Util.Tooltip().ProcessInfo) and true or false
+end
+
+function RT:HooksLine()
+    if not self:HooksAvailable() then return "tooltip hooks: not on this client" end
+    local DB = ns:GetModule("DB")
+    local cfg = DB and DB:Tracker()
+    if cfg and cfg.otherAddonTooltipLines == false then return "tooltip hooks: off" end
+    return ("tooltip hooks: on, ran %d, last quest %s"):format(self.hooksRan or 0, tostring(self.hookQuest))
 end
 
 function RT:Hide()

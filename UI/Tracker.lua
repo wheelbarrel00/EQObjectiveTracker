@@ -261,6 +261,16 @@ function Tracker:FilterActive()
     for _, c in ipairs(Filter.CATEGORIES) do
         if f[c.key] == false and ((not c.tag) or Registry:HasTag(c.tag)) then return true end
     end
+    if Filter.PLACE and Filter:OffersPlace(Registry) then
+        for _, c in ipairs(Filter.PLACE) do
+            if f[c.key] == false then return true end
+        end
+    end
+    if Filter.PROGRESS and not (TodoMode and TodoMode:IsOn(cfg)) then
+        for _, c in ipairs(Filter.PROGRESS) do
+            if f[c.key] == false then return true end
+        end
+    end
     return false
 end
 
@@ -286,38 +296,58 @@ local function zoneItems(items, changed)
     return #names
 end
 
-function Tracker:OpenFilterMenu(owner)
+-- Built whole on every open and again by Select all and Deselect all, which repaint the open menu.
+local function filterMenuItems(owner)
     local Options = ns:GetModule("Options")
     local cfg = ns:GetModule("DB"):Tracker()
     local Filter, Registry = ns:GetModule("Filter"), ns:GetModule("Registry")
-    if not (Options and Options.ui and Options.FILTER_ORDER and cfg and cfg.filters and Filter and Registry) then
-        return
-    end
     local f = cfg.filters
     local function changed()
         Tracker:PaintFilterButton()
         Tracker:Render()
         Options:RefreshIfShown("tracker")
     end
+    local function check(c)
+        return { kind = "check", text = c.label, checked = f[c.key] ~= false,
+                 onClick = function(on) f[c.key] = on; changed() end }
+    end
     local items = { { kind = "title", text = L["Filters"] } }
-    -- Left out while To-Do Mode decides the zone, since the menu has no dimmed row.
+    -- Left out while To-Do Mode decides the zone and progress, since the menu has no dimmed row.
     local TodoMode = ns:GetModule("TodoMode")
-    if not (TodoMode and TodoMode:IsOn(cfg)) then
+    local todoOn = TodoMode and TodoMode:IsOn(cfg)
+    if not todoOn then
         items[#items + 1] = { kind = "check", text = L["Show only quests in current zone"],
                               checked = f.onlyCurrentZone == true,
                               onClick = function(on) f.onlyCurrentZone = on; changed() end }
     end
     items[#items + 1] = { kind = "divider" }
-    local byKey = {}
+    local byKey, offered = {}, {}
     for _, c in ipairs(Filter.CATEGORIES) do byKey[c.key] = c end
     for _, key in ipairs(Options.FILTER_ORDER) do
         local c = byKey[key]
         if c and ((not c.tag) or Registry:HasTag(c.tag)) then
-            items[#items + 1] = { kind = "check", text = c.label, checked = f[key] ~= false,
-                                  onClick = function(on) f[key] = on; changed() end }
+            offered[#offered + 1] = key
+            items[#items + 1] = check(c)
         end
     end
+    -- A category the client never offers is left unwritten, as its box was never shown.
+    local function setAll(on)
+        for _, key in ipairs(offered) do f[key] = on end
+        changed()
+        local again = filterMenuItems(owner)
+        if Options.ui.RefreshMenu then Options.ui:RefreshMenu(again) else Options.ui:ShowMenu(again, owner) end
+    end
+    items[#items + 1] = { text = L["Select all"], onClick = function() setAll(true) end }
+    items[#items + 1] = { text = L["Deselect all"], onClick = function() setAll(false) end }
     items[#items + 1] = { kind = "divider" }
+    if Filter:OffersPlace(Registry) then
+        for _, c in ipairs(Filter.PLACE) do items[#items + 1] = check(c) end
+        items[#items + 1] = { kind = "divider" }
+    end
+    if not todoOn then
+        for _, c in ipairs(Filter.PROGRESS) do items[#items + 1] = check(c) end
+        items[#items + 1] = { kind = "divider" }
+    end
     local zoneBlock = #items
     items[#items + 1] = { kind = "title", text = L["Zones"] }
     if zoneItems(items, changed) > 0 then
@@ -329,7 +359,17 @@ function Tracker:OpenFilterMenu(owner)
         Options:ResetFilters()
         changed()
     end }
-    Options.ui:ShowMenu(items, owner)
+    return items
+end
+
+function Tracker:OpenFilterMenu(owner)
+    local Options = ns:GetModule("Options")
+    local cfg = ns:GetModule("DB"):Tracker()
+    local Filter, Registry = ns:GetModule("Filter"), ns:GetModule("Registry")
+    if not (Options and Options.ui and Options.FILTER_ORDER and cfg and cfg.filters and Filter and Registry) then
+        return
+    end
+    Options.ui:ShowMenu(filterMenuItems(owner), owner)
 end
 
 function Tracker:OpenZoneMenu(owner)
@@ -806,12 +846,39 @@ local function suspendBarInput(sf, suspended)
     end
 end
 
+-- The game's own range was measured stale after a resize (lists that fit read 16 and 10), so every
+-- range acted on here is read off the heights instead.
+local function scrollRange(sf)
+    local child = sf.GetScrollChild and sf:GetScrollChild()
+    if not child then return 0 end
+    return math.max(0, (child:GetHeight() or 0) - (sf:GetHeight() or 0))
+end
+
 -- A list that shrinks leaves the offset past its new end, so the frame draws blank where the
--- content used to be and the section reads as empty until the player scrolls back up.
-local function clampScroll(sf)
+-- content used to be and the section reads as empty until the player scrolls back up. Handed the
+-- caller's own heights, a list that fits goes back to its top.
+local function clampScroll(sf, contentH, viewH)
     if not sf then return end
-    local range = math.max(0, sf:GetVerticalScrollRange() or 0)
+    if contentH and viewH and contentH <= viewH + 0.5 then
+        if (sf:GetVerticalScroll() or 0) ~= 0 then sf:SetVerticalScroll(0) end
+        return
+    end
+    local range = scrollRange(sf)
     if (sf:GetVerticalScroll() or 0) > range then sf:SetVerticalScroll(range) end
+end
+
+local function settle(sf)
+    if not sf then return end
+    if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
+    clampScroll(sf)
+end
+
+-- One frame after each pass the game is asked to measure again (its own bar reads that), and each list
+-- is held to its heights. The quest list holds the secure buttons.
+local function settleScrolls(f)
+    if not f then return end
+    settle(f.eventsScroll)
+    if not secureLocked() then settle(f.scroll) end
 end
 
 function Tracker:SetScrollInputSuspended(suspended)
@@ -830,7 +897,7 @@ local function scrollIntoView(f, top)
 
     local viewH = sf:GetHeight() or 0
     local cur   = sf:GetVerticalScroll() or 0
-    local want  = math.min(top, math.max(0, sf:GetVerticalScrollRange() or 0))
+    local want  = math.min(top, scrollRange(sf))
     -- One header plus a little body is the bar for "you can see that it opened".
     local need  = ns:GetModule("Sections"):Height() + 40
     if top < cur or (top + need) > (cur + viewH) then
@@ -1375,7 +1442,7 @@ function Tracker:BuildFrame()
         -- is affected - its content child parents the secure item buttons, while eventsScroll
         -- is a disjoint subtree that hosts nothing secure.
         if sf == scroll and secureLocked() then return end
-        local range = sf:GetVerticalScrollRange() or 0
+        local range = scrollRange(sf)
         if range <= 0 then return end
         local new = (sf:GetVerticalScroll() or 0) - delta * 24
         sf:SetVerticalScroll(math.max(0, math.min(new, range)))
@@ -1423,7 +1490,7 @@ local function setScrollBarHidden(sf, hidden)
     if hidden then
         if bar:IsShown() then bar:Hide() end
     else
-        bar:SetShown((sf:GetVerticalScrollRange() or 0) > 0.5)
+        bar:SetShown(scrollRange(sf) > 0.5)
     end
 end
 
@@ -1790,11 +1857,15 @@ function Tracker:DebugScroll()
     out[#out + 1] = ("barWidth cfg=%s applied=%s"):format(
         tostring(cfg.scrollBarWidth), tostring(bar and bar._eqotSlimW or "stock"))
 
-    out[#out + 1] = ("wq %s pos=%s scrollH=%.0f regionH=%.0f contentH=%.0f"):format(
+    -- The game's own ranges beside the offsets, so a stale one reads at a glance.
+    local es = f.eventsScroll
+    out[#out + 1] = ("wq %s pos=%s scrollH=%.0f regionH=%.0f contentH=%.0f offsets %.0f/%.0f ranges %.0f/%.0f"):format(
         shown(f.eventsRegion), tostring(cfg.worldQuestsPosition),
         sf:GetHeight() or 0,
         f.eventsRegion and f.eventsRegion:GetHeight() or 0,
-        f.eventsContent and f.eventsContent:GetHeight() or 0)
+        f.eventsContent and f.eventsContent:GetHeight() or 0,
+        sf:GetVerticalScroll() or 0, es and es:GetVerticalScroll() or 0,
+        sf:GetVerticalScrollRange() or 0, es and es:GetVerticalScrollRange() or 0)
 
     out[#out + 1] = ("scenario container %s h=%.0f"):format(
         shown(f.scenarioContainer),
@@ -1846,8 +1917,8 @@ local function noteFocus(entry, row)
     if entry.isFocused and not focusRow then focusRow, focusQuestID = row, entry.id end
 end
 
--- World quests live outside the main scroll area in a region capped to a fraction of the
--- tracker, so a long world quest list can never push the quest sections off screen.
+-- World quests live outside the main scroll area in a region of their own, capped by Render, so a long
+-- world quest list can never push the quest sections off screen.
 function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
     local f = self.frame
     local region, escroll, econtent = f.eventsRegion, f.eventsScroll, f.eventsContent
@@ -1922,10 +1993,12 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
     setRegionHeight(region, band + viewport)
 
     if escroll.UpdateScrollChildRect then escroll:UpdateScrollChildRect() end
-    clampScroll(escroll)
+    -- In a fight setRegionHeight waits, so the wanted viewport is not the one on screen.
+    if secureLocked() then clampScroll(escroll) else clampScroll(escroll, y, viewport) end
 
     if f.eventsScrollBarBG then
-        local needsBar = y > viewport + 0.5
+        local shownH = secureLocked() and (escroll:GetHeight() or 0) or viewport
+        local needsBar = y > shownH + 0.5
         if needsBar and cfg and cfg.scrollBarBg ~= false and cfg.hideScrollBar ~= true then
             paintTrack(f.eventsScrollBarBG, cfg)
             f.eventsScrollBarBG:Show()
@@ -2247,6 +2320,7 @@ function Tracker:_ArmHeightCheck()
     self._heightArmed = true
     self._heightCheck = self._heightCheck or function()
         self._heightArmed = nil
+        settleScrolls(self.frame)
         self:_CheckHeights()
     end
     C_Timer.After(0, self._heightCheck)
@@ -2556,7 +2630,11 @@ function Tracker:Render()
     -- quest log. questFloor is what stops a trailing section becoming a header with no body.
     local eventsCap
     local questFloor = band + 40
-    if cfg and cfg.worldQuestsHeightOverride then
+    local wqAlone = stickyN == 0
+    if wqAlone then
+        -- Nothing else drawn, so the whole room less the band's pixel, the list's 1 px and the gap.
+        eventsCap = math.max(0, available - bandH - 3)
+    elseif cfg and cfg.worldQuestsHeightOverride then
         local wqWant = band + math.max(0, cfg.worldQuestsHeight or 0)
         eventsCap = math.max(0, math.min(wqWant, available - questFloor))
     else
@@ -2584,7 +2662,7 @@ function Tracker:Render()
     if not locked then
         f.scroll:SetSize(math.max(1, width), scrollH)
         if f.scroll.UpdateScrollChildRect then f.scroll:UpdateScrollChildRect() end
-        clampScroll(f.scroll)
+        clampScroll(f.scroll, questContentH, scrollH)
     end
     -- The world quest region's 2 px gap, which available leaves out. At Top a hidden region still holds
     -- its 1 px and its gap in the chain (f._wqTop is the position as anchored).
