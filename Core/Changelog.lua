@@ -9,6 +9,14 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.24.0", date = "2026-11-24",
+        sections = {
+            { head = "New Features", items = {
+                "Profiles can now move to another account, another game version or a friend. The General tab's Profiles card has two new buttons. Export shows the profile you are on as one string, already selected, so you can copy it with Ctrl+C. Import takes a string made with Export, asks what to call the new profile (the name it had when it was exported is filled in for you), then creates it, switches to it and reloads the interface. A name that is already taken asks before that profile is overwritten. The string carries every setting in the profile, the tracker's position and size included, but only the ones you changed, so anything you left alone keeps the default of the game version you import it on. It leaves behind each character's pins, folded quests, hidden zones and collapsed sections, the Manual sort order, the options window's size and spot, the After an update choice, and which quest trackers run (Use Blizzard's quest tracker and Hide Questie's quest tracker). Everything Quests' own settings are not part of it. A string another addon made, or one cut short when it was copied, is refused with a message saying why, and nothing changes. Settings this version does not know yet are skipped. If the tracker lands somewhere odd on a different screen, Reset position and size on the General tab puts it back. Requested by AphelionZero78.",
+            } },
+        },
+    },
+    {
         version = "2.23.0", date = "2026-11-23",
         sections = {
             { head = "New Features", items = {
@@ -395,24 +403,6 @@ ns.Changelog = {
                 "The Appearance tab is reorganized with the most used settings first: Text, Quest Colors, Tracker, Section Headers and Spacing, then Quest Rows, Progress Bars, the Scroll Bar, the Scenario panel, the Scenario Bonus Objectives and the Zone Progress Bar. Every setting keeps its value.",
                 "The switch that hides the cogwheel at the top of the tracker is now called Show the options cogwheel on the tracker, so it can be found. It is on the Tracker tab, and /eqot still opens the options with the cogwheel hidden. Requested by zeldakostv.",
                 "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover every new option in this release, including Quest Title Color, the objective and count colors, and the sticky section headers.",
-            } },
-        },
-    },
-    {
-        version = "2.0.0", date = "2026-10-03",
-        sections = {
-            { head = "Improvements", items = {
-                "The options window has a new look: a sidebar for its four tabs, settings grouped into cards on every tab, and redesigned checkboxes, sliders, dropdowns and color swatches. No setting or saved value changes.",
-                "The Appearance tab shows a live preview beside its settings: a sample tracker drawn the way your tracker draws, which changes as you adjust fonts, colors, header bars, quest cards, progress bars, the scroll bar, the background and border, and the docked zone bar.",
-                "The About tab uses the same cards, with its links as buttons and the changelog listed by version.",
-                "Confirmation prompts, the new profile name prompt and the copy-a-link popups match the new look.",
-                "The right-click menus on quests, the floating zone progress bar and the bonus objectives HUD match the new look.",
-            } },
-            { head = "Bug Fixes", items = {
-                "A confirmation left open when a fight started no longer keeps every key from reaching the game after Enter was pressed on it.",
-            } },
-            { head = "Notes", items = {
-                "Everything Quests is next in line for this overhaul, so its windows will get the same new look.",
             } },
         },
     },

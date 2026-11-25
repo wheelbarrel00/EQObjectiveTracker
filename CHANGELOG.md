@@ -5,6 +5,12 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2026-11-24
+
+### New Features
+
+- Profiles can now move to another account, another game version or a friend. The General tab's Profiles card has two new buttons. Export shows the profile you are on as one string, already selected, so you can copy it with Ctrl+C. Import takes a string made with Export, asks what to call the new profile (the name it had when it was exported is filled in for you), then creates it, switches to it and reloads the interface. A name that is already taken asks before that profile is overwritten. The string carries every setting in the profile, the tracker's position and size included, but only the ones you changed, so anything you left alone keeps the default of the game version you import it on. It leaves behind each character's pins, folded quests, hidden zones and collapsed sections, the Manual sort order, the options window's size and spot, the After an update choice, and which quest trackers run (Use Blizzard's quest tracker and Hide Questie's quest tracker). Everything Quests' own settings are not part of it. A string another addon made, or one cut short when it was copied, is refused with a message saying why, and nothing changes. Settings this version does not know yet are skipped. If the tracker lands somewhere odd on a different screen, Reset position and size on the General tab puts it back. Requested by AphelionZero78.
+
 ## [2.23.0] - 2026-11-23
 
 ### New Features

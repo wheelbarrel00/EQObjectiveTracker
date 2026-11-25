@@ -68,7 +68,7 @@ L["Off"] = true
 L["How EQ Objective Tracker tells you about a version that brings new features: a Popup window, a quiet clickable Chat link in your chat, or Off. Releases with only fixes stay quiet, and the next feature release shows them too. Reopen the notes any time with /eqot whatsnew."] = true
 L["Show What's New"] = true
 L["Profiles"] = true
-L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot."] = true
+L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot. |cffEBB706Export|r and |cffEBB706Import|r move a profile to another account or game version as a string you copy and paste."] = true
 L["Active profile"] = true
 L["Switches to another saved settings profile. The interface reloads immediately when you pick one."] = true
 L["New Profile"] = true
@@ -78,6 +78,21 @@ L["Overwrite profile?"] = true
 L["A profile named \"%s\" already exists. Overwrite it with a copy of your current settings?"] = true
 L["Overwrite"] = true
 L["Prompts for a name, then creates a profile holding a copy of your current settings and switches to it. The interface reloads."] = true
+L["empty string"] = true
+L["not a valid import string"] = true
+L["it was made by a newer version of EQ Objective Tracker"] = true
+L["A profile with that name already exists. Overwrite it with the imported settings?"] = true
+L["Export"] = true
+L["Export Profile"] = true
+L["Export failed."] = true
+L["Press Ctrl+C to copy this string, then use Import on the other account or game version."] = true
+L["Close"] = true
+L["Shows this profile's settings as a string to copy, so you can import them on another account, another game version or for a friend. Your characters' pins, folded quests and hidden zones stay behind, and so does your choice of which quest trackers run."] = true
+L["Import"] = true
+L["Import Profile"] = true
+L["Paste a string made with Export."] = true
+L["Import failed: %s"] = true
+L["Paste a string made with Export to make a new profile from it. The interface reloads."] = true
 
 -- Options/TabTracker.lua
 L["Zone"] = true
@@ -574,7 +589,6 @@ L["Search results"] = true
 
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = true
-L["Close"] = true
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = true
 
 -- Core/Migrate.lua
@@ -644,7 +658,6 @@ L["Blizzard's quest tracker is in use - see /eqot, General."] = true
 L["no Everything Quests configuration found to import."] = true
 L["Import from Everything Quests"] = true
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = true
-L["Import"] = true
 L["commands:"] = true
 
 -- UI/Dialog.lua

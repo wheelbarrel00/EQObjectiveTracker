@@ -69,7 +69,7 @@ L["Off"] = "끔"
 L["How EQ Objective Tracker tells you about a version that brings new features: a Popup window, a quiet clickable Chat link in your chat, or Off. Releases with only fixes stay quiet, and the next feature release shows them too. Reopen the notes any time with /eqot whatsnew."] = "EQ Objective Tracker가 새 기능이 담긴 버전을 알리는 방식입니다. 팝업 창, 채팅창에 조용히 뜨는 클릭 가능한 채팅 링크, 또는 끔. 수정만 담긴 버전은 조용히 지나가고, 다음 새 기능 버전이 함께 보여 줍니다. /eqot whatsnew 로 언제든 다시 열 수 있습니다."
 L["Show What's New"] = "새 소식 표시"
 L["Profiles"] = "프로필"
-L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot."] = "프로필을 전환하면 UI가 리로드됩니다. 프로필은 캐릭터 간 공유되며, 서로 다른 설정(예: 공격대 vs 솔로)을 유지하는 데 씁니다. |cffEBB706새 프로필|r은 이름을 입력받아 즉시 만듭니다."
+L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot. |cffEBB706Export|r and |cffEBB706Import|r move a profile to another account or game version as a string you copy and paste."] = "프로필을 전환하면 UI가 리로드됩니다. 프로필은 캐릭터 간 공유되며, 서로 다른 설정(예: 공격대 vs 솔로)을 유지하는 데 씁니다. |cffEBB706새 프로필|r은 이름을 입력받아 즉시 만듭니다. |cffEBB706내보내기|r와 |cffEBB706가져오기|r는 복사해 붙여 넣는 문자열로 프로필을 다른 계정이나 게임 버전으로 옮깁니다."
 L["Active profile"] = "활성 프로필"
 L["Switches to another saved settings profile. The interface reloads immediately when you pick one."] = "저장된 다른 설정 프로필로 전환합니다. 선택하는 즉시 인터페이스를 다시 불러옵니다."
 L["New Profile"] = "새 프로필"
@@ -79,6 +79,21 @@ L["Overwrite profile?"] = "프로필 덮어쓸까요?"
 L["A profile named \"%s\" already exists. Overwrite it with a copy of your current settings?"] = "\"%s\" 프로필이 이미 있습니다. 현재 설정의 사본으로 덮어쓸까요?"
 L["Overwrite"] = "덮어쓰기"
 L["Prompts for a name, then creates a profile holding a copy of your current settings and switches to it. The interface reloads."] = "이름을 물어본 뒤 현재 설정을 복사한 프로필을 만들어 그쪽으로 전환합니다. 인터페이스를 다시 불러옵니다."
+L["empty string"] = "빈 문자열"
+L["not a valid import string"] = "올바른 가져오기 문자열이 아님"
+L["it was made by a newer version of EQ Objective Tracker"] = "더 새로운 버전의 EQ Objective Tracker에서 만든 문자열임"
+L["A profile with that name already exists. Overwrite it with the imported settings?"] = "같은 이름의 프로필이 이미 있습니다. 가져온 설정으로 덮어쓸까요?"
+L["Export"] = "내보내기"
+L["Export Profile"] = "프로필 내보내기"
+L["Export failed."] = "내보내기에 실패했습니다."
+L["Press Ctrl+C to copy this string, then use Import on the other account or game version."] = "Ctrl+C를 눌러 이 문자열을 복사한 뒤, 다른 계정이나 게임 버전에서 가져오기를 사용하세요."
+L["Close"] = "닫기"
+L["Shows this profile's settings as a string to copy, so you can import them on another account, another game version or for a friend. Your characters' pins, folded quests and hidden zones stay behind, and so does your choice of which quest trackers run."] = "이 프로필의 설정을 복사할 수 있는 문자열로 보여 주어, 다른 계정이나 게임 버전에서 가져오거나 친구에게 줄 수 있게 합니다. 캐릭터의 고정 항목, 접힌 퀘스트, 숨긴 지역은 옮겨지지 않으며, 어떤 퀘스트 추적기를 쓸지에 대한 선택도 옮겨지지 않습니다."
+L["Import"] = "가져오기"
+L["Import Profile"] = "프로필 가져오기"
+L["Paste a string made with Export."] = "내보내기로 만든 문자열을 붙여 넣으세요."
+L["Import failed: %s"] = "가져오기 실패: %s"
+L["Paste a string made with Export to make a new profile from it. The interface reloads."] = "내보내기로 만든 문자열을 붙여 넣어 새 프로필을 만듭니다. 인터페이스를 다시 불러옵니다."
 
 -- Options/TabTracker.lua
 L["Zone"] = "지역"
@@ -575,7 +590,6 @@ L["Search results"] = "검색 결과"
 
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "아래 링크를 복사하세요 (미리 선택되어 있습니다 - Ctrl+C만 누르세요):"
-L["Close"] = "닫기"
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "도움말, 피드백, 소식을 위해 커뮤니티에 참여하세요.\n아래 초대 링크를 복사하세요 (미리 선택되어 있습니다 - Ctrl+C만 누르세요):"
 
 -- Core/Migrate.lua
@@ -645,7 +659,6 @@ L["Blizzard's quest tracker is in use - see /eqot, General."] = "블리자드 �
 L["no Everything Quests configuration found to import."] = "가져올 Everything Quests 설정을 찾지 못했습니다."
 L["Import from Everything Quests"] = "Everything Quests에서 가져오기"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "이 프로필을 기본값으로 되돌린 뒤 Everything Quests 추적기 설정으로 교체할까요?\n\n되돌릴 수 없습니다. 현재 프로필을 남기려면 먼저 새 프로필을 만드세요."
-L["Import"] = "가져오기"
 L["commands:"] = "명령어:"
 
 -- UI/Dialog.lua

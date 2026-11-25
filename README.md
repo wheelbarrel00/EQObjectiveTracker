@@ -97,6 +97,13 @@ itself, so the two do not sit side by side. It waits for a fight to end before a
 Blizzard's quest tracker on, EllesmereUI's tracker is left alone. Without that option, EllesmereUI
 uses the game's tracker, which this addon hides already.
 
+### AllTheThings
+
+On retail and WoW Forever, AllTheThings 5.4.18 or later adds its own lines to this tracker's quest
+tooltips, as it does to the game's. Older versions add them to the game's tooltips only, so update
+it. To keep other addons' lines out of the tracker's tooltips, untick Let other addons add to quest
+tooltips on the Tracker tab.
+
 ### Everything Quests, the companion addon
 
 Everything Quests adds the other half of the picture, map pins and a TomTom waypoint arrow
@@ -391,6 +398,12 @@ tell which dungeon it is for.
 
 Settings live in profiles, so you can keep separate setups and switch between them.
 Profiles are shared across all your characters.
+
+Export and Import, on the General tab's Profiles card, move a profile to another account, another
+game version or a friend as a string you copy and paste. Import makes a new profile from the string
+(it asks before overwriting one with the same name) and reloads the interface. The string carries
+the profile's settings, the tracker's position and size included, but not each character's pins,
+folded quests or hidden zones, and not which quest trackers run.
 
 ## Translations
 

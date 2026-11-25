@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 2.23.0
+## Version: 2.24.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -13,6 +13,8 @@ Libs\LibStub\LibStub.lua
 Libs\EverythingUI\EverythingUI.xml
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
+Libs\AceSerializer-3.0\AceSerializer-3.0.xml
+Libs\LibDeflate\LibDeflate.lua
 Libs\LibSharedMedia-3.0\lib.xml
 
 # Locales. enUS creates ns.L and must load before any consumer. The rest only add
@@ -35,6 +37,7 @@ Core\API.lua
 Core\Media.lua
 Core\DB.lua
 Core\Migrate.lua
+Core\Transfer.lua
 Core\Changelog.lua
 
 # Data layer. Operates on normalized entries and game APIs, never on frames.

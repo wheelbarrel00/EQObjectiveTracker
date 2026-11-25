@@ -71,7 +71,7 @@ L["Off"] = "关闭"
 L["How EQ Objective Tracker tells you about a version that brings new features: a Popup window, a quiet clickable Chat link in your chat, or Off. Releases with only fixes stay quiet, and the next feature release shows them too. Reopen the notes any time with /eqot whatsnew."] = "EQ Objective Tracker 通知带来新功能的版本的方式：“弹窗”、聊天框中一条安静的可点击“聊天链接”，或“关闭”。只含修复的版本不会提醒，下一个带新功能的版本会一并显示。随时输入 /eqot whatsnew 可重新查看更新说明。"
 L["Show What's New"] = "显示更新内容"
 L["Profiles"] = "配置文件"
-L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot."] = "切换配置文件将重载界面。配置全角色共享。可保存副本、单人等多套方案。|cffEBB706新建配置文件|r输入名称即可即时创建。"
+L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot. |cffEBB706Export|r and |cffEBB706Import|r move a profile to another account or game version as a string you copy and paste."] = "切换配置文件将重载界面。配置全角色共享。可保存副本、单人等多套方案。|cffEBB706新建配置文件|r输入名称即可即时创建。|cffEBB706导出|r与|cffEBB706导入|r可将配置文件以复制粘贴的字符串转到另一个账号或游戏版本。"
 L["Active profile"] = "当前配置文件"
 L["Switches to another saved settings profile. The interface reloads immediately when you pick one."] = "切换至其他已保存配置文件。选中后界面立即重载。"
 L["New Profile"] = "新建配置文件"
@@ -81,6 +81,21 @@ L["Overwrite profile?"] = "覆盖该配置文件？"
 L["A profile named \"%s\" already exists. Overwrite it with a copy of your current settings?"] = "名为“%s”的配置文件已存在。是否使用当前设置覆盖？"
 L["Overwrite"] = "覆盖"
 L["Prompts for a name, then creates a profile holding a copy of your current settings and switches to it. The interface reloads."] = "输入名称新建配置文件，保存当前全部设置并切换过去，界面重载。"
+L["empty string"] = "字符串为空"
+L["not a valid import string"] = "不是有效的导入字符串"
+L["it was made by a newer version of EQ Objective Tracker"] = "该字符串由更新版本的 EQ Objective Tracker 生成"
+L["A profile with that name already exists. Overwrite it with the imported settings?"] = "同名配置文件已存在。是否使用导入的设置覆盖？"
+L["Export"] = "导出"
+L["Export Profile"] = "导出配置文件"
+L["Export failed."] = "导出失败。"
+L["Press Ctrl+C to copy this string, then use Import on the other account or game version."] = "按 Ctrl+C 复制此字符串，然后在另一个账号或游戏版本中使用【导入】。"
+L["Close"] = "关闭"
+L["Shows this profile's settings as a string to copy, so you can import them on another account, another game version or for a friend. Your characters' pins, folded quests and hidden zones stay behind, and so does your choice of which quest trackers run."] = "将此配置文件的设置显示为可复制的字符串，便于在另一个账号、另一个游戏版本或好友处导入。角色的固定条目、折叠任务和隐藏区域不会带走，使用哪个任务追踪器的选择也不会带走。"
+L["Import"] = "导入"
+L["Import Profile"] = "导入配置文件"
+L["Paste a string made with Export."] = "粘贴使用【导出】生成的字符串。"
+L["Import failed: %s"] = "导入失败：%s"
+L["Paste a string made with Export to make a new profile from it. The interface reloads."] = "粘贴使用【导出】生成的字符串，以此新建配置文件，界面重载。"
 
 -- Options/TabTracker.lua
 L["Zone"] = "区域"
@@ -577,7 +592,6 @@ L["Search results"] = "查找结果"
 
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "复制下方链接（已预选，直接 Ctrl+C）："
-L["Close"] = "关闭"
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "加入社区获取帮助、反馈意见、接收更新。\n复制下方邀请链接（已预选，直接 Ctrl+C）："
 
 -- Core/Migrate.lua
@@ -647,7 +661,6 @@ L["Blizzard's quest tracker is in use - see /eqot, General."] = "正在使用暴
 L["no Everything Quests configuration found to import."] = "未找到可导入的 Everything Quests 配置。"
 L["Import from Everything Quests"] = "从 Everything Quests 导入"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "将该配置文件恢复默认，并替换为Everything Quests追踪器设置？\n\n此操作不可撤销。如需保留当前配置，请先新建配置文件。"
-L["Import"] = "导入"
 L["commands:"] = "命令："
 
 -- UI/Dialog.lua

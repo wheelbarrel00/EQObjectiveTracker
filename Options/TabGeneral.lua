@@ -193,7 +193,7 @@ Options:RegisterTab({
         profiles:SetPoint("TOPLEFT", updates, "BOTTOMLEFT", 0, -self:Spacing("groupGap"))
         profiles:SetPoint("TOPRIGHT", updates, "BOTTOMRIGHT", 0, -self:Spacing("groupGap"))
         self:AttachTooltip(profiles.label, L["Profiles"],
-            L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot."])
+            L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot. |cffEBB706Export|r and |cffEBB706Import|r move a profile to another account or game version as a string you copy and paste."])
 
         local function profileList()
             local names = {}
@@ -284,5 +284,89 @@ Options:RegisterTab({
             L["Prompts for a name, then creates a profile holding a copy of your current settings and switches to it. The interface reloads."])
         newProfile:SetPoint("RIGHT", profRow, "RIGHT", -self:Spacing("rowPadding"), 0)
         profDD:SetPoint("RIGHT", newProfile, "LEFT", -self:Spacing("buttonGap"), 0)
+
+        local REASONS = {
+            empty   = L["empty string"],
+            invalid = L["not a valid import string"],
+            newer   = L["it was made by a newer version of EQ Objective Tracker"],
+        }
+
+        -- Each next dialog opens from inside the last one's onAccept, as promptForName does.
+        local promptImportName
+        promptImportName = function(payload, seed)
+            local Dialog = ns:GetModule("Dialog")
+            if not Dialog then return end
+            Dialog:Show({
+                title       = L["New Profile"],
+                text        = L["Profile name:"],
+                hasEditBox  = true,
+                editBoxText = seed or "",
+                -- Selected, so a name typed over the exported one replaces it
+                highlightEditBox = true,
+                maxLetters  = 32,
+                button1     = L["Create"],
+                button2     = L["Cancel"],
+                onAccept = function(text)
+                    local name = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                    if name == "" then return promptImportName(payload, text) end
+                    local Transfer = ns:GetModule("Transfer")
+                    if profileExists(name) then
+                        Dialog:Show({
+                            title    = L["Overwrite profile?"],
+                            text     = L["A profile with that name already exists. Overwrite it with the imported settings?"],
+                            button1  = L["Overwrite"],
+                            button2  = L["Cancel"],
+                            onAccept = function() Transfer:Apply(payload.profile, name) end,
+                        })
+                    else
+                        Transfer:Apply(payload.profile, name)
+                    end
+                end,
+            })
+        end
+
+        local exportButton = self:CreateButton(content, L["Export"], nil, function()
+            local Dialog = ns:GetModule("Dialog")
+            if not Dialog then return end
+            local str = ns:GetModule("Transfer"):Export()
+            if not str then
+                Dialog:Show({ title = L["Export Profile"], text = L["Export failed."] })
+                return
+            end
+            Dialog:Show({
+                title            = L["Export Profile"],
+                text             = L["Press Ctrl+C to copy this string, then use Import on the other account or game version."],
+                hasEditBox       = true,
+                readOnly         = true,
+                highlightEditBox = true,
+                editBoxText      = str,
+                button1          = L["Close"],
+            })
+        end, L["Shows this profile's settings as a string to copy, so you can import them on another account, another game version or for a friend. Your characters' pins, folded quests and hidden zones stay behind, and so does your choice of which quest trackers run."])
+        profiles:Add(exportButton)
+
+        local importButton = self:CreateButton(content, L["Import"], nil, function()
+            local Dialog = ns:GetModule("Dialog")
+            if not Dialog then return end
+            Dialog:Show({
+                title      = L["Import Profile"],
+                text       = L["Paste a string made with Export."],
+                hasEditBox = true,
+                button1    = L["Import"],
+                button2    = L["Cancel"],
+                onAccept   = function(text)
+                    local payload, reason = ns:GetModule("Transfer"):Decode(text)
+                    if not payload then
+                        Dialog:Show({
+                            title = L["Import Profile"],
+                            text  = L["Import failed: %s"]:format(REASONS[reason] or REASONS.invalid),
+                        })
+                        return
+                    end
+                    promptImportName(payload, payload.name)
+                end,
+            })
+        end, L["Paste a string made with Export to make a new profile from it. The interface reloads."])
+        importButton:SetPoint("LEFT", exportButton, "RIGHT", self:Spacing("buttonGap"), 0)
     end,
 })

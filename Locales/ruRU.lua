@@ -69,7 +69,7 @@ L["Off"] = "Выкл"
 L["How EQ Objective Tracker tells you about a version that brings new features: a Popup window, a quiet clickable Chat link in your chat, or Off. Releases with only fixes stay quiet, and the next feature release shows them too. Reopen the notes any time with /eqot whatsnew."] = "Как EQ Objective Tracker сообщает вам о версии с новыми возможностями: «Всплывающее окно», тихая кликабельная «Ссылка в чате» или «Выкл». Версии только с исправлениями проходят тихо, а следующая версия с новыми возможностями показывает и их. Заново открыть заметки можно в любой момент командой /eqot whatsnew."
 L["Show What's New"] = "Показать, что нового"
 L["Profiles"] = "Профили"
-L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot."] = "Переключение профилей перезагружает интерфейс. Профили общие для всех персонажей; используйте их для разных настроек (например, рейд vs соло). |cffEBB706Новый профиль|r запросит имя и создаст его на месте."
+L["Switching profiles reloads the UI. Profiles are shared across characters. Use them to keep different setups such as raid and solo. |cffEBB706New Profile|r prompts for a name and creates it on the spot. |cffEBB706Export|r and |cffEBB706Import|r move a profile to another account or game version as a string you copy and paste."] = "Переключение профилей перезагружает интерфейс. Профили общие для всех персонажей; используйте их для разных настроек (например, рейд vs соло). |cffEBB706Новый профиль|r запросит имя и создаст его на месте. |cffEBB706Экспорт|r и |cffEBB706Импорт|r переносят профиль на другую учетную запись или в другую версию игры в виде строки, которую вы копируете и вставляете."
 L["Active profile"] = "Активный профиль"
 L["Switches to another saved settings profile. The interface reloads immediately when you pick one."] = "Переключает на другой сохранённый профиль настроек. Интерфейс перезагружается сразу после выбора."
 L["New Profile"] = "Новый профиль"
@@ -79,6 +79,21 @@ L["Overwrite profile?"] = "Перезаписать профиль?"
 L["A profile named \"%s\" already exists. Overwrite it with a copy of your current settings?"] = "Профиль с именем «%s» уже существует. Перезаписать его копией ваших текущих настроек?"
 L["Overwrite"] = "Перезаписать"
 L["Prompts for a name, then creates a profile holding a copy of your current settings and switches to it. The interface reloads."] = "Запрашивает имя, затем создаёт профиль с копией ваших текущих настроек и переключается на него. Интерфейс перезагружается."
+L["empty string"] = "пустая строка"
+L["not a valid import string"] = "недействительная строка импорта"
+L["it was made by a newer version of EQ Objective Tracker"] = "строка создана в более новой версии EQ Objective Tracker"
+L["A profile with that name already exists. Overwrite it with the imported settings?"] = "Профиль с таким именем уже существует. Перезаписать его импортированными настройками?"
+L["Export"] = "Экспорт"
+L["Export Profile"] = "Экспорт профиля"
+L["Export failed."] = "Не удалось выполнить экспорт."
+L["Press Ctrl+C to copy this string, then use Import on the other account or game version."] = "Нажмите Ctrl+C, чтобы скопировать эту строку, затем используйте «Импорт» на другой учетной записи или в другой версии игры."
+L["Close"] = "Закрыть"
+L["Shows this profile's settings as a string to copy, so you can import them on another account, another game version or for a friend. Your characters' pins, folded quests and hidden zones stay behind, and so does your choice of which quest trackers run."] = "Показывает настройки этого профиля в виде строки для копирования, чтобы их можно было импортировать на другой учетной записи, в другой версии игры или у друга. Закреплённые записи, свёрнутые задания и скрытые зоны ваших персонажей не переносятся, как и ваш выбор того, какие трекеры заданий работают."
+L["Import"] = "Импорт"
+L["Import Profile"] = "Импорт профиля"
+L["Paste a string made with Export."] = "Вставьте строку, созданную через «Экспорт»."
+L["Import failed: %s"] = "Импорт не удался: %s"
+L["Paste a string made with Export to make a new profile from it. The interface reloads."] = "Вставьте строку, созданную через «Экспорт», чтобы создать из неё новый профиль. Интерфейс перезагружается."
 
 -- Options/TabTracker.lua
 L["Zone"] = "Зона"
@@ -575,7 +590,6 @@ L["Search results"] = "Результаты поиска"
 
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Скопируйте ссылку ниже (она уже выделена - просто нажмите Ctrl+C):"
-L["Close"] = "Закрыть"
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Присоединяйтесь к сообществу за помощью, отзывами и обновлениями.\nСкопируйте приглашение ниже (оно уже выделено - просто нажмите Ctrl+C):"
 
 -- Core/Migrate.lua
@@ -645,7 +659,6 @@ L["Blizzard's quest tracker is in use - see /eqot, General."] = "Использ�
 L["no Everything Quests configuration found to import."] = "Не найдено настроек Everything Quests для импорта"
 L["Import from Everything Quests"] = "Импорт из Everything Quests"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "Сбросить этот профиль к значениям по умолчанию и заменить его вашими настройками трекера из Everything Quests?\n\nЭто нельзя отменить. Сначала создайте новый профиль, если хотите сохранить текущий."
-L["Import"] = "Импорт"
 L["commands:"] = "Команды:"
 
 -- UI/Dialog.lua
