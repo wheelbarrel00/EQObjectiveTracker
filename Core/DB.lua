@@ -75,6 +75,10 @@ DB.defaults = {
             autoMinimizeFinished = false,
             showHandInText = true,
             showFoldButtons      = false,
+            compactMode          = false,
+            compactTags          = true,
+            compactFinished      = true,
+            compactOneLine       = true,
             simplifyGroups       = {},
 
             font               = "GothamXNarrow Black",

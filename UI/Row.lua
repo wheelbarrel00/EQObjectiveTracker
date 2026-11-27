@@ -39,6 +39,11 @@ local SUBTITLE_COLOR   = { 0.42, 0.69, 1.00 }
 local DEFAULT_DONE_HEX = "44ff44"
 local COMPLETE_SUFFIX  = " " .. (PARENS_TEMPLATE or "(%s)"):format(L["Complete"])
 
+-- Each of Compact Mode's parts answers only while the switch itself is on.
+local function compactOn(cfg, key)
+    return cfg ~= nil and cfg.compactMode == true and cfg[key] ~= false
+end
+
 -- Objective lines are drawn as an ordered run of blocks rather than one string, so a bar can
 -- sit between two text lines instead of being pushed under them. A finished line is a block of
 -- its own with a check icon beside it. Unfinished lines share a block between bars.
@@ -333,6 +338,15 @@ local function isBarLine(ln, cfg)
     return (ln.required and ln.required > 1) and true or false
 end
 
+-- Compact Mode's finished line: the game's short ready word in place of where to hand the quest in or
+-- its objectives, minimized or not, whatever Show hand-in text says. A client missing the word keeps
+-- today's lines.
+local function shortFinished(entry, cfg)
+    local ready = QUEST_WATCH_QUEST_READY
+    return compactOn(cfg, "compactFinished") and entry.state == STATE.COMPLETE and entry.handIn ~= nil
+        and type(ready) == "string" and ready ~= ""
+end
+
 -- Every user styling option is applied here, once, so it reaches every content type.
 local function buildBlocks(entry, cfg, folded)
     local lines  = entry.lines
@@ -344,18 +358,21 @@ local function buildBlocks(entry, cfg, folded)
     local hideDone = simple or (cfg and cfg.hideFinishedObjectives)
                      or (groups and entry.groupID and groups[entry.groupID]) or false
     local cap, drawn = entry.maxLines, 0
+    -- A string kept to one line draws only its first line, so each line gets a block of its own.
+    local oneLine = compactOn(cfg, "compactOneLine")
 
     _nBlocks, _nText = 0, 0
-    if folded then return end
+    local short = shortFinished(entry, cfg)
+    if folded and not short then return end
 
     -- A finished or failed quest's one line, in place of its objectives and ahead of every filter
-    if entry.handIn and not (cfg and cfg.showHandInText == false) then
+    if entry.handIn and (short or not (cfg and cfg.showHandInText == false)) then
         if entry.state == STATE.FAILED then
             _nText = 1
             _scratch[1] = "|cffd94545" .. entry.handIn .. "|r"
             flushText()
         else
-            pushCheckLine("|cff" .. hex .. entry.handIn .. "|r")
+            pushCheckLine("|cff" .. hex .. (short and QUEST_WATCH_QUEST_READY or entry.handIn) .. "|r")
         end
         return
     end
@@ -427,6 +444,7 @@ local function buildBlocks(entry, cfg, folded)
                 else
                     _nText = _nText + 1
                     _scratch[_nText] = text
+                    if oneLine then flushText() end
                 end
             end
             if simple then break end
@@ -600,17 +618,44 @@ local function typeTagsOn(cfg)
     return (p and p.TypeTagsDefault and p:TypeTagsDefault()) and true or false
 end
 
+-- Compact Mode's letters, the same on every client.
+local SHORT_LETTERS = { group = "g", dungeon = "d", heroic = "hc", raid = "r", raid10 = "r10", raid25 = "r25",
+                        delve = "de", scenario = "s", pvp = "pvp" }
+
+-- The level and type shortened into one tag in front of the title, such as [90g3!]. The type shows
+-- whatever Show quest type tags says and the level only with Show quest level prefix. The elite type
+-- is a +, an elite quest's own + rides the level, and any other type with no letter keeps its word.
+local function shortTag(entry, cfg, title)
+    local level = cfg.showLevelInTracker and entry.level and entry.level > 0 and entry.level
+    local key = entry.typeKey
+    local letters = SHORT_LETTERS[key] or ""
+    if letters ~= "" and key == "group" and entry.groupSize then letters = letters .. entry.groupSize end
+    local plus = (level and entry.elite) or key == "elite"
+    local mark = ""
+    if entry.repeatTag then mark = (entry.tags and entry.tags.daily) and "!" or "!!" end
+    local inner = (level and ("%d"):format(level) or "") .. (plus and "+" or "") .. letters .. mark
+    local text = (inner ~= "") and ("[" .. inner .. "] " .. title) or title
+    if entry.typeTag and not SHORT_LETTERS[key] and key ~= "elite" then
+        text = text .. " " .. (PARENS_TEMPLATE or "(%s)"):format(entry.typeTag)
+    end
+    return text
+end
+
 local function decorateTitle(entry, cfg)
     local text = entry.title or ""
     if not cfg or entry.providerID ~= TITLE_META_PROVIDER then return text end
 
-    if cfg.showLevelInTracker and entry.level and entry.level > 0 then
-        text = ("[%d%s] %s"):format(entry.level, entry.elite and "+" or "", text)
-    end
-    local word, rep = entry.typeTag, entry.repeatTag
-    if (word or rep) and typeTagsOn(cfg) then
-        local inner = (word and rep) and (word .. (LIST_DELIMITER or ", ") .. rep) or word or rep
-        text = text .. " " .. (PARENS_TEMPLATE or "(%s)"):format(inner)
+    if compactOn(cfg, "compactTags") then
+        text = shortTag(entry, cfg, text)
+    else
+        if cfg.showLevelInTracker and entry.level and entry.level > 0 then
+            text = ("[%d%s] %s"):format(entry.level, entry.elite and "+" or "", text)
+        end
+        local word, rep = entry.typeTag, entry.repeatTag
+        if (word or rep) and typeTagsOn(cfg) then
+            local inner = (word and rep) and (word .. (LIST_DELIMITER or ", ") .. rep) or word or rep
+            text = text .. " " .. (PARENS_TEMPLATE or "(%s)"):format(inner)
+        end
     end
     if cfg.showQuestID and entry.id then
         text = text .. (" |cff666666(#%d)|r"):format(entry.id)
@@ -795,7 +840,18 @@ local function paintTooltip(row)
         if RT then RT:ShowForEntry(row, row._entry, row._hintShown) end
         return
     end
-    if not provider.OnEntryTooltip then return end
+    if not provider.OnEntryTooltip then
+        -- One line per text can cut a title, and these rows have no tooltip of their own to show it whole.
+        local DB = ns:GetModule("DB")
+        local title = row._entry and row._entry.title
+        if compactOn(DB and DB:Tracker(), "compactOneLine") and type(title) == "string" and title ~= "" then
+            local tip = ns.Util.Tooltip()
+            tip:SetOwner(row, "ANCHOR_RIGHT")
+            tip:AddLine(title, 1, 0.82, 0, true)
+            tip:Show()
+        end
+        return
+    end
     local tip = ns.Util.Tooltip()
     tip:SetOwner(row, "ANCHOR_RIGHT")
     provider:OnEntryTooltip(row._entry, tip)
@@ -980,7 +1036,9 @@ function Row:Render(row, entry, width, cfg, sample)
     end
 
     local titleText = decorateTitle(entry, cfg)
-    if folded and entry.state == STATE.COMPLETE then titleText = titleText .. COMPLETE_SUFFIX end
+    if folded and entry.state == STATE.COMPLETE and not shortFinished(entry, cfg) then
+        titleText = titleText .. COMPLETE_SUFFIX
+    end
     -- Zone headers name the heading already, so the label would say it twice. A quest in the
     -- Dungeons header is no longer under its zone's header, so it keeps the label.
     local headed = cfg and cfg.zoneHeaders and not (cfg.dungeonHeader == true and entry.tags and entry.tags.dungeon)
@@ -1113,6 +1171,9 @@ function Row:Render(row, entry, width, cfg, sample)
     row.subtitle:ClearAllPoints()
     row.subtitle:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -TITLE_TO_SUB)
 
+    -- Wrapping is in no gate field: the options call Row:Invalidate when it changes.
+    local oneLine = compactOn(cfg, "compactOneLine")
+    row.title:SetWordWrap(not oneLine)
     row.title:SetText(titleText)
     local tr, tg, tb, lit = titleColor(entry, cfg)
     row._tR, row._tG, row._tB, row._tLit = tr, tg, tb, lit
@@ -1173,6 +1234,7 @@ function Row:Render(row, entry, width, cfg, sample)
             Media:ApplyFont(block, -2)
             block:SetTextColor(oR, oG, oB)
             block:SetSpacing(lineGap)
+            block:SetWordWrap(not oneLine)
             if textW > 0 then block:SetWidth(math.max(1, blockW - indent)) end
             block:SetText(_bText[i])
             block:Show()

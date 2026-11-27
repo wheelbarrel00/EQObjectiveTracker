@@ -5,6 +5,21 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.25.0] - 2026-11-27
+
+### New Features
+
+- Compact Mode makes the tracker take less room. Turn it on with the new Compact Mode card on the Tracker tab, right under To-Do Mode, and pick which of its three parts you want. Short quest tags puts a quest's level and type in one short tag in front of its title, such as [60g3!] for a level 60 group quest for three that resets daily, in place of the words after the title. The letters are g for group, d dungeon, hc heroic, r raid, r10 and r25 for the raid's size, de delve, s scenario and pvp, with + for elite, ! for daily and !! for weekly. The type shows even with Show quest type tags off, and the level only while Show quest level prefix is on. Short finished line shows Ready for turn-in under a finished quest in place of where to hand it in or its objectives, even with Show hand-in text on finished quests off, and a minimized finished quest shows that line too instead of (Complete) in its title. One line per text keeps long titles and objectives on one line, ending in "...", and hovering a row shows its whole title. Compact Mode is off by default, and nothing changes until you turn it on. Requested by Tyrial.
+
+### Bug Fixes
+
+- The boxes that hand you a link to copy, from Search on Wowhead, the Discord button, the About tab's links and Export, now hold the keyboard as they open, so Ctrl+C copies the link straight away. Before, the link looked selected but nothing was copied until you clicked in the box. The boxes you type or paste into, New Profile, Import's paste box and the imported profile's name, take your keys straight away too, where before they went to your key bindings. Reported by AnotherDamnDave.
+
+### Improvements
+
+- The About tab opens faster, since its text is no longer measured again for every line it adds.
+- For addon authors: on retail the tracker now announces the quest you follow to addons listening through its focus calls, as it already did on WoW Forever, so companion addons such as Everything Quests can follow it. A world quest or bonus objective is announced under the world quests provider, a move from one provider to the other first tells the old one its quest lost focus, and clicking the world quest you already follow announces it again.
+
 ## [2.24.0] - 2026-11-24
 
 ### New Features

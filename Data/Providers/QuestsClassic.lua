@@ -313,11 +313,29 @@ local function fillTags(e, id, frequency)
     end
 end
 
+-- The kinds Compact Mode draws a letter for. Tag 1 is missing on purpose: see fillType.
+local CLASSIC_TYPE_KEYS = {
+    [TAG_DUNGEON] = "dungeon", [TAG_HEROIC] = "heroic", [TAG_RAID] = "raid",
+    [TAG_RAID10] = "raid10", [TAG_RAID25] = "raid25", [41] = "pvp",
+}
+
 -- Tag 1 is the tag Era words Elite and TBC words Group, and the log's third return is that word,
--- which Blizzard's own quest log prints in parentheses (read on both, 2026-11-17).
+-- which Blizzard's own quest log prints in parentheses (read on both, 2026-11-17). Nothing else here
+-- tells Era from TBC, so the word decides tag 1's kind.
 local function fillType(e, id, questTag)
+    local tagID = getTagID(id)
     e.elite = getTagID(id) == 1
     e.typeTag = (type(questTag) == "string" and questTag ~= "") and questTag or nil
+    e.typeKey, e.groupSize = nil, nil
+    if e.typeTag and tagID == 1 then
+        if e.typeTag == ELITE then
+            e.typeKey = "elite"
+        elseif e.typeTag == GROUP then
+            e.typeKey = "group"
+        end
+    elseif e.typeTag then
+        e.typeKey = CLASSIC_TYPE_KEYS[tagID]
+    end
     e.repeatTag = (e.tags.daily and DAILY) or (e.tags.weekly and WEEKLY) or nil
 end
 

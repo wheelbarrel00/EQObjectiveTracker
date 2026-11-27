@@ -540,11 +540,14 @@ function WorldQuests:OnEntryClick(entry, button)
     if ns.Has.SuperTrack then
         local DB  = ns:GetModule("DB")
         local cfg = DB and DB:Tracker()
-        if cfg and cfg.clickToUnfocus == true and C_SuperTrack.GetSuperTrackedQuestID
-           and C_SuperTrack.GetSuperTrackedQuestID() == entry.id then
+        local again = C_SuperTrack.GetSuperTrackedQuestID ~= nil and C_SuperTrack.GetSuperTrackedQuestID() == entry.id
+        if cfg and cfg.clickToUnfocus == true and again then
             C_SuperTrack.SetSuperTrackedQuestID(0)
         else
             C_SuperTrack.SetSuperTrackedQuestID(entry.id)
+            -- Unchanged, so Focus would announce nothing: the resend brings back an arrow TomTom took
+            -- down on arrival.
+            if again then ns:GetModule("Focus"):Resend() end
         end
         if self._notifyDirty then self._notifyDirty() end
     end

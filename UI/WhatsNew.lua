@@ -99,7 +99,6 @@ local function openOptions()
     return Options
 end
 
--- A text block measures all of its lines again for every line added, so each release gets its own
 local function fill(ui, content, releases, quietFirst, goToSetting)
     local pieces = {}
     local function place(frame)

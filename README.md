@@ -34,7 +34,7 @@ activities and the neighborhood tasks you have tracked.
 ### What works on Classic today
 
 Quest tracking and the customization around it: sorting, manual drag ordering, per-quest
-pinning, filters, To-Do Mode, section visibility and ordering, zone headers, the card layout, fonts
+pinning, filters, To-Do Mode, Compact Mode, section visibility and ordering, zone headers, the card layout, fonts
 and colors, profiles, row tooltips, and the row right-click menu. Blizzard's own quest watch frame is
 suppressed so you do not get two trackers.
 
@@ -368,6 +368,18 @@ section names leaves only the counts on those headers, without the words Quests 
 headers keep theirs), and the Header Size Offset button beside it opens the slider that makes the
 words smaller instead. The counts follow that slider, and Count Size Offset sizes them back.
 
+Compact Mode, off by default and switched on from its own card on the Tracker tab right under
+To-Do Mode, makes the tracker take less room, in three parts you can keep or drop. Short quest tags
+puts a quest's level and type in one short tag in front of its title, such as `[60g3!]`, in place of
+the words after the title: g group (with its size), d dungeon, hc heroic, r raid, r10 and r25,
+de delve, s scenario, pvp, + elite, ! daily and !! weekly, the same letters on every client. The
+type shows even with Show quest type tags off, the level only while Show quest level prefix is on,
+and a type with no letter keeps its word. Short finished line shows Ready for turn-in under a
+finished quest in place of where to hand it in or its objectives, even with Show hand-in text on
+finished quests off, minimized or not, so a minimized finished quest shows that line instead of
+(Complete) in its title. One line per text keeps long titles and objectives on one line, ending in
+"...", and hovering a row shows its whole title. Nothing changes while the switch is off.
+
 Quest titles can be colored by difficulty, all in gold, in your class color, in a color you pick,
 or in Original Style, the way the game's own tracker colors them on your version of the game. The
 objective text, a count like 0/5 as it goes from none done to in progress, half done, mostly done
@@ -468,10 +480,15 @@ without one.
 
 Callbacks receive the provider ID and the entry ID, never the entry table, because entries are
 rebuilt on every quest event. `onFocus` is called with a nil quest ID when the focus is
-cleared. It fires on Classic Era and TBC, where the tracker owns the focus, and on WoW Forever,
-where it follows the quest you super-track and fires again when you click the quest you already
-follow, or with a nil quest ID when Click a focused quest to unfocus it is on, since that click
-clears the focus. On retail it never fires. `/eqot status` reports what is registered. Everything Quests uses this
+cleared. It fires on Classic Era and TBC, where the tracker owns the focus, and on retail and WoW
+Forever, where it follows the quest you super-track and fires again when you click the quest you
+already follow, or with a nil quest ID when Click a focused quest to unfocus it is on, since that
+click clears the focus. A super-tracked world quest or bonus objective is announced with the
+provider ID `worldquests`, everything else with `quests`. When the focus moves from one provider
+to the other, the old provider first gets a nil quest ID, so a listener that reads only one provider
+still hears that its quest lost focus. During that clear, `GetFocus()` already answers the new
+focus. `GetFocus()` returns the same pair, or nil, nil while nothing
+is focused. `/eqot status` reports what is registered. Everything Quests uses this
 for two header icons, its Chain Guide and its own options, for its "Get Directions" and "Open
 Chain Guide" menu entries, and for its TomTom arrow.
 

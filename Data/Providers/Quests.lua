@@ -41,13 +41,17 @@ local TAG_RAID25  = (Enum and Enum.QuestTag and Enum.QuestTag.Raid25)  or 89
 local TAG_DELVE   = (Enum and Enum.QuestTag and Enum.QuestTag.Delve)   or 288
 local TAG_GROUP   = (Enum and Enum.QuestTag and Enum.QuestTag.Group)   or 1
 
--- Retail's type words, each the tag's own name. Account and Combat Ally are left out.
+-- Retail's type words, each the tag's own name, and the kind Compact Mode draws a letter for. Account and
+-- Combat Ally are left out.
 local RETAIL_TYPE_TAGS = {
-    [TAG_GROUP] = true, [TAG_DUNGEON] = true, [TAG_HEROIC] = true, [TAG_RAID] = true, [TAG_RAID10] = true,
-    [TAG_RAID25] = true, [TAG_DELVE] = true,
-    [(Enum and Enum.QuestTag and Enum.QuestTag.PvP) or 41] = true,
-    [(Enum and Enum.QuestTag and Enum.QuestTag.Scenario) or 98] = true,
+    [TAG_GROUP] = "group", [TAG_DUNGEON] = "dungeon", [TAG_HEROIC] = "heroic", [TAG_RAID] = "raid",
+    [TAG_RAID10] = "raid10", [TAG_RAID25] = "raid25", [TAG_DELVE] = "delve",
+    [(Enum and Enum.QuestTag and Enum.QuestTag.PvP) or 41] = "pvp",
+    [(Enum and Enum.QuestTag and Enum.QuestTag.Scenario) or 98] = "scenario",
 }
+
+-- The kinds of the tags Forever words, read by the same ids as typeWord below.
+local FOREVER_TYPE_KEYS = { [1] = "elite", [81] = "dungeon", [41] = "pvp", [62] = "raid" }
 
 local CLASS_LEGENDARY = Enum and Enum.QuestClassification and Enum.QuestClassification.Legendary
 
@@ -281,12 +285,16 @@ local function fillType(e, id, info)
     local forever = ns.IsForever()
     e.elite = forever and C_QuestLog.IsEliteQuest ~= nil and C_QuestLog.IsEliteQuest(id)
     local tagID, tagName = getTagID(id)
+    e.typeKey, e.groupSize = nil, nil
     if forever then
         e.typeTag = typeWord(tagID)
+        if e.typeTag then e.typeKey = FOREVER_TYPE_KEYS[tagID] end
     elseif RETAIL_TYPE_TAGS[tagID] and type(tagName) == "string" and tagName ~= "" then
         local size = info and tonumber(info.suggestedGroup)
         if tagID == TAG_GROUP and size and size > 1 then tagName = tagName .. " " .. size end
         e.typeTag = tagName
+        e.typeKey = RETAIL_TYPE_TAGS[tagID]
+        if tagID == TAG_GROUP and size and size > 1 then e.groupSize = size end
     else
         e.typeTag = nil
     end

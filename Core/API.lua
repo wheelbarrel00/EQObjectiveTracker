@@ -104,8 +104,8 @@ function API:MenuItemsFor(providerID, entryID, out)
 end
 
 -- Announced when the tracker's focused row changes: EQOT owns the focus, a listener owns
--- whatever it points at. Only Data/Focus.lua fires this, and only on Classic and WoW Forever,
--- so a retail listener is registered and never called.
+-- whatever it points at. Only Data/Focus.lua fires this: on Era and TBC from a click, on retail
+-- and WoW Forever from super-track.
 -- Registering here on every flavor is deliberate - a call that exists on one flavor and is nil
 -- on another is the trap, not the courtesy.
 function API:AddFocusListener(spec)

@@ -178,6 +178,50 @@ local function buildTodoCard(ui, content, above, zoneOnly, progressBoxes)
     return card
 end
 
+local COMPACT_PARTS = {
+    { key = "compactTags", label = L["Short quest tags"],
+      tip = L["Shows a quest's level and type as one short tag in front of its title, such as [60g3!]: g group, with its size, d dungeon, hc heroic, r raid, r10 and r25 its size, de delve, s scenario, pvp player versus player, + elite, ! daily, !! weekly. The type shows even with Show quest type tags off, and the level only while Show quest level prefix is on."] },
+    { key = "compactFinished", label = L["Short finished line"],
+      tip = L["A finished quest shows Ready for turn-in under its title in place of where to hand it in or its objectives, minimized or not."] },
+    { key = "compactOneLine", label = L["One line per text"],
+      tip = L["Long quest titles and objectives stay on one line and end in ... instead of wrapping. Hover a quest to read its whole title."] },
+}
+
+-- Its own function for the same reason as the To-Do card's. Wrapping is in no gate field, so every
+-- change draws the rows again from scratch.
+local function buildCompactCard(ui, content, above)
+    local gap  = ui:Spacing("groupGap")
+    local card = ui:CreateGroup(content, L["Compact Mode"])
+    card:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -gap)
+    card:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -gap)
+
+    local rows = {}
+    local function sync()
+        local on = DB().compactMode == true
+        for _, r in ipairs(rows) do ui:SetDependent(r, on) end
+    end
+    local function redraw()
+        ns:GetModule("Row"):Invalidate()
+        render()
+    end
+
+    card:Add(ui:CreateCheckbox(content, L["Turn on Compact Mode"],
+        function() return DB().compactMode == true end,
+        function(v) DB().compactMode = v; sync(); redraw() end,
+        L["Makes the tracker take less room: a short tag in front of quest titles, a short line for finished quests and one line for each title and objective. Choose which below. Nothing changes while this is off."]))
+    for _, part in ipairs(COMPACT_PARTS) do
+        local box = ui:CreateCheckbox(content, part.label,
+            function() return DB()[part.key] ~= false end,
+            function(v) DB()[part.key] = v; redraw() end,
+            part.tip)
+        card:Add(box, { dependent = true })
+        rows[#rows + 1] = box
+    end
+
+    sync()
+    return card
+end
+
 local function sectionLabel(id)
     return ns:GetModule("Sections"):Title(id)
 end
@@ -276,7 +320,7 @@ Options:RegisterTab({
         onScreen:Add(self:CreateCheckbox(content, L["Show hand-in text on finished quests"],
             function() return DB().showHandInText ~= false end,
             function(v) DB().showHandInText = v; render() end,
-            L["A quest ready to turn in shows one line in place of its finished objectives, saying where to hand it in when the game says, or that it is ready for turn-in. A failed quest shows that it failed. On by default."]))
+            L["A quest ready to turn in shows one line in place of its finished objectives, saying where to hand it in when the game says, or that it is ready for turn-in. A failed quest shows that it failed. On by default. Compact Mode's short finished line shows Ready for turn-in even with this box off."]))
 
         onScreen:Add(self:CreateCheckbox(content, L["Simplify tracked achievements"],
             function() return DB().simplifyGroups and DB().simplifyGroups.achievements end,
@@ -397,10 +441,11 @@ Options:RegisterTab({
         filters:Add(resetFilters)
 
         local todoCard = buildTodoCard(self, content, filters, zoneOnly, progressBoxes)
+        local compactCard = buildCompactCard(self, content, todoCard)
 
         local visibility = self:CreateGroup(content, L["Tracker Visibility"])
-        visibility:SetPoint("TOPLEFT", todoCard, "BOTTOMLEFT", 0, -gap)
-        visibility:SetPoint("TOPRIGHT", todoCard, "BOTTOMRIGHT", 0, -gap)
+        visibility:SetPoint("TOPLEFT", compactCard, "BOTTOMLEFT", 0, -gap)
+        visibility:SetPoint("TOPRIGHT", compactCard, "BOTTOMRIGHT", 0, -gap)
 
         -- Gated like the filter run above it: a section its TOC never loaded must not get a
         -- toggle that can never do anything.
@@ -586,7 +631,8 @@ Options:RegisterTab({
             rowSetting("showLevelInTracker"))
         questRows:Add(lvl)
         self:AttachTooltip(lvl, L["Show quest level prefix"], typed
-            and L["For example, [60] Title, or [60+] for an elite or group quest."] or L["For example, [60] Title."])
+            and L["For example, [60] Title, or [60+] for an elite or group quest. With Compact Mode's short tags on, the level and the type share one tag in front of the title."]
+            or L["For example, [60] Title. With Compact Mode's short tags on, the level and the type share one tag in front of the title."])
 
         if questsProvider and questsProvider.TypeTagsDefault then
             local _, setTypeTag = rowSetting("showQuestTypeTag")
@@ -598,7 +644,7 @@ Options:RegisterTab({
                 end, setTypeTag)
             questRows:Add(typeTag)
             self:AttachTooltip(typeTag, L["Show quest type tags"],
-                L["Adds the quest's type after its title in your game's own words, such as (Dungeon) or (Daily). A quest with two shows both, such as (Dungeon, Daily)."])
+                L["Adds the quest's type after its title in your game's own words, such as (Dungeon) or (Daily). A quest with two shows both, such as (Dungeon, Daily). With Compact Mode's short tags on, the type shows as letters in one tag in front of the title, even with this box off."])
         end
 
         local zoneCheck = self:CreateCheckbox(content, L["Show zone label under quest titles"],

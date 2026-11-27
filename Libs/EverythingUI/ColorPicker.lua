@@ -38,8 +38,8 @@ local function classColor()
 end
 
 -- The Class button, the watcher and the stored callbacks outlive a picker that has closed unless something
--- clears them, and a stale cancel would
--- revert an already committed color the next time the options window hides over an open picker.
+-- clears them, and a stale cancel would revert an already committed color the next time the options window
+-- hides over an open picker.
 local function detach()
     if state.classButton then state.classButton:Hide() end
     if state.watcher then state.watcher:Hide() end

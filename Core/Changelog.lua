@@ -9,6 +9,21 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.25.0", date = "2026-11-27",
+        sections = {
+            { head = "New Features", items = {
+                "Compact Mode makes the tracker take less room. Turn it on with the new Compact Mode card on the Tracker tab, right under To-Do Mode, and pick which of its three parts you want. Short quest tags puts a quest's level and type in one short tag in front of its title, such as [60g3!] for a level 60 group quest for three that resets daily, in place of the words after the title. The letters are g for group, d dungeon, hc heroic, r raid, r10 and r25 for the raid's size, de delve, s scenario and pvp, with + for elite, ! for daily and !! for weekly. The type shows even with Show quest type tags off, and the level only while Show quest level prefix is on. Short finished line shows Ready for turn-in under a finished quest in place of where to hand it in or its objectives, even with Show hand-in text on finished quests off, and a minimized finished quest shows that line too instead of (Complete) in its title. One line per text keeps long titles and objectives on one line, ending in \"...\", and hovering a row shows its whole title. Compact Mode is off by default, and nothing changes until you turn it on. Requested by Tyrial.",
+            } },
+            { head = "Bug Fixes", items = {
+                "The boxes that hand you a link to copy, from Search on Wowhead, the Discord button, the About tab's links and Export, now hold the keyboard as they open, so Ctrl+C copies the link straight away. Before, the link looked selected but nothing was copied until you clicked in the box. The boxes you type or paste into, New Profile, Import's paste box and the imported profile's name, take your keys straight away too, where before they went to your key bindings. Reported by AnotherDamnDave.",
+            } },
+            { head = "Improvements", items = {
+                "The About tab opens faster, since its text is no longer measured again for every line it adds.",
+                "For addon authors: on retail the tracker now announces the quest you follow to addons listening through its focus calls, as it already did on WoW Forever, so companion addons such as Everything Quests can follow it. A world quest or bonus objective is announced under the world quests provider, a move from one provider to the other first tells the old one its quest lost focus, and clicking the world quest you already follow announces it again.",
+            } },
+        },
+    },
+    {
         version = "2.24.0", date = "2026-11-24",
         sections = {
             { head = "New Features", items = {
@@ -388,21 +403,6 @@ ns.Changelog = {
             } },
             { head = "Bug Fixes", items = {
                 "A color swatch at the end of a checkbox row on the Appearance tab, such as Bar Color beside Show header bars, no longer has its name run under the swatch.",
-            } },
-        },
-    },
-    {
-        version = "2.1.0", date = "2026-10-03",
-        sections = {
-            { head = "New Features", items = {
-                "Keep section headers in view while scrolling (Tracker tab): the header of the section you are scrolled into stays at the top of the quest list, and the next section's header pushes it out of the way as you reach it. Clicking it still collapses the section. On by default.",
-                "Quest Title Color (Appearance tab) colors quest titles By difficulty, in Gold color, in your Class color, in a Custom color, or in Original Style, the way Blizzard's own tracker colors them on your version of the game. It replaces Use class color for titles and the Tracker tab's Quest Title Color By Difficulty. The Quest Title Color Override picker moves under it as Custom Title Color, and whatever those were set to carries over unchanged.",
-                "The objective text, the color of a count like 0/5 (none done, in progress and done), and finished objectives can each be given their own color on the Appearance tab. Every one starts at the color it has always been. Until a finished objective is given its own color, it follows the done color, or the title color while Use title color for completed quests is on and Quest Title Color gives one (Class color, Custom color or Original Style). Requested by Rhinoplasty.",
-            } },
-            { head = "Improvements", items = {
-                "The Appearance tab is reorganized with the most used settings first: Text, Quest Colors, Tracker, Section Headers and Spacing, then Quest Rows, Progress Bars, the Scroll Bar, the Scenario panel, the Scenario Bonus Objectives and the Zone Progress Bar. Every setting keeps its value.",
-                "The switch that hides the cogwheel at the top of the tracker is now called Show the options cogwheel on the tracker, so it can be found. It is on the Tracker tab, and /eqot still opens the options with the cogwheel hidden. Requested by zeldakostv.",
-                "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover every new option in this release, including Quest Title Color, the objective and count colors, and the sticky section headers.",
             } },
         },
     },

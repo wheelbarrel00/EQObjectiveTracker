@@ -1,12 +1,11 @@
 local _, ns = ...
 
--- Which row the player is working on. Classic has no super-track, so a click sets it here. WoW
--- Forever runs the retail file list, so there it follows super-track instead, giving Everything
--- Quests the same announcement it turns into a TomTom arrow on Classic. Retail loads this and
--- never sets it.
+-- Which row the player is working on. Classic has no super-track, so a click sets it here. Retail
+-- and WoW Forever follow super-track instead, giving Everything Quests the same announcement it
+-- turns into a TomTom arrow on Classic.
 --
--- Session state on purpose. A Classic login starts with no focus, and on Forever super-track is
--- read at the first loading screen.
+-- Session state on purpose. A Classic login starts with no focus, and where super-track exists it
+-- is read at the first loading screen.
 local Focus = ns:RegisterModule("Focus", {})
 
 local focusedProvider, focusedID
@@ -32,12 +31,16 @@ function Focus:Set(providerID, entryID)
     if focusedProvider == providerID and focusedID == entryID then return false end
 
     -- A clear is announced against the provider that LOST focus, so a listener scoped to one
-    -- provider can tell whether the clear concerns it.
-    local announceProvider = providerID or focusedProvider
+    -- provider can tell whether the clear concerns it. A move to another provider sends that clear
+    -- first, or such a listener keeps following a quest that lost focus.
+    local lost = focusedProvider
     focusedProvider, focusedID = providerID, entryID
 
     local API = ns:GetModule("API")
-    if API then API:NotifyFocus(announceProvider, entryID) end
+    if API then
+        if providerID and lost and lost ~= providerID then API:NotifyFocus(lost, nil) end
+        API:NotifyFocus(providerID or lost, entryID)
+    end
     for i = 1, #dirtyHandlers do dirtyHandlers[i]() end
     return true
 end
@@ -59,20 +62,27 @@ function Focus:Resend()
     if API then API:NotifyFocus(focusedProvider, focusedID) end
 end
 
--- The packager's Forever range. Forever has retail's API and project id, so only this tells them apart.
-local function isForever()
-    local toc = tonumber((select(4, GetBuildInfo())))
-    return toc ~= nil and toc >= 16000 and toc < 17000
+-- A world quest or bonus objective is announced as World Quests', so a listener can tell it from a
+-- log quest.
+local function providerOf(id)
+    local log = C_QuestLog
+    if log and ((log.IsWorldQuest and log.IsWorldQuest(id)) or (log.IsQuestTask and log.IsQuestTask(id))) then
+        return "worldquests"
+    end
+    return "quests"
 end
 
 local function followSuperTrack()
     local id = C_SuperTrack.GetSuperTrackedQuestID()
-    if not (id and id > 0) then id = nil end
-    Focus:Set("quests", id)
+    if not (id and id > 0) then
+        Focus:Set(nil, nil)
+        return
+    end
+    Focus:Set(providerOf(id), id)
 end
 
 -- Defined only where it does something, so /eqot modules never offers a switch that changes nothing.
-if ns.Has.SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and isForever() then
+if ns.Has.SuperTrack and C_SuperTrack.GetSuperTrackedQuestID then
     function Focus:OnEnable()
         local Events = ns:GetModule("Events")
         Events:On("SUPER_TRACKING_CHANGED", followSuperTrack)

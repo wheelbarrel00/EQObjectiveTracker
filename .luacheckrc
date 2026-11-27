@@ -93,8 +93,8 @@ read_globals = {
     "SelectQuestLogEntry", "GetNumQuestLeaderBoards", "GetQuestLogLeaderBoard",
     "IsQuestWatched", "AddQuestWatch", "RemoveQuestWatch", "GetQuestTagInfo",
     "GetQuestLogSelection",
-    -- Forever's quest type tag words, and the parentheses UI/Row.lua puts around any client's tag.
-    "ELITE", "CALENDAR_TYPE_DUNGEON", "CALENDAR_TYPE_PVP", "RAID", "PARENS_TEMPLATE",
+    -- Quest type tag words, and the parentheses UI/Row.lua puts around any client's tag.
+    "ELITE", "GROUP", "CALENDAR_TYPE_DUNGEON", "CALENDAR_TYPE_PVP", "RAID", "PARENS_TEMPLATE",
     -- The repeat words after a quest's title, joined to its type with Blizzard's list separator.
     "DAILY", "WEEKLY", "LIST_DELIMITER",
     -- Blizzard's own Vanilla and TBC QuestWatch_OnLogin walks its watch list with these two.

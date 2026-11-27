@@ -47,6 +47,7 @@ function Preview:Samples()
         quests = {
             quest(90002, "quests", "Wolves at the Door", {
                 addedAt = time(), zone = "Ashwood Glen", xp = 450, distance = 120,
+                repeatTag = DAILY, tags = { daily = DAILY and true or nil },
                 lines = { { text = "4/8 Gray wolves slain", kind = LINE.OBJECTIVE },
                           { text = "Speak with the innkeeper", kind = LINE.OBJECTIVE } },
             }),
@@ -68,6 +69,7 @@ function Preview:Samples()
             quest(90006, "quests", "Into the Sunken Halls", {
                 tags = { dungeon = true }, level = level + 1, zone = "The Sunken Halls",
                 subtitle = "The Sunken Halls",
+                typeTag = CALENDAR_TYPE_DUNGEON, typeKey = CALENDAR_TYPE_DUNGEON and "dungeon" or nil,
                 lines = { { text = "0/1 Tidecaller Vossa slain", kind = LINE.OBJECTIVE } },
             }),
         },
