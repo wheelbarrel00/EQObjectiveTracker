@@ -37,12 +37,14 @@ L["Cancel"] = "取消"
 L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale, where the options window sits and After an update, which every character shares, and clears this character's collapsed sections, folded quests, hidden zones and pinned entries."] = "全部標籤頁恢復預設並重載界面。同時重置全角色共享的設定視窗縮放、設定視窗位置與「更新之後」，以及本角色折疊板塊、折疊任務、隱藏區域、固定條目。"
 L["Reset position and size"] = "重置位置與大小"
 L["Returns the tracker to its default position and size."] = "將追蹤框恢復至預設位置與尺寸。"
+L["The interface did not reload. Type /reload to finish."] = "界面未能重載。請輸入 /reload 完成操作。"
 L["Use Blizzard's quest tracker"] = "使用暴雪任務追蹤器"
 L["Switch to Blizzard's quest tracker? The interface will reload."] = "切換到暴雪任務追蹤器？界面將會重載。"
 L["Switch back to the EQ Objective Tracker window? The interface will reload."] = "切換回EQ Objective Tracker視窗？界面將會重載。"
 L["Yes"] = "是"
-L["The interface did not reload. Type /reload to finish."] = "界面未能重載。請輸入 /reload 完成操作。"
 L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."] = "關閉EQ Objective Tracker視窗，恢復暴雪原生的任務追蹤器。EQ Objective Tracker的任務音效等其他功能照常運作。切換時界面將會重載。"
+L["Use Blizzard's tracker while the Gamepad UI is on"] = "啟用手把界面時使用暴雪追蹤器"
+L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."] = "啟用手把界面時使用遊戲內建的任務追蹤器（支援手把），其餘時間使用本視窗。切換時界面將會重載。基於暴雪程式碼製作，尚未用手把測試，如有任何問題請回報。"
 L["Lock tracker"] = "鎖定追蹤器"
 L["Disable drag-to-move and resize."] = "禁用拖拽移動與縮放。"
 L["Hide tracker in combat"] = "戰斗中隱藏追蹤器"
@@ -599,6 +601,11 @@ L["Search settings"] = "搜尋設定"
 L["No settings match"] = "沒有符合的設定"
 L["Search results"] = "搜尋結果"
 
+-- Core/Bindings.lua
+L["Follow next quest"] = "超級追蹤下一個任務"
+L["Follow previous quest"] = "超級追蹤上一個任務"
+L["Use the followed quest's item"] = "使用超級追蹤任務的物品"
+
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "複製下方鏈接（已預選，直接 Ctrl+C）："
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "加入社區獲取幫助、反饋意見、接收更新。\n複製下方邀請鏈接（已預選，直接 Ctrl+C）："
@@ -667,6 +674,7 @@ L["tracker locked."] = "追蹤框已鎖定。"
 L["tracker unlocked."] = "追蹤框已解鎖。"
 L["position and size reset."] = "位置與大小已重置。"
 L["Blizzard's quest tracker is in use - see /eqot, General."] = "正在使用暴雪任務追蹤器，請查看 /eqot 的通用設置。"
+L["No quests to follow."] = "沒有可超級追蹤的任務。"
 L["no Everything Quests configuration found to import."] = "未找到可導入的 Everything Quests 配置。"
 L["Import from Everything Quests"] = "從 Everything Quests 導入"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "將該設定檔恢復預設，並替換為Everything Quests追蹤器設置？\n\n此操作不可撤銷。如需保留當前配置，請先新建設定檔。"
@@ -674,6 +682,14 @@ L["commands:"] = "命令："
 
 -- UI/Dialog.lua
 L["OK"] = "確定"
+
+-- UI/GamepadPrompt.lua
+L["The Gamepad UI was switched, so the quest tracker should switch too. Reload the interface now?"] = "手把界面已切換，任務追蹤器也應隨之切換。現在重載界面嗎？"
+L["Reload"] = "重載"
+L["Not now"] = "暫不"
+L["You are using the Gamepad UI. The game's own quest tracker works with a controller, and this one does not yet."] = "你正在使用手把界面。遊戲內建的任務追蹤器支援手把，而本追蹤器暫不支援。"
+L["Use the game's quest tracker while the Gamepad UI is on? The interface reloads. You can change this later on the General tab."] = "啟用手把界面時使用遊戲的任務追蹤器嗎？界面將會重載。之後可在【通用】標籤頁中更改。"
+L["No"] = "否"
 
 -- UI/QuestieCoexist.lua
 L["Questie's own quest tracker is on screen alongside this one.\n\nHide Questie's tracker? You can change this later on the General tab. This only hides the frame, and leaves Questie's settings and tracked quests alone."] = "Questie 內建的任務追蹤器正與此追蹤器一同顯示在螢幕上。\n\n是否隱藏 Questie 的追蹤器？之後可在【通用】標籤頁中更改。此操作僅隱藏框體，不會改動 Questie 的設置或它所追蹤的任務。"

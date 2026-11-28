@@ -15,11 +15,12 @@ local BUTTON_BOTTOM = 16
 
 local DIALOG_FIELDS = {
     title = "string", text = "string", button1 = "string", button2 = "string",
-    onAccept = "function", onCancel = "function", hasEditBox = "boolean", maxLetters = "number",
+    onAccept = "function", onCancel = "function", onDecline = "function", hasEditBox = "boolean", maxLetters = "number",
     editBoxText = "string", highlightEditBox = "boolean", danger = "boolean", readOnly = "boolean",
 }
 
-local function finish(f, accepted)
+-- declined: the secondary button itself, which a host may hear apart from Escape through onDecline.
+local function finish(f, accepted, declined)
     local opts = f.opts
     -- Guards a double fire - a button click and the escape key can both land.
     if not opts then return end
@@ -35,6 +36,8 @@ local function finish(f, accepted)
     -- raise cannot leave the dialog on screen with no callbacks left to close it.
     if accepted then
         if opts.onAccept then xpcall(function() opts.onAccept(text) end, geterrorhandler()) end
+    elseif declined and opts.onDecline then
+        xpcall(opts.onDecline, geterrorhandler())
     elseif opts.onCancel then
         xpcall(opts.onCancel, geterrorhandler())
     end
@@ -171,7 +174,7 @@ local function build(ctx)
     f.accept:SetPoint("BOTTOMRIGHT", -PADDING, BUTTON_BOTTOM)
     f.acceptDanger = ctx:CreateButton(f, "", nil, function() finish(f, true) end, nil, "danger")
     f.acceptDanger:SetPoint("BOTTOMRIGHT", -PADDING, BUTTON_BOTTOM)
-    f.cancel = ctx:CreateButton(f, "", nil, function() finish(f, false) end)
+    f.cancel = ctx:CreateButton(f, "", nil, function() finish(f, false, true) end)
     return f
 end
 

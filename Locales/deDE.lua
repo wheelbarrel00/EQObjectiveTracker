@@ -22,12 +22,14 @@ L["Cancel"] = "Abbrechen"
 L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale, where the options window sits and After an update, which every character shares, and clears this character's collapsed sections, folded quests, hidden zones and pinned entries."] = "Setzt alle Einstellungen auf jedem Tab auf ihre Standardwerte zurück und lädt die Benutzeroberfläche neu. Dadurch werden auch die Skalierung des Optionsfensters, seine Position und „Nach einem Update“ zurückgesetzt, die von allen Charakteren gemeinsam verwendet werden, sowie die eingeklappten Abschnitte, eingeklappten Quests, ausgeblendeten Gebiete und angehefteten Einträge dieses Charakters."
 L["Reset position and size"] = "Position und Größe zurücksetzen"
 L["Returns the tracker to its default position and size."] = "Setzt den Tracker auf seine Standardposition und -größe zurück."
+L["The interface did not reload. Type /reload to finish."] = "Die Benutzeroberfläche wurde nicht neu geladen. Gib /reload ein, um den Vorgang abzuschließen."
 L["Use Blizzard's quest tracker"] = "Blizzard-Questtracker verwenden"
 L["Switch to Blizzard's quest tracker? The interface will reload."] = "Zum Blizzard-Questtracker wechseln? Die Benutzeroberfläche wird neu geladen."
 L["Switch back to the EQ Objective Tracker window? The interface will reload."] = "Zurück zum Fenster des EQ Objective Trackers wechseln? Die Benutzeroberfläche wird neu geladen."
 L["Yes"] = "Ja"
-L["The interface did not reload. Type /reload to finish."] = "Die Benutzeroberfläche wurde nicht neu geladen. Gib /reload ein, um den Vorgang abzuschließen."
 L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."] = "Schaltet das Fenster des EQ Objective Trackers ab und bringt den spieleigenen Questtracker zurück. Die übrigen Funktionen des EQ Objective Trackers, etwa die Questtöne, funktionieren weiter. Zum Wechseln wird die Benutzeroberfläche neu geladen."
+L["Use Blizzard's tracker while the Gamepad UI is on"] = "Blizzard-Tracker verwenden, solange die Gamepad-Oberfläche aktiv ist"
+L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."] = "Verwendet den spieleigenen Questtracker, der mit einem Controller funktioniert, solange die Gamepad-Oberfläche aktiv ist, und sonst dieses Fenster. Zum Wechseln wird die Benutzeroberfläche neu geladen. Anhand von Blizzards Code gebaut und noch nicht mit einem Controller getestet. Bitte melde daher alles, was nicht funktioniert."
 L["Lock tracker"] = "Tracker sperren"
 L["Disable drag-to-move and resize."] = "Verschieben und Ändern der Größe per Ziehen deaktivieren."
 L["Hide tracker in combat"] = "Tracker im Kampf ausblenden"
@@ -584,6 +586,11 @@ L["Search settings"] = "Einstellungen suchen"
 L["No settings match"] = "Keine passenden Einstellungen"
 L["Search results"] = "Suchergebnisse"
 
+-- Core/Bindings.lua
+L["Follow next quest"] = "Nächste Quest fokussieren"
+L["Follow previous quest"] = "Vorherige Quest fokussieren"
+L["Use the followed quest's item"] = "Gegenstand der fokussierten Quest benutzen"
+
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Kopiere den untenstehenden Link (er ist bereits markiert \226\128\148 drücke einfach Strg+C):"
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Tritt der Community bei, um Hilfe, Feedback und Updates zu erhalten.\nKopiere die untenstehende Einladung (sie ist bereits markiert \226\128\148 drücke einfach Strg+C):"
@@ -652,6 +659,7 @@ L["tracker locked."] = "Tracker gesperrt."
 L["tracker unlocked."] = "Tracker entsperrt."
 L["position and size reset."] = "Position und Größe zurückgesetzt."
 L["Blizzard's quest tracker is in use - see /eqot, General."] = "Der Blizzard-Questtracker ist aktiv – siehe /eqot, Allgemein."
+L["No quests to follow."] = "Keine Quests zum Fokussieren."
 L["no Everything Quests configuration found to import."] = "Keine Everything Quests-Konfiguration zum Importieren gefunden."
 L["Import from Everything Quests"] = "Aus Everything Quests importieren"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "Dieses Profil auf die Standardwerte zurücksetzen und durch deine Everything Quests-Tracker-Einstellungen ersetzen?\n\nDies kann nicht rückgängig gemacht werden. Erstelle zuerst ein neues Profil, wenn du das aktuelle behalten möchtest."
@@ -659,6 +667,14 @@ L["commands:"] = "Befehle:"
 
 -- UI/Dialog.lua
 L["OK"] = "OK"
+
+-- UI/GamepadPrompt.lua
+L["The Gamepad UI was switched, so the quest tracker should switch too. Reload the interface now?"] = "Die Gamepad-Oberfläche wurde umgeschaltet, daher sollte auch der Questtracker wechseln. Benutzeroberfläche jetzt neu laden?"
+L["Reload"] = "Neu laden"
+L["Not now"] = "Nicht jetzt"
+L["You are using the Gamepad UI. The game's own quest tracker works with a controller, and this one does not yet."] = "Du verwendest die Gamepad-Oberfläche. Der spieleigene Questtracker funktioniert mit einem Controller, dieser hier noch nicht."
+L["Use the game's quest tracker while the Gamepad UI is on? The interface reloads. You can change this later on the General tab."] = "Den Questtracker des Spiels verwenden, solange die Gamepad-Oberfläche aktiv ist? Die Benutzeroberfläche wird neu geladen. Du kannst das später auf dem Reiter „Allgemein“ ändern."
+L["No"] = "Nein"
 
 -- UI/QuestieCoexist.lua
 L["Questie's own quest tracker is on screen alongside this one.\n\nHide Questie's tracker? You can change this later on the General tab. This only hides the frame, and leaves Questie's settings and tracked quests alone."] = "Der eigene Questie-Questtracker wird zusammen mit diesem Tracker angezeigt.\n\nQuesties Tracker ausblenden? Du kannst dies später auf dem Reiter „Allgemein“ ändern. Dadurch wird nur der Rahmen ausgeblendet; Questies Einstellungen und verfolgte Quests bleiben unverändert."

@@ -1,0 +1,15 @@
+<Bindings>
+    <Binding name="EQOT_FOLLOW_NEXT" category="BINDING_HEADER_EQOBJECTIVETRACKER">
+        local C = EQObjectiveTracker and EQObjectiveTracker:GetModule("Commands")
+        if C then C:Run("next") end
+    </Binding>
+    <Binding name="EQOT_FOLLOW_PREV" category="BINDING_HEADER_EQOBJECTIVETRACKER">
+        local C = EQObjectiveTracker and EQObjectiveTracker:GetModule("Commands")
+        if C then C:Run("prev") end
+    </Binding>
+    <Binding name="CLICK EQOTQuestItem:LeftButton" category="BINDING_HEADER_EQOBJECTIVETRACKER"></Binding>
+    <Binding name="EQOT_TOGGLE" category="BINDING_HEADER_EQOBJECTIVETRACKER">
+        local C = EQObjectiveTracker and EQObjectiveTracker:GetModule("Commands")
+        if C then C:Run("toggle") end
+    </Binding>
+</Bindings>

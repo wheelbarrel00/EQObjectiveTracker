@@ -35,12 +35,14 @@ L["Cancel"] = "취소"
 L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale, where the options window sits and After an update, which every character shares, and clears this character's collapsed sections, folded quests, hidden zones and pinned entries."] = "모든 탭의 모든 설정을 기본값으로 되돌리고 인터페이스를 다시 불러옵니다. 모든 캐릭터가 공유하는 설정 창 배율, 설정 창 위치와 '업데이트 후', 그리고 이 캐릭터의 접힌 구역, 접힌 퀘스트, 숨긴 지역과 고정 항목도 함께 초기화됩니다."
 L["Reset position and size"] = "위치/크기 초기화"
 L["Returns the tracker to its default position and size."] = "추적기를 기본 위치와 크기로 되돌립니다."
+L["The interface did not reload. Type /reload to finish."] = "인터페이스를 다시 불러오지 못했습니다. /reload 명령어를 입력해 마무리하세요."
 L["Use Blizzard's quest tracker"] = "블리자드 퀘스트 추적기 사용"
 L["Switch to Blizzard's quest tracker? The interface will reload."] = "블리자드 퀘스트 추적기로 전환할까요? 인터페이스를 다시 불러옵니다."
 L["Switch back to the EQ Objective Tracker window? The interface will reload."] = "EQ Objective Tracker 창으로 돌아갈까요? 인터페이스를 다시 불러옵니다."
 L["Yes"] = "예"
-L["The interface did not reload. Type /reload to finish."] = "인터페이스를 다시 불러오지 못했습니다. /reload 명령어를 입력해 마무리하세요."
 L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."] = "EQ Objective Tracker 창을 끄고 게임 자체의 퀘스트 추적기를 다시 표시합니다. 퀘스트 소리 같은 EQ Objective Tracker의 다른 기능은 계속 작동합니다. 전환하면 인터페이스를 다시 불러옵니다."
+L["Use Blizzard's tracker while the Gamepad UI is on"] = "게임패드 UI가 켜져 있는 동안 블리자드 추적기 사용"
+L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."] = "게임패드 UI가 켜져 있는 동안에는 컨트롤러로 조작할 수 있는 게임 자체 퀘스트 추적기를, 그 밖에는 이 창을 사용합니다. 전환하려면 인터페이스를 다시 불러옵니다. 블리자드 코드를 바탕으로 만들었으며 아직 컨트롤러로 시험하지 않았으니 문제가 있으면 알려 주세요."
 L["Lock tracker"] = "추적기 잠금"
 L["Disable drag-to-move and resize."] = "드래그 이동/크기 조정 비활성화."
 L["Hide tracker in combat"] = "전투 중 추적기 숨김"
@@ -597,6 +599,11 @@ L["Search settings"] = "설정 검색"
 L["No settings match"] = "일치하는 설정 없음"
 L["Search results"] = "검색 결과"
 
+-- Core/Bindings.lua
+L["Follow next quest"] = "다음 퀘스트 집중 추적"
+L["Follow previous quest"] = "이전 퀘스트 집중 추적"
+L["Use the followed quest's item"] = "집중 추적 중인 퀘스트의 아이템 사용"
+
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "아래 링크를 복사하세요 (미리 선택되어 있습니다 - Ctrl+C만 누르세요):"
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "도움말, 피드백, 소식을 위해 커뮤니티에 참여하세요.\n아래 초대 링크를 복사하세요 (미리 선택되어 있습니다 - Ctrl+C만 누르세요):"
@@ -665,6 +672,7 @@ L["tracker locked."] = "추적기 잠김"
 L["tracker unlocked."] = "추적기 잠금 해제됨."
 L["position and size reset."] = "위치/크기 초기화됨."
 L["Blizzard's quest tracker is in use - see /eqot, General."] = "블리자드 퀘스트 추적기를 사용 중입니다. /eqot 의 일반 탭을 확인하세요."
+L["No quests to follow."] = "집중 추적할 퀘스트가 없습니다."
 L["no Everything Quests configuration found to import."] = "가져올 Everything Quests 설정을 찾지 못했습니다."
 L["Import from Everything Quests"] = "Everything Quests에서 가져오기"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "이 프로필을 기본값으로 되돌린 뒤 Everything Quests 추적기 설정으로 교체할까요?\n\n되돌릴 수 없습니다. 현재 프로필을 남기려면 먼저 새 프로필을 만드세요."
@@ -672,6 +680,14 @@ L["commands:"] = "명령어:"
 
 -- UI/Dialog.lua
 L["OK"] = "확인"
+
+-- UI/GamepadPrompt.lua
+L["The Gamepad UI was switched, so the quest tracker should switch too. Reload the interface now?"] = "게임패드 UI가 전환되었으므로 퀘스트 추적기도 전환해야 합니다. 지금 인터페이스를 다시 불러올까요?"
+L["Reload"] = "다시 불러오기"
+L["Not now"] = "나중에"
+L["You are using the Gamepad UI. The game's own quest tracker works with a controller, and this one does not yet."] = "게임패드 UI를 사용 중입니다. 게임 자체 퀘스트 추적기는 컨트롤러로 조작할 수 있지만 이 추적기는 아직 그렇지 않습니다."
+L["Use the game's quest tracker while the Gamepad UI is on? The interface reloads. You can change this later on the General tab."] = "게임패드 UI가 켜져 있는 동안 게임의 퀘스트 추적기를 사용할까요? 인터페이스를 다시 불러옵니다. 나중에 일반 탭에서 바꿀 수 있습니다."
+L["No"] = "아니요"
 
 -- UI/QuestieCoexist.lua
 L["Questie's own quest tracker is on screen alongside this one.\n\nHide Questie's tracker? You can change this later on the General tab. This only hides the frame, and leaves Questie's settings and tracked quests alone."] = "Questie 자체 퀘스트 추적기가 이 추적기와 함께 화면에 표시되고 있습니다.\n\nQuestie의 추적기를 숨길까요? 나중에 일반 탭에서 바꿀 수 있습니다. 프레임만 숨길 뿐, Questie의 설정과 추적 중인 퀘스트는 그대로 둡니다."

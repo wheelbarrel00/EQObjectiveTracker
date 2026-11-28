@@ -2,7 +2,7 @@ local addonName, ns = ...
 
 _G.EQObjectiveTracker = ns
 ns.NAME    = addonName
-ns.VERSION = "2.25.0"
+ns.VERSION = "2.26.0"
 
 ns.modules     = {}
 ns.moduleOrder = {}
@@ -77,7 +77,8 @@ local NEVER_SKIP = {
 -- does not clash - Focus for Everything Quests' arrow, the quest sounds and their cache, the zone
 -- bar, the flight map, the options window, What's New, AutoTrack, which keeps Classic's own set
 -- current for the way back, Fold, which forgets the folds of quests that left the log, Filter, which
--- only notes the quests that left it, and LogCount, which only marks its count stale.
+-- only notes the quests that left it, LogCount, which only marks its count stale, and the Gamepad UI's
+-- questions and quest item key, which work with Blizzard's tracker.
 -- Tracker is in NEVER_SKIP and stands down in its own OnEnable.
 local STAND_DOWN = {
     Blizzard = true, QuestLogChecks = true, QuestieCoexist = true, EllesmereCoexist = true,

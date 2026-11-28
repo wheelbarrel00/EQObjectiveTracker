@@ -2,7 +2,7 @@
 ## Title: EQ Objective Tracker
 ## Notes: Standalone replacement for the default objective tracker.
 ## Author: Wheelbarrel00
-## Version: 2.25.0
+## Version: 2.26.0
 ## SavedVariables: EQObjectiveTrackerDB
 ## X-Curse-Project-ID: 1637002
 ## X-Website: https://github.com/wheelbarrel00/EQObjectiveTracker
@@ -32,6 +32,7 @@ Locales\deDE.lua
 Core\Init.lua
 Core\Compat.lua
 Core\Events.lua
+Core\Gamepad.lua
 Core\Util.lua
 Core\API.lua
 Core\Media.lua
@@ -39,12 +40,14 @@ Core\DB.lua
 Core\Migrate.lua
 Core\Transfer.lua
 Core\Changelog.lua
+Core\Bindings.lua
 
 # Data layer. Operates on normalized entries and game APIs, never on frames.
 Data\Entry.lua
 Data\Registry.lua
 Data\QuestCache.lua
 Data\Focus.lua
+Data\FollowWalk.lua
 Data\Filter.lua
 Data\TodoMode.lua
 Data\Fold.lua
@@ -89,6 +92,7 @@ UI\DragDrop.lua
 UI\Row.lua
 UI\RowMenu.lua
 UI\ItemButtons.lua
+UI\QuestItemKey.lua
 UI\AutoQuestPopup.lua
 UI\TodoCounts.lua
 UI\Sections.lua
@@ -105,6 +109,7 @@ UI\RewardTooltip.lua
 UI\ScenarioBonusHUD.lua
 UI\Visibility.lua
 UI\Dialog.lua
+UI\GamepadPrompt.lua
 UI\TrackerPreview.lua
 UI\WhatsNew.lua
 

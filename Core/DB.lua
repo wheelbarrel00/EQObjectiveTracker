@@ -24,6 +24,9 @@ DB.defaults = {
             -- has no default because it is only ever written true.
             hideQuestieTracker = false,
             useBlizzardTracker = false,
+            -- A new key, so a false default reverts nobody. Its companions global.gamepadPromptAnswered
+            -- and global.gamepadPromptAsks are absence flags and get no default.
+            blizzardTrackerOnGamepad = false,
         },
         tracker = {
             anchor        = "TOPRIGHT",
@@ -486,7 +489,16 @@ function DB:OnInitialize()
 
     -- Latched for the session. Suppressing Blizzard's tracker cannot be undone live, so a change
     -- waits for the reload it asks for.
-    ns._blizzardTracker = (self.db.profile.general.useBlizzardTracker == true)
+    local gen = self.db.profile.general
+    local Gamepad = ns:GetModule("Gamepad")
+    if gen.useBlizzardTracker == true then
+        ns._blizzardTrackerWhy = "setting"
+    elseif gen.blizzardTrackerOnGamepad == true and Gamepad and Gamepad:SavedOn() then
+        ns._blizzardTrackerWhy = "gamepad"
+    else
+        ns._blizzardTrackerWhy = nil
+    end
+    ns._blizzardTracker = ns._blizzardTrackerWhy ~= nil
 end
 
 function DB:Profile()

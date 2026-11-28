@@ -37,12 +37,14 @@ L["Cancel"] = "取消"
 L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale, where the options window sits and After an update, which every character shares, and clears this character's collapsed sections, folded quests, hidden zones and pinned entries."] = "全部标签页恢复默认并重载界面。同时重置全角色共享的设置窗口缩放、设置窗口位置与“更新之后”，以及本角色折叠板块、折叠任务、隐藏区域、固定条目。"
 L["Reset position and size"] = "重置位置与大小"
 L["Returns the tracker to its default position and size."] = "将追踪框恢复至默认位置与尺寸。"
+L["The interface did not reload. Type /reload to finish."] = "界面未能重载。请输入 /reload 完成操作。"
 L["Use Blizzard's quest tracker"] = "使用暴雪任务追踪器"
 L["Switch to Blizzard's quest tracker? The interface will reload."] = "切换到暴雪任务追踪器？界面将会重载。"
 L["Switch back to the EQ Objective Tracker window? The interface will reload."] = "切换回EQ Objective Tracker窗口？界面将会重载。"
 L["Yes"] = "是"
-L["The interface did not reload. Type /reload to finish."] = "界面未能重载。请输入 /reload 完成操作。"
 L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."] = "关闭EQ Objective Tracker窗口，恢复暴雪原生的任务追踪器。EQ Objective Tracker的任务音效等其他功能照常工作。切换时界面将会重载。"
+L["Use Blizzard's tracker while the Gamepad UI is on"] = "启用手柄界面时使用暴雪追踪器"
+L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."] = "启用手柄界面时使用游戏自带的任务追踪器（支持手柄），其余时间使用本窗口。切换时界面将会重载。基于暴雪代码制作，尚未用手柄测试，如有任何问题请反馈。"
 L["Lock tracker"] = "锁定追踪器"
 L["Disable drag-to-move and resize."] = "禁用拖拽移动与缩放。"
 L["Hide tracker in combat"] = "战斗中隐藏追踪器"
@@ -599,6 +601,11 @@ L["Search settings"] = "查找设置"
 L["No settings match"] = "未找到匹配设置"
 L["Search results"] = "查找结果"
 
+-- Core/Bindings.lua
+L["Follow next quest"] = "超级追踪下一个任务"
+L["Follow previous quest"] = "超级追踪上一个任务"
+L["Use the followed quest's item"] = "使用超级追踪任务的物品"
+
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "复制下方链接（已预选，直接 Ctrl+C）："
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "加入社区获取帮助、反馈意见、接收更新。\n复制下方邀请链接（已预选，直接 Ctrl+C）："
@@ -667,6 +674,7 @@ L["tracker locked."] = "追踪框已锁定。"
 L["tracker unlocked."] = "追踪框已解锁。"
 L["position and size reset."] = "位置与大小已重置。"
 L["Blizzard's quest tracker is in use - see /eqot, General."] = "正在使用暴雪任务追踪器，请查看 /eqot 的通用设置。"
+L["No quests to follow."] = "没有可超级追踪的任务。"
 L["no Everything Quests configuration found to import."] = "未找到可导入的 Everything Quests 配置。"
 L["Import from Everything Quests"] = "从 Everything Quests 导入"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "将该配置文件恢复默认，并替换为Everything Quests追踪器设置？\n\n此操作不可撤销。如需保留当前配置，请先新建配置文件。"
@@ -674,6 +682,14 @@ L["commands:"] = "命令："
 
 -- UI/Dialog.lua
 L["OK"] = "确定"
+
+-- UI/GamepadPrompt.lua
+L["The Gamepad UI was switched, so the quest tracker should switch too. Reload the interface now?"] = "手柄界面已切换，任务追踪器也应随之切换。现在重载界面吗？"
+L["Reload"] = "重载"
+L["Not now"] = "暂不"
+L["You are using the Gamepad UI. The game's own quest tracker works with a controller, and this one does not yet."] = "你正在使用手柄界面。游戏自带的任务追踪器支持手柄，而本追踪器暂不支持。"
+L["Use the game's quest tracker while the Gamepad UI is on? The interface reloads. You can change this later on the General tab."] = "启用手柄界面时使用游戏的任务追踪器吗？界面将会重载。之后可在「通用」标签页中更改。"
+L["No"] = "否"
 
 -- UI/QuestieCoexist.lua
 L["Questie's own quest tracker is on screen alongside this one.\n\nHide Questie's tracker? You can change this later on the General tab. This only hides the frame, and leaves Questie's settings and tracked quests alone."] = "Questie 自带的任务追踪器正与此追踪器一同显示在屏幕上。\n\n是否隐藏 Questie 的追踪器？之后可在「通用」标签页中更改。此操作仅隐藏框体，不会改动 Questie 的设置或它所追踪的任务。"

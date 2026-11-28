@@ -137,6 +137,36 @@ and TBC Anniversary the game's tracker starts empty, so shift-click quests in th
 watch them, up to the game's limit of five. This tracker's own list is kept for when you switch
 back.
 
+### Playing with a controller on WoW Forever
+
+WoW Forever's Gamepad UI works with the game's own quest tracker, and not yet with this one: its
+Quest Tracker shortcut (LB+RB and D-pad Up) and its D-pad navigation only know the game's tracker.
+So tick **Use Blizzard's tracker while the Gamepad UI is on** on the General tab, or answer Yes
+when the tracker asks the first time it sees the Gamepad UI on. While the Gamepad UI is on you get
+the game's tracker, with Everything Quests' arrow still following the quest you follow, and the
+rest of the time this one. If the question is closed some other way it asks again at your next
+login, at most three times in all, until you click Yes or No. With the box ticked, turning the
+Gamepad UI on or off while you play asks to reload, since the tracker is picked when you log in.
+The box shows only on game versions that have the Gamepad UI.
+
+While the Gamepad UI is on, addon key bindings may not reach controller buttons, so use macros on
+the Gamepad UI's action bars instead, placed with Blizzard's own action bar editor:
+
+- `/click EQOTQuestItem` uses the item of the quest you follow, in combat too. Follow another quest
+  during a fight and it keeps the old item until the fight ends.
+- `/eqot next` and `/eqot prev` follow the next or previous quest, in the order this tracker shows
+  them, or through your tracked quests while the game's tracker is in use or this one is hidden.
+
+This was built from Blizzard's own code and has not been tested with a controller yet, so please
+tell us on CurseForge, GitHub or Discord if anything goes wrong. One known case: with EllesmereUI's
+Custom Quest Tracker or Questie's tracker installed, this addon stops hiding them while the game's
+tracker is in use, so theirs can come back, and if one of them hides the game's tracker the
+shortcut still reaches nothing.
+
+The same macros, and four key bindings in Key Bindings under the EQ Objective Tracker heading (Follow
+next quest, Follow previous quest, Use the followed quest's item, Show or hide the tracker), work on
+every game version from the keyboard.
+
 ## What it tracks
 
 - **Quests and Campaign**, in separate sections, with objectives, completion, and Find
@@ -214,6 +244,7 @@ events, which would otherwise not appear anywhere.
 | `/eqot lock` / `unlock` | Lock or unlock moving and resizing |
 | `/eqot reset` | Restore the default position and size |
 | `/eqot toggle` | Show or hide the tracker |
+| `/eqot next` / `prev` | Follow the next or previous quest the tracker shows |
 | `/eqot whatsnew` | Open the What's New window |
 | `/eqot status` | Print what each provider emitted and what reached the screen |
 | `/eqot bonushud` | Print what the bonus objectives HUD can see, or `test` to place it |

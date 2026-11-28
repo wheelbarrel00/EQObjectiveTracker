@@ -1900,6 +1900,31 @@ function Tracker:DragRows()
     return _dragRows
 end
 
+-- The drawn quests in screen order, for /eqot next and /eqot prev, copied as drawn since entries are
+-- pooled. Reset by Render beside _dragCount. Render skips a hidden window, so the lists go stale there
+-- and FollowOrder hands back nil.
+local followMain = { ids = {}, provs = {}, n = 0 }
+local followWQ   = { ids = {}, provs = {}, n = 0 }
+local function noteFollow(list, entry)
+    local p = ns:GetModule("Registry"):Get(entry.providerID)
+    if not (p and p.idSpace == "quest") then return end
+    list.n = list.n + 1
+    list.ids[list.n], list.provs[list.n] = entry.id, entry.providerID
+end
+
+function Tracker:FollowOrder(ids, provs)
+    local f = self.frame
+    if not f or f._eqotHidden or f._eqotPendingRender or not f:IsShown() then return nil end
+    local cfg = ns:GetModule("DB"):Tracker()
+    local first, second = followMain, followWQ
+    if cfg and cfg.worldQuestsPosition == "top" then first, second = followWQ, followMain end
+    local n = 0
+    for i = 1, first.n do n = n + 1; ids[n], provs[n] = first.ids[i], first.provs[i] end
+    for i = 1, second.n do n = n + 1; ids[n], provs[n] = second.ids[i], second.provs[i] end
+    for i = n + 1, #ids do ids[i], provs[i] = nil, nil end
+    return n
+end
+
 -- The soonest deadline on screen, not merely whether one exists, because the tick rate is
 -- chosen from it below. Reset by Render before either loop that feeds it.
 local soonestExpiry
@@ -1978,6 +2003,7 @@ function Tracker:_RenderPinnedWorldQuests(group, cap, width, cfg)
         row:SetPoint("TOPLEFT", econtent, "TOPLEFT", 0, -y)
         y = y + Row:Render(row, entry, width, cfg) + gap
         noteFocus(entry, row)
+        noteFollow(followWQ, entry)
     end
     econtent:SetHeight(math.max(1, y))
 
@@ -2425,6 +2451,7 @@ function Tracker:Render()
     RowPool:Begin()
     ItemButtons:Begin()
     _dragCount = 0
+    followMain.n, followWQ.n = 0, 0
     PopupBoxes:ReleaseAll()
     Sections:HideAll()
     ZoneHeaders:Begin()
@@ -2580,6 +2607,7 @@ function Tracker:Render()
                             if entry.hasItem then ItemButtons:Want(entry.id, row) end
                             y = y + Row:Render(row, entry, width - left, cfg) + gap
                             noteFocus(entry, row)
+                            noteFollow(followMain, entry)
                             -- After Render, which is what stamps row._entry - DragDrop reads it
                             -- back off the row to scope a drag to its own section and zone.
                             if entry.providerID == dragProvider then

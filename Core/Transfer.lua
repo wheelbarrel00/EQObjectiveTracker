@@ -14,7 +14,7 @@ Transfer.MAX_UNPACKED = 65536
 
 -- Which trackers run stays the importer's own choice, and a manual order is one character's quest list.
 Transfer.LEFT_OUT = {
-    general = { useBlizzardTracker = true, hideQuestieTracker = true },
+    general = { useBlizzardTracker = true, hideQuestieTracker = true, blizzardTrackerOnGamepad = true },
     tracker = { manualOrder = true },
 }
 

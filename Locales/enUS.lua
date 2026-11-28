@@ -34,12 +34,14 @@ L["Cancel"] = true
 L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale, where the options window sits and After an update, which every character shares, and clears this character's collapsed sections, folded quests, hidden zones and pinned entries."] = true
 L["Reset position and size"] = true
 L["Returns the tracker to its default position and size."] = true
+L["The interface did not reload. Type /reload to finish."] = true
 L["Use Blizzard's quest tracker"] = true
 L["Switch to Blizzard's quest tracker? The interface will reload."] = true
 L["Switch back to the EQ Objective Tracker window? The interface will reload."] = true
 L["Yes"] = true
-L["The interface did not reload. Type /reload to finish."] = true
 L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."] = true
+L["Use Blizzard's tracker while the Gamepad UI is on"] = true
+L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."] = true
 L["Lock tracker"] = true
 L["Disable drag-to-move and resize."] = true
 L["Hide tracker in combat"] = true
@@ -596,6 +598,11 @@ L["Search settings"] = true
 L["No settings match"] = true
 L["Search results"] = true
 
+-- Core/Bindings.lua
+L["Follow next quest"] = true
+L["Follow previous quest"] = true
+L["Use the followed quest's item"] = true
+
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = true
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = true
@@ -664,6 +671,7 @@ L["tracker locked."] = true
 L["tracker unlocked."] = true
 L["position and size reset."] = true
 L["Blizzard's quest tracker is in use - see /eqot, General."] = true
+L["No quests to follow."] = true
 L["no Everything Quests configuration found to import."] = true
 L["Import from Everything Quests"] = true
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = true
@@ -671,6 +679,14 @@ L["commands:"] = true
 
 -- UI/Dialog.lua
 L["OK"] = true
+
+-- UI/GamepadPrompt.lua
+L["The Gamepad UI was switched, so the quest tracker should switch too. Reload the interface now?"] = true
+L["Reload"] = true
+L["Not now"] = true
+L["You are using the Gamepad UI. The game's own quest tracker works with a controller, and this one does not yet."] = true
+L["Use the game's quest tracker while the Gamepad UI is on? The interface reloads. You can change this later on the General tab."] = true
+L["No"] = true
 
 -- UI/QuestieCoexist.lua
 L["Questie's own quest tracker is on screen alongside this one.\n\nHide Questie's tracker? You can change this later on the General tab. This only hides the frame, and leaves Questie's settings and tracked quests alone."] = true

@@ -32,6 +32,25 @@ handlers.toggle = function()
     tracker():Toggle()
 end
 
+-- The window's drawn quests while it shows them, else the game's watch list.
+local followIds, followProvs = {}, {}
+local function step(dir)
+    local Walk = ns:GetModule("FollowWalk")
+    local n
+    if not ns:UsesBlizzardTracker() then n = tracker():FollowOrder(followIds, followProvs) end
+    if not n then n = Walk:WatchOrder(followIds, followProvs) end
+    local _, current = ns:GetModule("Focus"):Get()
+    local i = Walk:Pick(followIds, n, current, dir)
+    if not i then
+        ns:Print(L["No quests to follow."])
+        return
+    end
+    Walk:Follow(followProvs[i], followIds[i])
+end
+
+handlers.next = function() step(1) end
+handlers.prev = function() step(-1) end
+
 handlers.whatsnew = function()
     local WN = ns:GetModule("WhatsNew")
     if WN then WN:Show() end
@@ -100,9 +119,19 @@ handlers.status = function()
             (okCount and type(watched) == "number") and tostring(watched) or "?")
     end
     ns:Print(("tracker in use: %s | setting %s | %d module(s) standing down%s"):format(
-        ns:UsesBlizzardTracker() and "Blizzard's" or "EQ Objective Tracker",
+        ns:UsesBlizzardTracker() and (ns._blizzardTrackerWhy == "gamepad" and "Blizzard's (Gamepad UI)" or "Blizzard's")
+            or "EQ Objective Tracker",
         (gen and gen.useBlizzardTracker == true) and "Blizzard's" or "EQ Objective Tracker",
         ns.stoodDown or 0, frameState))
+    local Gamepad = ns:GetModule("Gamepad")
+    if Gamepad then
+        local function yn(v) return v and "yes" or "no" end
+        ns:Print(("gamepad: supported %s, saved on %s, live on %s, box %s"):format(yn(Gamepad:Supported()),
+            yn(Gamepad:SavedOn()), yn(Gamepad:LiveOn()),
+            (gen and gen.blizzardTrackerOnGamepad == true) and "on" or "off"))
+    end
+    debugLine("GamepadPrompt")
+    debugLine("QuestItemKey")
 
     -- Early, because a refused event registration explains a whole subsystem being silent
     -- and every counter below it would otherwise read as a clean zero.
@@ -358,6 +387,13 @@ local function importEQ()
     })
 end
 
+local dispatch
+
+-- Bindings.xml runs its commands through here, as the slash command does.
+function Commands:Run(msg)
+    if dispatch then dispatch(msg) end
+end
+
 function Commands:OnEnable()
     SLASH_EQOT1 = "/eqot"
     SLASH_EQOT2 = "/eqobjectivetracker"
@@ -520,8 +556,9 @@ function Commands:OnEnable()
         else
             -- The subcommands are literals the dispatcher matches, so they stay outside
             -- L. Only the word introducing them is translated.
-            ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, whatsnew, status, debug, "
+            ns:Print(L["commands:"] .. " lock, unlock, reset, toggle, next, prev, whatsnew, status, debug, "
                 .. "bonushud [test], mplus [test|late], popup [test], timer [test], importeq, modules, disable <m>, enable <m>")
         end
     end
+    dispatch = SlashCmdList["EQOT"]
 end

@@ -57,12 +57,26 @@ Options:RegisterTab({
         general:SetPoint("TOPLEFT")
         general:SetPoint("TOPRIGHT")
 
-        -- Saved only on Yes, right before the reload, so the choice on screen is always the
-        -- tracker actually running. Everything Quests offers the same box through Core/API.lua.
+        local Gamepad = ns:GetModule("Gamepad")
+        local function reload()
+            ReloadUI()
+            -- Expected to fire only if the client refused the reload. The choice is saved either way.
+            C_Timer.After(1, function()
+                ns:Print(L["The interface did not reload. Type /reload to finish."])
+            end)
+        end
+
+        -- Saved on Yes, right before the reload. A tick that changes no tracker, such as one the Gamepad
+        -- UI box already runs, saves quietly. Everything Quests offers the same box through Core/API.lua.
         local blizz
         blizz = self:CreateCheckbox(content, L["Use Blizzard's quest tracker"],
             function() return ns:GetModule("API"):GetBlizzardTrackerSetting() end,
             function(v)
+                local wanted = v or (DB:General().blizzardTrackerOnGamepad == true and Gamepad ~= nil and Gamepad:LiveOn())
+                if wanted == ns:UsesBlizzardTracker() then
+                    if not ns:GetModule("API"):SetBlizzardTrackerSetting(v) then blizz:SetChecked(not v) end
+                    return
+                end
                 local Dialog = ns:GetModule("Dialog")
                 if not Dialog then blizz:SetChecked(not v); return end
                 Dialog:Show({
@@ -73,11 +87,7 @@ Options:RegisterTab({
                     button2  = L["Cancel"],
                     onAccept = function()
                         if ns:GetModule("API"):SetBlizzardTrackerSetting(v) then
-                            ReloadUI()
-                            -- Expected to fire only if the client refused the reload. The choice is saved either way.
-                            C_Timer.After(1, function()
-                                ns:Print(L["The interface did not reload. Type /reload to finish."])
-                            end)
+                            reload()
                         else
                             blizz:SetChecked(not v)
                         end
@@ -87,6 +97,40 @@ Options:RegisterTab({
             end,
             L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."])
         general:Add(blizz)
+
+        if Gamepad and Gamepad:Supported() then
+            local pad
+            pad = self:CreateCheckbox(content, L["Use Blizzard's tracker while the Gamepad UI is on"],
+                function() return DB:General().blizzardTrackerOnGamepad == true end,
+                function(v)
+                    local gen = DB:General()
+                    local wanted = gen.useBlizzardTracker == true or (v and Gamepad:LiveOn())
+                    -- Only a change of tracker needs the reload, so a box ticked with the Gamepad UI off waits quietly.
+                    -- Either way the box answers the one-time question, so it is not asked again.
+                    if wanted == ns:UsesBlizzardTracker() then
+                        gen.blizzardTrackerOnGamepad = v
+                        ns.db.global.gamepadPromptAnswered = v and "yes" or "no"
+                        return
+                    end
+                    local Dialog = ns:GetModule("Dialog")
+                    if not Dialog then pad:SetChecked(not v); return end
+                    Dialog:Show({
+                        title    = "EQ Objective Tracker",
+                        text     = wanted and L["Switch to Blizzard's quest tracker? The interface will reload."]
+                            or L["Switch back to the EQ Objective Tracker window? The interface will reload."],
+                        button1  = L["Yes"],
+                        button2  = L["Cancel"],
+                        onAccept = function()
+                            gen.blizzardTrackerOnGamepad = v
+                            ns.db.global.gamepadPromptAnswered = v and "yes" or "no"
+                            reload()
+                        end,
+                        onCancel = function() pad:SetChecked(not v) end,
+                    })
+                end,
+                L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."])
+            general:Add(pad)
+        end
 
         local lock = self:CreateCheckbox(content, L["Lock tracker"],
             function() return DB:General().lockTracker end,

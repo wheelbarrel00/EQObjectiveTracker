@@ -5,6 +5,15 @@ All notable changes to EQ Objective Tracker will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.0] - 2026-11-27
+
+### New Features
+
+- Controller players on WoW Forever can now use the game's own quest tracker whenever Blizzard's Gamepad UI is on, and EQ Objective Tracker the rest of the time. Tick the new Use Blizzard's tracker while the Gamepad UI is on box on the General tab, or answer Yes when the tracker asks the first time it sees the Gamepad UI on. The game's own tracker works with a controller, so its Quest Tracker shortcut (LB+RB and D-pad Up), D-pad navigation and quest items all work, and Everything Quests' arrow keeps following the quest you follow. If the question is closed some other way it asks again at your next login, at most three times in all, until you click Yes or No. With the box ticked, turning the Gamepad UI on or off while you play asks to reload, since the tracker is picked when you log in. The box shows only on game versions that have the Gamepad UI. This was built from Blizzard's own code and has not been tested with a controller yet, so please tell us on CurseForge, GitHub or Discord if anything goes wrong.
+- A macro with /click EQOTQuestItem uses the item of the quest you follow, in combat too, on every game version. On WoW Forever, put it on a button of the Gamepad UI's action bars with Blizzard's own action bar editor to use quest items from your controller. If you follow another quest during a fight, the macro keeps the old item until the fight ends.
+- /eqot next and /eqot prev follow the next or previous quest in the order the tracker shows them, going round to the start after the last one, and skip quests in collapsed sections. While Blizzard's tracker is in use, or this one is hidden, they go through your tracked quests instead. Everything Quests' arrow moves with them on WoW Forever, Classic Era and TBC Anniversary.
+- New key bindings in Key Bindings, under the EQ Objective Tracker heading: Follow next quest, Follow previous quest, Use the followed quest's item, and Show or hide the tracker. While the Gamepad UI is on, addon key bindings may not reach controller buttons, so use the macros above there.
+
 ## [2.25.0] - 2026-11-27
 
 ### New Features

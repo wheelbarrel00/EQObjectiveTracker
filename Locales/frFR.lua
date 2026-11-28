@@ -35,12 +35,14 @@ L["Cancel"] = "Annuler"
 L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale, where the options window sits and After an update, which every character shares, and clears this character's collapsed sections, folded quests, hidden zones and pinned entries."] = "Restaure tous les réglages de tous les onglets par défaut et recharge l'interface. Cela réinitialise aussi l'Échelle de la fenêtre d'options, la position de cette fenêtre et « Après une mise à jour », communs à tous les personnages, ainsi que les sections repliées, les quêtes repliées, les zones masquées et les entrées épinglées sur ce personnage."
 L["Reset position and size"] = "Réinitialiser la position et la taille"
 L["Returns the tracker to its default position and size."] = "Ramène le module de suivi à sa position et à sa taille par défaut."
+L["The interface did not reload. Type /reload to finish."] = "L'interface n'a pas été rechargée. Tapez /reload pour terminer."
 L["Use Blizzard's quest tracker"] = "Utiliser le module de suivi de Blizzard"
 L["Switch to Blizzard's quest tracker? The interface will reload."] = "Passer au module de suivi de Blizzard? L'interface sera rechargée."
 L["Switch back to the EQ Objective Tracker window? The interface will reload."] = "Revenir à la fenêtre d'EQ Objective Tracker? L'interface sera rechargée."
 L["Yes"] = "Oui"
-L["The interface did not reload. Type /reload to finish."] = "L'interface n'a pas été rechargée. Tapez /reload pour terminer."
 L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."] = "Désactive la fenêtre d'EQ Objective Tracker et rétablit le module de suivi des quêtes du jeu lui-même. Les autres fonctionnalités d'EQ Objective Tracker, comme les sons de quête, restent actives. L'interface sera rechargée pour effectuer le changement."
+L["Use Blizzard's tracker while the Gamepad UI is on"] = "Utiliser le module de suivi de Blizzard quand l'interface manette est active"
+L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."] = "Utilise le module de suivi des quêtes du jeu, qui fonctionne avec une manette, tant que l'interface manette est active, et cette fenêtre le reste du temps. L'interface est rechargée lors du changement. Conçu d'après le code de Blizzard et pas encore testé avec une manette, merci donc de signaler tout problème."
 L["Lock tracker"] = "Verrouiller le module de suivi"
 L["Disable drag-to-move and resize."] = "Désactive le glisser-déposer et le recadrage."
 L["Hide tracker in combat"] = "Cacher le module de suivi pendant le combat"
@@ -597,6 +599,11 @@ L["Search settings"] = "Rechercher un réglage"
 L["No settings match"] = "Aucun réglage ne correspond"
 L["Search results"] = "Résultats de la recherche"
 
+-- Core/Bindings.lua
+L["Follow next quest"] = "Super-suivre la quête suivante"
+L["Follow previous quest"] = "Super-suivre la quête précédente"
+L["Use the followed quest's item"] = "Utiliser l'objet de la quête suivie"
+
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Copiez le lien ci-dessous (pré-sélectionné - faites juste Ctrl+C):"
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Rejoignez la communauté pour de l'aide, des suggestions, et des mises à jour.\nCopiez l'invitation ci-dessous (pré-sélectionnée - faites juste Ctrl+C):"
@@ -665,6 +672,7 @@ L["tracker locked."] = "Module verrouillé"
 L["tracker unlocked."] = "Module déverrouillé"
 L["position and size reset."] = "Position et taille réinitialisées"
 L["Blizzard's quest tracker is in use - see /eqot, General."] = "Le module de suivi de Blizzard est actif - voir /eqot, Général."
+L["No quests to follow."] = "Aucune quête à super-suivre."
 L["no Everything Quests configuration found to import."] = "Aucune configuration Everything Quests à importer"
 L["Import from Everything Quests"] = "Importer depuis Everything Quests"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "Réinitialiser ce profil par défaut et le remplacer par vos réglages du module de suivi Everything Quests?\n\nCette action est irréversible. Créez d'abord un nouveau profil si vous souhaitez conserver l'actuel."
@@ -672,6 +680,14 @@ L["commands:"] = "Commandes :"
 
 -- UI/Dialog.lua
 L["OK"] = "OK"
+
+-- UI/GamepadPrompt.lua
+L["The Gamepad UI was switched, so the quest tracker should switch too. Reload the interface now?"] = "L'interface manette a été changée, le module de suivi des quêtes doit donc changer aussi. Recharger l'interface maintenant?"
+L["Reload"] = "Recharger"
+L["Not now"] = "Pas maintenant"
+L["You are using the Gamepad UI. The game's own quest tracker works with a controller, and this one does not yet."] = "Vous utilisez l'interface manette. Le module de suivi des quêtes du jeu fonctionne avec une manette, celui-ci pas encore."
+L["Use the game's quest tracker while the Gamepad UI is on? The interface reloads. You can change this later on the General tab."] = "Utiliser le module de suivi du jeu tant que l'interface manette est active? L'interface se recharge. Vous pourrez changer cela plus tard dans l'onglet Général."
+L["No"] = "Non"
 
 -- UI/QuestieCoexist.lua
 L["Questie's own quest tracker is on screen alongside this one.\n\nHide Questie's tracker? You can change this later on the General tab. This only hides the frame, and leaves Questie's settings and tracked quests alone."] = "Le suivi de quêtes de Questie est affiché à l'écran en même temps que celui-ci.\n\nMasquer le suivi de Questie ? Vous pourrez changer cela plus tard dans l'onglet Général. Cela masque seulement le cadre et ne touche ni aux réglages de Questie ni aux quêtes qu'il suit."

@@ -9,6 +9,17 @@ local _, ns = ...
 -- edit CHANGELOG.md and re-run the generator.
 ns.Changelog = {
     {
+        version = "2.26.0", date = "2026-11-27",
+        sections = {
+            { head = "New Features", items = {
+                "Controller players on WoW Forever can now use the game's own quest tracker whenever Blizzard's Gamepad UI is on, and EQ Objective Tracker the rest of the time. Tick the new Use Blizzard's tracker while the Gamepad UI is on box on the General tab, or answer Yes when the tracker asks the first time it sees the Gamepad UI on. The game's own tracker works with a controller, so its Quest Tracker shortcut (LB+RB and D-pad Up), D-pad navigation and quest items all work, and Everything Quests' arrow keeps following the quest you follow. If the question is closed some other way it asks again at your next login, at most three times in all, until you click Yes or No. With the box ticked, turning the Gamepad UI on or off while you play asks to reload, since the tracker is picked when you log in. The box shows only on game versions that have the Gamepad UI. This was built from Blizzard's own code and has not been tested with a controller yet, so please tell us on CurseForge, GitHub or Discord if anything goes wrong.",
+                "A macro with /click EQOTQuestItem uses the item of the quest you follow, in combat too, on every game version. On WoW Forever, put it on a button of the Gamepad UI's action bars with Blizzard's own action bar editor to use quest items from your controller. If you follow another quest during a fight, the macro keeps the old item until the fight ends.",
+                "/eqot next and /eqot prev follow the next or previous quest in the order the tracker shows them, going round to the start after the last one, and skip quests in collapsed sections. While Blizzard's tracker is in use, or this one is hidden, they go through your tracked quests instead. Everything Quests' arrow moves with them on WoW Forever, Classic Era and TBC Anniversary.",
+                "New key bindings in Key Bindings, under the EQ Objective Tracker heading: Follow next quest, Follow previous quest, Use the followed quest's item, and Show or hide the tracker. While the Gamepad UI is on, addon key bindings may not reach controller buttons, so use the macros above there.",
+            } },
+        },
+    },
+    {
         version = "2.25.0", date = "2026-11-27",
         sections = {
             { head = "New Features", items = {
@@ -383,26 +394,6 @@ ns.Changelog = {
                 "Heroic dungeon quests, such as TBC Anniversary's heroic dailies, count as dungeon quests, so Tint cards by quest type gives them the Dungeon color too.",
                 "/eqot status reports the Dungeons header and Keep Dungeons at the bottom on its zone headers line, counting only the zones that draw a header, and Finished Quest Color and NEW Tag Color on its title color line.",
                 "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover every new option in this release, including the sort button, the Dungeons header and the two new colors.",
-            } },
-        },
-    },
-    {
-        version = "2.2.0", date = "2026-10-05",
-        sections = {
-            { head = "New Features", items = {
-                "Zone headers, on a new Zone Headers card on the Appearance tab. Show zone headers groups the quests in the Quests and Campaign sections under the quest log heading each one sits under, which is its zone for most quests. Each zone gets a header with a count, the way a section does, and collapses on its own, and expanding one scrolls it into view. Off by default. On retail the quest log heads campaign quests with the campaign's name, so the Campaign section shows a header for each campaign rather than one for each zone. On Classic Era and TBC Anniversary it groups the Quests section.",
-                "Zone Order, just under it, puts the zones with a quest on the map you are in first and the rest in the order your quest log lists them, or lists every zone in alphabetical order. Quests inside a zone still follow Sort Order, and with the manual sort order a quest is dragged within its own zone.",
-                "The zone headers have a look of their own on the same card: a size added on top of the Font Size, a color or your class color, an optional bar and divider line with colors of their own, and how far the quests under each header are moved in. The preview beside the settings shows two sample zones while zone headers are on. Reset to Defaults puts the look back without turning zone headers off or changing Zone Order.",
-                "With Keep section headers in view while scrolling on, the header of the zone you are scrolled into stays in view too, just under its section's header.",
-                "Two new options on the Tracker tab, on retail and WoW Forever. Click a focused quest to unfocus it, off by default, makes a click on the quest you are following unfocus it, or a click on its icon while Split quest click is on. Focus newly accepted quests, on by default because that is what the game does, can be turned off so a quest you accept while nothing is focused is left unfocused, which on WoW Forever also keeps the Everything Quests TomTom arrow from jumping to it. Like Keep focused quest after relog, it waits while Use Blizzard's quest tracker is on. Requested by jackfbrownii.",
-            } },
-            { head = "Improvements", items = {
-                "The zone label under quest titles is not shown while zone headers are on, since the header above already names the zone. The setting keeps its value, and its box on the Tracker tab is dimmed while zone headers are on, with a tooltip saying why.",
-                "/eqot status reports the zone headers, with their order, how many are collapsed and which zones count as the one you are in, and the two focus options, with how many times the game asked to focus a new quest while nothing was focused and how many of those focuses were taken back.",
-                "Every language stays fully translated. German, French, Russian, Korean, Simplified Chinese and Traditional Chinese cover every new option in this release, including zone headers and the two focus options.",
-            } },
-            { head = "Bug Fixes", items = {
-                "A color swatch at the end of a checkbox row on the Appearance tab, such as Bar Color beside Show header bars, no longer has its name run under the swatch.",
             } },
         },
     },

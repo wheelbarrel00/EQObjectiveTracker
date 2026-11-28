@@ -35,12 +35,14 @@ L["Cancel"] = "Отмена"
 L["Restores every setting on every tab to its default and reloads the interface. This also resets the Options Window Scale, where the options window sits and After an update, which every character shares, and clears this character's collapsed sections, folded quests, hidden zones and pinned entries."] = "Восстанавливает значения по умолчанию для всех настроек на всех вкладках и перезагружает интерфейс. Также сбрасываются «Масштаб окна настроек», положение окна настроек и «После обновления», общие для всех персонажей, а также свёрнутые разделы, свёрнутые задания, скрытые зоны и закреплённые записи этого персонажа."
 L["Reset position and size"] = "Сбросить положение и размер"
 L["Returns the tracker to its default position and size."] = "Возвращает трекер к положению и размеру по умолчанию."
+L["The interface did not reload. Type /reload to finish."] = "Интерфейс не был перезагружен. Введите /reload, чтобы завершить."
 L["Use Blizzard's quest tracker"] = "Использовать трекер заданий Blizzard"
 L["Switch to Blizzard's quest tracker? The interface will reload."] = "Переключиться на трекер заданий Blizzard? Интерфейс будет перезагружен."
 L["Switch back to the EQ Objective Tracker window? The interface will reload."] = "Вернуться к окну EQ Objective Tracker? Интерфейс будет перезагружен."
 L["Yes"] = "Да"
-L["The interface did not reload. Type /reload to finish."] = "Интерфейс не был перезагружен. Введите /reload, чтобы завершить."
 L["Turns off the EQ Objective Tracker window and brings back the game's own quest tracker. EQ Objective Tracker's other features, such as quest sounds, keep working. The interface reloads to switch."] = "Отключает окно EQ Objective Tracker и возвращает собственный трекер заданий игры. Остальные функции EQ Objective Tracker, например звуки заданий, продолжают работать. Для переключения интерфейс будет перезагружен."
+L["Use Blizzard's tracker while the Gamepad UI is on"] = "Использовать трекер Blizzard, пока включён интерфейс геймпада"
+L["Uses the game's own quest tracker, which works with a controller, whenever the Gamepad UI is on, and this window the rest of the time. The interface reloads to switch. Built from Blizzard's code and not yet tested with a controller, so please report anything that goes wrong."] = "Пока включён интерфейс геймпада, использует встроенный трекер заданий игры, который работает с контроллером, а в остальное время это окно. Для переключения интерфейс перезагружается. Сделано на основе кода Blizzard и ещё не проверено с контроллером, поэтому сообщайте обо всём, что работает не так."
 L["Lock tracker"] = "Заблокировать трекер"
 L["Disable drag-to-move and resize."] = "Отключить перетаскивание и изменение размера."
 L["Hide tracker in combat"] = "Скрывать трекер в бою"
@@ -597,6 +599,11 @@ L["Search settings"] = "Найти настройку"
 L["No settings match"] = "Нет подходящих настроек"
 L["Search results"] = "Результаты поиска"
 
+-- Core/Bindings.lua
+L["Follow next quest"] = "Выбрать следующее задание"
+L["Follow previous quest"] = "Выбрать предыдущее задание"
+L["Use the followed quest's item"] = "Использовать предмет выбранного задания"
+
 -- Core/Init.lua
 L["Copy the link below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Скопируйте ссылку ниже (она уже выделена - просто нажмите Ctrl+C):"
 L["Join the community for help, feedback, and updates.\nCopy the invite below (it's pre-selected \226\128\148 just press Ctrl+C):"] = "Присоединяйтесь к сообществу за помощью, отзывами и обновлениями.\nСкопируйте приглашение ниже (оно уже выделено - просто нажмите Ctrl+C):"
@@ -665,6 +672,7 @@ L["tracker locked."] = "Трекер заблокирован"
 L["tracker unlocked."] = "Трекер разблокирован"
 L["position and size reset."] = "Положение и размер сброшены"
 L["Blizzard's quest tracker is in use - see /eqot, General."] = "Используется трекер заданий Blizzard - см. /eqot, «Основные»."
+L["No quests to follow."] = "Нет заданий для выбора."
 L["no Everything Quests configuration found to import."] = "Не найдено настроек Everything Quests для импорта"
 L["Import from Everything Quests"] = "Импорт из Everything Quests"
 L["Reset this profile to defaults and replace it with your Everything Quests tracker settings?\n\nThis cannot be undone. Make a new profile first if you want to keep the current one."] = "Сбросить этот профиль к значениям по умолчанию и заменить его вашими настройками трекера из Everything Quests?\n\nЭто нельзя отменить. Сначала создайте новый профиль, если хотите сохранить текущий."
@@ -672,6 +680,14 @@ L["commands:"] = "Команды:"
 
 -- UI/Dialog.lua
 L["OK"] = "ОК"
+
+-- UI/GamepadPrompt.lua
+L["The Gamepad UI was switched, so the quest tracker should switch too. Reload the interface now?"] = "Интерфейс геймпада переключён, поэтому трекер заданий тоже нужно переключить. Перезагрузить интерфейс сейчас?"
+L["Reload"] = "Перезагрузить"
+L["Not now"] = "Не сейчас"
+L["You are using the Gamepad UI. The game's own quest tracker works with a controller, and this one does not yet."] = "Вы используете интерфейс геймпада. Встроенный трекер заданий игры работает с контроллером, а этот пока нет."
+L["Use the game's quest tracker while the Gamepad UI is on? The interface reloads. You can change this later on the General tab."] = "Использовать трекер заданий игры, пока включён интерфейс геймпада? Интерфейс будет перезагружен. Изменить это можно позже на вкладке «Основные»."
+L["No"] = "Нет"
 
 -- UI/QuestieCoexist.lua
 L["Questie's own quest tracker is on screen alongside this one.\n\nHide Questie's tracker? You can change this later on the General tab. This only hides the frame, and leaves Questie's settings and tracked quests alone."] = "Собственный трекер заданий Questie находится на экране рядом с этим.\n\nСкрыть трекер Questie? Позже это можно изменить на вкладке Общие. Скрывается только рамка, настройки Questie и отслеживаемые в нём задания остаются нетронутыми."
